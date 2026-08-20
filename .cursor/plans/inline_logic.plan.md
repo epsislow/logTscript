@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–14 complete."
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–16 complete.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -47,6 +47,12 @@ todos:
   - id: logic-mut-trace
     content: "Faza 14: logic-mut Signal Trace + doc/signal-trace.md — D69–D76 (completed)"
     status: completed
+  - id: logic-use-composition
+    content: "Faza 15: use strict + use once (1+g) — D77–D81 (completed)"
+    status: completed
+  - id: logic-filter-trace
+    content: "Faza 16: Filter Logic Signal Trace (1+t) — D82–D85 (completed)"
+    status: completed
 isProject: false
 ---
 
@@ -65,6 +71,7 @@ isProject: false
 | ❌ | Backlog **respins** definitiv |
 | 🟠✗ | Backlog **închis** — alternativa nu se face; livrat altfel |
 | ⏳ | Backlog **deschis** — încă amânat |
+| ⏸ | Backlog **pause** — nu se promovează fază; rămâne idee în backlog |
 
 ---
 
@@ -1187,6 +1194,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 13** Scale & perf (1+q) | D60–D68 | **(completed)** |
 | **Faza 14** Mutation Signal Trace (`logic-mut`) | D69–D76 | **(completed)** |
 | **Faza 15** Composiție `use` / `use once` (1+g) | D77–D81 | **(completed)** |
+| **Faza 16** Filter **Logic** Signal Trace (1+t) | D82–D85 | **(completed)** |
 
 ---
 
@@ -1213,7 +1221,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ### Faza 0 — Spec **(completed)**
 
-Toate deciziile D1–D19 confirmate. **Fazele 0–14 (completed).** Itemi amânați: [Backlog post-MVP](#backlog-post-mvp).
+Toate deciziile D1–D19 confirmate. **Fazele 0–15 (completed).** Itemi amânați: [Backlog post-MVP](#backlog-post-mvp).
 
 ---
 
@@ -3042,7 +3050,7 @@ logic-mut .<comp>: rollback — <code>: <message>
 - [x] Teste **3607–3618** legacy + wave; suite verde (**2780**)
 - [x] Doc **[`signal-trace.md`](../v0_3_2/doc/signal-trace.md)** — pagină dedicată; mutare din debug.md; secțiune **`logic-mut`**; logts-play; cross-linkuri + doc-viewer
 
-**Backlog (nu F14):** `mutationReason` text pout; constraint-as-query helper; `#K (line L)` la parse; filter **Logic** dedicat în UI.
+**Backlog (nu F14):** `mutationReason` text pout (**1+s**); constraint-as-query helper (**1+u**); `#K (line L)` la parse (**1+v** — pause); ~~filter **Logic** dedicat~~ → **Faza 16**.
 
 ---
 
@@ -3233,6 +3241,92 @@ La trecerea la **`use` strict**, orice exemplu sau test care **depindea** de ski
 
 ---
 
+## Decizii Faza 16 — Filter **Logic** Signal Trace (D82–D85) **(1+t)**
+
+> **Sursă:** F14 livrează `logic-mut` sub filter **Components** (și apare și la **Wires**); user vrea izolare dedicată pentru debug mutații logic.  
+> **Stare:** **D82–D85 confirmed** — F16 **(completed)**.
+
+### Rezumat decizii F16
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D82** | **A** | Filter **Logic** = doar `kind === 'logic-mut'` (deocamdata); viitor `logic-*` — reevaluăm când apare |
+| **D83** | **A** | `logic-mut` **doar** în filter **Logic**; **scos** din **Components** și **Wires** |
+| **D84** | **A** | `traceCategory: 'logic'` pentru `logic-mut` (`_inferTraceCategory` + `signal-propagation.js`) |
+| **D85** | **A** | **Out of scope F16:** **1+s** (`mutationReason` pout), **1+u** (constraint-as-query helper) — backlog separat |
+
+---
+
+### D82 — Scope filter **Logic** **(confirmed: A — doar `logic-mut`)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — `logic-mut` only (confirmed)** | Filter afișează exclusiv linii `kind === 'logic-mut'` |
+| **B — orice `logic-*` viitor** | Categorie extensibilă — **amânat**; reevaluare când apare alt trace kind |
+
+**Decizie:** **A** — suficient pentru MVP post-F14; extinderea la B se face când există un al doilea kind concret.
+
+---
+
+### D83 — Retragere din **Components** / **Wires** **(confirmed: A)**
+
+| Filter | Înainte (F14) | După F16 |
+|--------|---------------|----------|
+| **Wires** | include `logic-mut` | **fără** `logic-mut` |
+| **Components** | include `logic-mut` | **fără** `logic-mut` |
+| **Logic** *(nou)* | — | **doar** `logic-mut` |
+
+**Decizie:** **A** — scopul filterului Logic e să nu mai cauți mutații printre commit/prop/connect/lut-mut.
+
+---
+
+### D84 — Model categorie **`logic`** **(confirmed: A)**
+
+| Layer | Schimbare |
+|-------|-----------|
+| [`wave-listen-panel.js`](../v0_3_2/ui/wave-listen-panel.js) | `'logic'` în `SIGNAL_TRACE_FILTER_OPTIONS`; `_inferTraceCategory` → `'logic'` pentru `logic-mut`; branch `waveListenEntryMatchesFilter` |
+| [`signal-propagation.js`](../v0_3_2/core/signal-propagation.js) | `logic-mut` → `traceCategory: 'logic'` (nu `'component'`) |
+| [`script_editor_v0_3_2.html`](../v0_3_2/script_editor_v0_3_2.html) | `<option value="logic">Logic</option>` în Filter ▾ |
+
+**Persistență:** același key `prog/signalTraceFilter`; valoare nouă `'logic'`.
+
+**Decizie:** **A**.
+
+---
+
+### D85 — Ce **nu** intră în F16 **(confirmed: A)**
+
+| Backlog | Motiv amânare |
+|---------|---------------|
+| **1+s** | `mutationReason` text pout — API scriptabil separat |
+| **1+u** | constraint-as-query helper — workflow debug, nu filter UI |
+
+**Decizie:** **A** — F16 = doar filter toolbar + mapare categorie + doc.
+
+---
+
+### Implementare F16
+
+| Layer | Fișier | Acțiune |
+|-------|--------|---------|
+| UI | [`wave-listen-panel.js`](../v0_3_2/ui/wave-listen-panel.js) | filter `'logic'`; `_inferTraceCategory`; `waveListenEntryMatchesFilter` — D83 |
+| Propagation | [`signal-propagation.js`](../v0_3_2/core/signal-propagation.js) | `logic-mut` → category `'logic'` |
+| HTML | [`script_editor_v0_3_2.html`](../v0_3_2/script_editor_v0_3_2.html) | option Logic în select |
+| Doc | [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) | tabel Filter + coloană **Logic**; `logic-mut` nu mai sub Components |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3636+** — filter Logic izolează `logic-mut`; Components/Wires fără logic-mut |
+
+### Criterii done
+
+- [x] Decizii **D82–D85** implementate
+- [x] Filter **Logic** în toolbar; persist `prog/signalTraceFilter`
+- [x] `logic-mut` exclus din Wires + Components; vizibil doar la Logic (+ All)
+- [x] Doc **`signal-trace.md`** + `doc-data_generated.js` regen
+- [x] Teste **3636–3637**; suite verde (**2799**)
+
+**Backlog (nu F16):** **1+s**, **1+u**; extindere D82-B când apare alt `logic-*` kind.
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -3318,8 +3412,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 | Topic | ID backlog |
 |-------|------------|
-| Fazele 0–15 | **(completed)** |
+| Fazele 0–16 | **(completed)** |
+| **Faza 16** Filter Logic Signal Trace | **1+t** **(completed)** |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
+| Constraint `#K (line L)` trace | **1+v** **(pause)** |
 | `query = …` explicit | **1+l** |
 | `use` circular / nested | ~~**1+g**~~ → **Faza 15** |
 | POUT declarate comp | **1+k** |
@@ -3330,21 +3426,19 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | Validare constraints la query | **1+p** |
 | Quoted atoms `'John'` | D8 post-MVP |
 | `mutationReason` text pout | **1+s** |
-| Filter **Logic** Signal Trace | **1+t** |
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 14~~ **(completed)**
-2. ~~**Faza 15**~~ **`use` strict + `use once`** **(completed)**
-3. Apoi backlog: **1+r**, **1+l**, **1+p**, …
+1. ~~Faza 0~~ → ~~Faza 16~~ **(completed)**
+2. Apoi backlog: **1+r**, **1+l**, **1+p**, **1+s**, **1+u**, …
 
 ---
 
 ## Backlog post-MVP
 
-Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · 🟠✗ închis (alt mecanism) · ⏳ deschis.
+Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · 🟠✗ închis (alt mecanism) · ⏳ deschis · ⏸ pause.
 
 | Stare | ID | Subiect | Detaliu | Legat de |
 |-------|-----|---------|---------|----------|
@@ -3368,9 +3462,9 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ⏳ | **1+r** | **`comp [logic] data:`** | **`overlay`** (default F11) / **`copy`** / **`static`**; ex-D41-C seed | D41 |
 | ✅ | ~~**1+…**~~ | Mutation Signal Trace | **Promovat → Faza 14** — `logic-mut` | D69–D76 |
 | ⏳ | **1+s** | `mutationReason` text pout | Motiv scriptabil pe wire; F14 livrează trace `logic-mut` | F14 |
-| ⏳ | **1+t** | Filter **Logic** Signal Trace | Filter UI dedicat (azi: **Components**) | F14 |
+| ✅ | ~~**1+t**~~ | Filter **Logic** Signal Trace | **Promovat → Faza 16** — D82–D85 **(completed)** | F14, D82–D85 |
 | ⏳ | **1+u** | Constraint-as-query helper | Debug constraints ca query manual | F14 |
-| ⏳ | **1+v** | Constraint trace `#K (line L)` | Ordinal + line number la parse | F14 |
+| ⏸ | **1+v** | Constraint trace `#K (line L)` | **Pause** — nu se promovează fază; D72-A (`#K`) e suficient acum | F14, D72-B |
 
 ### Note backlog — explicații
 
@@ -3407,6 +3501,14 @@ Index facts, **`count/2`**, `indexFacts` / `indexRebuild` — vezi **Faza 13**.
 #### ~~**logic-mut trace**~~ → **Faza 14**
 
 Signal Trace **`logic-mut`** (try / commit / rollback) — vezi **Faza 14** + [`signal-trace.md`](../v0_3_2/doc/signal-trace.md).
+
+#### ~~**1+t**~~ → **Faza 16**
+
+Filter toolbar **Logic** dedicat — **`logic-mut` exclusiv** (D82–D85): scoase din Wires/Components; `traceCategory: 'logic'`. Vezi **Faza 16**.
+
+#### **1+v** ⏸ — pause
+
+Ideea D72-B (`#K (line L)` în rollback) rămâne în backlog; **nu** se promovează fază — ordinal **`#K`** (F14) e suficient deocamdata.
 
 #### **1+r** — `comp [logic] data:` (overlay / copy / static)
 

@@ -45,7 +45,8 @@ class SignalPropagationStrategy {
   _listenCategoryFor(kind, opts) {
     const o = opts || {};
     if (o.traceCategory) return o.traceCategory;
-    if (kind === 'lut-mut' || kind === 'logic-mut' || kind === 'prop' || kind === 'connect') return 'component';
+    if (kind === 'logic-mut') return 'logic';
+    if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
     if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
     if (o.isComponent && kind === 'commit') return 'component';
     if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
@@ -205,7 +206,7 @@ class SignalPropagationStrategy {
     interp.emitWaveListenLine(payload, 'phz');
   }
 
-  /** Logic mutation try / commit / rollback. Category filter: Components (L2). */
+  /** Logic mutation try / commit / rollback. Category filter: Logic (L2). */
   emitListenLogicMut(compName, detail, expandLines, minLevel = 2) {
     if (this.debugLevel < minLevel) return;
     const interp = this.interp;
@@ -222,7 +223,7 @@ class SignalPropagationStrategy {
     }
     const payload = {
       listenText: text,
-      traceCategory: 'component',
+      traceCategory: 'logic',
       phzExpandLines: expandLines && expandLines.length ? expandLines : null,
     };
     interp.emitWaveListenLine(payload, 'logic-mut');
@@ -2854,3 +2855,47 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   
 
 };
+
+function inferSignalTraceCategory(entry) {
+  if (!entry) return 'wire';
+  if (entry.traceCategory) return entry.traceCategory;
+  const kind = entry.kind || 'trace';
+  if (kind === 'phz') return 'phz';
+  if (kind === 'logic-mut') return 'logic';
+  if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
+  if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
+  if (entry.label === 'commit component' || entry.isComponent) return 'component';
+  if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
+  return 'wire';
+}
+
+function signalTraceEntryMatchesFilter(entry, filter) {
+  if (!filter || filter === 'all') return true;
+  if (entry.kind === 'meta' || entry.kind === 'status') return true;
+  const kind = entry.kind || 'trace';
+  const cat = inferSignalTraceCategory(entry);
+  if (filter === 'wires') {
+    if (kind === 'lut-mut') return true;
+    if (cat === 'wire') return true;
+    if (kind === 'init' || kind === 'flush') return true;
+    return false;
+  }
+  if (filter === 'components') {
+    if (kind === 'lut-mut') return true;
+    if (cat === 'component') return true;
+    if (kind === 'prop' || kind === 'connect') return true;
+    return false;
+  }
+  if (filter === 'logic') {
+    return kind === 'logic-mut' || cat === 'logic';
+  }
+  if (filter === 'internals') {
+    if (cat === 'internal') return true;
+    if (kind === 'schedule' || kind === 'eval' || kind === 'state') return true;
+    return false;
+  }
+  if (filter === 'phz') {
+    return cat === 'phz' || kind === 'phz';
+  }
+  return true;
+}

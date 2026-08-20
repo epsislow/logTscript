@@ -38496,20 +38496,29 @@ comp [logic] .whLogic:
     const p = new Parser(new Tokenizer(processed), registry);
     const stmts = p.parse();
     const lines = [];
+    const traceEntries = [];
     const expands = [];
     const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
     interp.waveListenActive = true;
-    interp.onWaveListenLine = function (payload) {
+    interp.onWaveListenLine = function (payload, kind) {
+      const k = kind || 'trace';
       if (payload && payload.listenText != null) {
         lines.push(payload.listenText);
+        traceEntries.push({
+          kind: k,
+          traceCategory: payload.traceCategory,
+          listenText: payload.listenText,
+          phzExpandLines: payload.phzExpandLines,
+        });
         if (payload.phzExpandLines) expands.push(payload.phzExpandLines);
       } else {
         lines.push(String(payload));
+        traceEntries.push({ kind: k, listenText: String(payload) });
       }
     };
     for (const s of stmts) interp.exec(s);
     interp.postExecSrc();
-    return { lines, expands, interp };
+    return { lines, traceEntries, expands, interp };
   }
 
   function _logicMutLines(lines) {
@@ -39107,6 +39116,50 @@ show(found)`;
     h.assert('found=1', interp.getWireEffectiveValue('found'), '1');
     h.assert('show 1', String(out.some((l) => l.includes('1'))), 'true');
   }, { propagation: 'wave' });
+
+  reg(3636, 'logic', 'Signal Trace logic-mut traceCategory logic', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { traceEntries } = _logicMutTraceLines(session, src, 2, 'legacy');
+    const mut = (traceEntries || []).filter((e) => e.kind === 'logic-mut');
+    h.assert('has logic-mut entries', String(mut.length >= 2), 'true');
+    h.assert('all category logic', String(mut.every((e) => e.traceCategory === 'logic')), 'true');
+  });
+
+  reg(3637, 'logic', 'Signal Trace filter Logic isolates logic-mut', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { traceEntries } = _logicMutTraceLines(session, src, 2, 'legacy');
+    const mut = (traceEntries || []).filter((e) => e.kind === 'logic-mut');
+    h.assert('logic filter shows mut', String(mut.every((e) => signalTraceEntryMatchesFilter(e, 'logic'))), 'true');
+    h.assert('components filter hides mut', String(mut.every((e) => !signalTraceEntryMatchesFilter(e, 'components'))), 'true');
+    h.assert('wires filter hides mut', String(mut.every((e) => !signalTraceEntryMatchesFilter(e, 'wires'))), 'true');
+    h.assert('all filter shows mut', String(mut.every((e) => signalTraceEntryMatchesFilter(e, 'all'))), 'true');
+  });
 
   window.LogTScriptTestSuite.finalize();
 })();

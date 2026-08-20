@@ -4,7 +4,7 @@ const WAVE_LISTEN_ARMED_KEY = 'prog/waveListenArmed';
 const WAVE_LISTEN_LEVEL_KEY = 'prog/waveListenLevel';
 const WAVE_LISTEN_FMT_KEY = 'prog/waveListenFmt';
 const SIGNAL_TRACE_FILTER_KEY = 'prog/signalTraceFilter';
-const SIGNAL_TRACE_FILTER_OPTIONS = ['all', 'wires', 'components', 'internals', 'phz'];
+const SIGNAL_TRACE_FILTER_OPTIONS = ['all', 'wires', 'components', 'logic', 'internals', 'phz'];
 const WAVE_LISTEN_MAX_LINES = 2000;
 
 const _waveListenState = {
@@ -94,10 +94,12 @@ function loadWaveListenPreferences() {
 }
 
 function _inferTraceCategory(entry) {
+  if (typeof inferSignalTraceCategory === 'function') return inferSignalTraceCategory(entry);
   if (entry.traceCategory) return entry.traceCategory;
   const kind = entry.kind || 'trace';
   if (kind === 'phz') return 'phz';
-  if (kind === 'lut-mut' || kind === 'logic-mut' || kind === 'prop' || kind === 'connect') return 'component';
+  if (kind === 'logic-mut') return 'logic';
+  if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
   if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
   if (entry.label === 'commit component' || entry.isComponent) return 'component';
   if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
@@ -105,21 +107,27 @@ function _inferTraceCategory(entry) {
 }
 
 function waveListenEntryMatchesFilter(entry, filter) {
+  if (typeof signalTraceEntryMatchesFilter === 'function') {
+    return signalTraceEntryMatchesFilter(entry, filter);
+  }
   if (!filter || filter === 'all') return true;
   if (entry.kind === 'meta' || entry.kind === 'status') return true;
   const kind = entry.kind || 'trace';
   const cat = _inferTraceCategory(entry);
   if (filter === 'wires') {
-    if (kind === 'lut-mut' || kind === 'logic-mut') return true;
+    if (kind === 'lut-mut') return true;
     if (cat === 'wire') return true;
     if (kind === 'init' || kind === 'flush') return true;
     return false;
   }
   if (filter === 'components') {
-    if (kind === 'lut-mut' || kind === 'logic-mut') return true;
+    if (kind === 'lut-mut') return true;
     if (cat === 'component') return true;
     if (kind === 'prop' || kind === 'connect') return true;
     return false;
+  }
+  if (filter === 'logic') {
+    return kind === 'logic-mut' || cat === 'logic';
   }
   if (filter === 'internals') {
     if (cat === 'internal') return true;

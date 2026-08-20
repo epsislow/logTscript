@@ -15,7 +15,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (`debugLevel` on propagation engine) |
 | **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
-| **Filter ▾** | All / Wires / Components / Internals / PHZ (persisted as `prog/signalTraceFilter`) |
+| **Filter ▾** | All / Wires / Components / **Logic** / Internals / PHZ (persisted as `prog/signalTraceFilter`) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
 
@@ -59,9 +59,11 @@ Legacy uses **`[step N]`** prefix (immediate cascade) instead of **`[wave N]`**.
 | **state** | `[step 3] state mem1[0] = ^0101` | L3 | Internals |
 | **phz** | `[step 2] phz spawn phz[obj] id=\1 floor=\0 → .room:inside (count 1)` | L2 (+ attrs `[+]` at L3) | PHZ |
 | **lut-mut** | `lut-mut .huff:clear → re-exec …` | L1 | Wires + Components |
-| **logic-mut** | `logic-mut .whLogic: try { … }` then `commit` or `rollback` | L2 | Components |
+| **logic-mut** | `logic-mut .whLogic: try { … }` then `commit` or `rollback` | L2 | **Logic** |
 
-**Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut, **logic-mut**; **Internals** — eval L3, block exec, state/mem, schedule (wave L3); **PHZ** — spawn / move / remove ownership events.
+**Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut; **Logic** — **`logic-mut`** only (`comp [logic]` mutation try / commit / rollback at L2+); **Internals** — eval L3, block exec, state/mem, schedule (wave L3); **PHZ** — spawn / move / remove ownership events.
+
+Use **Logic** when debugging `logic { + / - }` blocks without commit/prop/connect noise. **All** still includes every line kind.
 
 PHZ lines (L2+): spawn shows `id` + `floor` inline; other attributes appear under **`[+]`** at L3. Move/remove list type + id and destination — named `.cont:coll`, or `phz.[bin < cont]:inside id=\N (count N)` when the owning container is anonymous. See [phz.md](phz.md).
 
@@ -111,6 +113,7 @@ logic-mut .<comp>: rollback — <reason>
 | **Truncation** | At most **4** ops inline; extra ops shown as `… (+N)` with full list under **`[+]`** expand |
 | **Constraint fail** | `rollback — constraint inside/2 #K failed on + inside(…)` — **`#K`** is 1-based ordinal in the inline program |
 | **No `logic { }`** | **Zero** `logic-mut` lines (queries-only passes are silent) |
+| **Filter** | Select **Logic** in the Signal Trace toolbar to show only `logic-mut` lines |
 
 `mutationFailed` on the component remains a **1-bit** flag; the trace carries the human-readable reason.
 
