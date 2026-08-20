@@ -37451,7 +37451,7 @@ comp [logic] .whLogic:
 1wire trigger = 1
 
 .whLogic:{
-    logic { + located(box1, destWire) }
+    logic { + located(box1, text destWire) }
     hasLocated >= ok
     mutationFailed >= failed
     set = trigger
@@ -37474,7 +37474,7 @@ comp [logic] .whLogic:
 1wire trigger = 1
 
 .whLogic:{
-    logic { + located(box1, destWire) }
+    logic { + located(box1, text destWire) }
     hasLocated >= ok
     mutationFailed >= failed
     set = trigger
@@ -37561,6 +37561,509 @@ comp [logic] .whLogic:
 }`;
     const { interp } = session.run(srcFixed);
     h.assert('tombstone hides static', interp.getWireEffectiveValue('ok'), '0');
+  }, { propagation: 'wave' });
+
+  const INLINE_LOGIC_WAREHOUSE_C = `inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+    query where:
+        inside(box1, X)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:`;
+
+  const INLINE_LOGIC_WAREHOUSE_LOC = `inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    badDuplicate(O) <-
+        inside(O, c1),
+        inside(O, c2)
+
+    singleLocation(O) <-
+        \\+ badDuplicate(O)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container),
+        singleLocation(Object)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+    query where:
+        inside(box1, X)
+
+:`;
+
+  const INLINE_LOGIC_WAREHOUSE_CAP = `inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    badTriple(C) <-
+        inside(box1, C),
+        inside(box2, C),
+        inside(box3, C)
+
+    slotAvailable(C) <-
+        capacity(C, Max),
+        \\+ badTriple(C)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container),
+        slotAvailable(Container)
+
+    query thirdInC1:
+        inside(box3, c1)
+
+:`;
+
+  reg(3576, 'logic', 'parse constraint inside(X,Y) <= body', function(h) {
+    const prog = parseLogicBody('constraint inside(X, Y) <= object(X), container(Y)');
+    h.assert('one constraint', String((prog.constraints || []).length), '1');
+    h.assert('head pred', prog.constraints[0].head.predicate, 'inside');
+    h.assert('two goals', String(prog.constraints[0].body.length), '2');
+  });
+
+  reg(3577, 'logic', 'constraint init rejects invalid static KB', function(h, session) {
+    const src = `inline [logic] .bad:
+
+    object(box1)
+    inside(box1, ghost)
+
+    constraint inside(O, C) <= object(O), container(C)
+
+:
+
+comp [logic] .badLogic:
+    on: 1
+    .bad { }
+:`;
+    h.assertThrows('static violates constraints', function() {
+      session.run(src);
+    }, 'violates constraints');
+  });
+
+  reg(3578, 'logic', 'constraint + inside succeeds when valid', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('two in c1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3579, 'logic', 'constraint fail rollback mutationFailed=1', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire still = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, ghost) }
+    stillAtC1 >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('unchanged', interp.getWireEffectiveValue('still'), '1');
+  });
+
+  reg(3580, 'logic', 'multiple constraints same predicate AND', function(h, session) {
+    const src = `inline [logic] .wh:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    allowed(box1, c1)
+
+    constraint inside(O, C) <= object(O), container(C)
+    constraint inside(O, C) <= allowed(O, C)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .wh { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1 no allowed', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('not added', interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3581, 'logic', 'constraint move atomic - inside + inside', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_LOC + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { out, interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('c2 char', interp.getWireEffectiveValue('where').slice(0, 8), '01100011');
+  });
+
+  reg(3582, 'logic', 'constraint capacity rejects third inside', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_CAP + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('box3 not in c1', interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3583, 'logic', 'constraint body uses helper on proposed state', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_LOC + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c2) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('move box2 ok', interp.getWireEffectiveValue('failed'), '0');
+  });
+
+  reg(3584, 'logic', 'mutation text unknownWire fails transaction', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, text missingWire) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+  });
+
+  reg(3585, 'logic', 'mutation number wire decodes in fact', function(h, session) {
+    const src = `inline [logic] .nums:
+
+    object(box1)
+
+    constraint level(O, N) <= object(O), N >= 0, N =< 99
+
+    query hasLevel:
+        level(box1, 15)
+
+:
+
+comp [logic] .numLogic:
+    on: 1
+    .nums { }
+:
+
+8wire scoreIn = 00001111
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.numLogic:{
+    logic { + level(box1, number scoreIn) }
+    hasLevel >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('level 15', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3586, 'logic', 'mutation bare id is atom even if wire exists', function(h, session) {
+    const src = `inline [logic] .wh:
+
+    object(box1)
+    container(c1)
+    container(container2)
+
+    constraint inside(O, C) <= object(O), container(C)
+
+    query inC2:
+        inside(box1, container2)
+
+:
+
+8wire container2 = 01100011
+
+comp [logic] .whLogic:
+    on: 1
+    .wh { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, container2) }
+    inC2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0 atom container2', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('in atom container2', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3587, 'logic', 'constraint + inside succeeds when valid (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('two in c1', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3588, 'logic', 'constraint fail rollback (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, ghost) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3589, 'logic', 'constraint move atomic (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_LOC + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('c2 char', interp.getWireEffectiveValue('where').slice(0, 8), '01100011');
+  }, { propagation: 'wave' });
+
+  reg(3590, 'logic', 'constraint capacity rejects third (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_CAP + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3591, 'logic', 'mutation number wire (wave)', function(h, session) {
+    const src = `inline [logic] .nums:
+
+    object(box1)
+
+    constraint level(O, N) <= object(O), N >= 0, N =< 99
+
+    query hasLevel:
+        level(box1, 15)
+
+:
+
+comp [logic] .numLogic:
+    on: 1
+    .nums { }
+:
+
+8wire scoreIn = 00001111
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.numLogic:{
+    logic { + level(box1, number scoreIn) }
+    hasLevel >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('level 15', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3592, 'logic', 'duplicate inside without remove fails singleLocation', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_LOC + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, c2) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1 duplicate location', interp.getWireEffectiveValue('failed'), '1');
+  });
+
+  reg(3593, 'logic', 'duplicate inside without remove fails singleLocation (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_LOC + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, c2) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
   }, { propagation: 'wave' });
 
   window.LogTScriptTestSuite.finalize();

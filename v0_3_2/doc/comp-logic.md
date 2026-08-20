@@ -752,6 +752,8 @@ Change the effective knowledge base on each solve pass without editing `inline [
 
 Mutations run **before** query redirects in the same pass. The dynamic store **persists** across `set` triggers on the same component.
 
+**Constraints** (`constraint P <= Body` in inline) validate init and each mutation commit — [logic-constraints.md](logic-constraints.md).
+
 ```logts-play
 inline [logic] .warehouse:
 
@@ -810,4 +812,5 @@ Several property blocks may target the same component. Query result slots are **
 
 - Knowledge definition → [inline-logic.md](inline-logic.md)
 - Static vs dynamic KB, tombstones, mutations → [logic-runtime.md](logic-runtime.md)
+- Constraints, validation, wire prefixes in mutation → [logic-constraints.md](logic-constraints.md)
 - Similar two-layer model → [plc.md](plc.md), [asm.md](asm.md)

@@ -21,6 +21,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across `set` passes on the same component |
 | **`.world:query`** | Reads **static inline only** — not the component dynamic overlay |
+| **Wire in mutation** | `text w` / `number w` / `bool w` — bare id = atom |
+| **Constraints** | `constraint P <= Body` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
 
@@ -74,13 +76,15 @@ Facts use the same syntax as inline ground facts: `predicate(arg1, arg2)`.
 
 ### Ground facts only
 
-Every argument must be **ground** (atom, number, or compound of ground terms). Variables and wires that decode to unbound logic variables are rejected.
+Every argument must be **ground** (atom, number, or compound of ground terms). Variables are rejected.
 
 | Attempt | Result |
 |---------|--------|
-| `+ inside(box1, c2)` | Success |
+| `+ inside(box1, c2)` | Success — bare identifiers are atoms |
 | `+ inside(box1, X)` | **Transaction fails** — `mutationFailed = 1`, store unchanged |
-| `+ located(box1, destWire)` with `40wire destWire = …` | Success — wire resolved to atom **before** ground check |
+| `+ located(box1, text destWire)` | Success — wire decoded to atom before ground check |
+| `+ level(box1, number scoreIn)` | Success — wire decoded to integer |
+| `+ inside(box2, text missingWire)` | **Fails** — wire not found |
 
 ### Idempotent add (D43)
 
@@ -121,8 +125,9 @@ sequenceDiagram
 | Step | What runs |
 |------|-----------|
 | 1 | Wire → pin assignments (`myX = scoreIn`) |
-| 2 | Collect all `logic { }` blocks in this exec block; resolve wire names in fact args |
+| 2 | Collect all `logic { }` blocks; resolve **`text`/`number`/`bool` wire** refs |
 | 3 | **Atomic transaction** — all `+`/`-` succeed or none apply |
+| 3b | **[Constraints]** validate proposed KB — see [logic-constraints.md](logic-constraints.md) |
 | 4 | Build runtime clauses from static + dynamic store |
 | 5 | Run **all** named queries from inline (with pin input env) |
 | 6 | Write query and pout redirects |
@@ -345,9 +350,9 @@ After **Load & Run**: **`ok = 0`** — static fact hidden by tombstone, not dele
 
 ---
 
-## Example — wire argument in mutation
+## Example — wire prefix in mutation
 
-Wire values decode to atoms or numbers before the ground check (same encoding as pin inputs).
+Use **`text`**, **`number`**, or **`bool`** before a wire name. Bare identifiers are **atoms** (even when a homonymous wire exists).
 
 ```logts-play
 inline [logic] .warehouse:
@@ -368,7 +373,7 @@ comp [logic] .whLogic:
 1wire trigger = 1
 
 .whLogic:{
-    logic { + located(box1, destWire) }
+    logic { + located(box1, text destWire) }
     hasLocated >= ok
     mutationFailed >= failed
     set = trigger
@@ -376,6 +381,11 @@ comp [logic] .whLogic:
 ```
 
 After **Load & Run**: **`ok = 1`**, **`failed = 0`** — `destWire` encodes atom **`zone2`**.
+
+```logts
+logic { + inside(box1, container2) }    /* atom container2 */
+logic { + inside(box1, text container2) } /* wire container2 → atom from bits */
+```
 
 ---
 
@@ -489,5 +499,6 @@ Mutation and query results are intended to be **identical** under **wave** and *
 ## Related
 
 - [inline-logic.md](inline-logic.md) — static facts, rules, queries
+- [logic-constraints.md](logic-constraints.md) — `constraint` validation, `<=` vs `<-`
 - [comp-logic.md](comp-logic.md) — pins, redirects, pouts, policies
 - [logic-query-exec.md](logic-query-exec.md) — `.world:query` on static inline KB

@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-constraints.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -12079,6 +12079,8 @@ Change the effective knowledge base on each solve pass without editing \`inline 
 
 Mutations run **before** query redirects in the same pass. The dynamic store **persists** across \`set\` triggers on the same component.
 
+**Constraints** (\`constraint P <= Body\` in inline) validate init and each mutation commit — [logic-constraints.md](logic-constraints.md).
+
 \`\`\`logts-play
 inline [logic] .warehouse:
 
@@ -12137,6 +12139,7 @@ Several property blocks may target the same component. Query result slots are **
 
 - Knowledge definition → [inline-logic.md](inline-logic.md)
 - Static vs dynamic KB, tombstones, mutations → [logic-runtime.md](logic-runtime.md)
+- Constraints, validation, wire prefixes in mutation → [logic-constraints.md](logic-constraints.md)
 - Similar two-layer model → [plc.md](plc.md), [asm.md](asm.md)
 `,
     'component-color-attributes.md': `# Component color attributes
@@ -19967,6 +19970,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
 | **Composition** | \`use .otherModule\` merges facts and rules (not queries) |
+| **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | \`doc(inline.logic)\`, \`doc(.myModule)\` |
 
 ---
@@ -20220,6 +20224,7 @@ show(doc(.character))
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
 - Static vs dynamic KB, \`logic { + / - }\`, tombstones → [logic-runtime.md](logic-runtime.md)
+- Constraints \`<=\` vs rules \`<-\` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)
 `,
@@ -22220,6 +22225,403 @@ comp [led] .name:
 - The \`color\` attribute applies to all LEDs in the group. Individual LED colors are not supported within a single component — declare separate \`led\` components for different colors.
 - \`nl\` places a line break after the **last** LED in the group.
 `,
+    'logic-constraints.md': `# Logic constraints — validate runtime state
+
+\`constraint\` declarations in \`inline [logic]\` define **which ground facts are allowed** in the effective knowledge base. Validation runs at **component init** (static facts) and at **mutation commit** (proposed state after \`logic { + / - }\`).
+
+Runtime mutations and overlay → [logic-runtime.md](logic-runtime.md). Component wiring → [comp-logic.md](comp-logic.md). Inline syntax → [inline-logic.md](inline-logic.md).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (\`on: 1\` on the component).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Syntax** | \`constraint Head <= Body\` in \`inline [logic]\` |
+| **Neck** | **\`<=\`** (validation) — not **\`<-\`** (derivation) |
+| **Same predicate** | Multiple \`constraint\` lines = **AND** (all must pass) |
+| **Relations** | Multiple rules with \`<-\` = **OR** (alternatives) |
+| **When validated** | Init (static KB) + each mutation commit (proposed KB) |
+| **Failure at init** | Elaboration error |
+| **Failure at commit** | ROLLBACK + \`mutationFailed = 1\` |
+| **Wire args in mutation** | \`text w\`, \`number w\`, \`bool w\` — bare id = atom |
+
+---
+
+## \`<-\` vs \`<=\`
+
+| Construct | Neck | Semantics |
+|-----------|------|-----------|
+| **Rule / relation** | \`<-\` | Derive knowledge — first matching clause wins (OR across clauses) |
+| **Constraint** | \`<=\` | Validate facts — **every** matching constraint declaration must succeed (AND) |
+
+\`\`\`logts
+canMove(X, Y) <- vehicle(X), road(Y)
+canMove(X, Y) <- robot(X), corridor(Y)
+
+constraint inside(O, C) <= object(O), container(C)
+constraint inside(O, C) <= allowed(O, C)
+\`\`\`
+
+- **\`canMove\`**: either vehicle+road **or** robot+corridor proves the goal.
+- **\`inside\` facts**: both constraint lines must succeed for each \`inside(...)\` fact in the KB.
+
+---
+
+## What constraints validate
+
+Constraints apply to **ground facts** in the effective KB (static ∪ dynamic adds, minus tombstones). They do **not** modify the world — they accept or reject a **proposed state**.
+
+\`\`\`text
+logic { + / - }  →  proposed KB  →  validate constraints  →  COMMIT or ROLLBACK
+\`\`\`
+
+| Pass | When |
+|------|------|
+| **Init** | All static ground facts must satisfy constraints when \`comp [logic]\` is elaborated |
+| **Commit** | Each **\`+\`** fact in the transaction is checked against constraints on the **full proposed KB** |
+
+Helper relations in the constraint body (e.g. \`slotAvailable(C)\`) run on the **proposed** clauses — the same engine as queries.
+
+---
+
+## Basic constraint
+
+\`\`\`logts
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`** — \`box2\` and \`c1\` exist.
+
+---
+
+## Commit failure — invalid container
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+
+    constraint inside(O, C) <= object(O), container(C)
+
+    query ghostInside:
+        inside(box1, ghost)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, ghost) }
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 1\`** — \`ghost\` is not a \`container/1\` fact; store unchanged.
+
+---
+
+## Init failure — static KB invalid
+
+If static facts violate constraints, elaboration fails before any exec pass:
+
+\`\`\`logts
+inline [logic] .bad:
+
+    object(box1)
+    inside(box1, ghost)
+
+    constraint inside(O, C) <= object(O), container(C)
+
+:
+
+comp [logic] .badLogic:
+    .bad { }
+:
+\`\`\`
+
+Error: static knowledge violates constraints.
+
+---
+
+## Multiple constraints (AND)
+
+\`\`\`logts-play
+inline [logic] .wh:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    allowed(box1, c1)
+
+    constraint inside(O, C) <= object(O), container(C)
+    constraint inside(O, C) <= allowed(O, C)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .wh { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 1\`**, **\`ok = 0\`** — \`allowed(box2, c1)\` is missing.
+
+---
+
+## Single location — atomic move
+
+Use a helper relation + negation to forbid two containers for one object:
+
+\`\`\`logts
+badDuplicate(O) <- inside(O, c1), inside(O, c2)
+singleLocation(O) <- \\+ badDuplicate(O)
+
+constraint inside(O, C) <= object(O), container(C), singleLocation(O)
+\`\`\`
+
+**Move** (remove + add in one transaction) succeeds; **add alone** while still at \`c1\` fails.
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    badDuplicate(O) <- inside(O, c1), inside(O, c2)
+    singleLocation(O) <- \\+ badDuplicate(O)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        singleLocation(O)
+
+    query where:
+        inside(box1, X)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`where\`** shows **\`c2\`**; **\`failed = 0\`**.
+
+---
+
+## Capacity — helper on proposed state
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    badTriple(C) <- inside(box1, C), inside(box2, C), inside(box3, C)
+    slotAvailable(C) <- capacity(C, Max), \\+ badTriple(C)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        slotAvailable(C)
+
+    query third:
+        inside(box3, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    third >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 1\`**, **\`ok = 0\`** — container already full in proposed state.
+
+---
+
+## Mutation wire prefixes (D59)
+
+In \`logic { }\`, a bare identifier is always a **logic atom**. To read a **LogTScript wire**, prefix with the decode type:
+
+| Form | Meaning |
+|------|---------|
+| \`box1\`, \`c1\` | Atoms (even if a wire with the same name exists) |
+| \`text destWire\` | Wire → ASCII atom |
+| \`number scoreIn\` | Wire → unsigned integer |
+| \`bool flag\` | Wire → 0/1 |
+
+\`\`\`logts-play
+inline [logic] .nums:
+
+    object(box1)
+
+    constraint level(O, N) <= object(O), N >= 0, N =< 99
+
+    query hasLevel:
+        level(box1, 15)
+
+:
+
+comp [logic] .numLogic:
+    on: 1
+    .nums { }
+:
+
+8wire scoreIn = 00001111
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.numLogic:{
+    logic { + level(box1, number scoreIn) }
+    hasLevel >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`**.
+
+Missing wire with prefix → transaction failure:
+
+\`\`\`logts
+logic { + inside(box2, text missingWire) }
+\`\`\`
+
+→ **\`mutationFailed = 1\`**.
+
+---
+
+## Pipeline with constraints
+
+\`\`\`mermaid
+sequenceDiagram
+  participant M as logic { + / - }
+  participant P as Proposed KB
+  participant V as Constraints
+  participant S as Store
+  participant Q as Queries
+
+  M->>P: apply all +/- (simulate)
+  P->>V: validate delta+ on full proposed KB
+  alt valid
+    V->>S: COMMIT
+  else invalid
+    V-->>M: ROLLBACK mutationFailed=1
+  end
+  S->>Q: execute queries
+\`\`\`
+
+Queries always run on the **committed** KB (unchanged if rollback).
+
+---
+
+## Wave and legacy
+
+Constraint and mutation results are intended to be **identical** under wave and legacy propagation. Automated tests cover both modes.
+
+---
+
+## Related
+
+- [logic-runtime.md](logic-runtime.md) — mutations, tombstones, overlay
+- [inline-logic.md](inline-logic.md) — facts, rules, queries
+- [comp-logic.md](comp-logic.md) — exec block, redirects, \`mutationFailed\`
+`,
     'logic-query-exec.md': `# Inline logic query — \`.world:query({ })\`
 
 Run **ad-hoc Prolog goals** on an \`inline [logic]\` instance **directly from a LogTScript expression**, without \`comp [logic]\`. Same goal syntax as a \`query name:\` body in [inline-logic.md](inline-logic.md). Return shape follows the **LHS wire** (scalar / vector / matrix), using the same encoding as [comp-logic.md](comp-logic.md) redirects.
@@ -22536,6 +22938,8 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across \`set\` passes on the same component |
 | **\`.world:query\`** | Reads **static inline only** — not the component dynamic overlay |
+| **Wire in mutation** | \`text w\` / \`number w\` / \`bool w\` — bare id = atom |
+| **Constraints** | \`constraint P <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
 
@@ -22589,13 +22993,15 @@ Facts use the same syntax as inline ground facts: \`predicate(arg1, arg2)\`.
 
 ### Ground facts only
 
-Every argument must be **ground** (atom, number, or compound of ground terms). Variables and wires that decode to unbound logic variables are rejected.
+Every argument must be **ground** (atom, number, or compound of ground terms). Variables are rejected.
 
 | Attempt | Result |
 |---------|--------|
-| \`+ inside(box1, c2)\` | Success |
+| \`+ inside(box1, c2)\` | Success — bare identifiers are atoms |
 | \`+ inside(box1, X)\` | **Transaction fails** — \`mutationFailed = 1\`, store unchanged |
-| \`+ located(box1, destWire)\` with \`40wire destWire = …\` | Success — wire resolved to atom **before** ground check |
+| \`+ located(box1, text destWire)\` | Success — wire decoded to atom before ground check |
+| \`+ level(box1, number scoreIn)\` | Success — wire decoded to integer |
+| \`+ inside(box2, text missingWire)\` | **Fails** — wire not found |
 
 ### Idempotent add (D43)
 
@@ -22636,8 +23042,9 @@ sequenceDiagram
 | Step | What runs |
 |------|-----------|
 | 1 | Wire → pin assignments (\`myX = scoreIn\`) |
-| 2 | Collect all \`logic { }\` blocks in this exec block; resolve wire names in fact args |
+| 2 | Collect all \`logic { }\` blocks; resolve **\`text\`/\`number\`/\`bool\` wire** refs |
 | 3 | **Atomic transaction** — all \`+\`/\`-\` succeed or none apply |
+| 3b | **[Constraints]** validate proposed KB — see [logic-constraints.md](logic-constraints.md) |
 | 4 | Build runtime clauses from static + dynamic store |
 | 5 | Run **all** named queries from inline (with pin input env) |
 | 6 | Write query and pout redirects |
@@ -22860,9 +23267,9 @@ After **Load & Run**: **\`ok = 0\`** — static fact hidden by tombstone, not de
 
 ---
 
-## Example — wire argument in mutation
+## Example — wire prefix in mutation
 
-Wire values decode to atoms or numbers before the ground check (same encoding as pin inputs).
+Use **\`text\`**, **\`number\`**, or **\`bool\`** before a wire name. Bare identifiers are **atoms** (even when a homonymous wire exists).
 
 \`\`\`logts-play
 inline [logic] .warehouse:
@@ -22883,7 +23290,7 @@ comp [logic] .whLogic:
 1wire trigger = 1
 
 .whLogic:{
-    logic { + located(box1, destWire) }
+    logic { + located(box1, text destWire) }
     hasLocated >= ok
     mutationFailed >= failed
     set = trigger
@@ -22891,6 +23298,11 @@ comp [logic] .whLogic:
 \`\`\`
 
 After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`** — \`destWire\` encodes atom **\`zone2\`**.
+
+\`\`\`logts
+logic { + inside(box1, container2) }    /* atom container2 */
+logic { + inside(box1, text container2) } /* wire container2 → atom from bits */
+\`\`\`
 
 ---
 
@@ -23004,6 +23416,7 @@ Mutation and query results are intended to be **identical** under **wave** and *
 ## Related
 
 - [inline-logic.md](inline-logic.md) — static facts, rules, queries
+- [logic-constraints.md](logic-constraints.md) — \`constraint\` validation, \`<=\` vs \`<-\`
 - [comp-logic.md](comp-logic.md) — pins, redirects, pouts, policies
 - [logic-query-exec.md](logic-query-exec.md) — \`.world:query\` on static inline KB
 `,

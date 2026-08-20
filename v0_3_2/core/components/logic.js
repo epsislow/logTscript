@@ -195,6 +195,25 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const merged = typeof logicResolveMerged === 'function'
       ? logicResolveMerged(prog.inst, ctx.inlineInstances)
       : prog.inst;
+
+    const maxDepth = this._parsePositiveIntAttr(attributes, 'maxDepth', name);
+    const maxSolutions = this._parsePositiveIntAttr(attributes, 'maxSolutions', name);
+
+    const validateStaticFn = typeof logicValidateStaticKnowledge === 'function'
+      ? logicValidateStaticKnowledge : null;
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const emptyStoreFn = typeof logicCreateDynamicStore === 'function' ? logicCreateDynamicStore : null;
+    if (validateStaticFn && buildFn && emptyStoreFn && (merged.constraints || []).length) {
+      const emptyStore = emptyStoreFn();
+      const staticClauses = buildFn(merged.clauses, emptyStore);
+      const execOpts = {};
+      if (maxDepth != null) execOpts.maxDepth = maxDepth;
+      if (maxSolutions != null) execOpts.maxSolutions = maxSolutions;
+      if (!validateStaticFn(merged.constraints, staticClauses, execOpts)) {
+        throw Error(`logic ${name}: static knowledge violates constraints (${prog.ref})`);
+      }
+    }
+
     const listGoalsFn = typeof logicListFreeVarsInGoals === 'function' ? logicListFreeVarsInGoals : null;
     const listGoalFn = typeof logicListFreeVarsInGoal === 'function' ? logicListFreeVarsInGoal : null;
     const queryGoalsFn = typeof logicQueryGoals === 'function' ? logicQueryGoals : null;
@@ -219,9 +238,6 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         queryMeta[q.name] = { freeVars: free };
       }
     }
-
-    const maxDepth = this._parsePositiveIntAttr(attributes, 'maxDepth', name);
-    const maxSolutions = this._parsePositiveIntAttr(attributes, 'maxSolutions', name);
 
     const compInfo = {
       type: 'logic',
@@ -329,26 +345,30 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return inputEnv;
   }
 
-  _resolveMutationTerm(term, ctx) {
+  _resolveMutationTerm(term, ctx, compName) {
     if (!term) return term;
-    if (term.kind === 'atom' && ctx.wires && ctx.wires.has(term.name)) {
-      const bits = ctx.getWireEffectiveValue(term.name) || '';
-      const inferFn = typeof logicInferBindType === 'function' ? logicInferBindType : null;
+    if (term.kind === 'wireRef') {
+      const wireName = term.wireName;
+      if (!ctx.wires || !ctx.wires.has(wireName)) {
+        throw Error(`logic ${compName}: mutation wire '${wireName}' not found`);
+      }
+      const bits = ctx.getWireEffectiveValue(wireName) || '';
       const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
-      if (inferFn && pinFn) return pinFn(bits, inferFn(bits.length));
+      if (!pinFn) throw Error('Logic engine is not loaded');
+      return pinFn(bits, term.bindType);
     }
     if (term.kind === 'compound') {
       return {
         kind: 'compound',
         predicate: term.predicate,
         arity: (term.args || []).length,
-        args: (term.args || []).map((a) => this._resolveMutationTerm(a, ctx)),
+        args: (term.args || []).map((a) => this._resolveMutationTerm(a, ctx, compName)),
       };
     }
     return term;
   }
 
-  _collectMutationOps(mutationBlocks, ctx) {
+  _collectMutationOps(mutationBlocks, ctx, compName) {
     const parseFn = typeof parseLogicMutationBlock === 'function' ? parseLogicMutationBlock : null;
     if (!parseFn || !mutationBlocks || !mutationBlocks.length) return [];
     const ops = [];
@@ -357,16 +377,24 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       for (const item of parsed) {
         ops.push({
           op: item.op,
-          head: this._resolveMutationTerm(item.head, ctx),
+          head: this._resolveMutationTerm(item.head, ctx, compName),
         });
       }
     }
     return ops;
   }
 
-  _applyMutations(comp, mutationBlocks, ctx) {
+  _applyMutations(comp, compName, mutationBlocks, ctx, merged) {
     const applyFn = typeof logicApplyMutationTransaction === 'function'
       ? logicApplyMutationTransaction : null;
+    const simFn = typeof logicSimulateMutationStore === 'function'
+      ? logicSimulateMutationStore : null;
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const validateFactsFn = typeof logicValidateConstraintsForFacts === 'function'
+      ? logicValidateConstraintsForFacts : null;
+    const deltaFn = typeof logicMutationDeltaPlusFacts === 'function'
+      ? logicMutationDeltaPlusFacts : null;
+
     if (!applyFn || !mutationBlocks || !mutationBlocks.length) {
       comp.mutationFailed = 0;
       return;
@@ -375,7 +403,40 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       comp.dynamicStore = typeof logicCreateDynamicStore === 'function'
         ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() };
     }
-    const ops = this._collectMutationOps(mutationBlocks, ctx);
+
+    let ops;
+    try {
+      ops = this._collectMutationOps(mutationBlocks, ctx, compName);
+    } catch (err) {
+      comp.mutationFailed = 1;
+      return;
+    }
+
+    for (const op of ops) {
+      if (!op || !op.head || !logicTermIsGround(op.head)) {
+        comp.mutationFailed = 1;
+        return;
+      }
+    }
+
+    const constraints = (merged && merged.constraints) || [];
+    if (constraints.length && simFn && buildFn && validateFactsFn && deltaFn) {
+      const proposedStore = simFn(comp.dynamicStore, ops);
+      if (!proposedStore) {
+        comp.mutationFailed = 1;
+        return;
+      }
+      const proposedClauses = buildFn(merged.clauses, proposedStore);
+      const deltaFacts = deltaFn(ops);
+      const execOpts = {};
+      if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
+      if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+      if (!validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts)) {
+        comp.mutationFailed = 1;
+        return;
+      }
+    }
+
     const result = applyFn(comp.dynamicStore, ops);
     comp.mutationFailed = result && result.success ? 0 : 1;
   }
@@ -389,7 +450,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
 
     const merged = resolveFn(inst, ctx.inlineInstances);
-    this._applyMutations(comp, mutationBlocks, ctx);
+    this._applyMutations(comp, compName, mutationBlocks, ctx, merged);
     const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
     const runtimeMerged = buildFn
       ? { ...merged, clauses: buildFn(merged.clauses, comp.dynamicStore) }

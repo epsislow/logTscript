@@ -2121,6 +2121,7 @@ class Interpreter {
         uses: prog.uses || [],
         queries: prog.queries || [],
         clauses: prog.clauses || [],
+        constraints: prog.constraints || [],
         bodyRaw: inline.bodyRaw,
       });
       return;

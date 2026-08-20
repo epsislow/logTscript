@@ -529,6 +529,7 @@ function logicFactClauseKey(clause) {
 
 function logicTermIsGround(term) {
   if (!term) return true;
+  if (term.kind === 'wireRef') return false;
   if (term.kind === 'var') return false;
   if (term.kind === 'compound') return (term.args || []).every(logicTermIsGround);
   if (term.kind === 'arith') return logicTermIsGround(term.left) && logicTermIsGround(term.right);
@@ -573,6 +574,117 @@ function logicApplyMutationTransaction(store, ops) {
   store.adds = nextAdds;
   store.tombstones = nextTombs;
   return { success: true };
+}
+
+function logicCloneDynamicStore(store) {
+  if (!store) return logicCreateDynamicStore();
+  return {
+    adds: new Map(store.adds || []),
+    tombstones: new Set(store.tombstones || []),
+  };
+}
+
+function logicSimulateMutationStore(store, ops) {
+  const sim = logicCloneDynamicStore(store);
+  const result = logicApplyMutationTransaction(sim, ops);
+  if (!result || !result.success) return null;
+  return sim;
+}
+
+function logicTermsEqualGround(a, b) {
+  if (!a || !b) return false;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'atom') return a.name === b.name;
+  if (a.kind === 'number') return a.value === b.value;
+  if (a.kind === 'compound') {
+    if (a.predicate !== b.predicate) return false;
+    const aa = a.args || [];
+    const bb = b.args || [];
+    if (aa.length !== bb.length) return false;
+    for (let i = 0; i < aa.length; i++) {
+      if (!logicTermsEqualGround(aa[i], bb[i])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function logicBindConstraintHead(cHead, factHead) {
+  if (!cHead || !factHead || cHead.kind !== 'compound' || factHead.kind !== 'compound') return null;
+  if (cHead.predicate !== factHead.predicate) return null;
+  const ca = cHead.args || [];
+  const fa = factHead.args || [];
+  if (ca.length !== fa.length) return null;
+  const env = {};
+  for (let i = 0; i < ca.length; i++) {
+    const cv = ca[i];
+    const fv = fa[i];
+    if (cv.kind === 'var') {
+      if (cv.name === '_') continue;
+      env[cv.name] = fv;
+    } else if (!logicTermsEqualGround(cv, fv)) {
+      return null;
+    }
+  }
+  return env;
+}
+
+function logicMatchingConstraints(factHead, constraints) {
+  if (!factHead || factHead.kind !== 'compound') return [];
+  const arity = (factHead.args || []).length;
+  return (constraints || []).filter((c) => {
+    const h = c && c.head;
+    return h && h.kind === 'compound'
+      && h.predicate === factHead.predicate
+      && (h.args || []).length === arity;
+  });
+}
+
+function logicValidateConstraintBody(bodyGoals, proposedClauses, inputEnv, options) {
+  if (!bodyGoals || !bodyGoals.length) return true;
+  const engine = new LogicEngine(proposedClauses || []);
+  if (options && options.maxDepth != null) engine.maxDepth = options.maxDepth;
+  if (options && options.maxSolutions != null) engine.maxSolutions = options.maxSolutions;
+  const solutions = engine.solveQuery(bodyGoals, inputEnv || {});
+  return solutions && solutions.length > 0;
+}
+
+function logicValidateFactConstraints(factHead, constraints, proposedClauses, options) {
+  const matching = logicMatchingConstraints(factHead, constraints);
+  if (!matching.length) return true;
+  for (const c of matching) {
+    const env = logicBindConstraintHead(c.head, factHead);
+    if (!env) return false;
+    if (!logicValidateConstraintBody(c.body, proposedClauses, env, options)) return false;
+  }
+  return true;
+}
+
+function logicCollectStaticGroundFacts(clauses) {
+  const out = [];
+  for (const c of clauses || []) {
+    if (c.body && c.body.length) continue;
+    if (c.head && logicTermIsGround(c.head)) out.push(c.head);
+  }
+  return out;
+}
+
+function logicValidateConstraintsForFacts(constraints, proposedClauses, facts, options) {
+  if (!constraints || !constraints.length) return true;
+  for (const fact of facts || []) {
+    if (!logicValidateFactConstraints(fact, constraints, proposedClauses, options)) return false;
+  }
+  return true;
+}
+
+function logicValidateStaticKnowledge(constraints, staticClauses, options) {
+  if (!constraints || !constraints.length) return true;
+  const facts = logicCollectStaticGroundFacts(staticClauses);
+  return logicValidateConstraintsForFacts(constraints, staticClauses, facts, options);
+}
+
+function logicMutationDeltaPlusFacts(ops) {
+  return (ops || []).filter((o) => o && o.op === 'add' && o.head).map((o) => o.head);
 }
 
 function executeLogicGoals(mergedDef, goals, inputEnv, options) {
@@ -764,6 +876,12 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicCreateDynamicStore = logicCreateDynamicStore;
   globalThis.logicBuildRuntimeClauses = logicBuildRuntimeClauses;
   globalThis.logicApplyMutationTransaction = logicApplyMutationTransaction;
+  globalThis.logicCloneDynamicStore = logicCloneDynamicStore;
+  globalThis.logicSimulateMutationStore = logicSimulateMutationStore;
+  globalThis.logicValidateStaticKnowledge = logicValidateStaticKnowledge;
+  globalThis.logicValidateConstraintsForFacts = logicValidateConstraintsForFacts;
+  globalThis.logicMutationDeltaPlusFacts = logicMutationDeltaPlusFacts;
+  globalThis.logicCollectStaticGroundFacts = logicCollectStaticGroundFacts;
   globalThis.logicFactClauseKey = logicFactClauseKey;
   globalThis.logicTermIsGround = logicTermIsGround;
 }
@@ -790,6 +908,12 @@ if (typeof module !== 'undefined' && module.exports) {
     logicCreateDynamicStore,
     logicBuildRuntimeClauses,
     logicApplyMutationTransaction,
+    logicCloneDynamicStore,
+    logicSimulateMutationStore,
+    logicValidateStaticKnowledge,
+    logicValidateConstraintsForFacts,
+    logicMutationDeltaPlusFacts,
+    logicCollectStaticGroundFacts,
     logicFactClauseKey,
     logicTermIsGround,
   };

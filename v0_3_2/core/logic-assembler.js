@@ -1,6 +1,7 @@
 /* ================= LOGIC ASSEMBLER (inline [logic]) ================= */
 
-const LOGIC_KEYWORDS = new Set(['query', 'use']);
+const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint']);
+const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number']);
 
 function logicError(msg, line) {
   if (line != null) throw new Error(`logic program line ${line}: ${msg}`);
@@ -108,6 +109,7 @@ class LogicParser {
     const uses = [];
     const queries = [];
     const clauses = [];
+    const constraints = [];
     while (!this.at('EOF')) {
       while (this.at('COMMA')) this.advance();
       if (this.at('EOF')) break;
@@ -127,10 +129,21 @@ class LogicParser {
         queries.push({ name: qName, goals });
         continue;
       }
+      if (this.at('KW', 'constraint')) {
+        this.advance();
+        const head = this.parseCompound();
+        if (!this.at('CMP', '=<')) {
+          logicError('constraint requires <= neck (write <= in source)', this.peek().line);
+        }
+        this.advance();
+        const body = this.parseBodyGoals();
+        constraints.push({ head, body });
+        continue;
+      }
       const clause = this.parseClause();
       clauses.push(clause);
     }
-    return { uses, queries, clauses };
+    return { uses, queries, clauses, constraints };
   }
 
   parseClause() {
@@ -227,6 +240,37 @@ class LogicParser {
     }
     return node;
   }
+
+  parseMutationTerm() {
+    if (this.at('ID') && LOGIC_MUTATION_BIND_TYPES.has(this.peek().value)) {
+      const bindType = this.advance().value;
+      if (!this.at('ID')) {
+        logicError(`expected wire name after ${bindType}`, this.peek().line);
+      }
+      const wireName = this.advance().value;
+      return { kind: 'wireRef', bindType, wireName };
+    }
+    return this.parseTerm();
+  }
+
+  parseMutationCompound() {
+    const predicate = this.expect('ID').value;
+    this.expect('LP');
+    const args = [];
+    if (!this.at('RP')) {
+      args.push(this.parseMutationTerm());
+      while (this.at('COMMA')) {
+        this.advance();
+        args.push(this.parseMutationTerm());
+      }
+    }
+    this.expect('RP');
+    return { kind: 'compound', predicate, args };
+  }
+
+  parseMutationFactHead() {
+    return this.parseMutationCompound();
+  }
 }
 
 function parseLogicBody(bodyRaw) {
@@ -309,6 +353,7 @@ function mergeLogicDefinitions(base, usedInst) {
     uses: [...(base.uses || [])],
     queries: [...(base.queries || [])],
     clauses: [...(base.clauses || []), ...(usedInst.clauses || [])],
+    constraints: [...(base.constraints || []), ...(usedInst.constraints || [])],
   };
   return merged;
 }
@@ -318,6 +363,7 @@ function logicResolveMerged(inlineInst, inlineInstances) {
     uses: inlineInst.uses || [],
     queries: inlineInst.queries || [],
     clauses: inlineInst.clauses || [],
+    constraints: inlineInst.constraints || [],
   };
   const seen = new Set();
   const queue = [...(def.uses || [])];
@@ -330,6 +376,7 @@ function logicResolveMerged(inlineInst, inlineInstances) {
       throw new Error(`logic use ${ref} must reference inline [logic]`);
     }
     def.clauses = def.clauses.concat(used.clauses || []);
+    def.constraints = def.constraints.concat(used.constraints || []);
     for (const u of used.uses || []) {
       if (!seen.has(u)) queue.push(u);
     }
@@ -347,6 +394,10 @@ function formatLogicInstanceDoc(name, inst) {
     } else {
       lines.push(`  ${head}`);
     }
+  }
+  for (const c of inst.constraints || []) {
+    const head = logicFormatCompound(c.head);
+    lines.push(`  constraint ${head} <= ${c.body.map(logicFormatGoal).join(', ')}`);
   }
   for (const q of inst.queries || []) {
     lines.push(`  query ${q.name}:`);
@@ -405,7 +456,12 @@ function formatLogicTypeDoc() {
 }
 
 function logicFingerprintProgram(inst) {
-  return JSON.stringify({ clauses: inst.clauses, queries: inst.queries, uses: inst.uses });
+  return JSON.stringify({
+    clauses: inst.clauses,
+    queries: inst.queries,
+    uses: inst.uses,
+    constraints: inst.constraints,
+  });
 }
 
 function parseLogicGoalsBlock(bodyRaw) {
@@ -435,15 +491,12 @@ function parseLogicMutationBlock(bodyRaw) {
     if (!rest.endsWith('.')) rest += '.';
     const tokens = logicTokenize(rest);
     const parser = new LogicParser(tokens);
-    const clause = parser.parseClause();
-    if (clause.body && clause.body.length) {
-      logicError('mutation must be a ground fact, not a rule', parser.peek().line);
-    }
+    const head = parser.parseMutationFactHead();
     if (parser.at('DOT')) parser.advance();
     if (!parser.at('EOF')) {
       logicError('unexpected tokens after mutation fact', parser.peek().line);
     }
-    ops.push({ op, head: clause.head });
+    ops.push({ op, head });
   }
   return ops;
 }
