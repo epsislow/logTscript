@@ -38853,5 +38853,19 @@ comp [logic] .whLogic:
     h.assert('no logic-mut wave', String(_logicMutLines(lines).length), '0');
   }, { propagation: 'wave' });
 
+  reg(3619, 'logic', 'doc(.warehouse) summary not full source', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + '\ndoc(.warehouse)';
+    const { out } = session.run(src);
+    h.assert('header', out[0], '.warehouse (inline [logic])');
+    h.assert('facts count', String(out.some((l) => l === '  facts: 9')), 'true');
+    h.assert('rules count', String(out.some((l) => l === '  rules: 0')), 'true');
+    h.assert('constraints count', String(out.some((l) => l === '  constraints: 1')), 'true');
+    h.assert('queries count', String(out.some((l) => l === '  queries: 3')), 'true');
+    h.assert('query name listed', String(out.some((l) => l === '    countC1')), 'true');
+    h.assert('constraint head listed', String(out.some((l) => l.includes('inside/2'))), 'true');
+    h.assert('predicate histogram', String(out.some((l) => l === '    object/1 (3)')), 'true');
+    h.assert('no full source dump', String(out.some((l) => l.includes('constraint inside(Object'))), 'false');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

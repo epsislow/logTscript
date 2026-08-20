@@ -17,7 +17,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts and rules (not queries) |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
-| **Doc helpers** | `doc(inline.logic)`, `doc(.myModule)` |
+| **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
 
 ---
 
@@ -206,7 +206,31 @@ inline [logic] .world:
 show(doc(.world))
 ```
 
-Use **Load** to inspect the module; **Load & Run** runs `show(doc(.world))` in the editor.
+Use **Load** to inspect the module summary via `doc(.world)`; **Load & Run** runs `show(doc(.world))` in the editor.
+
+`doc(.name)` prints counts and names — not the full inline source. Example:
+
+```text
+.world (inline [logic])
+
+  facts: 4
+  rules: 0
+  constraints: 0
+  queries: 2
+  uses: (none)
+
+  queries:
+    personWithoutAge
+    peterHasNoAge
+
+  predicates (facts):
+    age/2 (2)
+    person/1 (2)
+
+  execution:
+    definition only — no inline execution
+    ...
+```
 
 ---
 

@@ -387,27 +387,101 @@ function logicResolveMerged(inlineInst, inlineInstances) {
   return def;
 }
 
+function logicPredicateArityKey(head) {
+  if (!head || head.kind !== 'compound') return null;
+  const arity = head.arity != null ? head.arity : (head.args || []).length;
+  return `${head.predicate}/${arity}`;
+}
+
+function logicCountClauses(clauses) {
+  let facts = 0;
+  let rules = 0;
+  for (const c of clauses || []) {
+    if (c.body && c.body.length) rules++;
+    else facts++;
+  }
+  return { facts, rules };
+}
+
+function logicSummarizePredicates(clauses, wantFacts) {
+  const counts = new Map();
+  for (const c of clauses || []) {
+    const isFact = !c.body || !c.body.length;
+    if (wantFacts ? !isFact : isFact) continue;
+    const key = logicPredicateArityKey(c.head);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function logicSummarizeConstraintHeads(constraints) {
+  const counts = new Map();
+  for (const c of constraints || []) {
+    const key = logicPredicateArityKey(c && c.head);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
 function formatLogicInstanceDoc(name, inst) {
-  const lines = [`inline [logic] ${name}:`];
-  for (const u of inst.uses || []) lines.push(`  use ${u}`);
-  for (const c of inst.clauses || []) {
-    const head = logicFormatCompound(c.head);
-    if (c.body && c.body.length) {
-      lines.push(`  ${head} <- ${c.body.map(logicFormatGoal).join(', ')}`);
-    } else {
-      lines.push(`  ${head}`);
+  const lines = [`${name} (inline [logic])`, ''];
+  const { facts, rules } = logicCountClauses(inst.clauses);
+  const constraintCount = (inst.constraints || []).length;
+  const queryCount = (inst.queries || []).length;
+  const useCount = (inst.uses || []).length;
+
+  lines.push(`  facts: ${facts}`);
+  lines.push(`  rules: ${rules}`);
+  lines.push(`  constraints: ${constraintCount}`);
+  lines.push(`  queries: ${queryCount}`);
+  lines.push(`  uses: ${useCount ? useCount : '(none)'}`);
+
+  if (useCount) {
+    lines.push('');
+    lines.push('  compose:');
+    for (const u of inst.uses) lines.push(`    use ${u}`);
+  }
+
+  if (queryCount) {
+    lines.push('');
+    lines.push('  queries:');
+    for (const q of inst.queries) lines.push(`    ${q.name}`);
+  }
+
+  if (constraintCount) {
+    lines.push('');
+    lines.push('  constraints:');
+    for (const c of inst.constraints) {
+      const key = logicPredicateArityKey(c.head) || '?';
+      const idx = c.constraintIndex != null ? ` #${c.constraintIndex}` : '';
+      lines.push(`    ${key}${idx}`);
     }
   }
-  for (const c of inst.constraints || []) {
-    const head = logicFormatCompound(c.head);
-    lines.push(`  constraint ${head} <= ${c.body.map(logicFormatGoal).join(', ')}`);
+
+  const factPreds = logicSummarizePredicates(inst.clauses, true);
+  if (factPreds.length) {
+    lines.push('');
+    lines.push('  predicates (facts):');
+    for (const [key, n] of factPreds) lines.push(`    ${key} (${n})`);
   }
-  for (const q of inst.queries || []) {
-    lines.push(`  query ${q.name}:`);
-    lines.push(`    ${logicQueryGoals(q).map(logicFormatGoal).join(', ')}`);
+
+  const rulePreds = logicSummarizePredicates(inst.clauses, false);
+  if (rulePreds.length) {
+    lines.push('');
+    lines.push('  predicates (rules):');
+    for (const [key, n] of rulePreds) lines.push(`    ${key} (${n})`);
   }
-  lines.push('  :');
-  return lines.join('\n');
+
+  lines.push('');
+  lines.push('  execution:');
+  lines.push('    definition only — no inline execution');
+  lines.push('    compose: use .module merges facts, rules, constraints');
+  lines.push('    runtime: comp [logic] or .module:query({ … })');
+  lines.push('');
+  lines.push('  see doc(inline.logic)  doc(comp.logic)');
+  return lines;
 }
 
 function logicFormatCompound(c) {
