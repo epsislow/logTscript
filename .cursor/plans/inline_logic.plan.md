@@ -60,6 +60,11 @@ isProject: false
 | **(change)** | Alternativă validă, dar diferă de sketch / preferință arhitecturală |
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate |
 | **(completed)** | Decizie luată / implementată |
+| **1+a … 1+v** | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan) |
+| ✅ | Backlog **promovat / livrat** (fază completed) |
+| ❌ | Backlog **respins** definitiv |
+| 🟠✗ | Backlog **închis** — alternativa nu se face; livrat altfel |
+| ⏳ | Backlog **deschis** — încă amânat |
 
 ---
 
@@ -800,7 +805,7 @@ inline [logic] .world:
 :
 ```
 
-**Lint:** `use` circular → eroare elaborare (**1+g** pentru detectare avansată).
+**Lint (F15 / 1+g):** **`use .mod`** strict — ciclu sau revisit → eroare elaborare (lanț); **`use once .mod`** — skip dacă modul deja merged (analog PHP `#include_once`).
 
 ---
 
@@ -1158,73 +1163,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-## Amânate (post-MVP)
-
-| ID | Subiect | Detaliu | Legat de |
-|----|---------|---------|----------|
-| **1+a** | Inline-native (sketch v1) | `.people:johnOwns:0` direct pe inline, fără comp | D1 respins |
-| **1+b** | ~~Result policies~~ | **Promovat → Faza 10** (`;unique`, `first`, `last`, `;all`) | D10, D12a |
-| **1+c** | ~~Negation~~ | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
-| **1+d** | ~~Recursivitate + depth limit~~ | **Promovat → Faza 8** (D25–D29) | D5 |
-| **1+e** | ~~Facts dinamice runtime~~ | **Promovat → Faza 11** — `logic { + / - }`, tranzacții atomice, `mutationFailed` | D40–D49 |
-| **1+f** | ~~Multi-var vague~~ | **Mutat în Faza 5** — redirect matrix/vector | D12 |
-| **1+g** | `use` nested profund / circular deps | lint la elaborare | D16 |
-| **1+h** | ~~Invoke `.world:query({ goal })`~~ | **Promovat → Faza 9** (D30–D32) | D12, D30–D32 |
-| **1+i** | Cut | | D5 |
-| **1+j** | Integrare PHZ | | |
-| **1+k** | POUT declarate pe comp (D7-B) | Low priority — user: „nu prea il vad ca va fi facut”; probe/debug | D7 |
-| **1+l** | **`query = …` explicit** (D2-C) | Optimizare când A (toate query-urile) e prea lent; **nu redundant** cu redirect | D2 |
-| **1+m** | Inline mutation invoke | `.world:mutate({ + … - … })` — **D49=A**; **low priority**, puțin probabil | D49 |
-| **1+n** | `assert` / `retract` în body reguli | Prolog clasic în `<-` body — D40=A exec-only | D40 |
-| **1+o** | Persistență dynamic facts | retain / save-load între sesiuni; snapshot KB | D48 |
-| **1+p** | Validare constrângeri la query | read-only „is state legal?” fără mutație | D53 |
-| ~~**1+q**~~ | ~~Index pe dynamic facts~~ | **Promovat → Faza 13** — index facts, `count/2`, perf constraints | D60–D68 |
-| **1+r** | **`comp [logic] data:`** | **`overlay`** (default F11) / **`copy`** / **`static`**; ex-D41-C seed — impact D44/D45/D48 la **1+r** | D41 |
-
-### Note backlog — explicații (fără fază încă)
-
-#### ~~**1+e**~~ → **Faza 11**
-
-Sketch actualizat: **[`logic_runtime_mutation_n_constraint`](../my_ideas/logic_runtime_mutation_n_constraint)** — **`logic { + fact - fact }`** în exec block (nu `assert`/`retract` Prolog în reguli). Detaliu decizii **D40–D49** și implementare: vezi **Faza 11** mai jos.
-
-**Notă vs nota veche 1+e:** backlog-ul anterior presupunea `assert`/`retract` ca **goals** în reguli sau API intern. Sketch-ul nou mută mutația la **frontiera comp** (`comp [logic]` exec block), aliniat cu modelul ASM-like (circuit `set` + pout, nu execuție inline-native).
-
-#### ~~**1+h**~~ → **Faza 9**
-
-Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
-
-#### ~~**1+q**~~ → **Faza 13**
-
-Performanță runtime logic la volume mari: **index pe facts efective**, **`count/2`** pentru constraints (înlocuie helper-e `badTriple` / backtracking greoi), păstrând semantica F11/F12. Detaliu **D60–D68** mai jos.
-
-#### **1+r** — `comp [logic] data:` (overlay / copy / static)
-
-**F11 livrează doar `overlay`** (D41-A) — atribut **`data: overlay`** implicit, poate fi omis.
-
-**Amânat (1+r):** extindere header comp:
-
-```logts
-comp [logic] .whLogic:
-    data: overlay    # default — D41-A: static + dynamic + tombstone
-    data: copy       # ex-D41-B: copy-on-write la prima mutație
-    data: static     # read-only runtime: `logic { + / - }` = eroare elaborare sau no-op + mutationFailed
-```
-
-| Mod | Semnificație |
-|-----|--------------|
-| **`overlay`** | D41-A — KB = static ∖ tombstones ∪ dynamic |
-| **`copy`** | D41-B — clone static la prima mutație, apoi edit local |
-| **`static`** | Fără mutație — comp doar query/solve pe static (demo, probe) |
-
-**Ex-D41-C (seed):** model „inline copiat integral la init, fără overlay static live” — **nu** e același lucru cu `static`; rămâne variantă de evaluat în **1+r**. La implementare trebuie redesenate:
-
-| Decizie F11 (overlay) | Impact posibil sub seed/copy |
-|------------------------|------------------------------|
-| **D44-A** (`-` = asigură absent) | Poate deveni „delete din copie” vs tombstone |
-| **D45-A** (tombstone) | Poate fi **inutil** dacă tot static e deja copiat mutabil |
-| **D48-A** (pipeline) | Același flux, dar KB temp = copie completă |
-
-**Notă user:** deciziile se iau la faza **1+r**, nu blochează F11.
+> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet + note — [Backlog post-MVP](#backlog-post-mvp) (final plan).
 
 ---
 
@@ -1247,6 +1186,7 @@ comp [logic] .whLogic:
 | **Faza 12** Constraints | D50–D59 | **(completed)** |
 | **Faza 13** Scale & perf (1+q) | D60–D68 | **(completed)** |
 | **Faza 14** Mutation Signal Trace (`logic-mut`) | D69–D76 | **(completed)** |
+| **Faza 15** Composiție `use` / `use once` (1+g) | D77–D81 | **(completed)** |
 
 ---
 
@@ -1273,7 +1213,7 @@ comp [logic] .whLogic:
 
 ### Faza 0 — Spec **(completed)**
 
-Toate deciziile D1–D19 confirmate. **Fazele 0–6 (completed).** **Faza 7** așteaptă confirmare **D20–D24**. Amânate: **1+l**, **1+k**, **1+b** opțional.
+Toate deciziile D1–D19 confirmate. **Fazele 0–14 (completed).** Itemi amânați: [Backlog post-MVP](#backlog-post-mvp).
 
 ---
 
@@ -3106,6 +3046,193 @@ logic-mut .<comp>: rollback — <code>: <message>
 
 ---
 
+## Decizii Faza 15 — `use` strict + `use once` (D77–D81) **(1+g)**
+
+> **Sursă:** D16 merge `use` e livrat; lipsește lint circular + control user strict vs skip.  
+> **Stare:** **D77–D81 confirmed** — F15 **(completed)**.
+
+### Rezumat decizii F15
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D77** | **A** | **`use .mod`** — strict: target deja **`merged`** sau pe **`visiting`** → **o singură** eroare (D80); **stop** elaborare |
+| **D78** | **A** | **`use once .mod`** — modifier **`once`**: dacă `.mod` deja **`merged`** (sau pe **`visiting`**) → **skip** silențios |
+| **D79** | **A** | Modul lipsă / non-`[logic]` → **eroare** la **`use`** și **`use once`** (ca PHP `require`) |
+| **D80** | **A** | Mesaj unic: **`Cannot reuse inline logic .vehicles`** + lanț **`via .world → .vehicles → .world`**; **highlight** linia `use` care a eșuat |
+| **D81** | **A** | Un singur keyword **`use`** + modifier opțional **`once`**; `uses[]`: `{ ref, mode, line }` |
+
+**Syntax (confirmat):**
+
+```logts
+use .vehicles           ; strict (default)
+use once .vehicles      ; idempotent skip
+```
+
+**Analogie PHP:**
+
+| PHP | Logic |
+|-----|-------|
+| `#include` / `#require` | **`use .mod`** — obligatoriu; revisit/ciclu → fatal |
+| `#include_once` / `#require_once` | **`use once .mod`** — idempotent; revisit → skip |
+
+**Respinge:** keyword separat **`use-once`** / **`try-use`** — modifier **`once`** după **`use`**.
+
+---
+
+### D77 — `use` strict **(confirmed: A)**
+
+La `logicResolveMerged(root)` root-ul (ex. `.world`) intră în setul **`merged`** **înainte** de procesarea liniilor `use` / `use once`.
+
+Două seturi în merge:
+
+| Set | Semnificație |
+|-----|--------------|
+| **`visiting`** | Modul **deschis** — merge în curs (DFS); dependențele lui încă se rezolvă |
+| **`merged`** | Modul **închis** — clauzele lui sunt deja în KB |
+
+**Revisit** = ținta **`use .mod`** e deja în **`merged`** (modul fully merged). Exemple:
+
+- **`use .self`** pe același inline (root deja merged)
+- **`use .vehicles`** de două ori în același fișier (a doua linie = revisit strict)
+- muchie **back-edge** într-un graf acyclic dar cu **`use`** strict spre un strămoș deja merged
+
+**Ciclu** = ținta **`use .mod`** e pe stiva **`visiting`** dar **nu** încă în **`merged`** — re-intrare în lanț **înainte** de finish. Exemple:
+
+- `.a` **`use .b`**, `.b` **`use .a`**
+- `.a` **`use .a`** dacă root **nu** e considerat merged la prima muchie *(notă: cu root pre-merged, self strict lovește revisit, nu ciclu — ambele → eroare)*
+
+| Situație | `use .mod` |
+|----------|------------|
+| `.mod` nou (nu în `merged`, nu în `visiting`) | merge facts + rules + constraints; recursiv pe `uses` |
+| `.mod` în **`merged`** sau pe **`visiting`** | **Error** — mesaj unic D80; **stop** (fără runtime parțial) |
+
+**Intern:** algoritmul distinge **revisit** (`merged`) vs **ciclu** (`visiting` fără `merged`) — **userul vede același mesaj**; lanțul explică contextul.
+
+**Pre-producție:** inline/comp logic **nu sunt în producție** — nu există breaking-change policy; **`use`** devine strict, **`use once`** = escape explicit.
+
+---
+
+### D78 — `use once` **(confirmed: A)**
+
+Modifier **`once`** imediat după **`use`** (fără keyword nou).
+
+| Situație | `use once .mod` |
+|----------|-----------------|
+| `.mod` în **`merged`** | **skip** — fără eroare, fără re-merge |
+| `.mod` în **`visiting`** | **skip** — taie ciclul fără eroare |
+| `.mod` nou | merge ca la `use` strict, apoi `merged` |
+
+**Caz tipic:** `.a` **`use once .b`**, `.b` **`use once .a`** → KB = clauze `.a` + `.b`, o singură dată.
+
+**Mix:** `.a` **`use .b`**, `.b` **`use .a`** → **eroare** (muchie strictă închide ciclul).
+
+---
+
+### D79 — Referință invalidă **(confirmed: A)**
+
+Ambele forme: **`logic use .x must reference inline [logic]`** (mesaj existent).
+
+---
+
+### D80 — Mesaj eroare + highlight **(confirmed: A)**
+
+**O singură formă** — indiferent dacă detectarea internă e revisit sau ciclu:
+
+```text
+logic program line 5: Cannot reuse inline logic .vehicles
+  via .world → .vehicles → .world
+```
+
+| Parte | Conținut |
+|-------|----------|
+| **Prefix linie** | `logic program line N:` — linia **`use`** strict care a eșuat (editor highlight, ca restul erorilor logic) |
+| **Mesaj** | **`Cannot reuse inline logic .mod`** — `.mod` = ținta liniei care a eșuat |
+| **Lanț** | **`via .root → … → .mod`** — traseul DFS până la muchia fatală |
+
+**Exemple:**
+
+```logts
+inline [logic] .world:
+    use .vehicles
+    use .vehicles          ; line 5 — a doua linie strictă
+:
+```
+
+```text
+logic program line 5: Cannot reuse inline logic .vehicles
+  via .world → .vehicles
+```
+
+```logts
+inline [logic] .a:
+    use .b
+:
+inline [logic] .b:
+    use .a                  ; line 3 — muchia fatală când comp pe .a
+:
+```
+
+```text
+logic program line 3: Cannot reuse inline logic .a
+  via .a → .b → .a
+```
+
+**Stop joc:** eroarea oprește elaborarea/rularea; nu contează ce s-a merged înainte — user corectează și **run** din nou.
+
+**Implementare:** `uses[]` păstrează **`line`** la parse; `logicResolveMerged` aruncă cu `logicError(msg, useLine)` ([`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) — același pattern ca constraint/query errors).
+
+---
+
+### D81 — Parser + model **(confirmed: A)**
+
+- **Un** keyword **`use`**; după el, opțional modifier **`once`**, apoi **`.mod`**.
+- Gramatică: `use ('once')? DOT ID` → `uses: [{ ref: '.vehicles', mode: 'strict' | 'once', line: N }]`.
+- `formatLogicInstanceDoc` / `doc()` — afișează `use .x` vs `use once .x`.
+- **`logicResolveMerged`** — singur choke point (comp elaboration + `.world:query({ })`); propagă **`line`** la eroare.
+
+**Fără F15:** `maxUseDepth` — amânat (backlog separat dacă apare nevoia).
+
+---
+
+### Implementare F15
+
+| Layer | Fișier | Acțiune |
+|-------|--------|---------|
+| Parse | [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | modifier **`once`**; `uses[]` cu **`line`** + `mode`; `logicResolveMerged`; eroare D80 + highlight |
+| Runtime | [`components/logic.js`](../v0_3_2/core/components/logic.js) | (fără schimbări API — merge via `logicResolveMerged`) |
+| Invoke | [`interpreter.js`](../v0_3_2/core/interpreter.js) | același merge path |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3620+** — DAG valid, strict duplicate/cycle (mesaj D80 + **line**), `use once` OK, editor highlight smoke |
+| Doc | [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) | secțiune **`use` / `use once`** + exemple eroare |
+
+### Migrare teste / doc (audit pre-F15)
+
+La trecerea la **`use` strict**, orice exemplu sau test care **depindea** de skip-ul vechi trebuie **`use once`**.
+
+**Audit (2026-08-20):**
+
+| Zona | `use` găsit | Multiple / ciclu | Acțiune |
+|------|-------------|------------------|---------|
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **0** linii `use .…` în inline logic | — | nimic de migrat |
+| [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) | 1× `use .vehicles` (compoziție) | nu | **OK** — single strict `use` |
+| [`comp-logic.md`](../v0_3_2/doc/comp-logic.md), [`logic-runtime.md`](../v0_3_2/doc/logic-runtime.md), [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) | fără `use` în body | — | nimic |
+| [`doc-data_generated.js`](../v0_3_2/ui/doc-data_generated.js) | mirror inline-logic | nu | regen după update doc |
+
+**La implementare F15:** rerulează grep `^\s+use \.` + `use once` pe `v0_3_2/`; teste noi **3620+** acoperă explicit duplicate/cycle/`use once`.
+
+### Criterii done
+
+- [x] Decizii **D77–D81** implementate
+- [x] **`use`** strict → mesaj **`Cannot reuse inline logic .mod`** + lanț **`via …`**; highlight linie `use`
+- [x] **`use once`** → skip idempotent
+- [x] Modul invalid → eroare la ambele
+- [x] Audit teste/doc — nimic de migrat (2026-08-20)
+- [x] Teste **3620–3635** legacy + wave; suite verde (**2797**)
+- [x] Doc **`inline-logic.md`** + `doc-data_generated.js` regen
+
+**Backlog (nu F15):** `maxUseDepth`; lint `use` duplicate strict în același inline (opțional).
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -3180,37 +3307,132 @@ comp [logic] .peopleLogic:
 | Inputs | `X = age` direct | **Program:** `X is number myX`; **Exec:** `myX = scoreIn` (pin ← wire) |
 | Constants | Numeric IDs `owns(1,10)` | **Simboluri** `owns(john, chevy)` |
 | Comparisons | `GE(A, 18)` LogTScript | **`X >= 9`, `X =< 12`** logic syntax |
-| Composition | — | **`use .vehicles`** |
+| Composition | — | **`use .vehicles`** / **`use once .vehicles`** (F15) |
 | Analogie | — | **ASM-like**, not protocol |
 
 ---
 
 ## Riscuri / neclarități rămase
 
-| Topic | Status |
-|-------|--------|
-| `query = …` | **1+l** amânat |
-| Multi-var query | **Faza 5 (completed):** max 2 vars; matrix/vector + D12a + D12b + `::c` |
-| POUT declarate comp | **1+k** low priority |
-| `use` circular | lint la elaborare **1+g** |
-| boolean redirect | **D7a completed:** `isJohnOwner >= wire` |
-| Quoted atoms `'John'` | amânat post-MVP (D8) |
-| Negation `\+` | **Faza 7 (completed)** |
-| Depth / truncated / depthExceeded | **Faza 8 (completed)** |
-| Inline query `.world:query({ })` | **Faza 9 (completed)** — D30–D32 |
-| Result policies `;unique` / `;first` / `;last` | **Faza 10 (completed)** — D34–D38 |
-| Runtime mutation `logic { + / - }` | **Faza 11 (completed)** — D40–D49 |
-| `comp [logic] data:` copy/static/seed | **1+r** amânat |
-| Constraints `constraint P <= body` | **Faza 12 (completed)** — D50–D59 |
-| Scale / perf index + count (1+q) | **Faza 13 (completed)** — D60–D68 |
-| Mutation Signal Trace `logic-mut` | **Faza 14 (completed)** — D69–D76; doc [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) |
-| `"atom"` vs wire prefix în mutation | **D59-A (completed)** |
-| `assert`/`retract` în reguli | **1+n** amânat |
-| Inline `.world:mutate` | **1+m** amânat, low priority |
+Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
+
+| Topic | ID backlog |
+|-------|------------|
+| Fazele 0–15 | **(completed)** |
+| **`use` / `use once`** | **Faza 15** **(completed)** |
+| `query = …` explicit | **1+l** |
+| `use` circular / nested | ~~**1+g**~~ → **Faza 15** |
+| POUT declarate comp | **1+k** |
+| `comp [logic] data:` copy/static/seed | **1+r** |
+| `assert`/`retract` în reguli | ~~**1+n**~~ 🟠✗ — înlocuit de `logic { ± }` |
+| Inline `.world:mutate` | ~~**1+m**~~ ❌ — respins; mutație doar `comp [logic]` |
+| Persistență KB | **1+o** |
+| Validare constraints la query | **1+p** |
+| Quoted atoms `'John'` | D8 post-MVP |
+| `mutationReason` text pout | **1+s** |
+| Filter **Logic** Signal Trace | **1+t** |
 
 ---
 
 ## Ordine recomandată
 
 1. ~~Faza 0~~ → ~~Faza 14~~ **(completed)**
-2. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**, `mutationReason` pout, filter **Logic** dedicat în Signal Trace
+2. ~~**Faza 15**~~ **`use` strict + `use once`** **(completed)**
+3. Apoi backlog: **1+r**, **1+l**, **1+p**, …
+
+---
+
+## Backlog post-MVP
+
+Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · 🟠✗ închis (alt mecanism) · ⏳ deschis.
+
+| Stare | ID | Subiect | Detaliu | Legat de |
+|-------|-----|---------|---------|----------|
+| ❌ | **1+a** | Inline-native (sketch v1) | `.people:johnOwns:0` direct pe inline, fără comp — **respins** (D1) | D1 |
+| ✅ | ~~**1+b**~~ | Result policies | **Promovat → Faza 10** (`;unique`, `first`, `last`, `;all`) | D10, D12a |
+| ✅ | ~~**1+c**~~ | Negation | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
+| ✅ | ~~**1+d**~~ | Recursivitate + depth limit | **Promovat → Faza 8** (D25–D29) | D5 |
+| ✅ | ~~**1+e**~~ | Facts dinamice runtime | **Promovat → Faza 11** — `logic { + / - }`, `mutationFailed` | D40–D49 |
+| ✅ | ~~**1+f**~~ | Multi-var vague | **Mutat în Faza 5** — redirect matrix/vector | D12 |
+| ✅ | ~~**1+g**~~ | **`use` / `use once`** | **Promovat → Faza 15** — strict vs modifier **`once`** (D77–D81) | D16 |
+| ✅ | ~~**1+h**~~ | Invoke `.world:query({ goal })` | **Promovat → Faza 9** (D30–D32) | D12, D30–D32 |
+| ⏳ | **1+i** | Cut | Prolog cut — interacție NAF / depth | D5 |
+| ⏳ | **1+j** | Integrare PHZ | | |
+| ⏳ | **1+k** | POUT declarate pe comp (D7-B) | Low priority — probe/debug | D7 |
+| ⏳ | **1+l** | **`query = …` explicit** (D2-C) | Optimizare când rulezi toate query-urile e prea lent | D2 |
+| ❌ | ~~**1+m**~~ | Inline mutation invoke | **Respins** — `.world:mutate` pe inline **nu**; mutația rămâne în **`comp [logic]`** (`logic { ± }`, index, constraints) | D49 |
+| 🟠✗ | ~~**1+n**~~ | `assert` / `retract` în body reguli | **Închis** — nu Prolog în `<-`; livrat ca **`logic { + / - }`** în exec comp (F11) | D40 |
+| ⏳ | **1+o** | Persistență dynamic facts | retain / save-load între sesiuni; snapshot KB | D48 |
+| ⏳ | **1+p** | Validare constrângeri la query | read-only „is state legal?” fără mutație | D53 |
+| ✅ | ~~**1+q**~~ | Index pe dynamic facts | **Promovat → Faza 13** — index facts, `count/2`, perf constraints | D60–D68 |
+| ⏳ | **1+r** | **`comp [logic] data:`** | **`overlay`** (default F11) / **`copy`** / **`static`**; ex-D41-C seed | D41 |
+| ✅ | ~~**1+…**~~ | Mutation Signal Trace | **Promovat → Faza 14** — `logic-mut` | D69–D76 |
+| ⏳ | **1+s** | `mutationReason` text pout | Motiv scriptabil pe wire; F14 livrează trace `logic-mut` | F14 |
+| ⏳ | **1+t** | Filter **Logic** Signal Trace | Filter UI dedicat (azi: **Components**) | F14 |
+| ⏳ | **1+u** | Constraint-as-query helper | Debug constraints ca query manual | F14 |
+| ⏳ | **1+v** | Constraint trace `#K (line L)` | Ordinal + line number la parse | F14 |
+
+### Note backlog — explicații
+
+#### **1+a** ❌ — respins (inline-native)
+
+Query/redirect direct pe inline fără `comp [logic]` — **respins** (D1). Model ASM-like: inline = definiție, comp = runtime.
+
+#### ~~**1+g**~~ → **Faza 15**
+
+- **`use .mod`** — strict → mesaj unic **`Cannot reuse inline logic .mod`** + lanț; highlight linia `use` care a eșuat.
+- **`use once .mod`** — skip idempotent.
+- Implementare în **`logicResolveMerged`**; teste **3620+**; doc **`inline-logic.md`**.
+
+#### ~~**1+m**~~ ❌ — respins (mutație doar pe comp)
+
+**Respins:** invoke inline `.warehouse:mutate({ … })` — inline rămâne **definiție** (facts/rules/queries), fără engine de mutație. Runtime: **`comp [logic]`** — `logic { + / - }`, overlay/tombstone, constraints, `indexFacts`, Signal Trace. Analogie ASM: inline = ISA, comp = execuție.
+
+#### ~~**1+n**~~ 🟠✗ — închis (livrat ca `logic { ± }`)
+
+**Nu** `assert`/`retract` în body de regulă (side-effects în backtracking). Livrat **Faza 11:** mutație tranzacțională în exec block comp — același rol practic, model ASM-like.
+
+#### ~~**1+e**~~ → **Faza 11**
+
+Sketch: **[`logic_runtime_mutation_n_constraint`](../my_ideas/logic_runtime_mutation_n_constraint)** — **`logic { + fact - fact }`** în exec block. Vezi **Faza 11**.
+
+#### ~~**1+h**~~ → **Faza 9**
+
+Decizii **D30–D32** — vezi **Faza 9**.
+
+#### ~~**1+q**~~ → **Faza 13**
+
+Index facts, **`count/2`**, `indexFacts` / `indexRebuild` — vezi **Faza 13**.
+
+#### ~~**logic-mut trace**~~ → **Faza 14**
+
+Signal Trace **`logic-mut`** (try / commit / rollback) — vezi **Faza 14** + [`signal-trace.md`](../v0_3_2/doc/signal-trace.md).
+
+#### **1+r** — `comp [logic] data:` (overlay / copy / static)
+
+**F11 livrează doar `overlay`** (D41-A) — atribut **`data: overlay`** implicit, poate fi omis.
+
+**Amânat (1+r):** extindere header comp:
+
+```logts
+comp [logic] .whLogic:
+    data: overlay    # default — D41-A: static + dynamic + tombstone
+    data: copy       # ex-D41-B: copy-on-write la prima mutație
+    data: static     # read-only runtime: `logic { + / - }` = eroare elaborare sau no-op + mutationFailed
+```
+
+| Mod | Semnificație |
+|-----|--------------|
+| **`overlay`** | D41-A — KB = static ∖ tombstones ∪ dynamic |
+| **`copy`** | D41-B — clone static la prima mutație, apoi edit local |
+| **`static`** | Fără mutație — comp doar query/solve pe static (demo, probe) |
+
+**Ex-D41-C (seed):** model „inline copiat integral la init, fără overlay static live” — **nu** e același lucru cu `static`; rămâne variantă de evaluat în **1+r**. La implementare trebuie redesenate:
+
+| Decizie F11 (overlay) | Impact posibil sub seed/copy |
+|------------------------|------------------------------|
+| **D44-A** (`-` = asigură absent) | Poate deveni „delete din copie” vs tombstone |
+| **D45-A** (tombstone) | Poate fi **inutil** dacă tot static e deja copiat mutabil |
+| **D48-A** (pipeline) | Același flux, dar KB temp = copie completă |
+
+**Notă user:** deciziile se iau la **1+r**, nu blochează F11.

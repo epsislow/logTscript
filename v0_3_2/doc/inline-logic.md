@@ -15,7 +15,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Role** | Definition layer — facts, rules, queries |
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
-| **Composition** | `use .otherModule` merges facts and rules (not queries) |
+| **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
 
@@ -247,7 +247,9 @@ Recursive rules are allowed (Prolog-style). Use **`maxDepth`** to bound runaway 
 
 ---
 
-## Composition — `use`
+## Composition — `use` and `use once`
+
+Import knowledge from another `inline [logic]` module into the current module’s namespace.
 
 ```logts
 inline [logic] .vehicles:
@@ -260,14 +262,125 @@ inline [logic] .world:
 
     use .vehicles
 
-    query available:
-        wheeled(X)
+    query hasCar:
+        wheeled(car)
 
 :
 ```
 
-- **`use`** merges **facts and rules** from the referenced module.
+| Form | Behaviour |
+|------|-----------|
+| **`use .module`** | Merge that module’s facts, rules, and constraints. If the target was **already merged** in this resolution, elaboration stops with an error. |
+| **`use once .module`** | Same merge on first visit; **skip silently** if the module is already merged or currently open (idempotent — like `#include_once`). |
+
 - **Queries are never imported** — each inline defines its own query list.
+- **Missing module** or non-`[logic]` target → error for both forms.
+- **Strict reuse error** (single message, with chain):
+
+```text
+logic program line 5: Cannot reuse inline logic .vehicles
+  via .worldDup → .vehicles
+```
+
+The line number points at the **`use`** line that failed.
+
+### Example — compose and run (Load & Run)
+
+```logts-play
+inline [logic] .vehicles:
+
+    wheeled(car)
+
+:
+
+inline [logic] .world:
+
+    use .vehicles
+
+    query hasCar:
+        wheeled(car)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire carFlag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasCar >= carFlag
+    set = trigger
+}
+
+show(carFlag)
+```
+
+After **Load & Run**, `carFlag` is `1` because `wheeled(car)` comes from `.vehicles`.
+
+### Example — duplicate import with `use once` (Load)
+
+```logts-play
+inline [logic] .vehicles:
+
+    wheeled(car)
+
+:
+
+inline [logic] .worldOnce:
+
+    use once .vehicles
+    use once .vehicles
+
+    query hasCar:
+        wheeled(car)
+
+:
+
+comp [logic] .worldOnceLogic:
+    on: 1
+    .worldOnce { }
+:
+```
+
+The second `use once` is skipped; elaboration succeeds. The same script with two plain **`use .vehicles`** lines would fail with **`Cannot reuse inline logic .vehicles`**.
+
+### Example — mutual import with `use once` (Load & Run)
+
+```logts-play
+inline [logic] .useA:
+
+    use once .useB
+    tag(a)
+
+:
+
+inline [logic] .useB:
+
+    use once .useA
+    tag(b)
+
+:
+
+comp [logic] .useALogic:
+    on: 1
+    .useA { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.useALogic:{
+    ok = 1
+    set = trigger
+}
+
+show(ok)
+```
+
+Both modules merge once each — no error. Plain **`use`** on both sides would fail at elaboration.
 
 ---
 

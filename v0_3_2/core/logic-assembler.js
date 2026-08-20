@@ -114,11 +114,17 @@ class LogicParser {
       while (this.at('COMMA')) this.advance();
       if (this.at('EOF')) break;
       if (this.at('KW', 'use')) {
+        const useLine = this.peek().line;
         this.advance();
+        let mode = 'strict';
+        if (this.at('ID', 'once')) {
+          this.advance();
+          mode = 'once';
+        }
         if (!this.at('DOT')) logicError('expected inline reference after use', this.peek().line);
         this.advance();
         const refName = this.expect('ID').value;
-        uses.push('.' + refName);
+        uses.push({ ref: '.' + refName, mode, line: useLine });
         continue;
       }
       if (this.at('KW', 'query')) {
@@ -334,6 +340,28 @@ function logicCountFreeVarsInGoal(goal) {
   return logicListFreeVarsInGoal(goal).length;
 }
 
+function logicNormalizeUseEntry(u) {
+  if (u == null) return null;
+  if (typeof u === 'string') return { ref: u, mode: 'strict', line: null };
+  return {
+    ref: u.ref,
+    mode: u.mode === 'once' ? 'once' : 'strict',
+    line: u.line != null ? u.line : null,
+  };
+}
+
+function logicFormatUseEntry(u) {
+  const e = logicNormalizeUseEntry(u);
+  if (!e) return 'use ?';
+  return e.mode === 'once' ? `use once ${e.ref}` : `use ${e.ref}`;
+}
+
+function logicReuseUseError(targetRef, chain, useLine) {
+  const chainStr = (chain || []).join(' → ');
+  const msg = `Cannot reuse inline logic ${targetRef}\n  via ${chainStr}`;
+  logicError(msg, useLine);
+}
+
 function parseLogicProgramBlock(bodyRaw) {
   const src = bodyRaw == null ? '' : String(bodyRaw).trim();
   const bindings = [];
@@ -362,29 +390,55 @@ function mergeLogicDefinitions(base, usedInst) {
 }
 
 function logicResolveMerged(inlineInst, inlineInstances) {
-  let def = {
-    uses: inlineInst.uses || [],
-    queries: inlineInst.queries || [],
-    clauses: inlineInst.clauses || [],
-    constraints: inlineInst.constraints || [],
-  };
-  const seen = new Set();
-  const queue = [...(def.uses || [])];
-  while (queue.length) {
-    const ref = queue.shift();
-    if (seen.has(ref)) continue;
-    seen.add(ref);
+  const rootName = inlineInst.name;
+  const mergedSet = new Set([rootName]);
+  const visiting = new Set();
+  const clauses = [...(inlineInst.clauses || [])];
+  const constraints = [...(inlineInst.constraints || [])];
+
+  function applyUse(use, chain) {
+    const ref = use.ref;
+    const mode = use.mode === 'once' ? 'once' : 'strict';
+    const useLine = use.line;
+
+    if (mergedSet.has(ref)) {
+      if (mode === 'once') return;
+      logicReuseUseError(ref, [...chain, ref], useLine);
+    }
+    if (visiting.has(ref)) {
+      if (mode === 'once') return;
+      logicReuseUseError(ref, [...chain, ref], useLine);
+    }
+
     const used = inlineInstances.get(ref);
     if (!used || used.kind !== 'logic') {
       throw new Error(`logic use ${ref} must reference inline [logic]`);
     }
-    def.clauses = def.clauses.concat(used.clauses || []);
-    def.constraints = def.constraints.concat(used.constraints || []);
-    for (const u of used.uses || []) {
-      if (!seen.has(u)) queue.push(u);
+
+    visiting.add(ref);
+    for (const rawChild of used.uses || []) {
+      const child = logicNormalizeUseEntry(rawChild);
+      if (!child || !child.ref) continue;
+      applyUse(child, [...chain, ref]);
     }
+    visiting.delete(ref);
+    mergedSet.add(ref);
+    clauses.push(...(used.clauses || []));
+    constraints.push(...(used.constraints || []));
   }
-  return def;
+
+  for (const rawUse of inlineInst.uses || []) {
+    const use = logicNormalizeUseEntry(rawUse);
+    if (!use || !use.ref) continue;
+    applyUse(use, [rootName]);
+  }
+
+  return {
+    uses: inlineInst.uses || [],
+    queries: inlineInst.queries || [],
+    clauses,
+    constraints,
+  };
 }
 
 function logicPredicateArityKey(head) {
@@ -441,7 +495,7 @@ function formatLogicInstanceDoc(name, inst) {
   if (useCount) {
     lines.push('');
     lines.push('  compose:');
-    for (const u of inst.uses) lines.push(`    use ${u}`);
+    for (const u of inst.uses) lines.push(`    ${logicFormatUseEntry(u)}`);
   }
 
   if (queryCount) {
@@ -477,7 +531,7 @@ function formatLogicInstanceDoc(name, inst) {
   lines.push('');
   lines.push('  execution:');
   lines.push('    definition only — no inline execution');
-  lines.push('    compose: use .module merges facts, rules, constraints');
+  lines.push('    compose: use .module merges facts, rules, constraints; use once skips revisits');
   lines.push('    runtime: comp [logic] or .module:query({ … })');
   lines.push('');
   lines.push('  see doc(inline.logic)  doc(comp.logic)');
@@ -517,6 +571,7 @@ function formatLogicTypeDoc() {
     '  Rules:     modifier2(X, 0) <- X >= 9, X =< 12',
     '  Queries:   query johnOwns: owns(john, X)',
     '  Compose:   use .otherModule',
+    '             use once .otherModule',
     '',
     'comp [logic] — query runtime on a component',
     '',

@@ -38867,5 +38867,246 @@ comp [logic] .whLogic:
     h.assert('no full source dump', String(out.some((l) => l.includes('constraint inside(Object'))), 'false');
   });
 
+  const INLINE_LOGIC_VEHICLES = `inline [logic] .vehicles:
+
+    wheeled(car)
+
+:`;
+
+  const INLINE_LOGIC_WORLD_COMPOSE = `inline [logic] .world:
+
+    use .vehicles
+
+    query hasCar:
+        wheeled(car)
+
+:`;
+
+  const INLINE_LOGIC_WORLD_DUP_STRICT = `inline [logic] .worldDup:
+
+    use .vehicles
+    use .vehicles
+
+    query hasCar:
+        wheeled(car)
+
+:`;
+
+  const INLINE_LOGIC_WORLD_DUP_ONCE = `inline [logic] .worldOnce:
+
+    use once .vehicles
+    use once .vehicles
+
+    query hasCar:
+        wheeled(car)
+
+:`;
+
+  const INLINE_LOGIC_USE_A = `inline [logic] .useA:
+
+    use once .useB
+    tag(a)
+
+:`;
+
+  const INLINE_LOGIC_USE_B = `inline [logic] .useB:
+
+    use once .useA
+    tag(b)
+
+:`;
+
+  const INLINE_LOGIC_USE_STRICT_A = `inline [logic] .strictA:
+
+    use .strictB
+    tag(a)
+
+:`;
+
+  const INLINE_LOGIC_USE_STRICT_B = `inline [logic] .strictB:
+
+    use .strictA
+    tag(b)
+
+:`;
+
+  const INLINE_LOGIC_BASE = `inline [logic] .base:
+
+    shared(root)
+
+:`;
+
+  const INLINE_LOGIC_MID = `inline [logic] .mid:
+
+    use .base
+    tag(mid)
+
+:`;
+
+  const INLINE_LOGIC_TOP = `inline [logic] .top:
+
+    use .mid
+    tag(top)
+
+:`;
+
+  function logicJoinInlines() {
+    return Array.prototype.join.call(arguments, '\n');
+  }
+
+  function runLogicComposeComp(session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_COMPOSE) + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire carFlag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasCar >= carFlag
+    set = trigger
+}`;
+    return session.run(src);
+  }
+
+  reg(3620, 'logic', 'parse use once modifier', function(h, session) {
+    const prog = parseLogicBody('use once .vehicles\nuse .other');
+    h.assert('uses count', String(prog.uses.length), '2');
+    h.assert('once mode', prog.uses[0].mode, 'once');
+    h.assert('strict mode', prog.uses[1].mode, 'strict');
+    h.assert('once ref', prog.uses[0].ref, '.vehicles');
+    h.assert('once line', String(prog.uses[0].line), '1');
+  });
+
+  reg(3621, 'logic', 'use merges facts from referenced module', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_COMPOSE));
+    const inst = session.interp.inlineInstances.get('.world');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {});
+    h.assert('hasCar true', String(results.hasCar.length), '1');
+  });
+
+  reg(3622, 'logic', 'use merges facts from referenced module (wave)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_COMPOSE));
+    const inst = session.interp.inlineInstances.get('.world');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {});
+    h.assert('hasCar true', String(results.hasCar.length), '1');
+  }, { propagation: 'wave' });
+
+  reg(3623, 'logic', 'comp use composition redirect (legacy)', function(h, session) {
+    const { interp } = runLogicComposeComp(session);
+    h.assert('hasCar=1', interp.getWireEffectiveValue('carFlag'), '1');
+  });
+
+  reg(3624, 'logic', 'comp use composition redirect (wave)', function(h, session) {
+    const { interp } = runLogicComposeComp(session);
+    h.assert('hasCar=1', interp.getWireEffectiveValue('carFlag'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3625, 'logic', 'strict duplicate use errors with reuse message', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_DUP_STRICT) + `
+comp [logic] .worldLogic:
+    on: 1
+    .worldDup { }
+:`;
+    let err;
+    try {
+      session.run(src);
+      h.fail('expected error');
+    } catch (e) {
+      err = e;
+    }
+    h.assert('reuse msg', String(err.message.includes('Cannot reuse inline logic .vehicles')), 'true');
+    h.assert('via chain', String(err.message.includes('via .worldDup → .vehicles')), 'true');
+    h.assert('logic line', String(err.message.includes('logic program line')), 'true');
+  });
+
+  reg(3626, 'logic', 'use once duplicate skips (legacy)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_DUP_ONCE));
+    const inst = session.interp.inlineInstances.get('.worldOnce');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {});
+    h.assert('hasCar true', String(results.hasCar.length), '1');
+  });
+
+  reg(3627, 'logic', 'use once duplicate skips (wave)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_DUP_ONCE));
+    const inst = session.interp.inlineInstances.get('.worldOnce');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {});
+    h.assert('hasCar true', String(results.hasCar.length), '1');
+  }, { propagation: 'wave' });
+
+  reg(3628, 'logic', 'use once mutual cycle merges (legacy)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_USE_A, INLINE_LOGIC_USE_B));
+    const inst = session.interp.inlineInstances.get('.useA');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    h.assert('facts merged', String(merged.clauses.length), '2');
+  });
+
+  reg(3629, 'logic', 'use once mutual cycle merges (wave)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_USE_A, INLINE_LOGIC_USE_B));
+    const inst = session.interp.inlineInstances.get('.useA');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    h.assert('facts merged', String(merged.clauses.length), '2');
+  }, { propagation: 'wave' });
+
+  reg(3630, 'logic', 'strict mutual use errors (legacy)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_USE_STRICT_A, INLINE_LOGIC_USE_STRICT_B) + `
+comp [logic] .strictLogic:
+    on: 1
+    .strictA { }
+:`;
+    h.assertThrows('strict cycle', function() {
+      session.run(src);
+    }, 'Cannot reuse inline logic');
+  });
+
+  reg(3631, 'logic', 'strict mutual use errors (wave)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_USE_STRICT_A, INLINE_LOGIC_USE_STRICT_B) + `
+comp [logic] .strictLogic:
+    on: 1
+    .strictA { }
+:`;
+    h.assertThrows('strict cycle', function() {
+      session.run(src);
+    }, 'Cannot reuse inline logic');
+  }, { propagation: 'wave' });
+
+  reg(3632, 'logic', 'transitive use merge (legacy)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_BASE, INLINE_LOGIC_MID, INLINE_LOGIC_TOP));
+    const inst = session.interp.inlineInstances.get('.top');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    h.assert('three facts', String(merged.clauses.length), '3');
+  });
+
+  reg(3633, 'logic', 'transitive use merge (wave)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_BASE, INLINE_LOGIC_MID, INLINE_LOGIC_TOP));
+    const inst = session.interp.inlineInstances.get('.top');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    h.assert('three facts', String(merged.clauses.length), '3');
+  }, { propagation: 'wave' });
+
+  reg(3634, 'logic', 'query invoke merges use (legacy)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_COMPOSE) + `
+1wire found = .world:query({ wheeled(car) })
+show(found)`;
+    const { out, interp } = session.run(src);
+    h.assert('found=1', interp.getWireEffectiveValue('found'), '1');
+    h.assert('show 1', String(out.some((l) => l.includes('1'))), 'true');
+  });
+
+  reg(3635, 'logic', 'query invoke merges use (wave)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEHICLES, INLINE_LOGIC_WORLD_COMPOSE) + `
+1wire found = .world:query({ wheeled(car) })
+show(found)`;
+    const { out, interp } = session.run(src);
+    h.assert('found=1', interp.getWireEffectiveValue('found'), '1');
+    h.assert('show 1', String(out.some((l) => l.includes('1'))), 'true');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
