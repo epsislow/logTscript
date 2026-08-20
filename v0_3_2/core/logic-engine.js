@@ -598,7 +598,20 @@ function logicCreateDynamicStore() {
   return { adds: new Map(), tombstones: new Set() };
 }
 
-function logicBuildRuntimeClauses(staticClauses, store) {
+function logicBuildRuntimeClauses(staticClauses, store, options) {
+  const mode = (options && options.dataMode) || 'overlay';
+  if (mode === 'static') {
+    return (staticClauses || []).slice();
+  }
+  if (mode === 'seed') {
+    const out = [];
+    for (const c of staticClauses || []) {
+      if (c.body && c.body.length) out.push(c);
+    }
+    const adds = store && store.adds ? store.adds : new Map();
+    for (const c of adds.values()) out.push(c);
+    return out;
+  }
   const out = [];
   const tomb = store && store.tombstones ? store.tombstones : new Set();
   const adds = store && store.adds ? store.adds : new Map();
@@ -611,8 +624,20 @@ function logicBuildRuntimeClauses(staticClauses, store) {
   return out;
 }
 
-function logicApplyMutationTransaction(store, ops) {
+function logicSeedDynamicStore(clauses, store) {
+  if (!store) return;
+  const adds = new Map();
+  for (const head of logicCollectStaticGroundFacts(clauses)) {
+    const clause = { head, body: [] };
+    adds.set(logicFactClauseKey(clause), clause);
+  }
+  store.adds = adds;
+  store.tombstones = new Set();
+}
+
+function logicApplyMutationTransaction(store, ops, options) {
   if (!store) return { success: false };
+  const mode = (options && options.dataMode) || 'overlay';
   for (const op of ops || []) {
     if (!op || !op.head || !logicTermIsGround(op.head)) return { success: false };
   }
@@ -622,11 +647,11 @@ function logicApplyMutationTransaction(store, ops) {
     const clause = { head: op.head, body: [] };
     const key = logicFactClauseKey(clause);
     if (op.op === 'add') {
-      nextTombs.delete(key);
+      if (mode !== 'seed') nextTombs.delete(key);
       nextAdds.set(key, clause);
     } else if (op.op === 'remove') {
       nextAdds.delete(key);
-      nextTombs.add(key);
+      if (mode !== 'seed') nextTombs.add(key);
     }
   }
   store.adds = nextAdds;
@@ -642,9 +667,9 @@ function logicCloneDynamicStore(store) {
   };
 }
 
-function logicSimulateMutationStore(store, ops) {
+function logicSimulateMutationStore(store, ops, options) {
   const sim = logicCloneDynamicStore(store);
-  const result = logicApplyMutationTransaction(sim, ops);
+  const result = logicApplyMutationTransaction(sim, ops, options);
   if (!result || !result.success) return null;
   return sim;
 }
@@ -749,32 +774,34 @@ function logicFormatMutationTryBlock(ops) {
   return { summary, expandLines };
 }
 
-function logicMutationOpIsNet(store, op) {
+function logicMutationOpIsNet(store, op, options) {
   if (!store || !op || !op.head || !logicTermIsGround(op.head)) return false;
+  const mode = (options && options.dataMode) || 'overlay';
   const clause = { head: op.head, body: [] };
   const key = logicFactClauseKey(clause);
   const adds = store.adds || new Map();
   const tombs = store.tombstones || new Set();
   if (op.op === 'add') {
-    if (tombs.has(key)) return true;
+    if (mode !== 'seed' && tombs.has(key)) return true;
     if (!adds.has(key)) return true;
     const existing = adds.get(key);
     return !(existing && existing.head && logicTermsEqualGround(existing.head, op.head));
   }
   if (op.op === 'remove') {
     if (adds.has(key)) return true;
+    if (mode === 'seed') return false;
     if (tombs.has(key)) return false;
     return true;
   }
   return false;
 }
 
-function logicCountMutationNetOps(store, ops) {
+function logicCountMutationNetOps(store, ops, options) {
   const sim = logicCloneDynamicStore(store);
   let net = 0;
   for (const op of ops || []) {
-    if (logicMutationOpIsNet(sim, op)) net++;
-    logicApplyMutationTransaction(sim, [op]);
+    if (logicMutationOpIsNet(sim, op, options)) net++;
+    logicApplyMutationTransaction(sim, [op], options);
   }
   return net;
 }
@@ -1143,6 +1170,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicFactIndexAdd = logicFactIndexAdd;
   globalThis.logicCreateDynamicStore = logicCreateDynamicStore;
   globalThis.logicBuildRuntimeClauses = logicBuildRuntimeClauses;
+  globalThis.logicSeedDynamicStore = logicSeedDynamicStore;
   globalThis.logicApplyMutationTransaction = logicApplyMutationTransaction;
   globalThis.logicCloneDynamicStore = logicCloneDynamicStore;
   globalThis.logicSimulateMutationStore = logicSimulateMutationStore;
@@ -1186,6 +1214,7 @@ if (typeof module !== 'undefined' && module.exports) {
     logicFactIndexAdd,
     logicCreateDynamicStore,
     logicBuildRuntimeClauses,
+    logicSeedDynamicStore,
     logicApplyMutationTransaction,
     logicCloneDynamicStore,
     logicSimulateMutationStore,

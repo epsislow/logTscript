@@ -11192,6 +11192,10 @@ if (this.isBuiltinDEMUX(name)) {
       // BUT NOT when we're inside a PCB/chip/body body (internal blocks are executed inline)
       if(!this.insidePcbBody && !this.insideChipBody && !this.insideBoardBody){
         const blockIndex = this.componentPropertyBlocks.length; // Unique index for this block
+        const compForBlock = this.components.get(component);
+        if (compForBlock && compForBlock.type === 'logic' && typeof LogicComponent !== 'undefined') {
+          LogicComponent.assertNoMutationBlocks(compForBlock, component, properties);
+        }
         const setExprComponentRefs = (typeof collectSetExprComponentRefs === 'function')
           ? collectSetExprComponentRefs(setExpr, this)
           : new Set();
@@ -14421,6 +14425,9 @@ if (s.assignment) {
     }
 
     if (comp.type === 'logic') {
+      if (typeof LogicComponent !== 'undefined') {
+        LogicComponent.assertNoMutationBlocks(comp, component, properties);
+      }
       comp._logicRedirectProps = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
       comp._logicRedirects = comp._logicRedirectProps;
       comp._logicMutationBlocks = properties.filter((p) => p.property === 'logicMutation');

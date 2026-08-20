@@ -109,7 +109,32 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   getSpecialParseAttributes() {
     return {
       logicProgramBlockAttrs: true,
+      literalAttrs: ['data'],
     };
+  }
+
+  _parseDataMode(attributes, compName) {
+    const raw = attributes.data;
+    if (raw == null || raw === '') return 'overlay';
+    const v = String(raw).toLowerCase();
+    if (v === 'overlay' || v === 'static' || v === 'seed') return v;
+    if (v === 'copy') {
+      throw Error(`logic ${compName}: data: copy is not supported`);
+    }
+    throw Error(`logic ${compName}: data must be overlay, static, or seed`);
+  }
+
+  _buildDataOpts(comp) {
+    return comp && comp.dataMode ? { dataMode: comp.dataMode } : undefined;
+  }
+
+  static assertNoMutationBlocks(comp, compName, properties) {
+    if (!comp || comp.dataMode !== 'static') return;
+    for (const p of properties || []) {
+      if (p.property === 'logicMutation') {
+        throw Error(`logic ${compName}: data: static forbids logic { } mutation block`);
+      }
+    }
   }
 
   getWidthBits() { return 1; }
@@ -157,7 +182,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       comp.factIndex = null;
       return;
     }
-    const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore);
+    const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore, this._buildDataOpts(comp));
     comp.factIndex = indexFn(runtimeClauses);
   }
 
@@ -168,7 +193,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const verifyFn = typeof logicVerifyFactIndex === 'function' ? logicVerifyFactIndex : null;
     const indexFn = typeof logicBuildFactIndex === 'function' ? logicBuildFactIndex : null;
     if (!buildFn || !indexFn) return;
-    const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore);
+    const buildOpts = this._buildDataOpts(comp);
+    const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore, buildOpts);
     if (comp.indexRebuild === 'delta') {
       if (!deltaFn || !verifyFn || !comp.factIndex) {
         throw Error(`logic ${comp.name}: fact index delta requires initialized index`);
@@ -188,6 +214,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         { name: 'maxSolutions', value: 'integer (default 64)' },
         { name: 'indexFacts', value: '0 or 1 (default 1 — fact index on)' },
         { name: 'indexRebuild', value: 'full or delta (default full; ignored when indexFacts: 0)' },
+        { name: 'data', value: 'overlay (default), static, or seed' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -251,15 +278,21 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const maxSolutions = this._parsePositiveIntAttr(attributes, 'maxSolutions', name);
     const indexFacts = this._parseIndexFacts(attributes, name);
     const indexRebuild = this._parseIndexRebuild(attributes, name, indexFacts);
+    const dataMode = this._parseDataMode(attributes, name);
 
     const validateStaticFn = typeof logicValidateStaticKnowledge === 'function'
       ? logicValidateStaticKnowledge : null;
     const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
     const emptyStoreFn = typeof logicCreateDynamicStore === 'function' ? logicCreateDynamicStore : null;
+    const seedFn = typeof logicSeedDynamicStore === 'function' ? logicSeedDynamicStore : null;
     const ruleFn = typeof logicCollectRuleClauses === 'function' ? logicCollectRuleClauses : null;
+    const dynamicStore = emptyStoreFn ? emptyStoreFn() : { adds: new Map(), tombstones: new Set() };
+    if (dataMode === 'seed' && seedFn) {
+      seedFn(merged.clauses, dynamicStore);
+    }
+    const buildOpts = { dataMode };
     if (validateStaticFn && buildFn && emptyStoreFn && (merged.constraints || []).length) {
-      const emptyStore = emptyStoreFn();
-      const staticClauses = buildFn(merged.clauses, emptyStore);
+      const staticClauses = buildFn(merged.clauses, dynamicStore, buildOpts);
       const execOpts = {};
       if (maxDepth != null) execOpts.maxDepth = maxDepth;
       if (maxSolutions != null) execOpts.maxSolutions = maxSolutions;
@@ -314,7 +347,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       truncated: 0,
       depthExceeded: 0,
       mutationFailed: 0,
-      dynamicStore: typeof logicCreateDynamicStore === 'function' ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() },
+      dynamicStore,
+      dataMode,
       indexFacts,
       indexRebuild,
       factIndex: null,
@@ -485,6 +519,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       comp.mutationFailed = 0;
       return;
     }
+    if (comp.dataMode === 'static') {
+      comp.mutationFailed = 0;
+      return;
+    }
     if (!comp.dynamicStore) {
       comp.dynamicStore = typeof logicCreateDynamicStore === 'function'
         ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() };
@@ -533,9 +571,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
     emitTry();
 
+    const buildOpts = this._buildDataOpts(comp);
     const constraints = (merged && merged.constraints) || [];
     if (constraints.length && simFn && buildFn && validateFactsFn && deltaFn) {
-      const proposedStore = simFn(comp.dynamicStore, ops);
+      const proposedStore = simFn(comp.dynamicStore, ops, buildOpts);
       if (!proposedStore) {
         comp.mutationFailed = 1;
         const msg = 'simulate store failed';
@@ -546,7 +585,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         }
         return;
       }
-      const proposedClauses = buildFn(merged.clauses, proposedStore);
+      const proposedClauses = buildFn(merged.clauses, proposedStore, buildOpts);
       const deltaFacts = deltaFn(ops);
       const execOpts = {};
       if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
@@ -567,8 +606,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       }
     }
 
-    const net = netFn ? netFn(comp.dynamicStore, ops) : ops.length;
-    const result = applyFn(comp.dynamicStore, ops);
+    const net = netFn ? netFn(comp.dynamicStore, ops, buildOpts) : ops.length;
+    const result = applyFn(comp.dynamicStore, ops, buildOpts);
     if (result && result.success) {
       this._updateFactIndexAfterCommit(comp, merged, ops);
       comp.mutationFailed = 0;
@@ -595,8 +634,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const merged = resolveFn(inst, ctx.inlineInstances);
     this._applyMutations(comp, compName, mutationBlocks, ctx, merged);
     const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const buildOpts = this._buildDataOpts(comp);
     const runtimeMerged = buildFn
-      ? { ...merged, clauses: buildFn(merged.clauses, comp.dynamicStore) }
+      ? { ...merged, clauses: buildFn(merged.clauses, comp.dynamicStore, buildOpts) }
       : merged;
     const inputEnv = this._readPinValues(comp, pending, reEvaluate, ctx);
     const execOpts = {};

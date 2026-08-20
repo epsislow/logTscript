@@ -11401,6 +11401,7 @@ comp [logic] .characterLogic:
 | **\`maxSolutions:\`** | Optional — max solutions collected per query (default **64**) |
 | **\`indexFacts:\`** | **\`0\`** or **\`1\`** (default **1**) — persistent fact index; **\`0\`** disables index |
 | **\`indexRebuild:\`** | **\`full\`** (default) or **\`delta\`** — index update after commit; ignored when **\`indexFacts: 0\`** |
+| **\`data:\`** | **\`overlay\`** (default), **\`static\`**, or **\`seed\`** — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
 
 ### Program block bindings
 
@@ -12060,6 +12061,8 @@ After **Load & Run**: **\`hitDepth = 1\`** — recursive rule exceeded depth (fa
 ## Runtime mutations — \`logic { + / - }\`
 
 Change the effective knowledge base on each solve pass without editing \`inline [logic]\`. Full behaviour, tombstones, and **\`mutationFailed\`** → [logic-runtime.md](logic-runtime.md).
+
+**\`data:\`** selects the runtime KB mode (**\`overlay\`**, **\`static\`**, **\`seed\`**) — see [logic-runtime.md — data modes](logic-runtime.md#data-modes). **\`data: static\`** forbids **\`logic { }\`** blocks.
 
 \`\`\`logts
 .whLogic:{
@@ -23356,8 +23359,8 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | Topic | Summary |
 |-------|---------|
 | **Static KB** | Ground facts and rules from \`inline [logic]\` — unchanged at runtime |
-| **Dynamic overlay** | Per-component store: **adds** (\`+\`) and **tombstones** (\`-\`) |
-| **Effective KB** | \`static ∖ tombstoned facts ∪ dynamic adds\` |
+| **Effective KB** | Mode-dependent — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
+| **Dynamic overlay** | Per-component store: **adds** (\`+\`) and **tombstones** (\`-\`) — **\`overlay\`** mode |
 | **Mutation syntax** | \`logic { + fact\\n- fact }\` in exec block — Prolog **assert** / **retract** analogy |
 | **Transaction** | All ops in one \`logic { }\` block commit together or roll back |
 | **\`mutationFailed\`** | Pout **\`1\`** if the transaction failed (non-ground fact, etc.) |
@@ -23389,6 +23392,94 @@ inline [logic] .warehouse          comp [logic] .whLogic
 | **Tombstones** | \`- groundFact\` hides a static fact | Yes — fact omitted from effective KB until removed from store |
 
 Rules are always taken from the merged inline definition. Only **ground facts** participate in the overlay.
+
+---
+
+## Data modes
+
+Set **\`data:\`** on **\`comp [logic]\`** to control how facts enter the runtime knowledge base. Omit **\`data:\`** for **\`overlay\`** (default).
+
+| Mode | Runtime facts | Mutations | Use |
+|------|---------------|-----------|-----|
+| **\`overlay\`** (default) | Static facts ∖ tombstones ∪ dynamic adds | **\`logic { + / - }\`** — \`-\` may tombstone static facts | General mutable KB on top of inline |
+| **\`static\`** | Static inline facts only | **\`logic { }\` forbidden** (elaboration error) | Query-only; read inline KB unchanged |
+| **\`seed\`** | Ground facts copied to dynamic store at init; rules stay in inline | **\`logic { + / - }\`** — \`-\` deletes from dynamic (no tombstones) | Mutable facts isolated from inline static layer |
+
+Invalid values (**\`data: copy\`**, unknown strings) are **elaboration errors**.
+
+### Example — \`data: static\` (query only)
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+
+    inside(box1, c1)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+:
+
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**. A **\`logic { }\`** block on this component is rejected at elaboration.
+
+### Example — \`data: seed\` (seed + mutate)
+
+At init, all ground facts from the merged inline (including facts from **\`use\`**) are copied into the component dynamic store. Rules and constraints remain in the inline layer.
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`**. Retracting a seeded fact uses **\`- fact\`**, which removes it from the dynamic store directly (no tombstone on static facts).
 
 ---
 

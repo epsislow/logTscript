@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–16 complete.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–17 complete.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -53,6 +53,9 @@ todos:
   - id: logic-filter-trace
     content: "Faza 16: Filter Logic Signal Trace (1+t) — D82–D85 (completed)"
     status: completed
+  - id: logic-data-modes
+    content: "Faza 17: comp [logic] data: static + seed (1+r) — D88–D94 confirmed, completed"
+    status: pending
 isProject: false
 ---
 
@@ -1195,6 +1198,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 14** Mutation Signal Trace (`logic-mut`) | D69–D76 | **(completed)** |
 | **Faza 15** Composiție `use` / `use once` (1+g) | D77–D81 | **(completed)** |
 | **Faza 16** Filter **Logic** Signal Trace (1+t) | D82–D85 | **(completed)** |
+| **Faza 17** `comp [logic] data:` static + seed (1+r) | D88–D94 | **(completed)** |
 
 ---
 
@@ -1809,7 +1813,7 @@ Model țintă: **RULES = program**, **FACTS = date runtime**, **CONSTRAINTS = ga
 | ID | Decizie |
 |----|---------|
 | D40 | **A** — `logic { + / - }`; doc ≈ assert/retract |
-| D41 | **A** — overlay default; **1+r** → `copy` / `static` / seed |
+| D41 | **A** — overlay default; **1+r** → **`static`** / **`seed`** (~~copy~~ respins) |
 | D42 | **A** — wire + literal |
 | D43 | **A** — `+` idempotent |
 | D44 | **A** — `-` absent = success |
@@ -1857,7 +1861,7 @@ Model țintă: **RULES = program**, **FACTS = date runtime**, **CONSTRAINTS = ga
 
 **Decizie:** **A** — overlay pe comp. F11 implementează **doar** acest mod; atribut comp **`data: overlay`** implicit (poate fi omis).
 
-**Amânat 1+r:** `data: copy` (ex-D41-B), `data: static` (fără `+/-`), redesign **ex-D41-C** (seed) — vezi backlog **1+r**; impact **D44/D45/D48** decis acolo.
+**Amânat 1+r:** `data: static` (fără `+/-`), **`data: seed`** (ex-D41-C) — vezi backlog **1+r**; ~~`data: copy`~~ **respins**; impact **D44/D45/D48** decis la **1+r** pentru **seed/static**.
 
 La fiecare `set` pe comp, motorul construiește KB-ul pentru query/solve/mutation validate:
 
@@ -1879,7 +1883,7 @@ query/solve        →  KB efectiv = static ∖ tombstones ∔ dynamic
 
 **Exemplu:** inline are `container(c1).`. Comp A face `+ container(c2)`. Query pe A vede `c1` (static) + `c2` (dynamic). Comp B fără mutații vede doar `c1`.
 
-#### **B — copy-on-write la primul `+`** → **1+r** (`data: copy`)
+#### **B — copy-on-write la primul `+`** ❌ **respins (nu 1+r)**
 
 ```text
 load comp  →  pointer la static (read-only)
@@ -1892,11 +1896,10 @@ mutații    →  editezi copia locală
 | **Prima mutație** | Cost **O(n)** — copiezi **toate** facts static |
 | **După clone** | Un singur index; `+`/`-` ca pe o KB clasică |
 | **Memorie** | Duplică tot staticul per comp care mută măcar o dată |
-| **`use`** | La clone, incluzi și facts din module merged — complicat de menținut la sync |
 
-**Când are sens:** KB static mică, multe mutații, vrei implementare simplă post-clone.
+**Decizie user (2026-08-20):** **nu implementăm** — beneficiu mic față de **overlay** / **seed**; complexitate la index delta + `use`. Rămâne doar ca referință istorică (ex-D41-B).
 
-#### **C — doar dynamic; inline = schema / seed** → **1+r** (redesign; nu F11)
+#### **C — doar dynamic; inline = schema / seed** → **1+r** (`data: seed`)
 
 ```text
 init comp   →  COPY facts inline → dynamic store (one-time seed)
@@ -1908,8 +1911,8 @@ mutații     →  doar pe dynamic store
 |--------|--------------|
 | **Init** | Toate facts din inline devin dynamic la crearea comp |
 | **Inline după init** | Nu mai citești static la fiecare solve — doar store-ul comp |
-| **Sharing** | Două comp-uri cu același inline au **seed identic** la init, apoi diverg independent |
-| **Reload inline** | Nu actualizează automat comp-urile existente (spre deosebire de A) |
+| **Sharing** | Două comp-uri cu același inline au **seed identic** la init (același run), apoi diverg independent |
+| **Rerulare** | Orice edit inline → **rerun** — fără persistență; nu există sync live inline↔comp |
 
 **Când are sens:** vrei mental model „comp = bază de date; inline = DDL + seed”.
 
@@ -2182,7 +2185,7 @@ comp [logic] .whLogic:
 - [x] Teste **3559–3575** (legacy + wave); suite verde **2737/2737**
 - [x] Doc **logts-play** — [`logic-runtime.md`](../v0_3_2/doc/logic-runtime.md), [`comp-logic.md`](../v0_3_2/doc/comp-logic.md)
 
-**Amânat post-F11:** **1+r** (`data: copy/static/seed`), **1+m**, **1+n**, **1+o**, **1+q**.
+**Amânat post-F11:** **1+r** (`data: static/seed`), **1+m**, **1+n**, **1+o**, **1+q**.
 
 ---
 
@@ -3327,6 +3330,123 @@ La trecerea la **`use` strict**, orice exemplu sau test care **depindea** de ski
 
 ---
 
+## Decizii Faza 17 — `comp [logic] data:` static + seed (D88–D94) **(1+r)**
+
+> **Sursă:** F11 livrează **`data: overlay`** implicit; user confirmă **fără `copy`** (D88); scope **1+r** = **`static`** + **`seed`**.  
+> **Stare:** **D88–D94 confirmed** — F17 **(completed)**.
+
+### Rezumat decizii F17
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D88** | **A** | **`data: copy` respins** — scope: overlay (F11) + **static** + **seed** |
+| **D89** | **A** | **`data: static`** + `logic { }` în exec → **elaboration error** |
+| **D90** | **A** | **`data: seed`**: la init copie **toate ground facts** din `merged.clauses` → `dynamicStore` |
+| **D91** | **A** | **`seed` solve**: **facts** din dynamic; **rules + constraints** din `merged` (nemutate) |
+| **D92** | **A** | **`seed` init**: validate constraints pe KB seeded (ca init static overlay) |
+| **D93** | **A** | **`seed` mutation**: `-` = delete dynamic; **fără tombstone**; `+`/`-` pe store mutabil |
+| **D94** | **A** | Attribute **`data: overlay \| static \| seed`**; omit = overlay; invalid → elaboration error |
+
+---
+
+### D89 — **`data: static`** + `logic { }` **(confirmed: A — elaboration error)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — elaboration error (confirmed)** | Comp cu `data: static` + exec block conține `logic { … }` → **Error** la elaborare (ca query invalid) |
+| **B — runtime no-op** | Pass rulează; `mutationFailed=1`; store neschimbat — **respins** |
+
+**Motiv A:** fail-fast; comp read-only e explicit; fără logic-mut noise în trace.
+
+**Decizie:** **A** — confirmat explicit (2026-08-20).
+
+---
+
+### D90 — **`seed`: ce se copiază la init **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — ground facts din merged (confirmed)** | `logicCollectStaticGroundFacts(merged.clauses)` → `dynamicStore.adds` — **tot** (include facts din `use`) |
+| **B — doar facts din modul root program** | Exclude facts din module `use`-d — **respins** |
+
+**Decizie:** **A** — copiem **tot** ground facts din merge (inclusiv `use`); confirmat explicit (2026-08-20).
+
+---
+
+### D91 — **`seed`: KB la solve/mutation **(confirmed: A)**
+
+| Layer | `overlay` (F11) | `seed` (F17) |
+|-------|-----------------|--------------|
+| **Facts** | static ∖ tombstones ∪ dynamic | **doar dynamic** (post-seed + mutații) |
+| **Rules / constraints** | din `merged.clauses` | din **`merged.clauses`** (read-only) |
+
+**Implementare:** variantă `logicBuildRuntimeClauses(..., { dataMode: 'seed' })` sau echivalent — **fără** path static facts la runtime.
+
+**Decizie:** **A**.
+
+---
+
+### D92 — **`seed`: constraints la init **(confirmed: A)**
+
+După seed, rulează **`logicValidateStaticKnowledge`** (sau echivalent) pe clauses = rules + seeded facts — **elaboration error** dacă invalid (D52 init).
+
+**Decizie:** **A**.
+
+---
+
+### D93 — **`seed`: semantica `-` / index **(confirmed: A)**
+
+| | `overlay` | `seed` |
+|---|-----------|--------|
+| **`-`** | tombstone static sau delete dynamic | **delete** din `dynamicStore` (fără tombstone) |
+| **`indexRebuild: delta`** | patch tombstone + adds | patch **add/remove** simplu pe dynamic |
+
+Aliniat D44-A: `-` absent = success silent.
+
+**Decizie:** **A**.
+
+---
+
+### D94 — Parse attribute **`data:`** **(confirmed: A)**
+
+```logts
+comp [logic] .whLogic:
+    data: overlay    # default — omit = overlay (F11)
+    data: static     # read-only — D89
+    data: seed       # seed la init — D90–D93
+```
+
+| Valoare invalidă | Rezultat |
+|------------------|----------|
+| `data: copy` | **Error** — respins (D88) |
+| alt string | **Error** elaboration |
+
+**Decizie:** **A**.
+
+---
+
+### Implementare F17
+
+| Layer | Fișier | Acțiune |
+|-------|--------|---------|
+| Parse | [`parser.js`](../v0_3_2/core/parser.js) / comp attrs | `data:` pe `comp [logic]` — D94 |
+| Engine | [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `logicBuildRuntimeClauses` mode seed; seed init helper; static fără mutation path |
+| Runtime | [`logic.js`](../v0_3_2/core/components/logic.js) | `dataMode` pe comp; seed la init; static → skip `_applyMutations` + D89 elaboration |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3638+** — static query; static+logic error; seed init+solve; seed mutate; index delta seed |
+| Doc | [`comp-logic.md`](../v0_3_2/doc/comp-logic.md), [`logic-runtime.md`](../v0_3_2/doc/logic-runtime.md) | secțiune **`data:`** (EN) |
+
+### Criterii done
+
+- [x] **D88–D94** confirmate + implementate
+- [x] **`data: static`** — query/solve OK; `logic { }` → elaboration error (D89)
+- [x] **`data: seed`** — seed init + constraints (D90–D92); mutate `-`/`+` (D93)
+- [x] **`overlay`** implicit neschimbat (regresie zero)
+- [x] Teste **3638–3650**; doc EN; suite verde (2812/2812)
+
+**Backlog (nu F17):** **1+l**, **1+p**, **1+s**, **1+o** (persistență).
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -3413,15 +3533,11 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | Topic | ID backlog |
 |-------|------------|
 | Fazele 0–16 | **(completed)** |
-| **Faza 16** Filter Logic Signal Trace | **1+t** **(completed)** |
+| **Faza 17** `data: static` + `seed` | **1+r** **(completed)** |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
 | Constraint `#K (line L)` trace | **1+v** **(pause)** |
 | `query = …` explicit | **1+l** |
-| `use` circular / nested | ~~**1+g**~~ → **Faza 15** |
 | POUT declarate comp | **1+k** |
-| `comp [logic] data:` copy/static/seed | **1+r** |
-| `assert`/`retract` în reguli | ~~**1+n**~~ 🟠✗ — înlocuit de `logic { ± }` |
-| Inline `.world:mutate` | ~~**1+m**~~ ❌ — respins; mutație doar `comp [logic]` |
 | Persistență KB | **1+o** |
 | Validare constraints la query | **1+p** |
 | Quoted atoms `'John'` | D8 post-MVP |
@@ -3432,7 +3548,8 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 ## Ordine recomandată
 
 1. ~~Faza 0~~ → ~~Faza 16~~ **(completed)**
-2. Apoi backlog: **1+r**, **1+l**, **1+p**, **1+s**, **1+u**, …
+2. ~~**Faza 17**~~ — `comp [logic] data:` **static** + **seed** **(1+r)** — **(completed)**
+3. Apoi backlog: **1+l**, **1+p**, **1+s**, **1+u**, …
 
 ---
 
@@ -3459,7 +3576,7 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ⏳ | **1+o** | Persistență dynamic facts | retain / save-load între sesiuni; snapshot KB | D48 |
 | ⏳ | **1+p** | Validare constrângeri la query | read-only „is state legal?” fără mutație | D53 |
 | ✅ | ~~**1+q**~~ | Index pe dynamic facts | **Promovat → Faza 13** — index facts, `count/2`, perf constraints | D60–D68 |
-| ⏳ | **1+r** | **`comp [logic] data:`** | **`overlay`** (default F11) / **`copy`** / **`static`**; ex-D41-C seed | D41 |
+| ✅ | ~~**1+r**~~ | **`comp [logic] data:`** | **Promovat → Faza 17** — static + seed; ~~copy~~ D88 | D41, D88–D94 |
 | ✅ | ~~**1+…**~~ | Mutation Signal Trace | **Promovat → Faza 14** — `logic-mut` | D69–D76 |
 | ⏳ | **1+s** | `mutationReason` text pout | Motiv scriptabil pe wire; F14 livrează trace `logic-mut` | F14 |
 | ✅ | ~~**1+t**~~ | Filter **Logic** Signal Trace | **Promovat → Faza 16** — D82–D85 **(completed)** | F14, D82–D85 |
@@ -3506,35 +3623,10 @@ Signal Trace **`logic-mut`** (try / commit / rollback) — vezi **Faza 14** + [`
 
 Filter toolbar **Logic** dedicat — **`logic-mut` exclusiv** (D82–D85): scoase din Wires/Components; `traceCategory: 'logic'`. Vezi **Faza 16**.
 
+#### ~~**1+r**~~ → **Faza 17**
+
+**Scope:** **`data: static`** + **`data: seed`**; ~~**copy**~~ respins (D88). Decizii **D89–D94** — vezi **Faza 17**.
+
 #### **1+v** ⏸ — pause
 
 Ideea D72-B (`#K (line L)` în rollback) rămâne în backlog; **nu** se promovează fază — ordinal **`#K`** (F14) e suficient deocamdata.
-
-#### **1+r** — `comp [logic] data:` (overlay / copy / static)
-
-**F11 livrează doar `overlay`** (D41-A) — atribut **`data: overlay`** implicit, poate fi omis.
-
-**Amânat (1+r):** extindere header comp:
-
-```logts
-comp [logic] .whLogic:
-    data: overlay    # default — D41-A: static + dynamic + tombstone
-    data: copy       # ex-D41-B: copy-on-write la prima mutație
-    data: static     # read-only runtime: `logic { + / - }` = eroare elaborare sau no-op + mutationFailed
-```
-
-| Mod | Semnificație |
-|-----|--------------|
-| **`overlay`** | D41-A — KB = static ∖ tombstones ∪ dynamic |
-| **`copy`** | D41-B — clone static la prima mutație, apoi edit local |
-| **`static`** | Fără mutație — comp doar query/solve pe static (demo, probe) |
-
-**Ex-D41-C (seed):** model „inline copiat integral la init, fără overlay static live” — **nu** e același lucru cu `static`; rămâne variantă de evaluat în **1+r**. La implementare trebuie redesenate:
-
-| Decizie F11 (overlay) | Impact posibil sub seed/copy |
-|------------------------|------------------------------|
-| **D44-A** (`-` = asigură absent) | Poate deveni „delete din copie” vs tombstone |
-| **D45-A** (tombstone) | Poate fi **inutil** dacă tot static e deja copiat mutabil |
-| **D48-A** (pipeline) | Același flux, dar KB temp = copie completă |
-
-**Notă user:** deciziile se iau la **1+r**, nu blochează F11.

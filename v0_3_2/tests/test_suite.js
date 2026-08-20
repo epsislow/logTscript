@@ -39161,5 +39161,255 @@ comp [logic] .whLogic:
     h.assert('all filter shows mut', String(mut.every((e) => signalTraceEntryMatchesFilter(e, 'all'))), 'true');
   });
 
+  reg(3638, 'logic', 'data: static query without mutation (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('stillAtC1=1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3639, 'logic', 'data: static query without mutation (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('stillAtC1=1', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3640, 'logic', 'data: static forbids logic block (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    set = trigger
+}`;
+    h.assertThrows('static forbids mutation', function() {
+      session.run(src);
+    }, 'data: static forbids');
+  });
+
+  reg(3641, 'logic', 'data: static forbids logic block (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    set = trigger
+}`;
+    h.assertThrows('static forbids mutation wave', function() {
+      session.run(src);
+    }, 'data: static forbids');
+  }, { propagation: 'wave' });
+
+  reg(3642, 'logic', 'data: copy rejected at elaboration', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: copy
+    on: 1
+    .warehouse { }
+:`;
+    h.assertThrows('copy rejected', function() {
+      session.run(src);
+    }, 'data: copy is not supported');
+  });
+
+  reg(3643, 'logic', 'data: seed init query (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('seed stillAtC1=1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3644, 'logic', 'data: seed init query (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('seed stillAtC1=1 wave', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3645, 'logic', 'data: seed mutation add fact (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('box2 in c1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3646, 'logic', 'data: seed mutation add fact (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('box2 in c1 wave', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3647, 'logic', 'data: seed init rejects invalid seeded KB', function(h, session) {
+    const src = `inline [logic] .bad:
+
+    object(box1)
+    inside(box1, ghost)
+
+    constraint inside(O, C) <= object(O), container(C)
+
+:
+
+comp [logic] .badLogic:
+    data: seed
+    on: 1
+    .bad { }
+:`;
+    h.assertThrows('seed violates constraints', function() {
+      session.run(src);
+    }, 'violates constraints');
+  });
+
+  reg(3648, 'logic', 'data: seed remove deletes dynamic fact (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire still = 1
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { - inside(box1, c1) }
+    stillAtC1 >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('not at c1', interp.getWireEffectiveValue('still'), '0');
+  });
+
+  reg(3649, 'logic', 'data: seed remove deletes dynamic fact (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: seed
+    on: 1
+    .warehouse { }
+:
+
+1wire still = 1
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { - inside(box1, c1) }
+    stillAtC1 >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('not at c1 wave', interp.getWireEffectiveValue('still'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3650, 'logic', 'data: invalid value rejected', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: bogus
+    on: 1
+    .warehouse { }
+:`;
+    h.assertThrows('invalid data', function() {
+      session.run(src);
+    }, 'data must be overlay, static, or seed');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

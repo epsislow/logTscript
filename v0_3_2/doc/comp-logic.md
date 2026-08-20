@@ -74,6 +74,7 @@ comp [logic] .characterLogic:
 | **`maxSolutions:`** | Optional — max solutions collected per query (default **64**) |
 | **`indexFacts:`** | **`0`** or **`1`** (default **1**) — persistent fact index; **`0`** disables index |
 | **`indexRebuild:`** | **`full`** (default) or **`delta`** — index update after commit; ignored when **`indexFacts: 0`** |
+| **`data:`** | **`overlay`** (default), **`static`**, or **`seed`** — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
 
 ### Program block bindings
 
@@ -733,6 +734,8 @@ After **Load & Run**: **`hitDepth = 1`** — recursive rule exceeded depth (fail
 ## Runtime mutations — `logic { + / - }`
 
 Change the effective knowledge base on each solve pass without editing `inline [logic]`. Full behaviour, tombstones, and **`mutationFailed`** → [logic-runtime.md](logic-runtime.md).
+
+**`data:`** selects the runtime KB mode (**`overlay`**, **`static`**, **`seed`**) — see [logic-runtime.md — data modes](logic-runtime.md#data-modes). **`data: static`** forbids **`logic { }`** blocks.
 
 ```logts
 .whLogic:{
