@@ -11195,6 +11195,7 @@ if (this.isBuiltinDEMUX(name)) {
         const compForBlock = this.components.get(component);
         if (compForBlock && compForBlock.type === 'logic' && typeof LogicComponent !== 'undefined') {
           LogicComponent.assertNoMutationBlocks(compForBlock, component, properties);
+          LogicComponent.validateQuerySelection(compForBlock, component, properties, this);
         }
         const setExprComponentRefs = (typeof collectSetExprComponentRefs === 'function')
           ? collectSetExprComponentRefs(setExpr, this)
@@ -14427,10 +14428,24 @@ if (s.assignment) {
     if (comp.type === 'logic') {
       if (typeof LogicComponent !== 'undefined') {
         LogicComponent.assertNoMutationBlocks(comp, component, properties);
+        LogicComponent.validateQuerySelection(comp, component, properties, this);
       }
       comp._logicRedirectProps = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
       comp._logicRedirects = comp._logicRedirectProps;
       comp._logicMutationBlocks = properties.filter((p) => p.property === 'logicMutation');
+      let queryNone = false;
+      let queryNames = null;
+      for (const p of properties) {
+        if (p.property === 'logicQueryNone') queryNone = true;
+        if (p.property === 'logicQueryList') queryNames = p.queryNames;
+      }
+      if (queryNone) {
+        comp._logicQueryOpts = { queryNone: true };
+      } else if (queryNames) {
+        comp._logicQueryOpts = { queryNames };
+      } else {
+        comp._logicQueryOpts = null;
+      }
     }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
@@ -14468,7 +14483,7 @@ if (s.assignment) {
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
-      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>' || property === 'logicMutation'){
+      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>' || property === 'logicMutation' || property === 'logicQueryNone' || property === 'logicQueryList'){
         continue;
       }
 

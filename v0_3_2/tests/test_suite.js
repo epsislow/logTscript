@@ -39411,5 +39411,252 @@ comp [logic] .whLogic:
     }, 'data must be overlay, static, or seed');
   });
 
+  reg(3651, 'logic', 'query = subset runs only listed queries (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    query = stillAtC1
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('stillAtC1=1', interp.getWireEffectiveValue('ok'), '1');
+    const comp = interp.components.get('.whLogic');
+    h.assert('one query result', String(Object.keys(comp.queryResults || {}).sort().join(',')), 'stillAtC1');
+  });
+
+  reg(3652, 'logic', 'query = subset runs only listed queries (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    query = stillAtC1
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('stillAtC1=1 wave', interp.getWireEffectiveValue('ok'), '1');
+    const comp = interp.components.get('.whLogic');
+    h.assert('one query result wave', String(Object.keys(comp.queryResults || {}).sort().join(',')), 'stillAtC1');
+  }, { propagation: 'wave' });
+
+  reg(3653, 'logic', 'query none skips queries mutation only (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    query none
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    const comp = interp.components.get('.whLogic');
+    h.assert('no query results', String(Object.keys(comp.queryResults || {}).length), '0');
+  });
+
+  reg(3654, 'logic', 'query none skips queries mutation only (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    query none
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    const comp = interp.components.get('.whLogic');
+    h.assert('no query results wave', String(Object.keys(comp.queryResults || {}).length), '0');
+  }, { propagation: 'wave' });
+
+  reg(3655, 'logic', 'query = unknown name elaboration error', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+.whLogic:{
+    query = ghostQuery
+    set = 1
+}`;
+    h.assertThrows('unknown query', function() {
+      session.run(src);
+    }, "unknown query 'ghostQuery'");
+  });
+
+  reg(3656, 'logic', 'query duplicated name elaboration error', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+.whLogic:{
+    query = stillAtC1, stillAtC1
+    set = 1
+}`;
+    h.assertThrows('duplicated', function() {
+      session.run(src);
+    }, "query 'stillAtC1' duplicated");
+  });
+
+  reg(3657, 'logic', 'query none with query = elaboration error', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+.whLogic:{
+    query none
+    query = stillAtC1
+    set = 1
+}`;
+    h.assertThrows('mutual exclusive', function() {
+      session.run(src);
+    }, 'query none cannot be combined with query =');
+  });
+
+  reg(3658, 'logic', 'redirect not in query = list elaboration error', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire trigger = 1
+
+.whLogic:{
+    query = stillAtC1
+    where:0 >= where
+    set = trigger
+}`;
+    h.assertThrows('redirect not in list', function() {
+      session.run(src);
+    }, "redirect references query 'where' not in query = list");
+  });
+
+  reg(3659, 'logic', 'query none forbids query redirect', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    query none
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    h.assertThrows('query none redirect', function() {
+      session.run(src);
+    }, "query none forbids query redirect 'stillAtC1'");
+  });
+
+  reg(3660, 'logic', 'query = empty list elaboration error', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+.whLogic:{
+    query =
+    set = 1
+}`;
+    h.assertThrows('empty list', function() {
+      session.run(src);
+    }, 'query = requires at least one query name');
+  });
+
+  reg(3661, 'logic', 'query none = rejected at parse', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+.whLogic:{
+    query none = stillAtC1
+    set = 1
+}`;
+    h.assertThrows('query none equals', function() {
+      session.run(src);
+    }, 'query none does not take');
+  });
+
+  reg(3662, 'logic', 'omit query = runs all queries (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('stillAtC1=1', interp.getWireEffectiveValue('ok'), '1');
+    const comp = interp.components.get('.whLogic');
+    h.assert('three query results', String(Object.keys(comp.queryResults || {}).length), '3');
+  });
+
+  reg(3663, 'logic', 'omit query = runs all queries (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('stillAtC1=1 wave', interp.getWireEffectiveValue('ok'), '1');
+    const comp = interp.components.get('.whLogic');
+    h.assert('three query results wave', String(Object.keys(comp.queryResults || {}).length), '3');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

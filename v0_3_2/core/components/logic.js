@@ -137,6 +137,64 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     }
   }
 
+  static LOGIC_META_POUTS = new Set(['execCount', 'truncated', 'depthExceeded', 'mutationFailed']);
+
+  static validateQuerySelection(comp, compName, properties, ctx) {
+    if (!comp || comp.type !== 'logic') return;
+    let queryNone = false;
+    let queryList = null;
+    for (const p of properties || []) {
+      if (p.property === 'logicQueryNone') queryNone = true;
+      if (p.property === 'logicQueryList') queryList = p.queryNames;
+    }
+    if (queryNone && queryList) {
+      throw Error(`logic ${compName}: query none cannot be combined with query =`);
+    }
+    if (queryList) {
+      const seen = new Set();
+      for (const name of queryList) {
+        if (seen.has(name)) {
+          throw Error(`logic ${compName}: query '${name}' duplicated`);
+        }
+        seen.add(name);
+      }
+      const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
+      const inst = ctx && ctx.inlineInstances && comp.programRef
+        ? ctx.inlineInstances.get(comp.programRef) : null;
+      if (!resolveFn || !inst) return;
+      const merged = resolveFn(inst, ctx.inlineInstances);
+      const known = new Set((merged.queries || []).map((q) => q.name));
+      for (const name of queryList) {
+        if (!known.has(name)) {
+          throw Error(`logic ${compName}: unknown query '${name}'`);
+        }
+      }
+      const allowed = new Set(queryList);
+      for (const p of properties) {
+        if (p.property === 'logicQuery>') {
+          if (!allowed.has(p.queryName)) {
+            throw Error(`logic ${compName}: redirect references query '${p.queryName}' not in query = list`);
+          }
+        }
+        if (p.property === 'pout>' && !LogicComponent.LOGIC_META_POUTS.has(p.poutName)) {
+          if (!allowed.has(p.poutName)) {
+            throw Error(`logic ${compName}: redirect references query '${p.poutName}' not in query = list`);
+          }
+        }
+      }
+    }
+    if (queryNone) {
+      for (const p of properties) {
+        if (p.property === 'logicQuery>') {
+          throw Error(`logic ${compName}: query none forbids query redirect '${p.queryName}'`);
+        }
+        if (p.property === 'pout>' && !LogicComponent.LOGIC_META_POUTS.has(p.poutName)) {
+          throw Error(`logic ${compName}: query none forbids query redirect '${p.poutName}'`);
+        }
+      }
+    }
+  }
+
   getWidthBits() { return 1; }
 
   getSupportedProperties() {
@@ -623,7 +681,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     }
   }
 
-  _runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks) {
+  _runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks, queryOpts) {
     const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
     const execFn = typeof executeLogicQueries === 'function' ? executeLogicQueries : null;
     if (!resolveFn || !execFn) throw Error('Logic engine is not loaded');
@@ -645,6 +703,11 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (comp.indexFacts && comp.factIndex) {
       execOpts.factIndex = comp.factIndex;
       execOpts.ruleClauses = comp.ruleClauses || [];
+    }
+    if (queryOpts && queryOpts.queryNone) {
+      execOpts.queryNone = true;
+    } else if (queryOpts && queryOpts.queryNames && queryOpts.queryNames.length) {
+      execOpts.queryNames = queryOpts.queryNames;
     }
     const raw = execFn(runtimeMerged, inputEnv, execOpts);
     const meta = raw._logicMeta || {};
@@ -781,9 +844,11 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (!this._isActive(setVal)) return;
     const redirects = comp._logicRedirects || [];
     const mutationBlocks = comp._logicMutationBlocks || [];
-    this._runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks);
+    const queryOpts = comp._logicQueryOpts || null;
+    this._runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks, queryOpts);
     comp._logicRedirects = [];
     comp._logicMutationBlocks = [];
+    comp._logicQueryOpts = null;
   }
 
   evalGetProperty(comp, property, a, ctx) {

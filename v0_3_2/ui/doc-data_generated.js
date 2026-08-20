@@ -11344,6 +11344,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Trigger** | \`set\` pin — respects \`on:\` (\`raise\` / \`edge\` / \`1\`) |
 | **Inputs** | Pin ← wire in exec block (\`myX = scoreIn\`) |
 | **Outputs** | Query redirect (\`modifier:0 >= result\`) |
+| **Query selection** | **Omit** = all queries; **\`query = a, b\`** = subset; **\`query none\`** = no queries |
 | **Mutations** | \`logic { + fact / - fact }\` — see [logic-runtime.md](logic-runtime.md) |
 | **Doc** | \`doc(comp.logic)\`, \`doc(.characterLogic)\` |
 
@@ -11375,7 +11376,7 @@ sequenceDiagram
 | 1 | **Elaboration** | Program block maps logic vars → pins (\`X is number myX\`) |
 | 2 | **Exec block** | Wires assign pins (\`myX = scoreIn\`); optional **\`logic { + / - }\`** |
 | 3 | **Trigger** | Active \`set\` (per \`on:\`) starts one solve pass |
-| 4 | **Engine** | Runtime KB → all queries from inline run with input bindings |
+| 4 | **Engine** | Runtime KB → queries from inline run (all, subset, or none — see below) |
 | 5 | **Redirect** | Selected solutions written to target wires |
 
 ---
@@ -12055,6 +12056,105 @@ comp [logic] .loopLogic:
 \`\`\`
 
 After **Load & Run**: **\`hitDepth = 1\`** — recursive rule exceeded depth (fail silent on deep branches). Query may still return **\`run >= flag = 0\`** (no complete proof within depth).
+
+---
+
+## Query selection — \`query =\` and \`query none\`
+
+By default, each solve pass runs **every** named query from the merged inline. Use query selection when the inline defines many queries but this exec block only needs a subset — or when you want mutations without any query solve.
+
+| Syntax | Queries run |
+|--------|-------------|
+| *(omit)* | **All** queries from inline |
+| \`query = stillAtC1, hasBox2\` | Only listed names, in list order |
+| \`query none\` | **None** — mutations and meta pouts only |
+
+**Mutual exclusive:** \`query none\` and \`query = …\` cannot appear in the same exec block.
+
+**Redirects:** When \`query =\` lists specific names, every query redirect in that block must name a query from the list. With **\`query none\`**, query redirects are forbidden (meta pouts like **\`mutationFailed\`** still work).
+
+| Error | Cause |
+|-------|--------|
+| Unknown query name | Name not in inline |
+| \`query 'x' duplicated\` | Same name twice in list |
+| Empty \`query =\` | Use **\`query none\`** for zero queries |
+| \`query none = …\` | **\`query none\`** is not an assignment |
+
+### Example — subset (\`query =\`)
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+
+    inside(box1, c1)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+    query where:
+        inside(box1, X)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    query = stillAtC1
+    stillAtC1 >= ok
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**. Only **\`stillAtC1\`** is solved; **\`where\`** and **\`hasBox2\`** are skipped.
+
+### Example — mutations only (\`query none\`)
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    query none
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 0\`**. No query is solved; the mutation commits before redirects.
 
 ---
 

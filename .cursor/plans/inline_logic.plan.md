@@ -1,9 +1,9 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–17 complete.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–18 complete.
 todos:
   - id: logic-decisions
-    content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
+    content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
     status: completed
   - id: logic-assembler
     content: "Faza 1: logic-assembler.js — parser inline [logic] (facts, relations, queries, use)"
@@ -55,7 +55,10 @@ todos:
     status: completed
   - id: logic-data-modes
     content: "Faza 17: comp [logic] data: static + seed (1+r) — D88–D94 confirmed, completed"
-    status: pending
+    status: completed
+  - id: logic-explicit-query
+    content: "Faza 18: query = … explicit (1+l) — D95–D99 confirmed, completed"
+    status: completed
 isProject: false
 ---
 
@@ -189,7 +192,7 @@ comp [logic] .characterLogic:
 | | |
 |---|---|
 | **Decizie MVP** | **A** — la fiecare `set = 1`, rulează **toate** query-urile declarate în inline (după merge `use`) |
-| **Amânat** | **C** — listă explicită `query = modifier, johnOwns` — vezi **1+l** (Faza post-MVP) |
+| **Amânat → F18** | **C** — listă explicită `query = modifier, johnOwns` — vezi **Faza 18** (1+l) |
 | **Motiv user** | MVP simplu; când multe query-uri încetinesc exec-ul, specificarea explicită **nu e redundantă** — e optimizare intenționată, nu duplicare inutilă a redirect-urilor `modifier:0 >=` |
 
 **MVP:**
@@ -200,7 +203,7 @@ comp [logic] .characterLogic:
 ; → toate query-urile se rezolvă; exec block citește doar modifier:0
 ```
 
-**Faza amânată (1+l / D2-C):**
+**Faza 18 (1+l / D2-C):**
 
 ```logts
 .characterLogic:{
@@ -210,6 +213,14 @@ comp [logic] .characterLogic:
     set = 1
 }
 ; → doar query modifier — mai rapid când inline are multe query-uri
+
+.characterLogic:{
+    query none
+    logic { + status(box1, ok) }
+    mutationFailed >= failed
+    set = trigger
+}
+; → zero query-uri — doar mutații + pout meta (linie standalone, fără =)
 ```
 
 ---
@@ -328,7 +339,7 @@ sequenceDiagram
 | **D16** | **A** | `use` merge **facts + relations**; **queries nu se importă**; module folosite n-au queries „vizibile” prin use |
 | **D17** | **A** | `=` bind/calc vs `=:=` test numeric — Prolog |
 | **D18** | **A** | Facts + rules același predicate — **ca Prolog** (clauze OR) |
-| **D19** | **amânat** | `query = …` → **1+l** (cu D2-C) |
+| **D19** | **→ F18** | `query = …` — **Faza 18** (cu D2-C) |
 
 ### Convenție Prolog (D8, D9, D18)
 
@@ -356,7 +367,7 @@ sequenceDiagram
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
 | **D1** | Model runtime | **Two-layer ASM** **(completed)** |
-| **D2** | Query-uri la `set = 1` | **A** MVP; **C** → 1+l **(completed)** |
+| **D2** | Query-uri la `set = 1` | **A** MVP; **C** → **Faza 18** **(completed)** |
 | **D3** | Inputs program + exec | **A** pin ← wire **(completed)** |
 | **D4** | Blocuri exec multiple | **A** last-write-wins **(completed)** |
 | **D5** | Algoritm rezolvare | **A** backtracking **(completed)** |
@@ -373,13 +384,13 @@ sequenceDiagram
 | **D16** | `use` | **A** merge facts/relations; fără queries import **(completed)** |
 | **D17** | `=` vs `=:=` | **A** **(completed)** |
 | **D18** | Facts + rules mixte | **A** ca Prolog **(completed, confirmat user)** |
-| **D19** | `query = …` | **amânat 1+l** |
+| **D19** | `query = …` | **→ Faza 18** (D95–D99) |
 
 ---
 
 ## Decizii de luat — detaliu per ID
 
-### D2 — Ce query-uri rulează la `set = 1` **(completed: A MVP; C amânat 1+l)**
+### D2 — Ce query-uri rulează la `set = 1` **(completed: A MVP; C → Faza 18)**
 
 **Decizie luată:** MVP = **A**. Post-MVP = **C** (query explicit), nu **B** (infer din redirect).
 
@@ -387,7 +398,7 @@ sequenceDiagram
 |---------|--------|----------|
 | **A** | **MVP (completed)** | Toate query-urile din definiție |
 | **B** | respins / nefolosit | Doar query-uri referite în `modifier:N >=` |
-| **C** | **amânat 1+l** | Listă explicită `query = modifier, johnOwns` |
+| **C** | **→ Faza 18** | Listă explicită `query = modifier, johnOwns` |
 
 #### A — Toate query-urile (MVP)
 
@@ -396,7 +407,7 @@ La fiecare exec, rezolvă **fiecare** `query name:` din inline. Rezultatele în 
 - **Pro:** simplu, predictibil, toate slot-urile fresh.
 - **Contra:** cost când sunt multe query-uri — motiv pentru **C** amânat.
 
-#### C — Explicit `query = …` (Faza post-MVP, **1+l**)
+#### C — Explicit `query = …` (**Faza 18**, **1+l**)
 
 ```logts
 .characterLogic:{
@@ -837,9 +848,9 @@ inline [logic] .world:
 
 ---
 
-### D19 — `query = …` în exec block **(amânat — același scope ca D2-C / 1+l)**
+### D19 — `query = …` în exec block **(→ Faza 18 — același scope ca D2-C)**
 
-Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C** amânat ca **1+l**.
+Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C** livrat în **Faza 18**.
 
 ```logts
 .characterLogic:{
@@ -852,7 +863,7 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 
 | Opțiune | Status |
 |---------|--------|
-| **A/C amânat** | **1+l** — post-MVP optimizare |
+| **C** | **→ Faza 18** — `query = …` explicit (D95–D99) |
 | **B** | respins — obligatoriu prea strict |
 
 ---
@@ -1199,6 +1210,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 15** Composiție `use` / `use once` (1+g) | D77–D81 | **(completed)** |
 | **Faza 16** Filter **Logic** Signal Trace (1+t) | D82–D85 | **(completed)** |
 | **Faza 17** `comp [logic] data:` static + seed (1+r) | D88–D94 | **(completed)** |
+| **Faza 18** `query = …` explicit (1+l) | D95–D99 | **(completed)** |
 
 ---
 
@@ -3443,7 +3455,148 @@ comp [logic] .whLogic:
 - [x] **`overlay`** implicit neschimbat (regresie zero)
 - [x] Teste **3638–3650**; doc EN; suite verde (2812/2812)
 
-**Backlog (nu F17):** **1+l**, **1+p**, **1+s**, **1+o** (persistență).
+**Backlog (nu F17):** **1+p**, **1+s**, **1+o** (persistență).
+
+---
+
+## Decizii Faza 18 — `query = …` explicit (D95–D99) **(1+l)**
+
+> **Sursă:** D2 **A** livrat MVP (toate query-urile); D2-C / D19 amânat ca **1+l** — optimizare când inline are multe query-uri.  
+> **Stare:** **D95–D99 confirmed** — F18 **(completed)**.
+
+### Rezumat decizii F18
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D95** | **A** | **`query = name, …`** — subset; **omit** = toate; linie **`query none`** = zero query-uri (NU assignment) |
+| **D96** | **A** | Redirect la query **neinclus** sau cu **`query none`** → **elaboration error** |
+| **D97** | **A** | Nume **necunoscut**, listă **goală**, **`query none` + `query =`** în același block → **elaboration error** |
+| **D98** | **A** | Scope **per exec block** |
+| **D99** | **A** | **Duplicate** în listă → **elaboration error** (ex. `query 'a' duplicated`); ordinea exec = ordinea din listă |
+
+---
+
+### D95 — Sintaxă: omit / listă / zero query-uri **(confirmed: A — user 2026-08-20, rev. sintaxă `query none`)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — omit / `query =` / `query none` (confirmed)** | **Omit** → toate. **`query = a, b`** → subset (doar nume query). **`query none`** → zero query-uri — **linie standalone**, fără `=` |
+| **B — infer din redirect** | Doar query-urile cu redirect — **respins** (D2-B) |
+
+Trei moduri — **mutual exclusive** în același exec block:
+
+| Sintaxă | Query-uri rulate |
+|---------|------------------|
+| *(omit)* | **Toate** din inline merged |
+| `query = modifier, audit` | Doar **modifier**, **audit** (ordinea din listă) |
+| **`query none`** | **Niciunul** — pass fără solve query |
+
+**Zero query-uri — de ce nu `query = none`:** implică fals că poți scrie `query = none, modifier`. Respins.
+
+**Sintaxă zero (confirmed):** linie **`query none`** — modifier după keyword **`query`**, **fără assignment**:
+
+```logts
+.whLogic:{
+    query none
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+| Formă | Status |
+|-------|--------|
+| **`query none`** | **confirmed** — zero query-uri |
+| **`query none = …`** | **respins** — nu e assignment |
+| **`query = none`** | **respins** — implică mix cu alte nume |
+
+```logts
+.characterLogic:{
+    query = modifier, audit
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+}
+```
+
+**Decizie:** **A** — confirmat; zero query-uri via **`query none`** (rev. 2026-08-20).
+
+---
+
+### D96 — Redirect fără query în listă **(confirmed: A — user 2026-08-20)**
+
+Exec block cu `query = audit` dar `modifier:0 >= result`:
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — elaboration error (confirmed)** | Orice redirect `logicQuery>` care citește un query **neinclus** în `query =` → **Error**. Cu linia **`query none`**, orice redirect query → **Error** |
+| **B — auto-run la redirect** | Infer query din redirect — **respins** (D2-B) |
+| **C — stale / zero** | Redirect citește slot neactualizat — **respins** (surpriză la runtime) |
+
+**Motiv A:** fail-fast; lista explicită e contract complet; aliniat D89 (static + logic).
+
+**Decizie:** **A** — confirmat explicit (2026-08-20).
+
+---
+
+### D97 — Nume invalid / listă goală **(confirmed: A — user 2026-08-20)**
+
+| Caz | Rezultat |
+|-----|----------|
+| `query = unknownName` | **Error** — query inexistent în merged inline |
+| `query =` (fără nume după `=`) | **Error** — listă goală; folosește **`query none`** |
+| `query none` + `query = modifier` în același block | **Error** — mutual exclusive |
+| `query none = …` | **Error** — nu e assignment |
+
+**Decizie:** **A** — confirmat explicit (2026-08-20).
+
+---
+
+### D98 — Scope per exec block **(confirmed: A — user 2026-08-20)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — per exec block (confirmed)** | Fiecare property block `.logic:{ … }` are propria listă (sau omit → all). Blocuri diferite pe același comp pot filtra diferit |
+| **B — per component global** | O singură listă pe comp — **respins** (prea rigid) |
+
+**Decizie:** **A** — confirmat explicit (2026-08-20).
+
+---
+
+### D99 — Duplicate și ordine **(confirmed: A — user 2026-08-20)**
+
+| Aspect | Comportament |
+|--------|--------------|
+| **Duplicate** | `query = a, b, a` → **elaboration error** — mesaj tip **`logic .comp: query 'a' duplicated`** (nu dedupe) |
+| **Ordine** | Exec în ordinea din listă (nu ordinea din inline) |
+| **Pout meta** | `truncated`, `depthExceeded`, `execCount`, `mutationFailed` — **neschimbate**; la **`query none`**, `truncated`/`depthExceeded` rămân **0** |
+
+**Decizie:** **A** — confirmat explicit (2026-08-20).
+
+---
+
+### Implementare F18
+
+| Layer | Fișier | Acțiune |
+|-------|--------|---------|
+| Parse | [`parser.js`](../v0_3_2/core/parser.js) | `query = name, …` și linie **`query none`** (fără `=`) în exec block |
+| Runtime | [`logic.js`](../v0_3_2/core/components/logic.js) | Filtrare query set; flag `queryNone` per block; validare D96–D99 |
+| Engine | [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `executeLogicQueries` — subset opțional sau skip all (`query none`) |
+| Elaboration | [`interpreter.js`](../v0_3_2/core/interpreter.js) | Redirect vs listă (D96); `query none` + `query =` mutual exclusive (D97) |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3651+** — omit=all; subset; **`query none`**; errors; legacy+wave |
+| Doc | [`comp-logic.md`](../v0_3_2/doc/comp-logic.md) | **`query =`** + **`query none`** (EN) + `logts-play` |
+
+### Criterii done
+
+- [x] **D95–D99** confirmate + implementate
+- [x] **`query =`** subset; **omit** = all; linie **`query none`** = zero
+- [x] **`query none`** mutual exclusive cu **`query =`** (D97)
+- [x] Redirect neinclus / cu `query none` → elaboration error (D96)
+- [x] Nume invalid / listă goală / duplicate → elaboration error (D97, D99)
+- [x] Per exec block (D98)
+- [x] Teste **3651–3663** legacy + wave; doc EN; suite verde (2825/2825)
+
+**Backlog (nu F18):** **1+p**, **1+s**, **1+o**, **1+u**, …
 
 ---
 
@@ -3532,11 +3685,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 | Topic | ID backlog |
 |-------|------------|
-| Fazele 0–16 | **(completed)** |
-| **Faza 17** `data: static` + `seed` | **1+r** **(completed)** |
+| Fazele 0–17 | **(completed)** |
+| **Faza 18** `query = …` explicit | **1+l** **(completed)** |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
 | Constraint `#K (line L)` trace | **1+v** **(pause)** |
-| `query = …` explicit | **1+l** |
 | POUT declarate comp | **1+k** |
 | Persistență KB | **1+o** |
 | Validare constraints la query | **1+p** |
@@ -3547,9 +3699,9 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 16~~ **(completed)**
-2. ~~**Faza 17**~~ — `comp [logic] data:` **static** + **seed** **(1+r)** — **(completed)**
-3. Apoi backlog: **1+l**, **1+p**, **1+s**, **1+u**, …
+1. ~~Faza 0~~ → ~~Faza 17~~ **(completed)**
+2. ~~**Faza 18**~~ — `query = …` explicit **(1+l)** — **(completed)**
+3. Apoi backlog: **1+p**, **1+s**, **1+o**, **1+u**, …
 
 ---
 
@@ -3570,7 +3722,7 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ⏳ | **1+i** | Cut | Prolog cut — interacție NAF / depth | D5 |
 | ⏳ | **1+j** | Integrare PHZ | | |
 | ⏳ | **1+k** | POUT declarate pe comp (D7-B) | Low priority — probe/debug | D7 |
-| ⏳ | **1+l** | **`query = …` explicit** (D2-C) | Optimizare când rulezi toate query-urile e prea lent | D2 |
+| ✅ | ~~**1+l**~~ | **`query = …` explicit** | **Promovat → Faza 18** — D95–D99 **(completed)** | D2, D19 |
 | ❌ | ~~**1+m**~~ | Inline mutation invoke | **Respins** — `.world:mutate` pe inline **nu**; mutația rămâne în **`comp [logic]`** (`logic { ± }`, index, constraints) | D49 |
 | 🟠✗ | ~~**1+n**~~ | `assert` / `retract` în body reguli | **Închis** — nu Prolog în `<-`; livrat ca **`logic { + / - }`** în exec comp (F11) | D40 |
 | ⏳ | **1+o** | Persistență dynamic facts | retain / save-load între sesiuni; snapshot KB | D48 |
@@ -3626,6 +3778,10 @@ Filter toolbar **Logic** dedicat — **`logic-mut` exclusiv** (D82–D85): scoas
 #### ~~**1+r**~~ → **Faza 17**
 
 **Scope:** **`data: static`** + **`data: seed`**; ~~**copy**~~ respins (D88). Decizii **D89–D94** — vezi **Faza 17**.
+
+#### ~~**1+l**~~ → **Faza 18**
+
+**Scope:** **`query = name, …`** subset; linie **`query none`** zero query-uri; **omit** = all. Decizii **D95–D99** — vezi **Faza 18**.
 
 #### **1+v** ⏸ — pause
 

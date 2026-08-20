@@ -477,12 +477,26 @@ function logicCollectFreeVarsInGoals(goals) {
 
 function executeLogicQueries(mergedDef, inputEnv, options) {
   const opts = options || {};
+  let queries = mergedDef.queries || [];
+  if (opts.queryNone) {
+    queries = [];
+  } else if (opts.queryNames && opts.queryNames.length) {
+    const byName = new Map();
+    for (const q of mergedDef.queries || []) {
+      if (q && q.name) byName.set(q.name, q);
+    }
+    queries = [];
+    for (const name of opts.queryNames) {
+      const q = byName.get(name);
+      if (q) queries.push(q);
+    }
+  }
   const engine = opts.factIndex
     ? new LogicEngine(mergedDef.clauses || [], { factIndex: opts.factIndex, ruleClauses: opts.ruleClauses })
     : new LogicEngine(mergedDef.clauses || []);
   if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
-  const out = engine.executeQueries(mergedDef.queries || [], inputEnv);
+  const out = engine.executeQueries(queries, inputEnv);
   out._logicMeta = { truncated: engine.truncated, depthExceeded: engine.depthExceeded };
   return out;
 }

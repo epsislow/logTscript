@@ -2414,6 +2414,41 @@ parseBoardInstance() {
       const raw = this.parseRawBraceBlock(bracePos);
       return { property: 'logicMutation', raw };
     }
+    if (propName === 'query') {
+      this.t.skip();
+      if (this.c.type === 'ID' && this.c.value === 'none') {
+        this.eat('ID');
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === '=') {
+          throw Error(`logic ${componentName}: query none does not take '=' at ${this.c.line}:${this.c.col}`);
+        }
+        return { property: 'logicQueryNone' };
+      }
+      if (this.c.type === 'SYM' && this.c.value === '=') {
+        this.eat('SYM', '=');
+        this.t.skip();
+        const queryNames = [];
+        while (true) {
+          if (this.c.type !== 'ID') {
+            if (!queryNames.length) {
+              throw Error(`logic ${componentName}: query = requires at least one query name at ${this.c.line}:${this.c.col}`);
+            }
+            break;
+          }
+          queryNames.push(this.c.value);
+          this.eat('ID');
+          this.t.skip();
+          if (this.c.type === 'SYM' && this.c.value === ',') {
+            this.eat('SYM', ',');
+            this.t.skip();
+            continue;
+          }
+          break;
+        }
+        return { property: 'logicQueryList', queryNames };
+      }
+      throw Error(`logic ${componentName}: expected 'none' or '=' after query at ${this.c.line}:${this.c.col}`);
+    }
     if (propName === 'openSock' && this.c.type === 'SYM' && this.c.value === '<-') {
       this.eat('SYM', '<-');
       const targetAtom = this.atom();
