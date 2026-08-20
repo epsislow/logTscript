@@ -32,7 +32,6 @@ const DOC_SECTIONS = [
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
       { file: 'number-conversion.md', label: 'Number conversion', searchPrimary: 'CNTN10S N2N10S N10S2N CNTN16S N2N16S N16S2N ISDIGIT', searchExtra: 'decimal BCD hex CNTN10S N2N10S N10S2N CNTN16S N2N16S N16S2N ISDIGIT packed digits' },
       { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchPrimary: 'show peek probe watch Zlist deps lutOf', searchExtra: 'lutOf exprOfLut truthTableOf output panel ascii signed bin dec compact elRange deferred property block top-level wave settle flush' },
-      { file: 'signal-trace.md', label: 'Signal Trace (UI panel)', searchPrimary: 'Signal Trace wave listen L1 L2 L3 logic-mut lut-mut phz filter', searchExtra: 'logic-mut try commit rollback mutationFailed expand wave legacy components filter Fmt' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
       { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchPrimary: 'ZSTATE ZRELEASE ZCONNECT ZCONN', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= MODE' },
       { file: 'editorUI.md', label: 'Editor UI' },
@@ -168,6 +167,7 @@ const DOC_SECTIONS = [
       { file: 'mmap.md', label: 'Memory map (`comp [mmap]`)' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
       { file: 'servo.md', label: 'Servo component' },
+      { file: 'signal-trace.md', label: 'Signal Trace (UI panel)' },
       { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' },
       { file: 'text-functions.md', label: 'Text functions (ASCII)', searchPrimary: 'ASCII EQT TRIMT' }
     ],

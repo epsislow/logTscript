@@ -45,7 +45,7 @@ todos:
     content: "Faza 13: scale & perf (1+q) — fact index, count/2, D60–D68 confirmed"
     status: completed
   - id: logic-mut-trace
-    content: "Faza 14: logic-mut Signal Trace + doc/signal-trace.md — D69–D76 confirmed"
+    content: "Faza 14: logic-mut Signal Trace + doc/signal-trace.md — D69–D76 (completed)"
     status: completed
 isProject: false
 ---
@@ -1246,7 +1246,7 @@ comp [logic] .whLogic:
 | **Faza 11** Runtime mutation (1+e) | D40–D49 | **(completed)** |
 | **Faza 12** Constraints | D50–D59 | **(completed)** |
 | **Faza 13** Scale & perf (1+q) | D60–D68 | **(completed)** |
-| **Faza 14** Mutation Signal Trace (`logic-mut`) | D69–D76 | **(ready-to-implement)** — D69–D76 confirmed |
+| **Faza 14** Mutation Signal Trace (`logic-mut`) | D69–D76 | **(completed)** |
 
 ---
 
@@ -1263,9 +1263,9 @@ comp [logic] .whLogic:
 | **6** | [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md), teste **3506–3507** |
 | **5** | F5 vector/matrix, **3512–3520**, pin limits, round-trip |
 | **7–10** | `\+` NAF, depth tuning, `.world:query`, `;unique`/ `;last` — teste **3536–3558** |
-| **11–14** | **F11–F13 completed**; **F14 ready** — logic-mut Signal Trace D69–D76 |
+| **11–14** | **F11–F14 completed** — runtime mutation, constraints, indexing, logic-mut Signal Trace |
 
-**Teste:** 2768/2768 (post-F13).
+**Teste:** 2780/2780 (post-F14).
 
 **Notă:** `logic-comp-bind.js` planificat separat → integrat în `logic-assembler.js` (`parseLogicProgramBlock`) + `components/logic.js`.
 
@@ -2866,7 +2866,7 @@ inline [logic] .warehouse:
 ## Decizii Faza 14 — mutation Signal Trace (`logic-mut`) (D69–D76)
 
 > **Sursă:** debug UX — `mutationFailed` e doar 1 bit; user vrea motiv + vizibilitate în **Signal Trace** (Win → Signal Trace).  
-> **Stare:** **D69–D76 confirmed** — F14 **(ready-to-implement)**.
+> **Stare:** **D69–D76 confirmed** — F14 **(completed)**.
 
 ### Rezumat decizii F14
 
@@ -3038,7 +3038,7 @@ try { + level(box1, 15) }
 
 ---
 
-## Faza 14 — mutation Signal Trace (`logic-mut`) **(ready-to-implement — D69–D76 confirmed)**
+## Faza 14 — mutation Signal Trace (`logic-mut`) **(completed — D69–D76)**
 
 **Scop:** la fiecare pass cu `logic { + / - }`, Signal Trace arată **try**, apoi **commit (ops, net)** sau **rollback — motiv** (inclusiv constraint **`#K`**); valori wire rezolvate în `try`; wave = legacy. **Doc:** pagină dedicată [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) (mutare din `debug.md` + secțiune **`logic-mut`**).
 
@@ -3064,7 +3064,7 @@ try { + level(box1, 15) }
 |---------|---------|
 | **Mutare** | Conținutul actual § Signal Trace din [`debug.md`](../v0_3_2/doc/debug.md) → `signal-trace.md` (controls, L1–L3, Fmt, Filter, wave/legacy, line catalog PHZ/lut-mut, value formatting) |
 | **Stub în debug.md** | 3–5 rânduri: ce e panelul, Win → Signal Trace, link **[signal-trace.md](signal-trace.md)** — păstrează anchor `#signal-trace-ui-panel` sau redirect text |
-| **Extindere logic** | Secțiune **`logic-mut`**: contract try / commit `(N ops, M net)` / rollback `#K`; truncare + `[+]`; valori rezolvate; zero linii fără `logic { }`; **logts-play** exemple success + constraint fail |
+| **Extindere logic** | Secțiune **`logic-mut`**: contract try / commit `(N ops, M net)` / rollback `#K`; truncare + `[+]`; valori rezolvate (inclusiv exemplu wire `text`/`number` în `try`); zero linii fără `logic { }`; **logts-play** success + constraint fail |
 | **vs alte tool-uri** | Tabel scurt: Signal Trace vs `probe` vs `watch` vs `show` (mutat/rezumat din debug) |
 | **Cross-linkuri** | `phz.md`, `sock.md`, `huffman-v2.md`, `logic-runtime.md`, `logic-indexing.md` → `signal-trace.md`; Wave debug patterns din debug rămân în debug cu link la signal-trace |
 | **doc-viewer** | Label + searchPrimary/Extra pentru discoverability |
@@ -3094,13 +3094,13 @@ logic-mut .<comp>: rollback — <code>: <message>
 
 ### Criterii done
 
-- [ ] Decizii **D69–D76** confirmate *(done în plan)*
-- [ ] Linii `logic-mut` L2, Signal Trace ON, wave = legacy
-- [ ] `try` truncat + `[+]`; valori rezolvate fără prefix tip
-- [ ] `commit (N ops, M net)`; rollback cu `#K` la constraint
-- [ ] Fără `logic { }` → zero linii
-- [ ] Teste **3607+** legacy + wave; suite verde
-- [ ] Doc **[`signal-trace.md`](../v0_3_2/doc/signal-trace.md)** — pagină dedicată; mutare din debug.md; secțiune **`logic-mut`**; logts-play; cross-linkuri + doc-viewer
+- [x] Decizii **D69–D76** confirmate
+- [x] Linii `logic-mut` L2, Signal Trace ON, wave = legacy
+- [x] `try` truncat + `[+]`; valori rezolvate fără prefix tip
+- [x] `commit (N ops, M net)`; rollback cu `#K` la constraint
+- [x] Fără `logic { }` → zero linii
+- [x] Teste **3607–3618** legacy + wave; suite verde (**2780**)
+- [x] Doc **[`signal-trace.md`](../v0_3_2/doc/signal-trace.md)** — pagină dedicată; mutare din debug.md; secțiune **`logic-mut`**; logts-play; cross-linkuri + doc-viewer
 
 **Backlog (nu F14):** `mutationReason` text pout; constraint-as-query helper; `#K (line L)` la parse; filter **Logic** dedicat în UI.
 
@@ -3203,7 +3203,7 @@ comp [logic] .peopleLogic:
 | `comp [logic] data:` copy/static/seed | **1+r** amânat |
 | Constraints `constraint P <= body` | **Faza 12 (completed)** — D50–D59 |
 | Scale / perf index + count (1+q) | **Faza 13 (completed)** — D60–D68 |
-| Mutation Signal Trace `logic-mut` | **Faza 14 (ready-to-implement)** — D69–D76; doc [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) |
+| Mutation Signal Trace `logic-mut` | **Faza 14 (completed)** — D69–D76; doc [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) |
 | `"atom"` vs wire prefix în mutation | **D59-A (completed)** |
 | `assert`/`retract` în reguli | **1+n** amânat |
 | Inline `.world:mutate` | **1+m** amânat, low priority |
@@ -3212,6 +3212,5 @@ comp [logic] .peopleLogic:
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 13~~ **(completed)**
-2. **Faza 14** — **D69–D76 confirmed** → `logic-mut` Signal Trace + doc **`signal-trace.md`**
-3. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**, `mutationReason` pout
+1. ~~Faza 0~~ → ~~Faza 14~~ **(completed)**
+2. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**, `mutationReason` pout, filter **Logic** dedicat în Signal Trace

@@ -40527,7 +40527,7 @@ logic-mut .<comp>: rollback — <reason>
 |------|---------|
 | **\`ops\`** | Number of operations in the transaction (parsed list length) |
 | **\`net\`** | Operations that actually changed the dynamic store (idempotent retract/add skipped) |
-| **\`try\`** | Shows resolved ground facts — wires replaced by literals (\`"c1"\`, \`15\`, \`box3\`) without \`text\`/\`number\` prefixes |
+| **\`try\`** | Shows **resolved** ground facts at run time — wire operands are decoded and printed as literals, not wire names (see [Resolved wire values in \`try\`](#resolved-wire-values-in-try)) |
 | **Truncation** | At most **4** ops inline; extra ops shown as \`… (+N)\` with full list under **\`[+]\`** expand |
 | **Constraint fail** | \`rollback — constraint inside/2 #K failed on + inside(…)\` — **\`#K\`** is 1-based ordinal in the inline program |
 | **No \`logic { }\`** | **Zero** \`logic-mut\` lines (queries-only passes are silent) |
@@ -40590,6 +40590,82 @@ Expected trace (legacy):
 [step N] logic-mut .whLogic: try { - inside(box1, c1); + inside(box1, c2) }
 [step N] logic-mut .whLogic: commit (2 ops, 2 net)
 \`\`\`
+
+### Resolved wire values in \`try\`
+
+In the mutation source you write **\`text\`** / **\`number\`** / **\`bool\`** wire references (same syntax as in [logic-runtime.md](logic-runtime.md)). Signal Trace does **not** repeat the wire name or bind-type prefix — it shows the **effective value** read from the wire when the exec block runs.
+
+| In \`logic { … }\` source | Wire at run time | In \`try { … }\` trace |
+|-------------------------|------------------|----------------------|
+| \`+ inside(box3, text cName)\` | \`16wire cName = "c2"\` | \`+ inside(box3, "c2")\` |
+| \`+ level(box3, number lvlWire)\` | \`8wire lvlWire = 00001111\` (15) | \`+ level(box3, 15)\` |
+| \`+ inside(box1, c1)\` | atom in source (no wire) | \`+ inside(box1, c1)\` |
+
+Atoms and numbers written directly in the mutation block appear unchanged. Only **\`text\`**, **\`number\`**, and **\`bool\`** wire operands are decoded for display.
+
+Arm Signal Trace **ON**, level **L2**, then **Load & Run**:
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+    capacity(c2, 2)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container),
+        capacity(Container, Max),
+        count(inside(_, Container), N),
+        N =< Max
+
+    constraint level(O, N) <=
+        object(O),
+        N >= 0,
+        N =< 99
+
+    query countC1:
+        count(inside(_, c1), 2)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+16wire cName = "c2"
+8wire lvlWire = 00001111
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        + inside(box3, text cName)
+        + level(box3, number lvlWire)
+    }
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+Expected trace:
+
+\`\`\`text
+[step N] logic-mut .whLogic: try { + inside(box3, "c2"); + level(box3, 15) }
+[step N] logic-mut .whLogic: commit (2 ops, 2 net)
+\`\`\`
+
+Compare with the source: \`text cName\` and \`number lvlWire\` are gone from the trace — you see **\`"c2"\`** (decoded text) and **\`15\`** (decoded number) instead. Change \`cName\` or \`lvlWire\` before Run and the **\`try\`** line updates on the next pass.
 
 ### Example — constraint failure (rollback)
 
