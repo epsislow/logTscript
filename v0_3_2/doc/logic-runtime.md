@@ -500,5 +500,6 @@ Mutation and query results are intended to be **identical** under **wave** and *
 
 - [inline-logic.md](inline-logic.md) — static facts, rules, queries
 - [logic-constraints.md](logic-constraints.md) — `constraint` validation, `<=` vs `<-`
+- [logic-indexing.md](logic-indexing.md) — fact index, `count/2`, `indexFacts`, `indexRebuild`
 - [comp-logic.md](comp-logic.md) — pins, redirects, pouts, policies
 - [logic-query-exec.md](logic-query-exec.md) — `.world:query` on static inline KB

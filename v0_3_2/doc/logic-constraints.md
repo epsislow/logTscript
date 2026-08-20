@@ -306,6 +306,58 @@ After **Load & Run**: **`failed = 1`**, **`ok = 0`** — container already full 
 
 ---
 
+## Capacity with `count/2` (generic)
+
+The built-in **`count(Goal, N)`** counts solutions to **`Goal`** on the **proposed KB** — a direct replacement for helper + NAF patterns such as `badTriple` / `slotAvailable`:
+
+```logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
+
+    query thirdInC1:
+        inside(box3, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 1`**, **`ok = 0`**.
+
+Helper relations remain valid; see [logic-indexing.md](logic-indexing.md) for **`count/2`** syntax, **`indexFacts`**, and **`indexRebuild`**.
+
+---
+
 ## Mutation wire prefixes (D59)
 
 In `logic { }`, a bare identifier is always a **logic atom**. To read a **LogTScript wire**, prefix with the decode type:

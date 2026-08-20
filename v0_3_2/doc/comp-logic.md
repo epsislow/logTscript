@@ -72,6 +72,8 @@ comp [logic] .characterLogic:
 | **`on:`** | Property-block trigger mode (see below) |
 | **`maxDepth:`** | Optional — max goal steps per solve (default **256**) |
 | **`maxSolutions:`** | Optional — max solutions collected per query (default **64**) |
+| **`indexFacts:`** | **`0`** or **`1`** (default **1**) — persistent fact index; **`0`** disables index |
+| **`indexRebuild:`** | **`full`** (default) or **`delta`** — index update after commit; ignored when **`indexFacts: 0`** |
 
 ### Program block bindings
 

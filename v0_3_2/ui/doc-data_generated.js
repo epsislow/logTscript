@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-constraints.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-constraints.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11399,6 +11399,8 @@ comp [logic] .characterLogic:
 | **\`on:\`** | Property-block trigger mode (see below) |
 | **\`maxDepth:\`** | Optional — max goal steps per solve (default **256**) |
 | **\`maxSolutions:\`** | Optional — max solutions collected per query (default **64**) |
+| **\`indexFacts:\`** | **\`0\`** or **\`1\`** (default **1**) — persistent fact index; **\`0\`** disables index |
+| **\`indexRebuild:\`** | **\`full\`** (default) or **\`delta\`** — index update after commit; ignored when **\`indexFacts: 0\`** |
 
 ### Program block bindings
 
@@ -22533,6 +22535,58 @@ After **Load & Run**: **\`failed = 1\`**, **\`ok = 0\`** — container already f
 
 ---
 
+## Capacity with \`count/2\` (generic)
+
+The built-in **\`count(Goal, N)\`** counts solutions to **\`Goal\`** on the **proposed KB** — a direct replacement for helper + NAF patterns such as \`badTriple\` / \`slotAvailable\`:
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
+
+    query thirdInC1:
+        inside(box3, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 1\`**, **\`ok = 0\`**.
+
+Helper relations remain valid; see [logic-indexing.md](logic-indexing.md) for **\`count/2\`** syntax, **\`indexFacts\`**, and **\`indexRebuild\`**.
+
+---
+
 ## Mutation wire prefixes (D59)
 
 In \`logic { }\`, a bare identifier is always a **logic atom**. To read a **LogTScript wire**, prefix with the decode type:
@@ -22620,6 +22674,288 @@ Constraint and mutation results are intended to be **identical** under wave and 
 
 - [logic-runtime.md](logic-runtime.md) — mutations, tombstones, overlay
 - [inline-logic.md](inline-logic.md) — facts, rules, queries
+- [comp-logic.md](comp-logic.md) — exec block, redirects, \`mutationFailed\`
+`,
+    'logic-indexing.md': `# Logic indexing — fact index and \`count/2\`
+
+\`comp [logic]\` can maintain an internal **fact index** over the effective knowledge base (static facts minus tombstones, plus dynamic adds). The engine also provides built-in **\`count(Goal, N)\`** for counting solutions to a goal on the current KB — useful in constraints, rules, and queries.
+
+Related: [logic-runtime.md](logic-runtime.md) (mutations), [logic-constraints.md](logic-constraints.md) (validation), [comp-logic.md](comp-logic.md) (component wiring).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (\`on: 1\` on the component).
+
+---
+
+## Quick reference
+
+| Attribute | Default | Meaning |
+|-----------|---------|---------|
+| **\`indexFacts\`** | **\`1\`** (on) | Build and use a persistent fact index per component |
+| **\`indexFacts: 0\`** | — | No index — same scan path as before indexing (debug / comparison) |
+| **\`indexRebuild\`** | **\`full\`** | Rebuild strategy when index is on (\`indexFacts: 1\`) |
+| **\`indexRebuild: full\`** | default | Full O(n) rebuild at init and after each successful mutation commit |
+| **\`indexRebuild: delta\`** | opt-in | Full rebuild at init; O(delta) patch on each successful commit |
+| **\`indexRebuild\`** with **\`indexFacts: 0\`** | ignored | Attribute has no effect |
+
+| Built-in | Syntax | Meaning |
+|----------|--------|---------|
+| **\`count/2\`** | \`count(Goal, N)\` | **\`N\`** = number of solutions to **\`Goal\`** on the current KB |
+
+---
+
+## Component attributes
+
+\`\`\`logts
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1        # default — omit = on
+    indexRebuild: full    # default — or delta
+    .warehouse { }
+\`\`\`
+
+| \`indexFacts\` | \`indexRebuild\` | Behaviour |
+|--------------|----------------|-----------|
+| **\`0\`** | *(ignored)* | Linear merge path; no persistent index |
+| **\`1\`** / omitted | **\`full\`** / omitted | Index built at elaboration; full rebuild after each commit |
+| **\`1\`** / omitted | **\`delta\`** | Index built at elaboration; incremental patch after each commit |
+
+**Init** always performs a **full** index build (empty index → scan effective KB).
+
+**Pre-commit constraint validation** builds a **temporary full index** on the proposed KB (one pass per validation) — independent of \`indexRebuild\`.
+
+**Delta patch** applies mutation ops in transaction order, idempotently (aligned with the dynamic store):
+
+- **\`- key\`** when key absent → no-op  
+- **\`+ key\`** when key already present → no-op  
+
+If the index cannot legally reflect the post-commit KB, the engine throws **\`Error\`** (no silent fallback rebuild).
+
+---
+
+## \`count/2\`
+
+**Syntax:** \`count(Goal, N)\` — goal first, count second (same goal-list style as the rest of the body).
+
+| \`N\` in call | Behaviour |
+|-------------|-----------|
+| **Variable** | Bound to the solution count |
+| **Ground number** | Must equal the solution count (e.g. \`count(inside(_, c1), 2)\`) |
+
+**Example — count solutions in a query (boolean success on wire):**
+
+Use a **ground** second argument when the redirect wire is 1-bit success (\`ok = 1\` means the count matched):
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    query twoInC1:
+        count(inside(_, c1), 2)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    twoInC1 >= ok
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`** — exactly two \`inside(_, c1)\` facts.
+
+---
+
+## \`count/2\` in constraints (capacity)
+
+Replace helper relations + NAF with a direct count on the proposed KB:
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
+
+    query thirdInC1:
+        inside(box3, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 1\`**, **\`ok = 0\`** — third object rejected; store unchanged.
+
+Helper relations such as \`badTriple\` / \`slotAvailable\` remain valid; \`count/2\` is the generic pattern for “at most **N** facts matching **Goal**”.
+
+---
+
+## \`indexRebuild: delta\` — move with patch
+
+Same semantic result as **\`full\`** after an atomic move; delta patches only the touched keys:
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+    capacity(c2, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
+
+    query oneInC1:
+        count(inside(_, c1), 1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1
+    indexRebuild: delta
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    oneInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 0\`**, **\`ok = 1\`** — one object left in \`c1\` after the move.
+
+---
+
+## \`indexFacts: 0\` — index off
+
+Disables the persistent index. Constraints, mutations, and queries behave the same; only the internal index path is skipped (\`indexRebuild\` is ignored):
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
+
+    query thirdInC1:
+        inside(box3, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 0
+    indexRebuild: delta
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 1\`** — same rejection as with indexing on.
+
+---
+
+## Delta idempotency (duplicate ops)
+
+The dynamic store accepts duplicate **\`+\`** / **\`-\`** on the same key; the delta patch does too:
+
+\`\`\`logts
+logic {
+    - inside(box1, c1)
+    - inside(box1, c1)
+    - inside(box1, c1)
+}
+\`\`\`
+
+After the first remove, further removes are **no-ops** — no index error, no \`mutationFailed\`.
+
+---
+
+## See also
+
+- [logic-constraints.md](logic-constraints.md) — \`<=\` validation, proposed KB  
+- [logic-runtime.md](logic-runtime.md) — \`logic { + / - }\`, tombstones  
 - [comp-logic.md](comp-logic.md) — exec block, redirects, \`mutationFailed\`
 `,
     'logic-query-exec.md': `# Inline logic query — \`.world:query({ })\`
@@ -23417,6 +23753,7 @@ Mutation and query results are intended to be **identical** under **wave** and *
 
 - [inline-logic.md](inline-logic.md) — static facts, rules, queries
 - [logic-constraints.md](logic-constraints.md) — \`constraint\` validation, \`<=\` vs \`<-\`
+- [logic-indexing.md](logic-indexing.md) — fact index, \`count/2\`, \`indexFacts\`, \`indexRebuild\`
 - [comp-logic.md](comp-logic.md) — pins, redirects, pouts, policies
 - [logic-query-exec.md](logic-query-exec.md) — \`.world:query\` on static inline KB
 `,

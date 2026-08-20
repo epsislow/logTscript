@@ -38066,5 +38066,426 @@ comp [logic] .whLogic:
     h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
   }, { propagation: 'wave' });
 
+  const INLINE_LOGIC_WAREHOUSE_COUNT = `inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+    capacity(c2, 2)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container),
+        capacity(Container, Max),
+        count(inside(_, Container), N),
+        N =< Max
+
+    query thirdInC1:
+        inside(box3, c1)
+
+    query countC1:
+        count(inside(_, c1), 2)
+
+    query countC1one:
+        count(inside(_, c1), 1)
+
+:`;
+
+  const INLINE_LOGIC_WAREHOUSE_COUNT_HELPER = `inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+
+    badTriple(C) <-
+        inside(box1, C),
+        inside(box2, C),
+        inside(box3, C)
+
+    slotAvailable(C) <-
+        capacity(C, Max),
+        \\+ badTriple(C)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container),
+        slotAvailable(Container)
+
+    query thirdInC1:
+        inside(box3, c1)
+
+:`;
+
+  reg(3594, 'logic', 'parse and eval count(inside(_, c1), N)', function(h, session) {
+    const prog = parseLogicBody('query q: count(inside(_, c1), 2)');
+    h.assert('one query', String((prog.queries || []).length), '1');
+    h.assert('count goal', prog.queries[0].goals[0].predicate, 'count');
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    countC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('count is 2', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3595, 'logic', 'constraint capacity with count/2 rejects third inside', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('box3 not in c1', interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3596, 'logic', 'index after atomic move count correct', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1
+    indexRebuild: full
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('one in c1 after move', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3597, 'logic', 'badTriple helper vs count/2 same capacity result', function(h, session) {
+    const srcHelper = INLINE_LOGIC_WAREHOUSE_COUNT_HELPER + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const srcCount = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const r1 = session.run(srcHelper);
+    const r2 = session.run(srcCount);
+    h.assert('helper failed=1', r1.interp.getWireEffectiveValue('failed'), '1');
+    h.assert('count failed=1', r2.interp.getWireEffectiveValue('failed'), '1');
+    h.assert('helper ok=0', r1.interp.getWireEffectiveValue('ok'), '0');
+    h.assert('count ok=0', r2.interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3598, 'logic', 'indexRebuild delta same KB as full after move', function(h, session) {
+    const base = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const srcFull = base.replace('indexFacts: 1', 'indexFacts: 1\n    indexRebuild: full');
+    const srcDelta = base.replace('indexFacts: 1', 'indexFacts: 1\n    indexRebuild: delta');
+    const rFull = session.run(srcFull);
+    const rDelta = session.run(srcDelta);
+    h.assert('full failed=0', rFull.interp.getWireEffectiveValue('failed'), '0');
+    h.assert('delta failed=0', rDelta.interp.getWireEffectiveValue('failed'), '0');
+    h.assert('full ok', rFull.interp.getWireEffectiveValue('ok'), '1');
+    h.assert('delta ok', rDelta.interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3599, 'logic', 'delta idempotent triple remove and add same key', function(h, session) {
+    const srcRemove = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1
+    indexRebuild: delta
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        - inside(box1, c1)
+        - inside(box1, c1)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const srcAdd = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1
+    indexRebuild: delta
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        + inside(box3, c1)
+        + inside(box3, c1)
+        + inside(box3, c1)
+    }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const rRemove = session.run(srcRemove);
+    h.assert('triple remove failed=0', rRemove.interp.getWireEffectiveValue('failed'), '0');
+    h.assert('one left in c1', rRemove.interp.getWireEffectiveValue('ok'), '1');
+    const rAdd = session.run(srcAdd);
+    h.assert('triple add failed=1 capacity', rAdd.interp.getWireEffectiveValue('failed'), '1');
+  });
+
+  reg(3600, 'logic', 'indexFacts 0 ignores indexRebuild path F12', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 0
+    indexRebuild: delta
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1 no index', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('ok=0', interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3601, 'logic', 'constraint capacity with count/2 rejects third (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    thirdInC1 >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('box3 not in c1', interp.getWireEffectiveValue('ok'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3602, 'logic', 'index after atomic move count correct (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexRebuild: full
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('one in c1', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3603, 'logic', 'badTriple vs count/2 same result (wave)', function(h, session) {
+    const srcCount = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(srcCount);
+    h.assert('count failed=1 wave', interp.getWireEffectiveValue('failed'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3604, 'logic', 'indexRebuild delta same as full after move (wave)', function(h, session) {
+    const base = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const srcDelta = base.replace('on: 1', 'on: 1\n    indexRebuild: delta');
+    const { interp } = session.run(srcDelta);
+    h.assert('delta wave failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('delta wave ok', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3605, 'logic', 'delta idempotent triple remove (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexRebuild: delta
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        - inside(box1, c1)
+        - inside(box1, c1)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('one in c1 wave', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3606, 'logic', 'indexFacts 0 path F12 (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 0
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1 wave', interp.getWireEffectiveValue('failed'), '1');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

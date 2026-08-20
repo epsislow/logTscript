@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–10 complete; Fazele 11–12 planificate."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–12 complete; Faza 13 (1+q) ready."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -41,6 +41,9 @@ todos:
   - id: logic-constraints
     content: "Faza 12: constraints — constraint P <= body, validate proposed KB, D50–D59 confirmed"
     status: completed
+  - id: logic-scale-perf
+    content: "Faza 13: scale & perf (1+q) — fact index, count/2, D60–D68 confirmed"
+    status: pending
 isProject: false
 ---
 
@@ -1172,7 +1175,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **1+n** | `assert` / `retract` în body reguli | Prolog clasic în `<-` body — D40=A exec-only | D40 |
 | **1+o** | Persistență dynamic facts | retain / save-load între sesiuni; snapshot KB | D48 |
 | **1+p** | Validare constrângeri la query | read-only „is state legal?” fără mutație | D53 |
-| **1+q** | Index pe dynamic facts | performanță retract/lookup volume mari | F11 |
+| ~~**1+q**~~ | ~~Index pe dynamic facts~~ | **Promovat → Faza 13** — index facts, `count/2`, perf constraints | D60–D68 |
 | **1+r** | **`comp [logic] data:`** | **`overlay`** (default F11) / **`copy`** / **`static`**; ex-D41-C seed — impact D44/D45/D48 la **1+r** | D41 |
 
 ### Note backlog — explicații (fără fază încă)
@@ -1186,6 +1189,10 @@ Sketch actualizat: **[`logic_runtime_mutation_n_constraint`](../my_ideas/logic_r
 #### ~~**1+h**~~ → **Faza 9**
 
 Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
+
+#### ~~**1+q**~~ → **Faza 13**
+
+Performanță runtime logic la volume mari: **index pe facts efective**, **`count/2`** pentru constraints (înlocuie helper-e `badTriple` / backtracking greoi), păstrând semantica F11/F12. Detaliu **D60–D68** mai jos.
 
 #### **1+r** — `comp [logic] data:` (overlay / copy / static)
 
@@ -1235,6 +1242,7 @@ comp [logic] .whLogic:
 | **Faza 10** Result policies (1+b) | D34–D38 | **(completed)** — teste 3554–3558, doc logts-play |
 | **Faza 11** Runtime mutation (1+e) | D40–D49 | **(completed)** |
 | **Faza 12** Constraints | D50–D59 | **(completed)** |
+| **Faza 13** Scale & perf (1+q) | D60–D68 | **(ready-to-implement)** — D60–D68 confirmed |
 
 ---
 
@@ -1251,7 +1259,7 @@ comp [logic] .whLogic:
 | **6** | [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md), teste **3506–3507** |
 | **5** | F5 vector/matrix, **3512–3520**, pin limits, round-trip |
 | **7–10** | `\+` NAF, depth tuning, `.world:query`, `;unique`/ `;last` — teste **3536–3558** |
-| **11–12** | **F11 completed**; **F12 ready** — constraints D50–D59 confirmed |
+| **11–13** | **F11–F12 completed**; **F13 ready** — scale/perf 1+q D60–D68 |
 
 **Teste:** 2720/2720 (2026-08-20, post-F10).
 
@@ -2526,7 +2534,328 @@ comp [logic] .whLogic:
 - [x] Teste **3576–3593** legacy + wave; suite verde **2755/2755**
 - [x] Doc **logts-play** — [`logic-constraints.md`](../v0_3_2/doc/logic-constraints.md), updates runtime/comp/inline
 
-**Amânat post-F12:** constraints la query (**1+p**); aggregates în constraints (**1+q**); revalidare globală A2 (**1+q**).
+**Amânat post-F12:** constraints la query (**1+p**).
+
+---
+
+## Decizii Faza 13 — scale & perf (1+q) (D60–D68)
+
+> **Sursă:** backlog **1+q** — index dynamic facts, aggregates constraints (ex-D57-C), optimizări D54.  
+> **Stare:** **D60–D68 confirmed** — F13 **(ready-to-implement)**.
+
+### Rezumat decizii F13
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D60** | **A** | Index + `count/2` |
+| **D61** | **A** | Index pe KB **efectivă** per comp; **B** (static/dynamic separat) — follow-up dacă static uriaș |
+| **D62** | **B** | Attribute **`indexRebuild: full`** (default) **`\| delta`**; init = mereu full; **`indexFacts: 0`** → ignore |
+| **D63** | **A** | `count(Goals, N)` — nu B (ordine ISO), nu C |
+| **D64** | **A** | Număr soluții; înlocuiește pattern `badTriple` |
+| **D65** | **A** | N output sau ground; vars din head legate în G |
+| **D66** | **A** | Engine primește index pre-built + rules |
+| **D67** | **A** | Helper-e vechi rămân valide |
+| **D68** | **B** | **`indexFacts: 1`** implicit; **`0`** = fără index; **`indexRebuild`** ignorat când `0` |
+
+---
+
+### Rezumat problemă (context)
+
+| Situație azi (F12) | Limită |
+|--------------------|--------|
+| `logicBuildRuntimeClauses` | Scan liniar static + filtru tombstone + concat adds |
+| `LogicEngine` index | Re-internare clauses la fiecare solve/validate |
+| Constraints capacity | Helper relations + NAF + multiple `inside/2` goals (`badTriple`) |
+| D54-A | Corect funcțional; body scanează KB propusă — O(n) pe predicate populate |
+
+**Scop F13:** aceeași semantica wave=legacy, **fără breaking changes** — doar structuri de date + **`count/2`** (MVP aggregate).
+
+---
+
+### D60 — Scope F13 **(confirmed: A)**
+
+| Opțiune | Livrabil |
+|---------|----------|
+| **A — index + `count/2` (recommended)** | Index facts efective per comp + built-in `count(Goal, N)` în body constraint/rule/query |
+| **B — doar index** | Perf merge/lookup; constraints rămân relation helpers |
+| **C — doar `count/2`** | Aggregates fără index persistent |
+| **D — index + count + revalidare A2 opțională** | Flag intern când predicate are >N facts |
+
+**Decizie:** **A**.
+
+---
+
+### D61 — Ce indexăm **(confirmed: A — B amânat ca optimizare)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — index pe KB efectivă per comp (confirmed)** | Un singur `Map<predicate/arity, FactClause[]>` după merge static∖tombstone∪adds |
+| **B — index separat static + dynamic (follow-up)** | Static index o dată (per inline merge); la commit doar patch adds/tombstones |
+| **C — index global pe inline (respins)** | Dynamic e per comp |
+
+**De ce A acum (și nu B):**
+
+- **Rebuild la commit** = O(n) pe facts **efective** — pentru sim/warehouse (zeci–sute facts) e neglijabil (microsecunde).
+- **B** devine util când **static e foarte mare** (mii+) și mutațiile sunt **mici** (1–2 facts) — atunci patch incremental bate full rebuild.
+- **Tombstone** deranjează B: trebuie ținut per comp un `Set` de keys static ascunse + merge la citire; A absorbă asta natural în rebuild efectiv.
+- **C** e greșit: două comp-uri pe același inline au dynamic store diferit.
+
+**Decizie:** **A** pentru F13 MVP. **B** documentat ca optimizare viitoare (poate fuziona cu D62 `delta`).
+
+---
+
+### D62 — Strategie rebuild index **`indexRebuild:`** **(confirmed: B — user alege full \| delta)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — mereu full rebuild (respins ca singură opțiune)** | Simplu dar fără control user |
+| **B — attribute comp `indexRebuild:` (confirmed)** | **`full`** (default) sau **`delta`** |
+| **C — threshold automat (amânat)** | Hybrid intern — neimplementat F13 |
+
+**Attribute comp (F13):**
+
+```logts
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1        # default 1 — omit = activ; 0 = fără index (path F12)
+    indexRebuild: full    # default full — sau delta
+    .warehouse { }
+```
+
+| `indexFacts` | `indexRebuild` | Comportament |
+|--------------|----------------|--------------|
+| **`0`** | *(ignorat)* | Fără index persistent; merge liniar F12 |
+| **`1`** / omis | **`full`** / omis | La **init** + la **commit**: rebuild O(n) din KB efectivă |
+| **`1`** / omis | **`delta`** | **Init:** mereu **full** (index gol). **Commit reușit:** patch O(delta) din ops tranzacție |
+
+**Reguli:**
+
+- **`indexRebuild` ignorat complet** când `indexFacts: 0` (user: confirmat).
+- **Init / elaboration:** primul build index = **întotdeauna full** (index gol → scan KB efectivă). Atributele `indexFacts` / `indexRebuild` sunt fixate la elaborare; fiecare **Run** re-elaborează tot scriptul — **fără persistență** între Run-uri, deci nu există „index lipsă” la runtime după init reușit.
+- **KB statică** nu se modifică în timpul unui Run — singura cale de schimbare e **`logic { + / - }`** (mutations). Delta controlează doar patch post-commit pe ops tranzacție.
+- **Validare proposed (pre-commit):** index **ephemeral** rebuild **full** pe KB propusă (o dată per pass) — nu folosește `indexRebuild` persistent; simplifică corectitudinea D53/D54.
+- **Valori acceptate:** `full`, `delta` (alias documentat opțional: `incremental` = `delta` — de decis la implementare dacă acceptăm sinonim).
+
+**Exemplu `indexRebuild: delta` — commit move:**
+
+```logts
+logic { - inside(box1, c1); + inside(box1, c2) }
+```
+
+Patch pe `comp.factIndex` (fără rescan static):
+
+1. Remove key `inside/2` → `box1,c1` (tombstone / dynamic remove).
+2. Add key `inside/2` → `box1,c2`.
+3. Lăsă neatinse celelalte facts indexate.
+
+**Delta idempotentă (obligatoriu — aliniat cu store):**
+
+Store-ul acceptă ops duplicate fără eroare; delta trebuie același comportament:
+
+```logts
+logic { - inside(box1, c1); - inside(box1, c1); - inside(box1, c1) }   /* no-op după primul remove */
+logic { + inside(box1, c1); + inside(box1, c1); + inside(box1, c1) }   /* no-op după primul add */
+```
+
+| Op | Stare index înainte | Acțiune delta |
+|----|---------------------|---------------|
+| **`- key`** | key prezent (static sau dynamic) | Remove / hide din index efectiv |
+| **`- key`** | key absent (deja tombstoned) | **No-op** — nu e inconsistență |
+| **`+ key`** | key absent | Insert |
+| **`+ key`** | key deja prezent efectiv | **No-op** (replace echivalent) |
+
+Ops aplicate **în ordinea tranzacției** (aceeași ca `logicApplyMutationTransaction`).
+
+**Eroare la inconsistență reală — fără fallback silent la full rebuild:**
+
+- **Nu** facem fallback la full rebuild când delta detectează o problemă — full rebuild ar reuși mereu și **ascunde bug-uri** în path-ul delta.
+- **Nu** există warning-uri în logTscript — doar **`Error`** (throw), ca restul engine-ului.
+- Delta **throw** când indexul nu poate reflecta legal starea post-commit — ex.: structură index coruptă, bucket invalid, post-patch sanity check eșuează (index ≠ scan liniar pe KB efectivă).
+- **Nu** e inconsistență: remove/add idempotent pe key deja absent/prezent — store acceptă, delta no-op.
+- Eroarea delta **≠** `mutationFailed` — apare **după** commit store reușit; e bug intern F13 de reparat, nu respingere mutation user.
+
+**Decizie:** **B** — `indexRebuild: full` default; `delta` opt-in; delta strictă, idempotentă, **fail loud**.
+
+---
+
+### D63 — Sintaxă **`count/2`** **(confirmed: A)**
+
+| Opțiune | Exemplu |
+|---------|---------|
+| **A — goal `count(Goals, N)` comma-separated (recommended)** | `count(inside(_, C), N), N < Max` |
+| **B — `count(N, Goal)` ordine ISO (respins)** | Prolog libraries (`bagof`/`aggregate`) folosesc uneori Count-first — **noi** rămânem goal-first ca restul body-ului (`object(O), container(C), …`) |
+| **C — keyword `aggregate …` (respins)** | Prea mult syntax |
+
+**Legătura cu constraint:** body-ul `constraint … <= …` e o **listă de goals** legate prin virgulă (AND), ca la reguli. `count/2` e **un goal** în lanț — la fel ca `object(O)` sau `N =< Max`:
+
+```logts
+constraint inside(O, C) <=
+    object(O),           /* goal 1 — leagă O,C din head */
+    container(C),        /* goal 2 */
+    capacity(C, Max),    /* goal 3 */
+    count(inside(_, C), N),  /* goal 4 — N := câte inside(_,C) în KB propusă */
+    N =< Max             /* goal 5 — cmp arithmetic */
+```
+
+**Decizie:** **A**.
+
+---
+
+### D64 — Semantica `count/2` **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — număr soluții pentru Goal pe KB curentă (recommended)** | `count(inside(_, c1), N)` → N=2 dacă două soluții distincte |
+| **B — doar ground facts matching head pattern** | Echivalent pentru facts pure, diferă la rules |
+| **C — distinct pe primul arg liber** | Optimizare viitoare |
+
+**Ce era `badTriple` (F12, test 3582):**
+
+```logts
+badTriple(C) <-
+    inside(box1, C),
+    inside(box2, C),
+    inside(box3, C)
+
+slotAvailable(C) <- capacity(C, Max), \+ badTriple(C)
+```
+
+- **`badTriple(C)`** reușește dacă există **trei binding-uri** care satisfac cele 3 goals (backtracking) → „cel puțin 3 obiecte în C”.
+- **`slotAvailable`** reușește când **nu** poți proba badTriple → cel mult 2 obiecte (pentru box1..box3 fixe).
+- **Limitări:** hardcodat pe box1/2/3; predicate extra; NAF fragil; nu generalizează la `capacity(c1, 47)`.
+
+**Cu D64-A (`count/2`):**
+
+```logts
+count(inside(_, C), N), N =< Max
+```
+
+- **N** = număr soluții `inside(_, C)` pe KB propusă (2 obiecte → N=2).
+- Același rezultat ca badTriple pentru capacity 2, dar **generic** pentru orice Max.
+
+**Decizie:** **A**.
+
+---
+
+### D65 — `count/2` și variabile **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — N trebuie ground sau variabilă liberă output (recommended)** | `count(G, N)` leagă N; G poate conține vars deja legate din constraint head |
+| **B — N trebuie mereu liber** | |
+| **C — count în cmp chain: `N =< Max`** | N number term; engine evaluează cmp după count |
+
+**Decizie:** **A**.
+
+---
+
+### D66 — Index folosit de engine **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — `LogicEngine` primește index pre-built + clauses rules (recommended)** | Facts din index; rules din clauses cu body |
+| **B — doar fast path merge în `logicBuildRuntimeClauses`** | Index nu ajunge la solve |
+| **C — cache `LogicEngine` per comp între passes** | Invalidare la commit |
+
+**Decizie:** **A**.
+
+---
+
+### D67 — Compatibilitate **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — zero breaking: helper-e vechi rămân valide (recommended)** | Doc recomandă `count/2`; teste noi + păstrare 3582 |
+| **B — deprecate helpers în doc-only** | |
+
+**Wave = legacy:** obligatoriu teste perechi 3594+.
+
+---
+
+### D68 — Attribute comp **`indexFacts`** **(confirmed: B — cu D62 `indexRebuild`)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — mereu activ (respins ca singură opțiune)** | |
+| **B — `indexFacts:` pe comp (confirmed)** | **`1`** / omis = index ON; **`0`** = fallback F12 (debug, A/B perf) |
+
+```logts
+comp [logic] .whLogic:
+    on: 1
+    indexFacts: 1        # default — omit = 1
+    indexRebuild: full    # default — omit = full; delta = patch la commit
+    .warehouse { }
+```
+
+| `indexFacts` | Comportament |
+|--------------|--------------|
+| **`1`** / omis | Index activ; **`indexRebuild`** aplicat (D62) |
+| **`0`** | Fără index — path F12; **`indexRebuild` ignorat** |
+
+**Decizie:** **B** — pereche `indexFacts` + `indexRebuild`; ambele default **on/full**.
+
+---
+
+## Faza 13 — scale & perf (1+q) **(ready-to-implement — D60–D68 confirmed)**
+
+**Scop:** index facts efective per `comp [logic]`; **`count(Goal, N)`** în engine; constraints capacity/uniqueness simplificate; perf merge/validate/query identic semantic.
+
+### Fișiere țintă
+
+| Fișier | Modificări |
+|--------|------------|
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `logicBuildFactIndex`, `count/2` goal, engine ctor din index+facts |
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | parse `count(` goal (dacă nu e deja ca compound) |
+| [`logic.js`](../v0_3_2/core/components/logic.js) | `indexFacts:`, `indexRebuild:`; rebuild full/delta; pasează index la validate/query |
+| [`doc/logic-constraints.md`](../v0_3_2/doc/logic-constraints.md) | secțiune `count/2`, exemple capacity |
+| [`doc/logic-runtime.md`](../v0_3_2/doc/logic-runtime.md) | notă index intern (fără syntax user) |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3594+** |
+
+### Teste țintă (3594+)
+
+| ID | Titlu |
+|----|-------|
+| 3594 | parse / eval `count(inside(_, c1), N)` |
+| 3595 | constraint capacity cu `count/2` — al 3-lea `+ inside` respins |
+| 3596 | index: după move atomic, count corect pe proposed + committed |
+| 3597 | helper `badTriple` vs `count/2` — același rezultat |
+| 3598 | `indexRebuild: delta` — același KB ca `full` după move (corectitudine) |
+| 3599 | delta idempotent: triple `-` / triple `+` același key — fără eroare |
+| 3600 | `indexFacts: 0` — ignore `indexRebuild`; path F12 |
+| 3601–3608 | perechi **wave** pentru 3595–3600 |
+
+### Exemplu țintă (capacity cu count)
+
+```logts
+inline [logic] .warehouse:
+
+    capacity(c1, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
+
+:
+
+.whLogic:{
+    logic { + inside(box3, c1) }
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+### Criterii done
+
+- [x] Decizii **D60–D68** confirmate
+- [ ] `indexFacts:` + `indexRebuild: full|delta`; delta idempotentă; **Error** la inconsistență (fără fallback full)
+- [ ] `count/2` în engine (constraint + rule + query)
+- [ ] Teste **3594+** legacy + wave; suite verde
+- [ ] Doc **logts-play** — capacity cu `count/2`
+
+**Rămâne backlog (nu F13):** **1+p** (validate at query); revalidare A2 globală (doar dacă D60-D); **1+r** independent.
 
 ---
 
@@ -2625,8 +2954,9 @@ comp [logic] .peopleLogic:
 | Result policies `;unique` / `;first` / `;last` | **Faza 10 (completed)** — D34–D38 |
 | Runtime mutation `logic { + / - }` | **Faza 11 (completed)** — D40–D49 |
 | `comp [logic] data:` copy/static/seed | **1+r** amânat |
-| Constraints `constraint P <= body` | **Faza 12 (ready-to-implement)** — D50–D59 confirmed |
-| `"atom"` vs wire strict în mutation | **D59-A confirmed** — prefix `text`/`bool`/`number`; F12 migrare F11 |
+| Constraints `constraint P <= body` | **Faza 12 (completed)** — D50–D59 |
+| Scale / perf index + count (1+q) | **Faza 13 (ready-to-implement)** — D60–D68 confirmed |
+| `"atom"` vs wire prefix în mutation | **D59-A (completed)** |
 | `assert`/`retract` în reguli | **1+n** amânat |
 | Inline `.world:mutate` | **1+m** amânat, low priority |
 
@@ -2634,6 +2964,6 @@ comp [logic] .peopleLogic:
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 11~~ **(completed)**
-2. **Faza 12** — **D50–D59 confirmed** → constraints (hook D48 pas 3b + init)
-3. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**, **1+q**
+1. ~~Faza 0~~ → ~~Faza 12~~ **(completed)**
+2. **Faza 13 (1+q)** — **D60–D68 confirmed** → index facts + `count/2`
+3. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**

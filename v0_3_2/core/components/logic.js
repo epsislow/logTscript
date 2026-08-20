@@ -131,12 +131,63 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return n;
   }
 
+  _parseIndexFacts(attributes, compName) {
+    if (attributes.indexFacts == null || attributes.indexFacts === '') return 1;
+    const n = parseInt(String(attributes.indexFacts), 10);
+    if (isNaN(n) || (n !== 0 && n !== 1)) {
+      throw Error(`logic ${compName}: indexFacts must be 0 or 1`);
+    }
+    return n;
+  }
+
+  _parseIndexRebuild(attributes, compName, indexFacts) {
+    if (!indexFacts) return 'full';
+    const raw = attributes.indexRebuild;
+    if (raw == null || raw === '') return 'full';
+    const v = String(raw).toLowerCase();
+    if (v === 'incremental') return 'delta';
+    if (v === 'full' || v === 'delta') return v;
+    throw Error(`logic ${compName}: indexRebuild must be full or delta`);
+  }
+
+  _rebuildFactIndexFull(comp, merged) {
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const indexFn = typeof logicBuildFactIndex === 'function' ? logicBuildFactIndex : null;
+    if (!buildFn || !indexFn || !comp.indexFacts) {
+      comp.factIndex = null;
+      return;
+    }
+    const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore);
+    comp.factIndex = indexFn(runtimeClauses);
+  }
+
+  _updateFactIndexAfterCommit(comp, merged, ops) {
+    if (!comp.indexFacts) return;
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const deltaFn = typeof logicApplyFactIndexDelta === 'function' ? logicApplyFactIndexDelta : null;
+    const verifyFn = typeof logicVerifyFactIndex === 'function' ? logicVerifyFactIndex : null;
+    const indexFn = typeof logicBuildFactIndex === 'function' ? logicBuildFactIndex : null;
+    if (!buildFn || !indexFn) return;
+    const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore);
+    if (comp.indexRebuild === 'delta') {
+      if (!deltaFn || !verifyFn || !comp.factIndex) {
+        throw Error(`logic ${comp.name}: fact index delta requires initialized index`);
+      }
+      deltaFn(comp.factIndex, ops);
+      verifyFn(comp.factIndex, runtimeClauses);
+    } else {
+      comp.factIndex = indexFn(runtimeClauses);
+    }
+  }
+
   getDef() {
     return {
       attrs: [
         { name: 'on', value: 'mode (raise / edge / 1)' },
         { name: 'maxDepth', value: 'integer (default 256)' },
         { name: 'maxSolutions', value: 'integer (default 64)' },
+        { name: 'indexFacts', value: '0 or 1 (default 1 — fact index on)' },
+        { name: 'indexRebuild', value: 'full or delta (default full; ignored when indexFacts: 0)' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -198,17 +249,25 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
     const maxDepth = this._parsePositiveIntAttr(attributes, 'maxDepth', name);
     const maxSolutions = this._parsePositiveIntAttr(attributes, 'maxSolutions', name);
+    const indexFacts = this._parseIndexFacts(attributes, name);
+    const indexRebuild = this._parseIndexRebuild(attributes, name, indexFacts);
 
     const validateStaticFn = typeof logicValidateStaticKnowledge === 'function'
       ? logicValidateStaticKnowledge : null;
     const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
     const emptyStoreFn = typeof logicCreateDynamicStore === 'function' ? logicCreateDynamicStore : null;
+    const ruleFn = typeof logicCollectRuleClauses === 'function' ? logicCollectRuleClauses : null;
     if (validateStaticFn && buildFn && emptyStoreFn && (merged.constraints || []).length) {
       const emptyStore = emptyStoreFn();
       const staticClauses = buildFn(merged.clauses, emptyStore);
       const execOpts = {};
       if (maxDepth != null) execOpts.maxDepth = maxDepth;
       if (maxSolutions != null) execOpts.maxSolutions = maxSolutions;
+      if (indexFacts && ruleFn) {
+        execOpts.ruleClauses = ruleFn(merged.clauses);
+        execOpts.factIndex = typeof logicBuildFactIndex === 'function'
+          ? logicBuildFactIndex(staticClauses) : null;
+      }
       if (!validateStaticFn(merged.constraints, staticClauses, execOpts)) {
         throw Error(`logic ${name}: static knowledge violates constraints (${prog.ref})`);
       }
@@ -256,10 +315,18 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       depthExceeded: 0,
       mutationFailed: 0,
       dynamicStore: typeof logicCreateDynamicStore === 'function' ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() },
+      indexFacts,
+      indexRebuild,
+      factIndex: null,
+      ruleClauses: ruleFn ? ruleFn(merged.clauses) : [],
       maxDepth,
       maxSolutions,
       _logicRedirects: [],
     };
+
+    if (indexFacts) {
+      this._rebuildFactIndexFull(compInfo, merged);
+    }
 
     for (const [pinName, meta] of Object.entries(pinDefs)) {
       const initial = '0'.repeat(meta.bits);
@@ -431,6 +498,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       const execOpts = {};
       if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
       if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+      if (comp.indexFacts && typeof logicBuildFactIndex === 'function') {
+        execOpts.factIndex = logicBuildFactIndex(proposedClauses);
+        execOpts.ruleClauses = comp.ruleClauses || [];
+      }
       if (!validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts)) {
         comp.mutationFailed = 1;
         return;
@@ -438,6 +509,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     }
 
     const result = applyFn(comp.dynamicStore, ops);
+    if (result && result.success) {
+      this._updateFactIndexAfterCommit(comp, merged, ops);
+    }
     comp.mutationFailed = result && result.success ? 0 : 1;
   }
 
@@ -459,6 +533,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const execOpts = {};
     if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
     if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+    if (comp.indexFacts && comp.factIndex) {
+      execOpts.factIndex = comp.factIndex;
+      execOpts.ruleClauses = comp.ruleClauses || [];
+    }
     const raw = execFn(runtimeMerged, inputEnv, execOpts);
     const meta = raw._logicMeta || {};
     delete raw._logicMeta;

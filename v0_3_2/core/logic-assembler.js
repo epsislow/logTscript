@@ -217,6 +217,9 @@ class LogicParser {
       const v = this.advance().value;
       return { kind: 'number', value: v };
     }
+    if (this.at('ID') && this.tokens[this.pos + 1] && this.tokens[this.pos + 1].type === 'LP') {
+      return this.parseCompound();
+    }
     if (this.at('ID')) {
       const name = this.advance().value;
       if (logicIsVarName(name)) return { kind: 'var', name };

@@ -83,20 +83,40 @@ function logicPredicateKey(predicate, arity) {
 }
 
 class LogicEngine {
-  constructor(clauses) {
-    this.table = new LogicAtomTable();
+  constructor(clauses, options) {
+    const opts = options || {};
+    this.table = (opts.factIndex && opts.factIndex.table) ? opts.factIndex.table : new LogicAtomTable();
     this.index = new Map();
     this.maxSolutions = 64;
     this.maxDepth = 256;
     this.truncated = false;
     this.depthExceeded = false;
-    for (const c of clauses || []) {
-      const ic = logicInternClause(c, this.table);
-      const head = ic.head;
-      if (!head || head.kind !== 'compound') continue;
-      const key = logicPredicateKey(head.predicate, head.arity);
-      if (!this.index.has(key)) this.index.set(key, []);
-      this.index.get(key).push(ic);
+    if (opts.factIndex) {
+      const rules = opts.ruleClauses || (clauses || []).filter((c) => c.body && c.body.length);
+      for (const c of rules) {
+        const ic = logicInternClause(c, this.table);
+        const head = ic.head;
+        if (!head || head.kind !== 'compound') continue;
+        const key = logicPredicateKey(head.predicate, head.arity);
+        if (!this.index.has(key)) this.index.set(key, []);
+        this.index.get(key).push(ic);
+      }
+      for (const ic of opts.factIndex.keys.values()) {
+        const head = ic.head;
+        if (!head || head.kind !== 'compound') continue;
+        const key = logicPredicateKey(head.predicate, head.arity);
+        if (!this.index.has(key)) this.index.set(key, []);
+        this.index.get(key).push(ic);
+      }
+    } else {
+      for (const c of clauses || []) {
+        const ic = logicInternClause(c, this.table);
+        const head = ic.head;
+        if (!head || head.kind !== 'compound') continue;
+        const key = logicPredicateKey(head.predicate, head.arity);
+        if (!this.index.has(key)) this.index.set(key, []);
+        this.index.get(key).push(ic);
+      }
     }
   }
 
@@ -155,6 +175,9 @@ class LogicEngine {
       if (!logicUnifyExpr(g0.left, g0.right, env, this.table)) return false;
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'count' && g0.arity === 2) {
+      return this._solveCount(g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -170,6 +193,38 @@ class LogicEngine {
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     return false;
+  }
+
+  _solveCount(goal, rest, env, depth, onSuccess, onDepthExceeded) {
+    let innerPrepared = goal.args[0];
+    const innerDeref = logicDeref(innerPrepared, env);
+    if (innerDeref.kind !== 'compound') return false;
+    if (innerPrepared.kind === 'compound') {
+      innerPrepared = {
+        kind: 'call',
+        predicate: innerPrepared.predicate,
+        arity: innerPrepared.arity != null ? innerPrepared.arity : (innerPrepared.args || []).length,
+        args: innerPrepared.args,
+      };
+    }
+    let count = 0;
+    const trail = env.trailLength();
+    this._solveGoals([innerPrepared], env, depth + 1, () => {
+      count++;
+      return true;
+    }, onDepthExceeded);
+    env.undo(trail);
+    const nTerm = goal.args[1];
+    const nDeref = logicDeref(nTerm, env);
+    if (nDeref.kind === 'number') {
+      if (nDeref.value !== count) return false;
+    } else if (nDeref.kind === 'var') {
+      if (nDeref.name === '_') { /* anonymous — accept any count */ }
+      else env.bind(nDeref.name, { kind: 'number', value: count });
+    } else {
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
   _solveCall(goal, rest, env, depth, onSuccess, onDepthExceeded) {
@@ -421,9 +476,12 @@ function logicCollectFreeVarsInGoals(goals) {
 }
 
 function executeLogicQueries(mergedDef, inputEnv, options) {
-  const engine = new LogicEngine(mergedDef.clauses || []);
-  if (options && options.maxSolutions != null) engine.maxSolutions = options.maxSolutions;
-  if (options && options.maxDepth != null) engine.maxDepth = options.maxDepth;
+  const opts = options || {};
+  const engine = opts.factIndex
+    ? new LogicEngine(mergedDef.clauses || [], { factIndex: opts.factIndex, ruleClauses: opts.ruleClauses })
+    : new LogicEngine(mergedDef.clauses || []);
+  if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
+  if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
   const out = engine.executeQueries(mergedDef.queries || [], inputEnv);
   out._logicMeta = { truncated: engine.truncated, depthExceeded: engine.depthExceeded };
   return out;
@@ -642,9 +700,12 @@ function logicMatchingConstraints(factHead, constraints) {
 
 function logicValidateConstraintBody(bodyGoals, proposedClauses, inputEnv, options) {
   if (!bodyGoals || !bodyGoals.length) return true;
-  const engine = new LogicEngine(proposedClauses || []);
-  if (options && options.maxDepth != null) engine.maxDepth = options.maxDepth;
-  if (options && options.maxSolutions != null) engine.maxSolutions = options.maxSolutions;
+  const opts = options || {};
+  const engine = opts.factIndex
+    ? new LogicEngine(proposedClauses || [], { factIndex: opts.factIndex, ruleClauses: opts.ruleClauses })
+    : new LogicEngine(proposedClauses || []);
+  if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
+  if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   const solutions = engine.solveQuery(bodyGoals, inputEnv || {});
   return solutions && solutions.length > 0;
 }
@@ -683,13 +744,104 @@ function logicValidateStaticKnowledge(constraints, staticClauses, options) {
   return logicValidateConstraintsForFacts(constraints, staticClauses, facts, options);
 }
 
+function logicBuildFactIndex(clauses, tableOptional) {
+  const table = tableOptional || new LogicAtomTable();
+  const keys = new Map();
+  const buckets = new Map();
+  for (const c of clauses || []) {
+    if (c.body && c.body.length) continue;
+    if (!c.head || c.head.kind !== 'compound') continue;
+    if (!logicTermIsGround(c.head)) continue;
+    const fKey = logicFactClauseKey(c);
+    if (keys.has(fKey)) continue;
+    const ic = logicInternClause(c, table);
+    keys.set(fKey, ic);
+    const head = ic.head;
+    const bKey = logicPredicateKey(head.predicate, head.arity);
+    if (!buckets.has(bKey)) buckets.set(bKey, []);
+    buckets.get(bKey).push(ic);
+  }
+  return { table, keys, buckets };
+}
+
+function logicFactIndexRemove(factIndex, fKey) {
+  const ic = factIndex.keys.get(fKey);
+  if (!ic) return;
+  factIndex.keys.delete(fKey);
+  const head = ic.head;
+  const bKey = logicPredicateKey(head.predicate, head.arity);
+  const bucket = factIndex.buckets.get(bKey);
+  if (!bucket) return;
+  const idx = bucket.indexOf(ic);
+  if (idx >= 0) bucket.splice(idx, 1);
+  if (!bucket.length) factIndex.buckets.delete(bKey);
+}
+
+function logicFactIndexAdd(factIndex, clause) {
+  const fKey = logicFactClauseKey(clause);
+  if (factIndex.keys.has(fKey)) return;
+  const ic = logicInternClause(clause, factIndex.table);
+  factIndex.keys.set(fKey, ic);
+  const head = ic.head;
+  const bKey = logicPredicateKey(head.predicate, head.arity);
+  if (!factIndex.buckets.has(bKey)) factIndex.buckets.set(bKey, []);
+  factIndex.buckets.get(bKey).push(ic);
+}
+
+function logicApplyFactIndexDelta(factIndex, ops) {
+  if (!factIndex) throw Error('logic fact index delta: index is null');
+  for (const op of ops || []) {
+    if (!op || !op.head || !logicTermIsGround(op.head)) {
+      throw Error('logic fact index delta: invalid op');
+    }
+    const clause = { head: op.head, body: [] };
+    const fKey = logicFactClauseKey(clause);
+    if (op.op === 'remove') {
+      logicFactIndexRemove(factIndex, fKey);
+    } else if (op.op === 'add') {
+      logicFactIndexAdd(factIndex, clause);
+    } else {
+      throw Error(`logic fact index delta: unknown op '${op.op}'`);
+    }
+  }
+}
+
+function logicVerifyFactIndex(factIndex, runtimeClauses) {
+  if (!factIndex) throw Error('logic fact index verify: index is null');
+  const expected = new Set();
+  for (const c of runtimeClauses || []) {
+    if (c.body && c.body.length) continue;
+    if (!c.head || !logicTermIsGround(c.head)) continue;
+    expected.add(logicFactClauseKey(c));
+  }
+  if (expected.size !== factIndex.keys.size) {
+    throw Error(`logic fact index verify: size mismatch (expected ${expected.size}, got ${factIndex.keys.size})`);
+  }
+  for (const k of expected) {
+    if (!factIndex.keys.has(k)) {
+      throw Error(`logic fact index verify: missing key '${k}'`);
+    }
+  }
+  for (const k of factIndex.keys.keys()) {
+    if (!expected.has(k)) {
+      throw Error(`logic fact index verify: extra key '${k}'`);
+    }
+  }
+}
+
+function logicCollectRuleClauses(clauses) {
+  return (clauses || []).filter((c) => c.body && c.body.length);
+}
+
 function logicMutationDeltaPlusFacts(ops) {
   return (ops || []).filter((o) => o && o.op === 'add' && o.head).map((o) => o.head);
 }
 
 function executeLogicGoals(mergedDef, goals, inputEnv, options) {
-  const engine = new LogicEngine(mergedDef.clauses || []);
   const opts = options || {};
+  const engine = opts.factIndex
+    ? new LogicEngine(mergedDef.clauses || [], { factIndex: opts.factIndex, ruleClauses: opts.ruleClauses })
+    : new LogicEngine(mergedDef.clauses || []);
   if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
   const prepared = logicPrepareGoalsForInvoke(goals);
@@ -873,6 +1025,12 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicPackMatrixCol = logicPackMatrixCol;
   globalThis.logicApplyResultPolicy = logicApplyResultPolicy;
   globalThis.logicSolutionTupleKey = logicSolutionTupleKey;
+  globalThis.logicBuildFactIndex = logicBuildFactIndex;
+  globalThis.logicApplyFactIndexDelta = logicApplyFactIndexDelta;
+  globalThis.logicVerifyFactIndex = logicVerifyFactIndex;
+  globalThis.logicCollectRuleClauses = logicCollectRuleClauses;
+  globalThis.logicFactIndexRemove = logicFactIndexRemove;
+  globalThis.logicFactIndexAdd = logicFactIndexAdd;
   globalThis.logicCreateDynamicStore = logicCreateDynamicStore;
   globalThis.logicBuildRuntimeClauses = logicBuildRuntimeClauses;
   globalThis.logicApplyMutationTransaction = logicApplyMutationTransaction;
@@ -905,6 +1063,12 @@ if (typeof module !== 'undefined' && module.exports) {
     logicPackMatrixCol,
     logicApplyResultPolicy,
     logicSolutionTupleKey,
+    logicBuildFactIndex,
+    logicApplyFactIndexDelta,
+    logicVerifyFactIndex,
+    logicCollectRuleClauses,
+    logicFactIndexRemove,
+    logicFactIndexAdd,
     logicCreateDynamicStore,
     logicBuildRuntimeClauses,
     logicApplyMutationTransaction,
