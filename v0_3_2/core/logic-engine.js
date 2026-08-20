@@ -506,6 +506,75 @@ function logicApplyResultPolicy(solutions, policy, freeVars) {
   return list;
 }
 
+function logicGroundTermKey(term) {
+  if (!term) return '';
+  if (term.kind === 'atom') return `a:${term.name != null ? term.name : ''}`;
+  if (term.kind === 'number') return `n:${term.value}`;
+  if (term.kind === 'var') return `v:${term.name}`;
+  if (term.kind === 'compound') {
+    const args = (term.args || []).map(logicGroundTermKey).join('\1');
+    const arity = term.arity != null ? term.arity : (term.args || []).length;
+    return `c:${term.predicate}/${arity}:${args}`;
+  }
+  return '?';
+}
+
+function logicFactClauseKey(clause) {
+  const head = clause && clause.head;
+  if (!head || head.kind !== 'compound') return logicGroundTermKey(head);
+  const arity = head.arity != null ? head.arity : (head.args || []).length;
+  const args = (head.args || []).map(logicGroundTermKey).join('\0');
+  return `${head.predicate}/${arity}\0${args}`;
+}
+
+function logicTermIsGround(term) {
+  if (!term) return true;
+  if (term.kind === 'var') return false;
+  if (term.kind === 'compound') return (term.args || []).every(logicTermIsGround);
+  if (term.kind === 'arith') return logicTermIsGround(term.left) && logicTermIsGround(term.right);
+  return true;
+}
+
+function logicCreateDynamicStore() {
+  return { adds: new Map(), tombstones: new Set() };
+}
+
+function logicBuildRuntimeClauses(staticClauses, store) {
+  const out = [];
+  const tomb = store && store.tombstones ? store.tombstones : new Set();
+  const adds = store && store.adds ? store.adds : new Map();
+  for (const c of staticClauses || []) {
+    const isFact = !c.body || c.body.length === 0;
+    if (isFact && tomb.has(logicFactClauseKey(c))) continue;
+    out.push(c);
+  }
+  for (const c of adds.values()) out.push(c);
+  return out;
+}
+
+function logicApplyMutationTransaction(store, ops) {
+  if (!store) return { success: false };
+  for (const op of ops || []) {
+    if (!op || !op.head || !logicTermIsGround(op.head)) return { success: false };
+  }
+  const nextAdds = new Map(store.adds);
+  const nextTombs = new Set(store.tombstones);
+  for (const op of ops || []) {
+    const clause = { head: op.head, body: [] };
+    const key = logicFactClauseKey(clause);
+    if (op.op === 'add') {
+      nextTombs.delete(key);
+      nextAdds.set(key, clause);
+    } else if (op.op === 'remove') {
+      nextAdds.delete(key);
+      nextTombs.add(key);
+    }
+  }
+  store.adds = nextAdds;
+  store.tombstones = nextTombs;
+  return { success: true };
+}
+
 function executeLogicGoals(mergedDef, goals, inputEnv, options) {
   const engine = new LogicEngine(mergedDef.clauses || []);
   const opts = options || {};
@@ -692,6 +761,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicPackMatrixCol = logicPackMatrixCol;
   globalThis.logicApplyResultPolicy = logicApplyResultPolicy;
   globalThis.logicSolutionTupleKey = logicSolutionTupleKey;
+  globalThis.logicCreateDynamicStore = logicCreateDynamicStore;
+  globalThis.logicBuildRuntimeClauses = logicBuildRuntimeClauses;
+  globalThis.logicApplyMutationTransaction = logicApplyMutationTransaction;
+  globalThis.logicFactClauseKey = logicFactClauseKey;
+  globalThis.logicTermIsGround = logicTermIsGround;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -713,5 +787,10 @@ if (typeof module !== 'undefined' && module.exports) {
     logicPackMatrixCol,
     logicApplyResultPolicy,
     logicSolutionTupleKey,
+    logicCreateDynamicStore,
+    logicBuildRuntimeClauses,
+    logicApplyMutationTransaction,
+    logicFactClauseKey,
+    logicTermIsGround,
   };
 }

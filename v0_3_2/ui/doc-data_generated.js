@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-query-exec.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11344,6 +11344,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Trigger** | \`set\` pin — respects \`on:\` (\`raise\` / \`edge\` / \`1\`) |
 | **Inputs** | Pin ← wire in exec block (\`myX = scoreIn\`) |
 | **Outputs** | Query redirect (\`modifier:0 >= result\`) |
+| **Mutations** | \`logic { + fact / - fact }\` — see [logic-runtime.md](logic-runtime.md) |
 | **Doc** | \`doc(comp.logic)\`, \`doc(.characterLogic)\` |
 
 ---
@@ -11358,9 +11359,12 @@ sequenceDiagram
   participant E as Engine
   participant Q as Query modifier
   participant R as Wire result
+  participant M as logic { + / - }
 
   W->>P: exec block myX = scoreIn
   P->>L: read pin convert number
+  L->>M: optional mutation transaction
+  M->>E: runtime KB (static overlay)
   L->>E: input env X=15
   E->>Q: resolve all queries
   Q->>R: modifier:0 >= result
@@ -11369,9 +11373,9 @@ sequenceDiagram
 | Step | Where | What happens |
 |------|-------|--------------|
 | 1 | **Elaboration** | Program block maps logic vars → pins (\`X is number myX\`) |
-| 2 | **Exec block** | Wires assign pins (\`myX = scoreIn\`) |
+| 2 | **Exec block** | Wires assign pins (\`myX = scoreIn\`); optional **\`logic { + / - }\`** |
 | 3 | **Trigger** | Active \`set\` (per \`on:\`) starts one solve pass |
-| 4 | **Engine** | All queries from inline run with input bindings |
+| 4 | **Engine** | Runtime KB → all queries from inline run with input bindings |
 | 5 | **Redirect** | Selected solutions written to target wires |
 
 ---
@@ -11480,6 +11484,7 @@ Exemplu: \`8wire scoreIn\` + \`myX = scoreIn\` → pin **8** biți; \`128wire bi
 | **2 free** | \`allAges:count >= numRows\` | Rows written; \`allAges:width >= numCols\` → column count |
 | **pout** | \`truncated >= wire\` | **\`1\`** if any query hit \`maxSolutions\` cap this pass |
 | **pout** | \`depthExceeded >= wire\` | **\`1\`** if any query hit \`maxDepth\` this pass |
+| **pout** | \`mutationFailed >= wire\` | **\`1\`** if the last \`logic { }\` transaction failed |
 
 Pout redirects use the same syntax as query redirects: **\`poutName >= wire\`** (not \`wire = pout\`).
 
@@ -11536,6 +11541,7 @@ Use **\`on: 1\`** in examples so **Load & Run** performs a solve pass immediatel
 | **\`execCount\`** | 16 | Solve passes completed (\`.logic:execCount\`) |
 | **\`truncated\`** | 1 | Set when any query was capped by \`maxSolutions\` |
 | **\`depthExceeded\`** | 1 | Set when any query hit \`maxDepth\` |
+| **\`mutationFailed\`** | 1 | Set when \`logic { + / - }\` transaction failed (non-ground fact, etc.) |
 
 ---
 
@@ -12049,6 +12055,66 @@ After **Load & Run**: **\`hitDepth = 1\`** — recursive rule exceeded depth (fa
 
 ---
 
+## Runtime mutations — \`logic { + / - }\`
+
+Change the effective knowledge base on each solve pass without editing \`inline [logic]\`. Full behaviour, tombstones, and **\`mutationFailed\`** → [logic-runtime.md](logic-runtime.md).
+
+\`\`\`logts
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= destWire
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+| Construct | Role |
+|-----------|------|
+| **\`+ groundFact\`** | Assert fact into component dynamic store |
+| **\`- groundFact\`** | Tombstone — hide matching static or dynamic fact |
+| **\`mutationFailed >= wire\`** | **\`1\`** if transaction failed (store unchanged) |
+
+Mutations run **before** query redirects in the same pass. The dynamic store **persists** across \`set\` triggers on the same component.
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    inside(box1, c1)
+    container(c1)
+    container(c2)
+
+    query where:
+        inside(box1, X)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`where\`** shows **\`c2\`**; **\`failed = 0\`**.
+
+---
+
 ## Multiple exec blocks
 
 Several property blocks may target the same component. Query result slots are **shared**; the **last successful** exec block wins (last-write-wins), matching other multi-block components.
@@ -12070,6 +12136,7 @@ Several property blocks may target the same component. Query result slots are **
 ## Related
 
 - Knowledge definition → [inline-logic.md](inline-logic.md)
+- Static vs dynamic KB, tombstones, mutations → [logic-runtime.md](logic-runtime.md)
 - Similar two-layer model → [plc.md](plc.md), [asm.md](asm.md)
 `,
     'component-color-attributes.md': `# Component color attributes
@@ -19897,7 +19964,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | Topic | Summary |
 |-------|---------|
 | **Role** | Definition layer — facts, rules, queries |
-| **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries on \`comp [logic]\` |
+| **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
 | **Composition** | \`use .otherModule\` merges facts and rules (not queries) |
 | **Doc helpers** | \`doc(inline.logic)\`, \`doc(.myModule)\` |
@@ -20152,6 +20219,7 @@ show(doc(.character))
 ## Related
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
+- Static vs dynamic KB, \`logic { + / - }\`, tombstones → [logic-runtime.md](logic-runtime.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)
 `,
@@ -22444,6 +22512,500 @@ For repeated solves driven by hardware-style wiring, prefer **comp [logic]**. Fo
 
 - [inline-logic.md](inline-logic.md) — define facts, rules, named queries
 - [comp-logic.md](comp-logic.md) — runtime component, redirects, pins
+`,
+    'logic-runtime.md': `# Logic runtime — static KB, dynamic overlay, mutations
+
+This page describes how **\`comp [logic]\`** builds the knowledge base used on each solve pass: **static** facts from \`inline [logic]\`, a **dynamic overlay** (adds and tombstones), and the **\`logic { + / - }\`** mutation block in exec blocks.
+
+Definition syntax → [inline-logic.md](inline-logic.md). Component wiring and query redirects → [comp-logic.md](comp-logic.md). Ad-hoc expression queries → [logic-query-exec.md](logic-query-exec.md).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (use \`on: 1\` on the component so the first run executes when \`set = 1\`).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Static KB** | Ground facts and rules from \`inline [logic]\` — unchanged at runtime |
+| **Dynamic overlay** | Per-component store: **adds** (\`+\`) and **tombstones** (\`-\`) |
+| **Effective KB** | \`static ∖ tombstoned facts ∪ dynamic adds\` |
+| **Mutation syntax** | \`logic { + fact\\n- fact }\` in exec block — Prolog **assert** / **retract** analogy |
+| **Transaction** | All ops in one \`logic { }\` block commit together or roll back |
+| **\`mutationFailed\`** | Pout **\`1\`** if the transaction failed (non-ground fact, etc.) |
+| **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
+| **Persistence** | Dynamic store survives across \`set\` passes on the same component |
+| **\`.world:query\`** | Reads **static inline only** — not the component dynamic overlay |
+
+---
+
+## Static vs dynamic
+
+\`\`\`text
+inline [logic] .warehouse          comp [logic] .whLogic
+  inside(box1, c1)        ──►        dynamicStore { adds, tombstones }
+  rules / queries                      │
+                                       ▼
+                               runtime clauses = static ∖ tombstones ∪ adds
+                                       │
+                                       ▼
+                               executeLogicQueries (named queries)
+\`\`\`
+
+| Layer | Where | Mutable at runtime? |
+|-------|-------|---------------------|
+| **Static** | \`inline [logic]\` facts and rules | No |
+| **Dynamic adds** | \`+ groundFact\` in exec block | Yes — per \`comp [logic]\` instance |
+| **Tombstones** | \`- groundFact\` hides a static fact | Yes — fact omitted from effective KB until removed from store |
+
+Rules are always taken from the merged inline definition. Only **ground facts** participate in the overlay.
+
+---
+
+## Mutation block — \`logic { + / - }\`
+
+Place a **\`logic { … }\`** property inside a **\`comp [logic]\`** exec block:
+
+\`\`\`logts
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= destWire
+    mutationFailed >= failedWire
+    set = trigger
+}
+\`\`\`
+
+| Line | Meaning |
+|------|---------|
+| **\`+ fact\`** | **Assert** — add ground fact to dynamic store (like Prolog \`assert/1\`) |
+| **\`- fact\`** | **Retract** — tombstone the fact key (static or previously added) |
+| **Order inside block** | Applied top-to-bottom as one transaction |
+| **Multiple blocks / passes** | Same exec block: one \`logic { }\` per pass; store **accumulates** across passes |
+
+Facts use the same syntax as inline ground facts: \`predicate(arg1, arg2)\`.
+
+### Ground facts only
+
+Every argument must be **ground** (atom, number, or compound of ground terms). Variables and wires that decode to unbound logic variables are rejected.
+
+| Attempt | Result |
+|---------|--------|
+| \`+ inside(box1, c2)\` | Success |
+| \`+ inside(box1, X)\` | **Transaction fails** — \`mutationFailed = 1\`, store unchanged |
+| \`+ located(box1, destWire)\` with \`40wire destWire = …\` | Success — wire resolved to atom **before** ground check |
+
+### Idempotent add (D43)
+
+Adding a fact that is **already** in the effective KB (static or dynamic) succeeds. No duplicate clause is stored.
+
+### Remove absent (D44)
+
+\`- fact\` when the fact is **not** in the effective KB still **succeeds** (Prolog-style retract of absent fact). A tombstone may be recorded so a matching static fact stays hidden if added later in the same store lifecycle.
+
+### Tombstones (D45)
+
+\`- inside(box1, c1)\` on a static fact does **not** edit the inline module. It records a **tombstone** so \`inside(box1, c1)\` is skipped when building runtime clauses. Queries on the component see the fact as **retracted**.
+
+---
+
+## Solve pass pipeline
+
+\`\`\`mermaid
+sequenceDiagram
+  participant E as Exec block
+  participant P as Pins
+  participant M as logic { + / - }
+  participant K as Runtime KB
+  participant Q as Queries
+  participant R as Redirects
+
+  E->>P: myX = scoreIn
+  E->>M: apply mutation transaction
+  alt success
+    M->>K: commit adds / tombstones
+  else failure
+    M-->>E: mutationFailed = 1, no commit
+  end
+  K->>Q: executeLogicQueries
+  Q->>R: query >= wire, pouts
+\`\`\`
+
+| Step | What runs |
+|------|-----------|
+| 1 | Wire → pin assignments (\`myX = scoreIn\`) |
+| 2 | Collect all \`logic { }\` blocks in this exec block; resolve wire names in fact args |
+| 3 | **Atomic transaction** — all \`+\`/\`-\` succeed or none apply |
+| 4 | Build runtime clauses from static + dynamic store |
+| 5 | Run **all** named queries from inline (with pin input env) |
+| 6 | Write query and pout redirects |
+
+Mutations run **before** queries in the same pass, so redirects can observe updated facts immediately.
+
+---
+
+## \`mutationFailed\` pout
+
+| Value | Meaning |
+|-------|---------|
+| **\`0\`** | No mutation block, or last transaction **committed** |
+| **\`1\`** | Last transaction **failed** — typically non-ground fact; **no** partial apply |
+
+Redirect like any other pout:
+
+\`\`\`logts
+mutationFailed >= failed
+\`\`\`
+
+On failure, the dynamic store is unchanged from before that transaction.
+
+---
+
+## Mutations vs queries
+
+| Mechanism | Where | Purpose |
+|-----------|-------|---------|
+| **\`logic { + / - }\`** | \`comp [logic]\` exec block | Change effective facts between passes |
+| **\`query name:\` redirect** | Same exec block | Read solutions after mutations |
+| **\`.world:query({ … })\`** | Expression on inline instance | Ad-hoc goals on **static** inline KB only |
+
+Use **component query redirects** to test facts after mutation. Inline **\`.world:query\`** does not see the component dynamic store.
+
+---
+
+## Example — move box between containers
+
+Static warehouse fact: \`inside(box1, c1)\`. One pass moves the box to \`c2\`.
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    query where:
+        inside(box1, X)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire still = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    stillAtC1 >= still
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**:
+
+- **\`where\`** — first character is **\`c\`** (\`c2\` atom) — box moved.
+- **\`still\`** — **\`0\`** — old location retracted.
+- **\`failed\`** — **\`0\`** — transaction OK.
+
+---
+
+## Example — assert new status fact
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query hasActive:
+        status(box1, active)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`**.
+
+---
+
+## Example — idempotent duplicate add
+
+Adding the same fact twice (across two passes or in one block) does not fail.
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query hasActive:
+        status(box1, active)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic {
+        + status(box1, active)
+        + status(box1, active)
+    }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`**.
+
+---
+
+## Example — non-ground fact fails transaction
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    inside(box1, c1)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire still = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, X) }
+    stillAtC1 >= still
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**:
+
+- **\`failed = 1\`** — \`X\` is not ground.
+- **\`still = 1\`** — static \`inside(box1, c1)\` unchanged.
+
+---
+
+## Example — tombstone hides static fact
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    inside(box1, c1)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { - inside(box1, c1) }
+    stillAtC1 >= ok
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 0\`** — static fact hidden by tombstone, not deleted from inline.
+
+---
+
+## Example — wire argument in mutation
+
+Wire values decode to atoms or numbers before the ground check (same encoding as pin inputs).
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    query hasLocated:
+        located(box1, zone2)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+40wire destWire = 01111010 01101111 01101110 01100101 00110010
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + located(box1, destWire) }
+    hasLocated >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`** — \`destWire\` encodes atom **\`zone2\`**.
+
+---
+
+## Example — mutations then query in one pass
+
+Mutations commit before redirects read query results.
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    inside(box1, c1)
+    container(c1)
+    container(c2)
+
+    query where:
+        inside(box1, X)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire dest = 00000000
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= dest
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`dest\`** shows **\`c2\`** (ASCII **\`c\`** in first byte).
+
+---
+
+## Example — \`mutationFailed\` after success
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query hasActive:
+        status(box1, active)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 1
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 0\`**.
+
+---
+
+## Persistence across passes
+
+The dynamic store is owned by the **component instance**. A second **\`set\`** pass sees adds and tombstones from earlier passes (until reset by reloading the script).
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query hasActive:
+        status(box1, active)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire trigger = 0
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    hasActive >= ok
+    set = trigger
+}
+\`\`\`
+
+1. **Load & Run** with \`trigger = 0\` — no pass; **\`ok = 0\`**.
+2. Set **\`trigger = 1\`** and **Run** again — **\`ok = 1\`** (fact persists).
+
+For a single-shot demo, keep **\`1wire trigger = 1\`** as in other examples.
+
+---
+
+## Wave and legacy
+
+Mutation and query results are intended to be **identical** under **wave** and **legacy** propagation. Automated tests cover both modes for move, tombstone, wire args, and failure paths.
+
+---
+
+## Related
+
+- [inline-logic.md](inline-logic.md) — static facts, rules, queries
+- [comp-logic.md](comp-logic.md) — pins, redirects, pouts, policies
+- [logic-query-exec.md](logic-query-exec.md) — \`.world:query\` on static inline KB
 `,
     'loop.md': `# Loop preprocessor (\`loop N..M[\`)
 

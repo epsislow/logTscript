@@ -13,7 +13,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | Topic | Summary |
 |-------|---------|
 | **Role** | Definition layer — facts, rules, queries |
-| **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries on `comp [logic]` |
+| **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts and rules (not queries) |
 | **Doc helpers** | `doc(inline.logic)`, `doc(.myModule)` |
@@ -268,5 +268,6 @@ show(doc(.character))
 ## Related
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
+- Static vs dynamic KB, `logic { + / - }`, tombstones → [logic-runtime.md](logic-runtime.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — `inline.type{logic}`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)

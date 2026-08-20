@@ -115,11 +115,11 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   getWidthBits() { return 1; }
 
   getSupportedProperties() {
-    return ['execCount', 'truncated', 'depthExceeded'];
+    return ['execCount', 'truncated', 'depthExceeded', 'mutationFailed'];
   }
 
   getRedirectProperties() {
-    return ['execCount', 'truncated', 'depthExceeded'];
+    return ['execCount', 'truncated', 'depthExceeded', 'mutationFailed'];
   }
 
   _parsePositiveIntAttr(attributes, name, compName) {
@@ -144,6 +144,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         { bits: '16', name: 'execCount' },
         { bits: '1', name: 'truncated' },
         { bits: '1', name: 'depthExceeded' },
+        { bits: '1', name: 'mutationFailed' },
       ],
       returns: '1bit',
     };
@@ -237,6 +238,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       execCount: 0,
       truncated: 0,
       depthExceeded: 0,
+      mutationFailed: 0,
+      dynamicStore: typeof logicCreateDynamicStore === 'function' ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() },
       maxDepth,
       maxSolutions,
       _logicRedirects: [],
@@ -326,7 +329,58 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return inputEnv;
   }
 
-  _runLogic(comp, compName, pending, reEvaluate, ctx, redirects) {
+  _resolveMutationTerm(term, ctx) {
+    if (!term) return term;
+    if (term.kind === 'atom' && ctx.wires && ctx.wires.has(term.name)) {
+      const bits = ctx.getWireEffectiveValue(term.name) || '';
+      const inferFn = typeof logicInferBindType === 'function' ? logicInferBindType : null;
+      const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
+      if (inferFn && pinFn) return pinFn(bits, inferFn(bits.length));
+    }
+    if (term.kind === 'compound') {
+      return {
+        kind: 'compound',
+        predicate: term.predicate,
+        arity: (term.args || []).length,
+        args: (term.args || []).map((a) => this._resolveMutationTerm(a, ctx)),
+      };
+    }
+    return term;
+  }
+
+  _collectMutationOps(mutationBlocks, ctx) {
+    const parseFn = typeof parseLogicMutationBlock === 'function' ? parseLogicMutationBlock : null;
+    if (!parseFn || !mutationBlocks || !mutationBlocks.length) return [];
+    const ops = [];
+    for (const block of mutationBlocks) {
+      const parsed = parseFn(block.raw);
+      for (const item of parsed) {
+        ops.push({
+          op: item.op,
+          head: this._resolveMutationTerm(item.head, ctx),
+        });
+      }
+    }
+    return ops;
+  }
+
+  _applyMutations(comp, mutationBlocks, ctx) {
+    const applyFn = typeof logicApplyMutationTransaction === 'function'
+      ? logicApplyMutationTransaction : null;
+    if (!applyFn || !mutationBlocks || !mutationBlocks.length) {
+      comp.mutationFailed = 0;
+      return;
+    }
+    if (!comp.dynamicStore) {
+      comp.dynamicStore = typeof logicCreateDynamicStore === 'function'
+        ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() };
+    }
+    const ops = this._collectMutationOps(mutationBlocks, ctx);
+    const result = applyFn(comp.dynamicStore, ops);
+    comp.mutationFailed = result && result.success ? 0 : 1;
+  }
+
+  _runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks) {
     const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
     const execFn = typeof executeLogicQueries === 'function' ? executeLogicQueries : null;
     if (!resolveFn || !execFn) throw Error('Logic engine is not loaded');
@@ -335,11 +389,16 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
 
     const merged = resolveFn(inst, ctx.inlineInstances);
+    this._applyMutations(comp, mutationBlocks, ctx);
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const runtimeMerged = buildFn
+      ? { ...merged, clauses: buildFn(merged.clauses, comp.dynamicStore) }
+      : merged;
     const inputEnv = this._readPinValues(comp, pending, reEvaluate, ctx);
     const execOpts = {};
     if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
     if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
-    const raw = execFn(merged, inputEnv, execOpts);
+    const raw = execFn(runtimeMerged, inputEnv, execOpts);
     const meta = raw._logicMeta || {};
     delete raw._logicMeta;
     comp.queryResults = raw;
@@ -378,6 +437,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           bits = comp.truncated ? '1' : '0';
         } else if (rd.poutName === 'depthExceeded') {
           bits = comp.depthExceeded ? '1' : '0';
+        } else if (rd.poutName === 'mutationFailed') {
+          bits = comp.mutationFailed ? '1' : '0';
         } else if (rd.poutName === 'execCount') {
           const count = comp.execCount != null ? comp.execCount : 0;
           bits = count.toString(2).padStart(width, '0').slice(-width);
@@ -471,8 +532,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const setVal = this.reEvalPendingValue(pending, 'set', reEvaluate, ctx);
     if (!this._isActive(setVal)) return;
     const redirects = comp._logicRedirects || [];
-    this._runLogic(comp, compName, pending, reEvaluate, ctx, redirects);
+    const mutationBlocks = comp._logicMutationBlocks || [];
+    this._runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks);
     comp._logicRedirects = [];
+    comp._logicMutationBlocks = [];
   }
 
   evalGetProperty(comp, property, a, ctx) {
@@ -488,6 +551,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (property === 'depthExceeded') {
       const val = comp.depthExceeded ? '1' : '0';
       return { value: val, ref: null, varName: `${a.var}:depthExceeded`, bitWidth: 1 };
+    }
+    if (property === 'mutationFailed') {
+      const val = comp.mutationFailed ? '1' : '0';
+      return { value: val, ref: null, varName: `${a.var}:mutationFailed`, bitWidth: 1 };
     }
     return null;
   }

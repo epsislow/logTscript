@@ -420,9 +420,38 @@ function parseLogicGoalsBlock(bodyRaw) {
   return goals;
 }
 
+function parseLogicMutationBlock(bodyRaw) {
+  const src = bodyRaw == null ? '' : String(bodyRaw);
+  const ops = [];
+  for (const rawLine of src.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith(';')) continue;
+    let op = null;
+    if (line.startsWith('+')) op = 'add';
+    else if (line.startsWith('-')) op = 'remove';
+    else logicError(`mutation line must start with + or -: ${line}`);
+    let rest = line.slice(1).trim();
+    if (!rest) logicError('mutation line requires a fact after + or -');
+    if (!rest.endsWith('.')) rest += '.';
+    const tokens = logicTokenize(rest);
+    const parser = new LogicParser(tokens);
+    const clause = parser.parseClause();
+    if (clause.body && clause.body.length) {
+      logicError('mutation must be a ground fact, not a rule', parser.peek().line);
+    }
+    if (parser.at('DOT')) parser.advance();
+    if (!parser.at('EOF')) {
+      logicError('unexpected tokens after mutation fact', parser.peek().line);
+    }
+    ops.push({ op, head: clause.head });
+  }
+  return ops;
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.parseLogicBody = parseLogicBody;
   globalThis.parseLogicGoalsBlock = parseLogicGoalsBlock;
+  globalThis.parseLogicMutationBlock = parseLogicMutationBlock;
   globalThis.parseLogicProgramBlock = parseLogicProgramBlock;
   globalThis.logicResolveMerged = logicResolveMerged;
   globalThis.formatLogicInstanceDoc = formatLogicInstanceDoc;
@@ -438,6 +467,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     parseLogicBody,
     parseLogicGoalsBlock,
+    parseLogicMutationBlock,
     parseLogicProgramBlock,
     logicResolveMerged,
     formatLogicInstanceDoc,

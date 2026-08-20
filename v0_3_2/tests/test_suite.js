@@ -37177,5 +37177,391 @@ comp [logic] .peopleLogic:
     h.assert('bad=0', interp.getWireEffectiveValue('bad'), '0');
   });
 
+  const INLINE_LOGIC_WAREHOUSE = `inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    query where:
+        inside(box1, X)
+
+    query stillAtC1:
+        inside(box1, c1)
+
+    query hasLocated:
+        located(box1, zone2)
+
+:`;
+
+  const INLINE_LOGIC_TAGS = `inline [logic] .tags:
+
+    query hasActive:
+        status(box1, active)
+
+:`;
+
+  const ZONE2_40 = '01111010' + '01101111' + '01101110' + '01100101' + '00110010';
+
+  function runWarehouseMove(session) {
+    const src = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}`;
+    return session.run(src);
+  }
+
+  reg(3559, 'logic', 'parse logic { + / - } mutation block', function(h, session) {
+    const ops = parseLogicMutationBlock('+ status(box1, ok)\n- status(box1, old)');
+    h.assert('two ops', String(ops.length), '2');
+    h.assert('add', ops[0].op, 'add');
+    h.assert('remove', ops[1].op, 'remove');
+    h.assert('pred add', ops[0].head.predicate, 'status');
+  });
+
+  reg(3560, 'logic', 'runtime mutation + persists across set passes', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+
+1wire trigger2 = 1
+
+.tagLogic:{
+    hasActive >= ok
+    set = trigger2
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1 after persist', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3567, 'logic', 'runtime mutation + persists across set passes (wave)', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+
+1wire trigger2 = 1
+
+.tagLogic:{
+    hasActive >= ok
+    set = trigger2
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1 after persist', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3561, 'logic', 'runtime mutation atomic move - inside', function(h, session) {
+    const { interp } = runWarehouseMove(session);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('at c2', interp.getWireEffectiveValue('where').slice(0, 8), '01100011');
+  });
+
+  reg(3568, 'logic', 'runtime mutation atomic move - inside (wave)', function(h, session) {
+    const { interp } = runWarehouseMove(session);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('at c2', interp.getWireEffectiveValue('where').slice(0, 8), '01100011');
+  }, { propagation: 'wave' });
+
+  reg(3562, 'logic', 'runtime mutation non-ground fact fails transaction', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire still = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, X) }
+    stillAtC1 >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('static fact remains', interp.getWireEffectiveValue('still'), '1');
+  });
+
+  reg(3569, 'logic', 'runtime mutation non-ground fact fails transaction (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box1, X) }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('still c1 char', interp.getWireEffectiveValue('where').slice(0, 8), '01100011');
+  }, { propagation: 'wave' });
+
+  reg(3563, 'logic', 'runtime mutation + idempotent duplicate add', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic {
+        + status(box1, active)
+        + status(box1, active)
+    }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3570, 'logic', 'runtime mutation + idempotent duplicate add (wave)', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic {
+        + status(box1, active)
+        + status(box1, active)
+    }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3564, 'logic', 'runtime mutation - absent fact succeeds silently', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { - status(box1, ghost) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+  });
+
+  reg(3571, 'logic', 'runtime mutation - absent fact succeeds silently (wave)', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { - status(box1, ghost) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3565, 'logic', 'runtime mutation wire arg resolves to atom', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+40wire destWire = ${ZONE2_40}
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + located(box1, destWire) }
+    hasLocated >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('located ok', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3572, 'logic', 'runtime mutation wire arg resolves to atom (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+40wire destWire = ${ZONE2_40}
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + located(box1, destWire) }
+    hasLocated >= ok
+    mutationFailed >= failed
+    set = trigger
+    show(ok)
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('located ok', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3566, 'logic', 'runtime mutationFailed pout redirect', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 1
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0 after success', interp.getWireEffectiveValue('failed'), '0');
+  });
+
+  reg(3573, 'logic', 'runtime mutationFailed pout redirect (wave)', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 1
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + status(box1, active) }
+    mutationFailed >= failed
+    set = trigger
+    show(failed)
+}`;
+    const { out, interp } = session.run(src);
+    h.assert('failed=0 after success', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('show failed 0', String(out.some((l) => l.includes('failed') && l.includes('0'))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3574, 'logic', 'runtime mutation tombstone hides static fact', function(h, session) {
+    const srcFixed = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { - inside(box1, c1) }
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(srcFixed);
+    h.assert('tombstone hides static', interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3575, 'logic', 'runtime mutation tombstone hides static fact (wave)', function(h, session) {
+    const srcFixed = INLINE_LOGIC_WAREHOUSE + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { - inside(box1, c1) }
+    stillAtC1 >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(srcFixed);
+    h.assert('tombstone hides static', interp.getWireEffectiveValue('ok'), '0');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

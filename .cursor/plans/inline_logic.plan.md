@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–10 complete."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–10 complete; Fazele 11–12 planificate."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -35,6 +35,12 @@ todos:
   - id: logic-result-policies
     content: "Faza 10: result policies (1+b) — ;unique / ;first / ;last — D34–D37 confirmed, D38=A"
     status: completed
+  - id: logic-runtime-mutation
+    content: "Faza 11: runtime mutation (1+e) — logic { + / - }, D40–D49 confirmed, data: overlay"
+    status: completed
+  - id: logic-constraints
+    content: "Faza 12: constraints — constraint P <- body, validare pe stare propusă — D50–D59"
+    status: pending
 isProject: false
 ---
 
@@ -1154,7 +1160,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **1+b** | ~~Result policies~~ | **Promovat → Faza 10** (`;unique`, `first`, `last`, `;all`) | D10, D12a |
 | **1+c** | ~~Negation~~ | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
 | **1+d** | ~~Recursivitate + depth limit~~ | **Promovat → Faza 8** (D25–D29) | D5 |
-| **1+e** | Facts dinamice runtime | assert/retract | |
+| **1+e** | ~~Facts dinamice runtime~~ | **Promovat → Faza 11** — `logic { + / - }`, tranzacții atomice, `mutationFailed` | D40–D49 |
 | **1+f** | ~~Multi-var vague~~ | **Mutat în Faza 5** — redirect matrix/vector | D12 |
 | **1+g** | `use` nested profund / circular deps | lint la elaborare | D16 |
 | **1+h** | ~~Invoke `.world:query({ goal })`~~ | **Promovat → Faza 9** (D30–D32) | D12, D30–D32 |
@@ -1162,44 +1168,53 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **1+j** | Integrare PHZ | | |
 | **1+k** | POUT declarate pe comp (D7-B) | Low priority — user: „nu prea il vad ca va fi facut”; probe/debug | D7 |
 | **1+l** | **`query = …` explicit** (D2-C) | Optimizare când A (toate query-urile) e prea lent; **nu redundant** cu redirect | D2 |
+| **1+m** | Inline mutation invoke | `.world:mutate({ + … - … })` — **D49=A**; **low priority**, puțin probabil | D49 |
+| **1+n** | `assert` / `retract` în body reguli | Prolog clasic în `<-` body — D40=A exec-only | D40 |
+| **1+o** | Persistență dynamic facts | retain / save-load între sesiuni; snapshot KB | D48 |
+| **1+p** | Validare constrângeri la query | read-only „is state legal?” fără mutație | D53 |
+| **1+q** | Index pe dynamic facts | performanță retract/lookup volume mari | F11 |
+| **1+r** | **`comp [logic] data:`** | **`overlay`** (default F11) / **`copy`** / **`static`**; ex-D41-C seed — impact D44/D45/D48 la **1+r** | D41 |
 
 ### Note backlog — explicații (fără fază încă)
 
-#### **1+e** — Facts dinamice runtime (`assert` / `retract`)
+#### ~~**1+e**~~ → **Faza 11**
 
-**Ce e în Prolog (pe scurt):**
+Sketch actualizat: **[`logic_runtime_mutation_n_constraint`](../my_ideas/logic_runtime_mutation_n_constraint)** — **`logic { + fact - fact }`** în exec block (nu `assert`/`retract` Prolog în reguli). Detaliu decizii **D40–D49** și implementare: vezi **Faza 11** mai jos.
 
-| Comandă | Semnificație |
-|---------|--------------|
-| **`assert(Fact)`** | Adaugă un **fapt** în baza de cunoștințe **la runtime** (ex. `assert(owns(john, tesla))`) |
-| **`retract(Goal)`** | Șterge **prima** clauză/fapt care se potrivește cu `Goal` (ex. `retract(owns(john, chevy))`) |
-
-După `assert`, query-urile văd faptul nou; după `retract`, dispare. Baza **nu** mai e doar ce ai scris în fișier la compile.
-
-**Exemplu Prolog — inventar:**
-
-```prolog
-owns(john, chevy).          % static la load
-
-?- assert(owns(john, tesla)).
-?- retract(owns(john, chevy)).
-?- owns(john, X).
-X = tesla.
-```
-
-**Unde ar avea sens în LogTScript (dacă s-ar face vreodată):**
-
-- **Nu** în exec block (`.logic:{ … }`) — acolo e frontiera **circuit** (pin ↔ wire, redirect, `set`), nu motor Prolog.
-- Natural: **goal în body de regulă** — ex. `sell(Car) <- owns(john, Car), retract(owns(john, Car))`.
-- Sau API intern / persistență între `set`-uri pe comp — **neconfirmat**.
-
-**Ce avem azi:** facts/rules **statice** din `inline [logic]`; `comp [logic]` **citește** la fiecare solve. **Fără** assert/retract.
-
-**Status:** rămâne în **Amânate** — decizii viitoare (persistență, sintaxă, interacțiune cu `use` / `\+`).
+**Notă vs nota veche 1+e:** backlog-ul anterior presupunea `assert`/`retract` ca **goals** în reguli sau API intern. Sketch-ul nou mută mutația la **frontiera comp** (`comp [logic]` exec block), aliniat cu modelul ASM-like (circuit `set` + pout, nu execuție inline-native).
 
 #### ~~**1+h**~~ → **Faza 9**
 
 Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
+
+#### **1+r** — `comp [logic] data:` (overlay / copy / static)
+
+**F11 livrează doar `overlay`** (D41-A) — atribut **`data: overlay`** implicit, poate fi omis.
+
+**Amânat (1+r):** extindere header comp:
+
+```logts
+comp [logic] .whLogic:
+    data: overlay    # default — D41-A: static + dynamic + tombstone
+    data: copy       # ex-D41-B: copy-on-write la prima mutație
+    data: static     # read-only runtime: `logic { + / - }` = eroare elaborare sau no-op + mutationFailed
+```
+
+| Mod | Semnificație |
+|-----|--------------|
+| **`overlay`** | D41-A — KB = static ∖ tombstones ∪ dynamic |
+| **`copy`** | D41-B — clone static la prima mutație, apoi edit local |
+| **`static`** | Fără mutație — comp doar query/solve pe static (demo, probe) |
+
+**Ex-D41-C (seed):** model „inline copiat integral la init, fără overlay static live” — **nu** e același lucru cu `static`; rămâne variantă de evaluat în **1+r**. La implementare trebuie redesenate:
+
+| Decizie F11 (overlay) | Impact posibil sub seed/copy |
+|------------------------|------------------------------|
+| **D44-A** (`-` = asigură absent) | Poate deveni „delete din copie” vs tombstone |
+| **D45-A** (tombstone) | Poate fi **inutil** dacă tot static e deja copiat mutabil |
+| **D48-A** (pipeline) | Același flux, dar KB temp = copie completă |
+
+**Notă user:** deciziile se iau la faza **1+r**, nu blochează F11.
 
 ---
 
@@ -1218,6 +1233,8 @@ Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
 | **Faza 8** Depth tuning | D25–D29 | **(completed)** |
 | **Faza 9** Inline query invoke `.world:query({ })` | D30–D32 | **(completed)** |
 | **Faza 10** Result policies (1+b) | D34–D38 | **(completed)** — teste 3554–3558, doc logts-play |
+| **Faza 11** Runtime mutation (1+e) | D40–D49 | **(ready-to-implement)** — D40–D49 confirmed (F11: `data: overlay` implicit) |
+| **Faza 12** Constraints | D50–D59 | **(ready-to-implement)** — după F11 + confirmare D50–D59 |
 
 ---
 
@@ -1233,8 +1250,10 @@ Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
 | **4** | [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md), [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md), teste **3500–3505**, doc-viewer |
 | **6** | [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md), teste **3506–3507** |
 | **5** | F5 vector/matrix, **3512–3520**, pin limits, round-trip |
+| **7–10** | `\+` NAF, depth tuning, `.world:query`, `;unique`/ `;last` — teste **3536–3558** |
+| **11–12** | **Planificate** — runtime mutation (1+e), constraints — **D40–D59** |
 
-**Teste:** 2682/2682 trec (inclusiv grupul `logic` + `allow-notallow`).
+**Teste:** 2720/2720 (2026-08-20, post-F10).
 
 **Notă:** `logic-comp-bind.js` planificat separat → integrat în `logic-assembler.js` (`parseLogicProgramBlock`) + `components/logic.js`.
 
@@ -1776,6 +1795,647 @@ comp [logic] .peopleLogic:
 
 ---
 
+## Analiză sketch — runtime mutation + constraints
+
+**Sursă:** [`.cursor/my_ideas/logic_runtime_mutation_n_constraint`](../my_ideas/logic_runtime_mutation_n_constraint)
+
+### Direcție ( ce se dorește )
+
+| Layer | Rol |
+|-------|-----|
+| **`inline [logic]`** | Facts **statice**, reguli, queries, **`constraint`** (F12) — **definiție**, nemodificată la runtime |
+| **`comp [logic]`** | KB runtime = static + **dynamic fact store**; tranzacții **`logic { + / - }`**; pout **`mutationFailed`** |
+| **F12 constraints** | Reguli de **validare** pe **starea propusă** după tranzacție — nu produc soluții alternative |
+
+Model țintă: **RULES = program**, **FACTS = date runtime**, **CONSTRAINTS = gardă la tranziții**.
+
+### Aliniere cu ce există (F0–F10)
+
+| Sketch | Stare azi | Notă |
+|--------|-----------|------|
+| Exec block + `set` | ✅ F3 | Mutations intră în același property block |
+| Query + redirect | ✅ F3/F5/F10 | După mutație, query-urile văd starea nouă |
+| Wire → atom (pin/query) | ✅ D12b, F9 | Reutilizabil la args `+ allowed(destWire, boxWire)` |
+| Atoms unquoted `john` | ✅ D8 | Sketch folosește `"zone2"` — **neconcordanță** → D42/D59 |
+| `truncated` / `depthExceeded` | ✅ F8 | `mutationFailed` = al treilea pout de status tranzacție |
+
+### Posibile erori / neclarități în sketch
+
+| # | Problemă | Impact | Decizie propusă |
+|---|----------|--------|-----------------|
+| 1 | Ghilimele `"zone2"` vs atoms `zone2` | Parser / doc | **D42, D59** |
+| 2 | `- fact` absent = success sau fail? | Semantica tranzacției | **D44** |
+| 3 | Poți `-` un fact **static** din inline? | Model overlay | **D45** |
+| 4 | Ordinea `logic {}` vs query vs `set` | Pipeline exec pass | **D48** |
+| 5 | Constraint pe predicate vs pe **delta** | Performanță / corectitudine | **D54** |
+| 6 | `capacityAvailable/1` — relation helper sau built-in? | F12 expressivitate | **D57** |
+| 7 | Nota veche 1+e (`assert` în reguli) vs sketch (`logic {}`) | Scope F11 | **D40** — sketch **(recommended)** |
+
+### Recomandare ordine
+
+1. **Faza 11** — store dinamic + tranzacții (fără constraints sau cu validare minimă hardcoded)
+2. **Faza 12** — keyword `constraint` + validare pe stare propusă
+3. F11 **poate** merge live cu „constraint pass gol” până la F12 — **D58**
+
+---
+
+## Decizii Faza 11 — runtime mutation (D40–D49)
+
+> **Sursă:** item **1+e** promovat; sketch **runtime mutation**.  
+> **Stare:** **D40–D49 confirmed.** F11 **(ready-to-implement)** — mod `data: overlay` implicit.
+
+### Rezumat decizii F11
+
+| ID | Decizie |
+|----|---------|
+| D40 | **A** — `logic { + / - }`; doc ≈ assert/retract |
+| D41 | **A** — overlay default; **1+r** → `copy` / `static` / seed |
+| D42 | **A** — wire + literal |
+| D43 | **A** — `+` idempotent |
+| D44 | **A** — `-` absent = success |
+| D45 | **A** — tombstone |
+| D46 | **A** — atomic |
+| D47 | **A** — pout ultima tranzacție |
+| D48 | **A** — mutate(+F12 validate)→query→redirect |
+| D49 | **A** — comp-only; **1+m** low priority |
+
+---
+
+| Capabilitate | F0–F10 |
+|--------------|--------|
+| Facts la runtime | Doar static din `inline [logic]` |
+| World state între `set`-uri | Nu — fiecare solve = aceeași KB |
+| Move atomic `inside`- | Nu — doar simulare manuală prin fire |
+| Eroare tranziție | `truncated`/`depthExceeded` = search limits, **nu** commit |
+
+---
+
+### D40 — Unde trăiește mutația (sintaxă) **(confirmed: A)**
+
+| Opțiune | Descriere | Pro | Contra |
+|---------|-----------|-----|--------|
+| **A — `logic { + / - }` în exec block (recommended)** | Sketch: `.myLogic:{ logic { + … - … } set = trigger }` | Aliniat cu comp=circuit; atomic block clar; separă def de date | Nu e Prolog clasic |
+| **B — `assert` / `retract` ca goals în `<-` body (change)** | Nota veche 1+e / Prolog | Expresiv în reguli | Amestecă side-effects în backtracking; ordine soluții nedefinită |
+| **C — ambele** | Exec block + goals | Flexibilitate maximă | Două modele, cost implementare + doc |
+
+**Decizie:** **A** — mutația trăiește **doar** în exec block comp, sintaxă `logic { + fact(...) - fact(...) }`.
+
+**Documentație (obligatoriu la F11):** în [`comp-logic.md`](../v0_3_2/doc/comp-logic.md) și [`inline-logic.md`](../v0_3_2/doc/inline-logic.md), explică explicit analogia Prolog:
+
+| LogTScript (F11) | Prolog clasic | Semnificație |
+|------------------|---------------|--------------|
+| **`+ fact(...)`** | **`assert(fact)`** | Adaugă un fapt în KB **runtime** (dynamic store) |
+| **`- fact(...)`** | **`retract(fact)`** | Elimină un fapt din KB **runtime** (dynamic sau ascunde static — vezi D45) |
+
+**Nu** implementăm `assert`/`retract` ca goals în reguli în F11 — doar **`+`/`-`** în exec block. Prolog rămâne referința conceptuală în doc.
+
+**1+n** amânat (assert/retract în `<-` body).
+
+---
+
+### D41 — Model static + dynamic **(confirmed: A — overlay default)**
+
+**Decizie:** **A** — overlay pe comp. F11 implementează **doar** acest mod; atribut comp **`data: overlay`** implicit (poate fi omis).
+
+**Amânat 1+r:** `data: copy` (ex-D41-B), `data: static` (fără `+/-`), redesign **ex-D41-C** (seed) — vezi backlog **1+r**; impact **D44/D45/D48** decis acolo.
+
+La fiecare `set` pe comp, motorul construiește KB-ul pentru query/solve/mutation validate:
+
+#### **A — overlay pe comp (confirmed, default)**
+
+```text
+inline [logic]     →  facts STATICE (read-only, shared între instanțe)
+comp [logic]       →  dynamic store (Set separat: + adăugări, - retrageri overlay)
+query/solve        →  KB efectiv = static ∖ tombstones ∔ dynamic
+```
+
+| Aspect | Comportament |
+|--------|--------------|
+| **Inline** | `owns(john, chevy).` rămâne **nemodificat** în fișier și în registry |
+| **Instanță comp** | `.whLogic` și `.whLogic2` au **dynamic store-uri separate** |
+| **Prima mutație** | **Nu** copiază tot staticul — doar adaugă/șterge în overlay |
+| **Memorie** | Mică dacă puține mutații; static partajat |
+| **`use`** | Static din module `use`-d merge ca azi; overlay per comp |
+
+**Exemplu:** inline are `container(c1).`. Comp A face `+ container(c2)`. Query pe A vede `c1` (static) + `c2` (dynamic). Comp B fără mutații vede doar `c1`.
+
+#### **B — copy-on-write la primul `+`** → **1+r** (`data: copy`)
+
+```text
+load comp  →  pointer la static (read-only)
+primul `+` →  CLONE entire static KB → mutable copy on comp
+mutații    →  editezi copia locală
+```
+
+| Aspect | Comportament |
+|--------|--------------|
+| **Prima mutație** | Cost **O(n)** — copiezi **toate** facts static |
+| **După clone** | Un singur index; `+`/`-` ca pe o KB clasică |
+| **Memorie** | Duplică tot staticul per comp care mută măcar o dată |
+| **`use`** | La clone, incluzi și facts din module merged — complicat de menținut la sync |
+
+**Când are sens:** KB static mică, multe mutații, vrei implementare simplă post-clone.
+
+#### **C — doar dynamic; inline = schema / seed** → **1+r** (redesign; nu F11)
+
+```text
+init comp   →  COPY facts inline → dynamic store (one-time seed)
+inline      →  „template” — nu participă direct la solve după init
+mutații     →  doar pe dynamic store
+```
+
+| Aspect | Comportament |
+|--------|--------------|
+| **Init** | Toate facts din inline devin dynamic la crearea comp |
+| **Inline după init** | Nu mai citești static la fiecare solve — doar store-ul comp |
+| **Sharing** | Două comp-uri cu același inline au **seed identic** la init, apoi diverg independent |
+| **Reload inline** | Nu actualizează automat comp-urile existente (spre deosebire de A) |
+
+**Când are sens:** vrei mental model „comp = bază de date; inline = DDL + seed”.
+
+**Recomandare analiză:** **A** — aliniat sketch (inline imutabil, dynamic separat), eficient pentru simulări cu mult static și puține mutații. **Confirmat.**
+
+---
+
+### D42 — Argumente mutation: wire vs literal **(confirmed: A)**
+
+Sketch:
+
+```logts
+logic { + allowed(myDestWire, myBoxWire) }   # wire → valoare la run
+logic { + allowed("zone2", "container7") }   # literal text
+logic { + age("john", 25) }                  # literal numeric
+```
+
+| Opțiune | Descriere | Pro | Contra |
+|---------|-----------|-----|--------|
+| **A — wire + literal (recommended)** | Wire: decode ca binding F9 (`1`/`text`/`number`); literal: syntax logic existentă | Integrare circuit | Trebuie clarificat D59 pentru ghilimele |
+| **B — doar wire în MVP** | Orice arg = expr LogTScript | Un parser path | Verbose: `+ allowed(destWire, boxWire)` obligatoriu |
+| **C — doar literals logic în MVP (change)** | Fără wire direct în `+` | Parser simplu | Pierde legătura cu fire fără pins |
+
+**Decizie:** **A** — wire (decode ca F9) + literals logic în args mutation.
+
+---
+
+### D43 — `+` duplicat (idempotent) **(confirmed: A)**
+
+Sketch: dynamic facts = **set**; al doilea `+ allowed(z,c)` **nu** dublează.
+
+| Opțiune | Verdict sketch |
+|---------|----------------|
+| **A — idempotent, success (recommended)** | Aliniat sketch |
+| **B — fail tranzacție** | `mutationFailed=1` la duplicat |
+
+**Decizie:** **A** — al doilea `+` același fact = **success**, fără duplicat în store.
+
+---
+
+### D44 — `-` când factul lipsește **(confirmed: A)**
+
+Sketch (secțiune „Removing Facts”): eșecul rezervat pentru operații **illegal** conform regulilor runtime (inclusiv **F12 constraints**) — **nu** pentru „absent”.
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — success silent dacă absent (confirmed)** | `-` = „asigură absent” — scoate din dynamic sau tombstone pe static (D45) |
+| **B — fail tranzacție** | Prolog `retract` strict |
+| **C — fail doar dacă `-` țintește static fără overlay (change)** | Respins — înlocuit de **A + D45 tombstone** |
+
+**Decizie:** **A** — un singur comportament: `- fact` → fact absent din KB efectiv.
+
+#### Notă opțiune C (respinsă, păstrată pentru istoric)
+
+**C** spune: comportamentul lui `-` depinde de **unde** era factul:
+
+| Situație | `- fact` cu **C** |
+|----------|-------------------|
+| Fact în **dynamic store** | Success — îl scoți (ca A) |
+| Fact **absent** complet (nici static, nici dynamic) | Success silent (ca A) |
+| Fact există **doar static** (din inline), fără tombstone | **FAIL** → `mutationFailed=1`, rollback |
+
+**De ce există C:** forțează o distincție explicită — **nu poți „șterge” un fact static** cu `-` simplu; trebuie fie **D45-A tombstone**, fie accepti că static e permanent (D45-A2).
+
+**Cu A (recommended):** `- fact` = „vreau ca `fact` să **nu** fie în KB efectiv” — indiferent de sursă: scoate din dynamic **sau** adaugă tombstone pe static (D45). **Un singur comportament** pentru user.
+
+**Cu C:** user trebuie să știe că `- owns(john,chevy)` **eșuează** dacă `chevy` vine doar din inline, până nu implementezi tombstone — mesaj/semantica mai rigidă.
+
+**Cu C:** user trebuie să știe că `- owns(john,chevy)` **eșuează** dacă `chevy` vine doar din inline, până nu implementezi tombstone — mesaj/semantica mai rigidă. **Nu folosim C** — **A + D45** acoperă cazul.
+
+---
+
+### D45 — Retragere facts **statice** inline **(confirmed: A)**
+
+Facts din `inline [logic]` sunt **definiție** — nu le modifici în fișier la runtime. Întrebarea: poate `-` să **ascundă** un fact static **pentru instanța asta de comp**?
+
+#### **A — overlay: dynamic + tombstone (confirmed)**
+
+Trei liste la merge (KB efectiv):
+
+```text
+KB_efectiv = (static_facts ∖ tombstones) ∪ dynamic_adds
+```
+
+| Structură | Rol |
+|-----------|-----|
+| **static_facts** | Din inline (+ `use`), read-only shared |
+| **dynamic_adds** | Facts adăugate cu `+` |
+| **tombstones** | Facts **retrase** cu `-` — inclusiv cele care existau doar în static |
+
+**Ce e „tombstone”:** nu ștergi din inline; marchezi pe comp *„tratează `owns(john,chevy)` ca absent”*. La query, motorul **sare** peste acel fact static.
+
+**Exemplu:**
+
+```logts
+inline: owns(john, chevy). owns(john, ford).
+
+# comp init — KB: chevy, ford
+
+logic { - owns(john, chevy) }   # tombstone pe chevy
+
+# KB efectiv: ford only (chevy ascuns pentru instanța asta)
+# alt comp .peopleLogic2 fără mutație — încă vede chevy
+```
+
+**„Opțional” în draft anterior** = mecanismul tombstone e **parte din A**, nu feature separat de activat/dezactivat. Fără tombstone, A nu poate retrage static — rămâne doar A2.
+
+#### **A2 — static permanent; `-` doar pe dynamic**
+
+| `- target` | Rezultat |
+|------------|----------|
+| Fact în dynamic | Removed |
+| Fact doar static | **Ignorat** (success silent) sau **no-op** — static rămâne vizibil |
+
+**Limitare:** nu poți dezactiva un fact seed din inline (ex. `allowed(zone1,c1)` inițial) fără să schimbi inline.
+
+#### **B — copie mutabilă a întregului static**
+
+La init (sau la prima mutație), comp **clonează** toate facts static într-o KB locală. `-` șterge fizic din copie.
+
+| Pro | Contra |
+|-----|--------|
+| Un singur store după clone | Memorie duplicată; pierde sharing static read-only |
+
+**Decizie:** **A** — tombstone + dynamic; `-` pe static = adaugă tombstone, nu modifică inline.
+
+---
+
+### D46 — Atomicitate tranzacție **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — all-or-nothing per `logic { }` block (recommended)** | Sketch: COMMIT / ROLLBACK pe întreg block-ul |
+| **B — o operație = o tranzacție** | Mai simplu | Pierde „move” atomic |
+
+**Decizie:** **A** — tot `logic { }` = o tranzacție; COMMIT sau ROLLBACK integral.
+
+**F12:** validarea constraints rulează pe **starea finală propusă**, nu pas-cu-pas — **D54**.
+
+---
+
+### D47 — Pout `mutationFailed` **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — 1 bit, ultima tranzacție din ultimul exec pass (recommended)** | Paralel `truncated`/`depthExceeded`; redirect `mutationFailed >= wire` |
+| **B — latch până la clear explicit** | | 
+| **C — per `logic {}` block în același pass** | Rar util |
+
+Valori: **`0`** = success, **`1`** = rollback (sketch).
+
+**Decizie:** **A** — 1 bit, ultima tranzacție din ultimul exec pass; redirect `mutationFailed >= wire`.
+
+---
+
+### D48 — Ordine în exec pass **(confirmed: A — cu sub-pipeline F12)**
+
+#### Analiză: Faza 11 + Faza 12 (sketch constraints)
+
+Sketch mutation + constraints (flux conceptual):
+
+```text
+current state
+      ↓
+temporary state  ← aplică TOATE +/- din logic { }
+      ↓
+validate constraints (F12, D53: stare finală propusă)
+      ↓
+   valid? ──no──→ ROLLBACK → mutationFailed=1
+      │
+     yes
+      ↓
+   COMMIT → dynamic store + tombstones actualizate
+      ↓
+   queries (KB = stare commit-uită)
+      ↓
+   redirects (query + mutationFailed + truncated…)
+```
+
+**Concluzie analiză:** **D48-A** rămâne corect — query-urile rulează **după** commit/rollback. Dacă rollback, KB = starea anterioară (neschimbată); query-urile văd tot **starea commit-uită** (identică cu pre-mutation). **`mutationFailed`** reflectă eșecul tranzacției.
+
+**F12 nu schimbă ordinea macro** — inserează **validare în interiorul** fazei de mutație (pas 3–4), **înainte** de query. Aliniat sketch: *„validate constraints → COMMIT”* then queries on new world.
+
+#### Pipeline exec pass **(confirmed: A)**
+
+```text
+1. program block (pins) — wire → pin
+2. eval args logic { } — wire → termeni mutation
+3. mutation phase:
+   a. build proposed KB (overlay apply all +/-)
+   b. [F12 când activ] validateConstraints(proposed)  — D52-A, D53-A
+   c. COMMIT sau ROLLBACK → mutationFailed (D47)
+4. solve toate query-urile (D2-A) pe KB commit-uită
+5. redirects (query + pout)
+6. set consume
+```
+
+| Opțiune | Descriere | Pro | Contra |
+|---------|-----------|-----|--------|
+| **A — mutate(+validate F12)→query→redirect (confirmed)** | Sketch + F12 | Derived knowledge post-commit; `mutationFailed` disponibil la redirect | — |
+| **B — query→mutate→redirect (change)** | Query pe stare **pre-mutation** același pass | Citești vechea lume înainte de move | Regulile derivate contradictorii cu commit; anti-sketch |
+| **C — trigger separat `mutate = wire` (change)** | Mutations decouple de `set` | Control hardware | Sintaxă extra; 2 trigger-e |
+| **D — ordinea liniilor din exec block (change)** | Proprietățile rulează în ordinea scrierii | Flexibil | Fragil; diferă de D2-A „toate query-urile”; greu de testat |
+| **E — skip query dacă mutationFailed=1 (change)** | Optimizare | Economie solve | Query-urile pe stare veche pot fi tot utile (ex. „de ce a eșuat?”) |
+| **F — validate constraints și după query (change)** | Double-check | Paranoia | Contrazice D52-A; cost dublu |
+
+**Decizie:** **A** — macro-order fix; F12 = sub-pas în mutation phase. **Confirmat explicit.**
+
+**Notă F11 fără F12 (D58-A):** pas **3b** absent (no-op pass); **3c** commit direct după apply.
+
+**Ordine sursă exec block:** liniile `logic {}`, `mutationFailed >=`, `johnOwns >=`, `set =` — **nu** impun ordine de execuție; pipeline-ul de mai sus e **semantic**, ca la query-redirects azi.
+
+---
+
+### D49 — Inline mutation (`.world:mutate`) **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — comp-only (confirmed)** | Paralel F9: mutația = responsabilitate runtime comp |
+| **B — și invoke inline expresie (change)** | `.warehouse:mutate({ + inside(box, c1) })` | Simetric F9 |
+
+**Decizie:** **A** — **1+m** amânat, **low priority** (puțin probabil).
+
+---
+
+## Faza 11 — runtime mutation **(done)**
+
+**Scop:** `comp [logic]` menține **dynamic facts** (mod **`data: overlay`**, implicit); exec block acceptă **`logic { + fact(...) - fact(...) }`**; tranzacții **atomice**; pout **`mutationFailed`**. Pipeline exec: **D48-A**.
+
+```logts
+comp [logic] .whLogic:
+    data: overlay    # default F11 — omis = overlay
+    on: 1
+    .warehouse { }
+:
+```
+
+| Fișier | Modificări |
+|--------|------------|
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | (minimal) reprezentare fact term pentru serialize |
+| [`parser.js`](../v0_3_2/core/parser.js) | parse `logic { }` în property block; `+`/`-` statements |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `LogicDynamicStore`, merge static+dynamic, apply transaction |
+| [`logic.js`](../v0_3_2/core/components/logic.js) | store per comp, exec pass pipeline D48, pout `mutationFailed` |
+| [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) | runtime mutation + analogie **`+`≈assert / `-`≈retract** + exemple **logts-play** |
+| [`doc/logic-runtime.md`](../v0_3_2/doc/logic-runtime.md) | pagină dedicată static/dynamic/tombstone/mutations + exemple **logts-play** |
+| [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | static vs dynamic; link logic-runtime |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3559+** |
+
+### Teste țintă (3559+)
+
+| ID | Titlu |
+|----|-------|
+| 3559 | parse `logic { + fact - fact }` |
+| 3560 | `+` persistă între două `set`-uri; query vede fact nou |
+| 3561 | tranzacție atomică move `- inside + inside` |
+| 3562 | rollback parțial — `mutationFailed=1`, stare neschimbată |
+| 3563 | `+` idempotent (D43) |
+| 3564 | `-` absent silent (D44) |
+| 3565 | args din wire (text) + literal |
+| 3566 | `mutationFailed >= wire` redirect |
+| 3567–3575 | perechi **wave** (move, non-ground, wire arg, tombstone, …) |
+
+### Criterii done
+
+- [x] Decizii **D40–D49** confirmate
+- [x] Parser `logic { }` + eval args
+- [x] Dynamic store + union la solve (overlay)
+- [x] Tranzacție atomică + `mutationFailed` + pipeline D48-A
+- [x] Teste **3559–3575** (legacy + wave); suite verde **2737/2737**
+- [x] Doc **logts-play** — [`logic-runtime.md`](../v0_3_2/doc/logic-runtime.md), [`comp-logic.md`](../v0_3_2/doc/comp-logic.md)
+
+**Amânat post-F11:** **1+r** (`data: copy/static/seed`), **1+m**, **1+n**, **1+o**, **1+q**.
+
+---
+
+## Decizii Faza 12 — constraints (D50–D59)
+
+> **Sursă:** partea a II-a din sketch **constraints**.  
+> **Stare:** **neconfirmate** — depinde de F11; validare în **sub-pipeline mutation** (D48-A pas 3b).
+
+**Legătură D48:** constraints **nu** schimbă ordinea macro mutate→query→redirect; rulează **în interiorul** mutation phase, pe **starea propusă** (D53), **înainte** de COMMIT.
+
+### Context
+
+**Relație** (OR între clauze):
+
+```logts
+canMove(X, Y) <- vehicle(X), road(Y)
+canMove(X, Y) <- robot(X), corridor(Y)
+```
+
+**Constraint** (AND între declarații același predicate):
+
+```logts
+constraint inside(X, Y) <- object(X), container(Y)
+constraint inside(X, Y) <- allowed(X, Y)
+```
+
+Ambele trebuie să reușească pentru ca un fact `inside/2` din **starea propusă** să fie legal.
+
+---
+
+### D50 — Keyword și parse **(neconfirmat)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — `constraint Head <- Body` în inline body (recommended)** | Sketch exact |
+| **B — prefix `:- constraint` (change)** | | 
+| **C — attribute pe predicate (change)** | `@constraint inside/2` |
+
+---
+
+### D51 — Același predicate: relation **și** constraint **(neconfirmat)**
+
+Exemplu: `inside/2` poate fi **fact** runtime, **constraint** de validare, și **head** de regulă derivată?
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — da, roluri separate (recommended)** | Constraint validează **facts** `inside(...)` propuse; regulile derivate separate |
+| **B — predicate fie constraint fie relation** | Mutual exclusive |
+
+---
+
+### D52 — Când rulează constraints **(neconfirmat)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — doar la commit tranzacție F11 (recommended)** | Sketch |
+| **B — și la fiecare query** | Safe dar lent → **1+p** |
+| **C — opțional flag comp `validateOnQuery:`** | | 
+
+---
+
+### D53 — Scope validare: stare propusă completă **(neconfirmat)**
+
+Sketch: `- inside(b,c1) + inside(b,c2)` — constraints pe **starea finală**, nu pe delta intermediară.
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — full proposed state după toate +/- (recommended)** | Uniqueness, capacity |
+| **B — per operație** | Move atomic eșuează incorect |
+
+---
+
+### D54 — Ce facts verificăm **(neconfirmat)**
+
+| Opțiune | Descriere | Pro | Contra |
+|---------|-----------|-----|--------|
+| **A — toate facts afectate (delta+) ∪ predicate mutați (recommended)** | Echilibru | | |
+| **A2 — revalidare globală a tuturor facts `inside/2` din stare (change)** | Simplu de implementat | Corect pentru capacity | O(n) per tranzacție |
+| **B — doar facts nou adăugate** | Rapid | | Pierde uniqueness cross-fact |
+
+**Recomandare analiză:** **A2** pentru MVP F12 dacă volume mici (warehouse sim); optimizare → **1+q**.
+
+---
+
+### D55 — Eșec constraint → rollback **(neconfirmat)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — CONSTRAINT FAILED → ROLLBACK → mutationFailed=1 (recommended)** | Sketch |
+| **B — warning, commit parțial** | Respins de atomicitate D46 |
+
+---
+
+### D56 — Constraint body: ce goals permise **(neconfirmat)**
+
+`capacityAvailable(Container)` — apelează relații pe **starea propusă**.
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — același engine ca query, pe KB temporară (recommended)** | `\+`, arithmetic, relations |
+| **B — subset declarativ (doar facts, fără NAF)** | Mai simplu | 
+| **C — fără NAF în constraints (change)** | Evită fragile negation |
+
+**Legat F7:** NAF în constraint body → **neconfirmat**; amânat **1+p** pentru audit.
+
+---
+
+### D57 — Helpers derivate (`capacityAvailable/1`) **(neconfirmat)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — relation obișnuită în inline, apelată din constraint (recommended)** | Sketch |
+| **B — built-in library `logic.builtin.capacityAvailable`** | | 
+| **C — aggregate syntax amânat** | **1+r** viitor |
+
+---
+
+### D58 — F11 fără F12 **(neconfirmat)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — da: F11 livrabil fără constraints; F12 adaugă gardă (recommended)** | Incremental |
+| **B — F11 necesită minim `constraint` gol** | | 
+
+---
+
+### D59 — Literali string `"zone2"` vs atom `zone2` **(neconfirmat)**
+
+Sketch folosește ghilimele; motorul actual folosește **atoms unquoted**.
+
+| Opțiune | Descriere | Pro | Contra |
+|---------|-----------|-----|--------|
+| **A — acceptă ambele; `"text"` = atom ASCII (recommended)** | Compat sketch + doc | Un parser path | Două forme în doc |
+| **B — doar atoms unquoted (change)** | Consistent F0–F10 | Sketch de actualizat |
+| **C — ghilimele doar în mutation args, nu în inline facts (change)** | | | 
+
+---
+
+## Faza 12 — constraints **(ready-to-implement după F11 + D50–D59)**
+
+**Scop:** `constraint Name(...) <- Body` în `inline [logic]`; la commit F11, validează starea propusă; eșec → rollback.
+
+### Fișiere țintă
+
+| Fișier | Modificări |
+|--------|------------|
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | parse `constraint`, stocare separată de clauses |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `validateConstraints(proposedState, delta)` |
+| [`logic.js`](../v0_3_2/core/components/logic.js) | hook post-transaction pre-commit |
+| [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | constraints vs relations (OR vs AND) |
+| [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) | flux mutation → validate → commit |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3567+** |
+
+### Teste țintă (3567+)
+
+| ID | Titlu |
+|----|-------|
+| 3567 | parse `constraint inside(X,Y) <- ...` |
+| 3568 | `+ inside(box,c1)` success când object+container există |
+| 3569 | constraint fail → rollback + `mutationFailed=1` |
+| 3570 | multiple constraints same predicate (AND) |
+| 3571 | move atomic `- inside + inside` cu constraint uniqueness |
+| 3572 | capacity — a treia `+ inside` respinsă |
+| 3573 | constraint body folosește relație helper pe stare propusă |
+
+### Exemplu țintă (sketch consolidat)
+
+```logts
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+    container(c2)
+
+    constraint inside(Object, Container) <-
+        object(Object),
+        container(Container)
+
+    constraint inside(Object, Container) <-
+        singleLocation(Object)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+### Criterii done
+
+- [ ] Decizii **D50–D59** confirmate
+- [ ] Parser + storage constraints
+- [ ] Validare pe proposed state (D53–D54)
+- [ ] Integrare rollback F11
+- [ ] Teste **3567–3573**; suite verde
+- [ ] Doc **logts-play** (capacity, move, failure)
+
+**Amânat post-F12:** constraints la query (**1+p**); aggregates în constraints (**1+r** — de creat dacă e nevoie).
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -1868,12 +2528,19 @@ comp [logic] .peopleLogic:
 | Negation `\+` | **Faza 7 (completed)** |
 | Depth / truncated / depthExceeded | **Faza 8 (completed)** |
 | Inline query `.world:query({ })` | **Faza 9 (completed)** — D30–D32 |
-| Result policies `;unique` / `;first` / `;last` | **Faza 10 (ready)** — D34–D38 confirmed; fără `;all` |
+| Result policies `;unique` / `;first` / `;last` | **Faza 10 (completed)** — D34–D38 |
+| Runtime mutation `logic { + / - }` | **Faza 11 (ready-to-implement)** — D40–D49 confirmed; `data: overlay` |
+| `comp [logic] data:` copy/static/seed | **1+r** amânat |
+| Constraints `constraint P <- body` | **Faza 12 (ready-to-implement)** — D50–D59 neconfirmate |
+| Literali `"atom"` vs unquoted | **D59** neconfirmat |
+| `assert`/`retract` în reguli | **1+n** amânat |
+| Inline `.world:mutate` | **1+m** amânat, low priority |
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 9~~ **(completed)**
-2. **Faza 10 (1+b)** — D34–D37 confirmed → implementare
-3. Opțional: **1+l**, **1+k**, **1+e**, **1+i**
+1. ~~Faza 0~~ → ~~Faza 10~~ **(completed)**
+2. **Faza 11 (1+e)** — **D40–D49 confirmed** → implementare
+3. **Faza 12** — confirmă **D50–D59** → constraints (hook în D48 pas 3b)
+4. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**, **1+q**

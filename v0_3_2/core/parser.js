@@ -2409,6 +2409,11 @@ parseBoardInstance() {
       // Keep single ID properties (add, inside, set, move, to, …).
       break;
     }
+    if (propName === 'logic' && this.c.type === 'SYM' && this.c.value === '{') {
+      const bracePos = this.t.i - 1;
+      const raw = this.parseRawBraceBlock(bracePos);
+      return { property: 'logicMutation', raw };
+    }
     if (propName === 'openSock' && this.c.type === 'SYM' && this.c.value === '<-') {
       this.eat('SYM', '<-');
       const targetAtom = this.atom();

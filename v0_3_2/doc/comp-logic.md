@@ -17,6 +17,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Trigger** | `set` pin — respects `on:` (`raise` / `edge` / `1`) |
 | **Inputs** | Pin ← wire in exec block (`myX = scoreIn`) |
 | **Outputs** | Query redirect (`modifier:0 >= result`) |
+| **Mutations** | `logic { + fact / - fact }` — see [logic-runtime.md](logic-runtime.md) |
 | **Doc** | `doc(comp.logic)`, `doc(.characterLogic)` |
 
 ---
@@ -31,9 +32,12 @@ sequenceDiagram
   participant E as Engine
   participant Q as Query modifier
   participant R as Wire result
+  participant M as logic { + / - }
 
   W->>P: exec block myX = scoreIn
   P->>L: read pin convert number
+  L->>M: optional mutation transaction
+  M->>E: runtime KB (static overlay)
   L->>E: input env X=15
   E->>Q: resolve all queries
   Q->>R: modifier:0 >= result
@@ -42,9 +46,9 @@ sequenceDiagram
 | Step | Where | What happens |
 |------|-------|--------------|
 | 1 | **Elaboration** | Program block maps logic vars → pins (`X is number myX`) |
-| 2 | **Exec block** | Wires assign pins (`myX = scoreIn`) |
+| 2 | **Exec block** | Wires assign pins (`myX = scoreIn`); optional **`logic { + / - }`** |
 | 3 | **Trigger** | Active `set` (per `on:`) starts one solve pass |
-| 4 | **Engine** | All queries from inline run with input bindings |
+| 4 | **Engine** | Runtime KB → all queries from inline run with input bindings |
 | 5 | **Redirect** | Selected solutions written to target wires |
 
 ---
@@ -153,6 +157,7 @@ Exemplu: `8wire scoreIn` + `myX = scoreIn` → pin **8** biți; `128wire big` �
 | **2 free** | `allAges:count >= numRows` | Rows written; `allAges:width >= numCols` → column count |
 | **pout** | `truncated >= wire` | **`1`** if any query hit `maxSolutions` cap this pass |
 | **pout** | `depthExceeded >= wire` | **`1`** if any query hit `maxDepth` this pass |
+| **pout** | `mutationFailed >= wire` | **`1`** if the last `logic { }` transaction failed |
 
 Pout redirects use the same syntax as query redirects: **`poutName >= wire`** (not `wire = pout`).
 
@@ -209,6 +214,7 @@ Use **`on: 1`** in examples so **Load & Run** performs a solve pass immediately.
 | **`execCount`** | 16 | Solve passes completed (`.logic:execCount`) |
 | **`truncated`** | 1 | Set when any query was capped by `maxSolutions` |
 | **`depthExceeded`** | 1 | Set when any query hit `maxDepth` |
+| **`mutationFailed`** | 1 | Set when `logic { + / - }` transaction failed (non-ground fact, etc.) |
 
 ---
 
@@ -722,6 +728,66 @@ After **Load & Run**: **`hitDepth = 1`** — recursive rule exceeded depth (fail
 
 ---
 
+## Runtime mutations — `logic { + / - }`
+
+Change the effective knowledge base on each solve pass without editing `inline [logic]`. Full behaviour, tombstones, and **`mutationFailed`** → [logic-runtime.md](logic-runtime.md).
+
+```logts
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= destWire
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+| Construct | Role |
+|-----------|------|
+| **`+ groundFact`** | Assert fact into component dynamic store |
+| **`- groundFact`** | Tombstone — hide matching static or dynamic fact |
+| **`mutationFailed >= wire`** | **`1`** if transaction failed (store unchanged) |
+
+Mutations run **before** query redirects in the same pass. The dynamic store **persists** across `set` triggers on the same component.
+
+```logts-play
+inline [logic] .warehouse:
+
+    inside(box1, c1)
+    container(c1)
+    container(c2)
+
+    query where:
+        inside(box1, X)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+8wire where = 00000000
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    where:0 >= where
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`where`** shows **`c2`**; **`failed = 0`**.
+
+---
+
 ## Multiple exec blocks
 
 Several property blocks may target the same component. Query result slots are **shared**; the **last successful** exec block wins (last-write-wins), matching other multi-block components.
@@ -743,4 +809,5 @@ Several property blocks may target the same component. Query result slots are **
 ## Related
 
 - Knowledge definition → [inline-logic.md](inline-logic.md)
+- Static vs dynamic KB, tombstones, mutations → [logic-runtime.md](logic-runtime.md)
 - Similar two-layer model → [plc.md](plc.md), [asm.md](asm.md)

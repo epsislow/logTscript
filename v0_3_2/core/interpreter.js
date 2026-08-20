@@ -14422,6 +14422,7 @@ if (s.assignment) {
     if (comp.type === 'logic') {
       comp._logicRedirectProps = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
       comp._logicRedirects = comp._logicRedirectProps;
+      comp._logicMutationBlocks = properties.filter((p) => p.property === 'logicMutation');
     }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
@@ -14459,7 +14460,7 @@ if (s.assignment) {
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
-      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>'){
+      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>' || property === 'logicMutation'){
         continue;
       }
 

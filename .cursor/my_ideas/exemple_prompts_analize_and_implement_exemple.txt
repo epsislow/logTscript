@@ -1,0 +1,27 @@
+Vreau sa mai adaugi in acelasi plan in @.cursor/plans/inline_logic.plan.md Faza 11 cu logic runtime_mutation si Faza 12 cu logic constraint 
+
+Ai documentatia sketch cu exemple in fisierul acesta:@.cursor/my_ideas/logic_runtime_mutation_n_constraint
+
+
+La fel ca la fazele anterioare doresc ca  daca e ceva de amanat sa continui tabelul cu faze amanate cu nume date de genul 1+a, 1+b, 1+c, ... 1+x
+
+nu imi pune intrebari iti dau in scris pt fiecare decizie neconfirmata,
+
+necesar, si de adaugat si in plan daca nu este deja ca legenda:
+daca ai recomandari notezi optinile cu (recommended) 
+daca gasesti ca daca facem altfel are mai mult sens, poti pune optiunile tale cu (change)
+cand e o faza gata de implementare poti sa scrii (ready-to-implement)
+daca o faza e implementata poti sa scrii (completed)
+
+ as vrea sa analizezi sa vezi directia, sa vezi cam ce se doreste, dar este un sketch posibil sa fie si greseli, ce ti se pare neclar sau daca vezi modificari de la directie da-mi optiuni, in tabel as vrea tot asa D40 D41 D42 adica sa continuam de la numarul Dx la care suntem in plan, si pt fiecare decizie poti sa imi dai optiunile poate detaliate acolo unde este necesar. 
+
+
+-----------
+incepe implementarea pentru Faza 11,
+sa adaugi exemple cu butoane load si load and run
+sa scrii documentatie cu comportamentul/ functionalitatile noi si exemple care sa mearga conform
+trebuie sa existe si teste pe wave nu doar legacy, am observat diferente la rulari intre wave si legacy, au fost corectate dar posibil ca din nou sa apara rezultate diferite, si asta nu este ok, rezultatele trebuie sa fie aceleasi intre wave si legacy
+sa te asiguri ca toate testele trec cu success.
+Poti adauga pagina de documentatie noua cu ce inseamna logic runtime explicatia executiei static / dinamic thumbstone, mutationFailed, mutations and queries, etc exemple, poti sa adaugi mai multe exemple in documentatie la fiecare sectiune pentru diverse comportamente, cu butoane load si load and run, 
+
+nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
