@@ -217,6 +217,21 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'is' && g0.arity === 2) {
       return this._solveIs(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'member' && g0.arity === 2) {
+      return this._solveMember(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'append' && g0.arity === 3) {
+      return this._solveAppend(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'length' && g0.arity === 2) {
+      return this._solveLength(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'reverse' && g0.arity === 2) {
+      return this._solveReverse(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'sort' && g0.arity === 2) {
+      return this._solveSort(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -413,6 +428,159 @@ class LogicEngine {
       if (cutCommitted) break;
     }
     return any;
+  }
+
+  _solveMember(elem, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._memberWalk(elem, list, cont, env);
+  }
+
+  _memberWalk(elem, list, cont, env) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || logicListIsNil(ld)) return false;
+    let any = false;
+    const trail = env.trailLength();
+    if (logicUnify(elem, ld.head, env, this.table)) {
+      if (cont()) any = true;
+      if (this._solutionCapReached || env.cutCommitted) {
+        env.undo(trail);
+        return any;
+      }
+    }
+    env.undo(trail);
+    if (this._memberWalk(elem, ld.tail, cont, env)) any = true;
+    return any;
+  }
+
+  _solveAppend(l1, l2, l3, rest, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._appendWalk(l1, l2, l3, cont, env);
+  }
+
+  _appendWalk(l1, l2, l3, cont, env) {
+    const d1 = logicDeref(l1, env);
+    if (logicListIsNil(d1)) {
+      const trail = env.trailLength();
+      if (!logicUnify(l2, l3, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return cont();
+    }
+    if (d1.kind === 'list' && !d1.nil) {
+      const trail = env.trailLength();
+      const restL3 = { kind: 'var', name: `__ap${this._renameSerial++}` };
+      const l3cons = { kind: 'list', head: d1.head, tail: restL3 };
+      if (!logicUnify(l3, l3cons, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      const ok = this._appendWalk(d1.tail, l2, restL3, cont, env);
+      env.undo(trail);
+      return ok;
+    }
+    if (d1.kind === 'var') {
+      let any = false;
+      const trail0 = env.trailLength();
+      const tEmpty = env.trailLength();
+      if (logicUnify(l1, { kind: 'list', nil: true }, env, this.table)
+          && logicUnify(l2, l3, env, this.table)) {
+        if (cont()) any = true;
+        if (this._solutionCapReached) {
+          env.undo(trail0);
+          return any;
+        }
+      }
+      env.undo(tEmpty);
+      const tSplit = env.trailLength();
+      const l3d = logicDeref(l3, env);
+      if (l3d.kind === 'list' && !l3d.nil) {
+        const restL1 = { kind: 'var', name: `__ap${this._renameSerial++}` };
+        const l1cons = { kind: 'list', head: l3d.head, tail: restL1 };
+        if (logicUnify(l1, l1cons, env, this.table)) {
+          const ok = this._appendWalk(restL1, l2, l3d.tail, cont, env);
+          if (ok) any = true;
+          if (this._solutionCapReached) {
+            env.undo(trail0);
+            return any;
+          }
+        }
+      }
+      env.undo(tSplit);
+      env.undo(trail0);
+      return any;
+    }
+    return false;
+  }
+
+  _solveLength(list, nTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const nd = logicDeref(nTerm, env);
+    const ld = logicDeref(list, env);
+    if (nd.kind === 'number') {
+      if (nd.value < 0 || !Number.isInteger(nd.value)) return false;
+      if (ld.kind === 'var') {
+        const built = logicBuildAnonList(nd.value);
+        const trail = env.trailLength();
+        if (!logicUnify(list, built, env, this.table)) {
+          env.undo(trail);
+          return false;
+        }
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      if (ld.kind === 'list') {
+        const len = logicGroundListLength(ld, env);
+        if (len == null || len !== nd.value) return false;
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      return false;
+    }
+    if (nd.kind === 'var') {
+      if (ld.kind !== 'list') return false;
+      const len = logicGroundListLength(ld, env);
+      if (len == null) return false;
+      if (nd.name !== '_') env.bind(nd.name, { kind: 'number', value: len });
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _solveReverse(list, rev, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    const rd = logicDeref(rev, env);
+    if (ld.kind === 'list' && logicListIsGroundClosed(ld, env)) {
+      const reversed = logicReverseGroundList(ld, env);
+      const trail = env.trailLength();
+      if (!logicUnify(rev, reversed, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (rd.kind === 'list' && logicListIsGroundClosed(rd, env)) {
+      const reversed = logicReverseGroundList(rd, env);
+      const trail = env.trailLength();
+      if (!logicUnify(list, reversed, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _solveSort(list, sorted, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const elems = logicGroundListToArray(ld, env);
+    if (elems == null) return false;
+    const sortedCopy = elems.slice().sort((a, b) => logicCompareTerms(a, b, env, this.table));
+    const sortedList = logicArrayToList(sortedCopy);
+    const trail = env.trailLength();
+    if (!logicUnify(sorted, sortedList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 }
 
@@ -659,6 +827,117 @@ function logicOccurs(name, term, env) {
 
 function logicListIsNil(term) {
   return term && term.kind === 'list' && term.nil === true;
+}
+
+function logicTermTypeRank(term) {
+  if (!term) return -1;
+  if (term.kind === 'number') return 0;
+  if (term.kind === 'atom') return 1;
+  if (term.kind === 'list') return 2;
+  if (term.kind === 'compound') return 3;
+  return -1;
+}
+
+function logicCompareTerms(a, b, env, table) {
+  const da = logicDeref(a, env);
+  const db = logicDeref(b, env);
+  const ra = logicTermTypeRank(da);
+  const rb = logicTermTypeRank(db);
+  if (ra < 0 || rb < 0) return 0;
+  if (ra !== rb) return ra - rb;
+  if (da.kind === 'number') return da.value - db.value;
+  if (da.kind === 'atom') {
+    const na = table.name(da.id);
+    const nb = table.name(db.id);
+    if (na < nb) return -1;
+    if (na > nb) return 1;
+    return 0;
+  }
+  if (da.kind === 'list') {
+    if (logicListIsNil(da) && logicListIsNil(db)) return 0;
+    if (logicListIsNil(da)) return -1;
+    if (logicListIsNil(db)) return 1;
+    const hc = logicCompareTerms(da.head, db.head, env, table);
+    if (hc !== 0) return hc;
+    return logicCompareTerms(da.tail, db.tail, env, table);
+  }
+  if (da.kind === 'compound') {
+    if (da.predicate !== db.predicate) {
+      if (da.predicate < db.predicate) return -1;
+      if (da.predicate > db.predicate) return 1;
+    }
+    if (da.arity !== db.arity) return da.arity - db.arity;
+    for (let i = 0; i < da.arity; i++) {
+      const c = logicCompareTerms(da.args[i], db.args[i], env, table);
+      if (c !== 0) return c;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+function logicListIsGroundClosed(listD, env) {
+  let cur = listD;
+  while (!logicListIsNil(cur)) {
+    if (cur.kind !== 'list' || cur.nil) return false;
+    const headD = logicDeref(cur.head, env);
+    if (headD.kind === 'var') return false;
+    if (!logicTermIsGround(headD)) return false;
+    cur = logicDeref(cur.tail, env);
+    if (cur.kind === 'var') return false;
+  }
+  return true;
+}
+
+function logicGroundListLength(listD, env) {
+  let cur = listD;
+  let n = 0;
+  while (!logicListIsNil(cur)) {
+    if (cur.kind !== 'list' || cur.nil) return null;
+    cur = logicDeref(cur.tail, env);
+    if (cur.kind === 'var') return null;
+    n++;
+  }
+  return n;
+}
+
+function logicBuildAnonList(n) {
+  if (n === 0) return { kind: 'list', nil: true };
+  return {
+    kind: 'list',
+    head: { kind: 'var', name: '_' },
+    tail: logicBuildAnonList(n - 1),
+  };
+}
+
+function logicGroundListToArray(listD, env) {
+  const out = [];
+  let cur = listD;
+  while (!logicListIsNil(cur)) {
+    if (cur.kind !== 'list' || cur.nil) return null;
+    const headD = logicDeref(cur.head, env);
+    if (headD.kind === 'var') return null;
+    out.push(headD);
+    cur = logicDeref(cur.tail, env);
+    if (cur.kind === 'var') return null;
+  }
+  return out;
+}
+
+function logicArrayToList(elems) {
+  if (!elems.length) return { kind: 'list', nil: true };
+  let tail = { kind: 'list', nil: true };
+  for (let i = elems.length - 1; i >= 0; i--) {
+    tail = { kind: 'list', head: elems[i], tail };
+  }
+  return tail;
+}
+
+function logicReverseGroundList(listD, env) {
+  const elems = logicGroundListToArray(listD, env);
+  if (elems == null) return null;
+  elems.reverse();
+  return logicArrayToList(elems);
 }
 
 function logicEvalNumber(term, env, table) {

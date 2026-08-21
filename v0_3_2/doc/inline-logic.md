@@ -16,7 +16,8 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits; **`use .mod as alias`** prefixes imported predicates |
-| **Debug output** | Built-in **`show/N`** — print logic terms during query / rule / constraint execution |
+| **Debug output** | Built-in **`show/N`** — see [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **`member/2`**, **`append/3`**, **`length/2`**, **`reverse/2`**, **`sort/2`**, **`nth0/3`**, **`nth1/3`** — [logic-builtins.md](logic-builtins.md) |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
 
@@ -47,7 +48,7 @@ LogTScript logic follows common Prolog conventions:
 | **Rule** | `modifier2(X, 0) <- X >= 9, X =< 12` | Head `<-` body goals (comma = AND) |
 | **Negation** | `\+ age(peter, _)` | Negation as failure — goal cannot be proven |
 | **Cut** | `!` | Commit — discard backtracking choices from the current clause |
-| **Arithmetic eval** | `M is Expr`, `is(M, Expr)` | Built-in integer evaluation (see [Arithmetic `is/2`](#arithmetic-is2)) |
+| **Arithmetic eval** | `M is Expr`, `is(M, Expr)` | Built-in integer evaluation — [logic-builtins.md — `is/2`](logic-builtins.md#is2) |
 | **Query** | `query johnOwns: owns(john, X)` | Named goal(s) exported to runtime |
 
 Multiple clauses with the same predicate name and arity are **OR** alternatives (first successful match in discovery order, with backtracking).
@@ -96,7 +97,7 @@ Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **`
 
 **Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as `X = [X | _]` fail ). A bare list term cannot stand alone as a goal — bind it with `=` or pass it to a predicate.
 
-List literals accept at most **1024** comma-separated elements. Define relations such as **`member/2`** as user rules (see below). Built-in **`nth0/3`** and **`nth1/3`** index into lists (see [List indexing](#built-in-nth0--nth1-list-indexing)).
+List literals accept at most **1024** comma-separated elements. Built-in list predicates (**`member/2`**, **`append/3`**, **`length/2`**, **`reverse/2`**, **`sort/2`**, **`nth0/3`**, **`nth1/3`**) are documented in [logic-builtins.md](logic-builtins.md).
 
 **`show/N`** prints ground lists as `[a, b, c]` and partial lists as `[a, b|Rest]` when the tail is still a variable.
 
@@ -132,15 +133,12 @@ red green
 
 For queries with more than two output variables, use **`.world:query({ … })`** (see [logic-query-exec.md](logic-query-exec.md)).
 
-### Example — `member/2` as user rules
+### Example — built-in `member/2`
 
 ```logts-play
 inline [logic] .world:
 
     colors([red, green, blue])
-
-    member(X, [X | _]) <- X = X
-    member(X, [_ | T]) <- member(X, T)
 
     query allColors:
         colors(L),
@@ -162,7 +160,7 @@ comp [logic] .worldLogic:
 }
 ```
 
-**Load & Run** prints one line per color (`red`, `green`, `blue`).
+**Load & Run** prints one line per color (`red`, `green`, `blue`). Full **`member/2`** reference: [logic-builtins.md](logic-builtins.md#member2).
 
 ### Example — list inside a compound fact
 
@@ -200,85 +198,7 @@ mediterranean
 
 ## Built-in `nth0/3` and `nth1/3` (list indexing)
 
-**`nth0(I, List, Elem)`** and **`nth1(I, List, Elem)`** are **reserved built-in predicates** (arity **3**). They cannot be defined as fact, rule, or constraint heads.
-
-| Builtin | Index base | Example |
-|---------|------------|---------|
-| **`nth0/3`** | **0-based** (first element = index **0**) | `nth0(0, [a, b, c], X)` → `X = a` |
-| **`nth1/3`** | **1-based** (SWI Prolog style) | `nth1(2, [a, b, c], X)` → `X = b` |
-
-**Behaviour:**
-
-- **`List`** must unify with a list; a non-list second argument fails the goal.
-- **`I`** must be an integer variable or a ground integer; other types fail.
-- Ground **`I`** out of range → goal **fails** (no runtime exception).
-- Negative index (or **`nth1`** with **`I < 1`**) → goal **fails**.
-- **`I`** unbound → backtracking generates each valid index where **`Elem`** unifies with the list element.
-- Works in named queries on **`comp [logic]`**, rules, constraints, and **`.world:query({ … })`**.
-
-### Example — read rent by house number
-
-```logts-play
-inline [logic] .rents:
-
-    rents_list([2, 10, 30, 90, 160, 250])
-
-    rent(N, C) <- nth1(N, rents_list([2, 10, 30, 90, 160, 250]), C)
-
-    query house2:
-        rent(2, C),
-        show(C)
-
-:
-
-comp [logic] .rentsLogic:
-    on: 1
-    .rents { }
-:
-
-1wire trigger = 1
-
-.rentsLogic:{
-    query = house2
-    set = trigger
-}
-```
-
-**Load & Run** prints:
-
-```text
-10
-```
-
-### Example — find index of an element
-
-```logts-play
-inline [logic] .world:
-
-    query q:
-        nth0(I, [red, green, blue], green),
-        show(I)
-
-:
-
-comp [logic] .worldLogic:
-    on: 1
-    .world { }
-:
-
-1wire trigger = 1
-
-.worldLogic:{
-    query = q
-    set = trigger
-}
-```
-
-**Load & Run** prints:
-
-```text
-1
-```
+**`nth0/3`** (0-based) and **`nth1/3`** (1-based) are reserved list indexing builtins. Full syntax, behaviour, and examples: [logic-builtins.md — `nth0/3` · `nth1/3`](logic-builtins.md#nth03-and-nth13).
 
 ---
 
@@ -359,7 +279,7 @@ The word **`is`** appears in three different places in LogTScript. Only **logic 
 | **Program block (component wiring)** | `scoreIn is number pin` | Pin type declaration inside **`.module { … }`** — different parser, not this builtin |
 | **User predicate / atom (allowed)** | `flag(is).`, `is(1).` | Ordinary terms — **`is/1`**, **`is/3`**, etc. User **cannot** define **`is/2`** as a fact or rule head |
 
-**`is/2`** is a **reserved built-in** (like **`show/N`** and **`nth0/3`**). The engine handles it when you call it in a rule, query, or constraint body. You **cannot** write `is(X, Y) <- …` as your own clause.
+**`is/2`** is a **reserved built-in** — see [logic-builtins.md — `is/2`](logic-builtins.md#is2). You **cannot** write `is(X, Y) <- …` as your own clause. The **`=` vs `is/2`** contrast below stays here because unification and arithmetic often appear together in rules.
 
 ### `=` vs `is/2` vs `=:=`
 
@@ -873,77 +793,9 @@ Both modules merge once each — no error. Plain **`use`** on both sides would f
 
 ## Built-in `show/N` (logic debug output)
 
-**`show(T1, T2, …)`** is a **reserved built-in predicate** in the logic engine — not the top-level LogTScript **`show(wire)`** statement. Same name, different rules:
+**`show/N`** is a reserved logic predicate for printing terms during query execution — not script **`show(wire)`**. Full reference (semantics, limits, examples): [logic-builtins.md — `show/N`](logic-builtins.md#shown).
 
-| | **Logic `show/N`** | **Script `show(...)`** |
-|--|-------------------|-------------------------|
-| Where | Query / rule / constraint **bodies** | Top-level script, exec blocks |
-| Arguments | Logic **terms** (atom, number, compound, list, var, `"string"`) | Wires, expressions, `; dec` / `; hex` tags |
-| Output | Prolog-style term text → run **output buffer** | Wire / vector / decode formatting |
-
-**Semantics:**
-
-- **`N`** from **1** to **32** — one output line per successful goal, terms space-separated.
-- **`show()`** with zero arguments → **parse error**.
-- Always **succeeds** (side-effect goal); does not fail the surrounding query.
-- On **backtracking**, prints again for each successful branch (Prolog-style).
-- **`show/N`** cannot be defined as a fact, rule, or constraint head — reserved name.
-
-Works in named queries on **`comp [logic]`**, and in ad-hoc **`.world:query({ show(...) })`** — output appears in the same buffer as script **`show`**.
-
-String literals print **without** surrounding quotes.
-
-**Spacing:** arguments are joined with a **single space**. A string literal that already ends with a space adds **another** space from the join — e.g. `show("found ", X)` prints `found  john` (two spaces). Prefer `show("found", X)` or put the space in the next literal: `show("found ", " ", X)` only if you need explicit control.
-
-Also see built-in **`count/2`** in [logic-indexing.md](logic-indexing.md).
-
-### Example — trace inside relations
-
-```logts-play
-inline [logic] .world:
-
-    inside(john, johnsCar)
-    inside(mary, marysBike)
-
-    query trace:
-        inside(P, Obj),
-        show("inside:", inside(P, Obj))
-
-:
-
-comp [logic] .worldLogic:
-    on: 1
-    .world { }
-:
-
-1wire trigger = 1
-
-.worldLogic:{
-    query = trace
-    set = trigger
-}
-```
-
-**Load & Run** prints two lines (one per solution):
-
-```text
-inside: inside(john, johnsCar)
-inside: inside(mary, marysBike)
-```
-
-### Example — ad-hoc query
-
-```logts-play
-inline [logic] .world:
-
-    person(john)
-    person(mary)
-
-:
-
-1wire run = 1
-8wire[4] who = .world:query({ person(X), show("found", X) })
-```
+Also see **`count/2`** in [logic-builtins.md](logic-builtins.md#count2) and [logic-indexing.md](logic-indexing.md) (index attributes).
 
 ---
 
@@ -969,6 +821,7 @@ show(doc(.character))
 ## Related
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
+- **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
 - Static vs dynamic KB, `logic { + / - }`, tombstones → [logic-runtime.md](logic-runtime.md)
 - Constraints `<=` vs rules `<-` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — `inline.type{logic}`

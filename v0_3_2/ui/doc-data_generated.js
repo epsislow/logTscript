@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-constraints.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -20089,7 +20089,8 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
 | **Composition** | \`use .otherModule\` merges facts, rules, and constraints (not queries); \`use once\` skips revisits; **\`use .mod as alias\`** prefixes imported predicates |
-| **Debug output** | Built-in **\`show/N\`** — print logic terms during query / rule / constraint execution |
+| **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | \`doc(inline.logic)\` — syntax template; \`doc(.myModule)\` — **summary** (counts, query/constraint names, predicate histogram) |
 
@@ -20120,7 +20121,7 @@ LogTScript logic follows common Prolog conventions:
 | **Rule** | \`modifier2(X, 0) <- X >= 9, X =< 12\` | Head \`<-\` body goals (comma = AND) |
 | **Negation** | \`\\+ age(peter, _)\` | Negation as failure — goal cannot be proven |
 | **Cut** | \`!\` | Commit — discard backtracking choices from the current clause |
-| **Arithmetic eval** | \`M is Expr\`, \`is(M, Expr)\` | Built-in integer evaluation (see [Arithmetic \`is/2\`](#arithmetic-is2)) |
+| **Arithmetic eval** | \`M is Expr\`, \`is(M, Expr)\` | Built-in integer evaluation — [logic-builtins.md — \`is/2\`](logic-builtins.md#is2) |
 | **Query** | \`query johnOwns: owns(john, X)\` | Named goal(s) exported to runtime |
 
 Multiple clauses with the same predicate name and arity are **OR** alternatives (first successful match in discovery order, with backtracking).
@@ -20169,7 +20170,7 @@ Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **\
 
 **Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as \`X = [X | _]\` fail ). A bare list term cannot stand alone as a goal — bind it with \`=\` or pass it to a predicate.
 
-List literals accept at most **1024** comma-separated elements. Define relations such as **\`member/2\`** as user rules (see below). Built-in **\`nth0/3\`** and **\`nth1/3\`** index into lists (see [List indexing](#built-in-nth0--nth1-list-indexing)).
+List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`**) are documented in [logic-builtins.md](logic-builtins.md).
 
 **\`show/N\`** prints ground lists as \`[a, b, c]\` and partial lists as \`[a, b|Rest]\` when the tail is still a variable.
 
@@ -20205,15 +20206,12 @@ red green
 
 For queries with more than two output variables, use **\`.world:query({ … })\`** (see [logic-query-exec.md](logic-query-exec.md)).
 
-### Example — \`member/2\` as user rules
+### Example — built-in \`member/2\`
 
 \`\`\`logts-play
 inline [logic] .world:
 
     colors([red, green, blue])
-
-    member(X, [X | _]) <- X = X
-    member(X, [_ | T]) <- member(X, T)
 
     query allColors:
         colors(L),
@@ -20235,7 +20233,7 @@ comp [logic] .worldLogic:
 }
 \`\`\`
 
-**Load & Run** prints one line per color (\`red\`, \`green\`, \`blue\`).
+**Load & Run** prints one line per color (\`red\`, \`green\`, \`blue\`). Full **\`member/2\`** reference: [logic-builtins.md](logic-builtins.md#member2).
 
 ### Example — list inside a compound fact
 
@@ -20273,85 +20271,7 @@ mediterranean
 
 ## Built-in \`nth0/3\` and \`nth1/3\` (list indexing)
 
-**\`nth0(I, List, Elem)\`** and **\`nth1(I, List, Elem)\`** are **reserved built-in predicates** (arity **3**). They cannot be defined as fact, rule, or constraint heads.
-
-| Builtin | Index base | Example |
-|---------|------------|---------|
-| **\`nth0/3\`** | **0-based** (first element = index **0**) | \`nth0(0, [a, b, c], X)\` → \`X = a\` |
-| **\`nth1/3\`** | **1-based** (SWI Prolog style) | \`nth1(2, [a, b, c], X)\` → \`X = b\` |
-
-**Behaviour:**
-
-- **\`List\`** must unify with a list; a non-list second argument fails the goal.
-- **\`I\`** must be an integer variable or a ground integer; other types fail.
-- Ground **\`I\`** out of range → goal **fails** (no runtime exception).
-- Negative index (or **\`nth1\`** with **\`I < 1\`**) → goal **fails**.
-- **\`I\`** unbound → backtracking generates each valid index where **\`Elem\`** unifies with the list element.
-- Works in named queries on **\`comp [logic]\`**, rules, constraints, and **\`.world:query({ … })\`**.
-
-### Example — read rent by house number
-
-\`\`\`logts-play
-inline [logic] .rents:
-
-    rents_list([2, 10, 30, 90, 160, 250])
-
-    rent(N, C) <- nth1(N, rents_list([2, 10, 30, 90, 160, 250]), C)
-
-    query house2:
-        rent(2, C),
-        show(C)
-
-:
-
-comp [logic] .rentsLogic:
-    on: 1
-    .rents { }
-:
-
-1wire trigger = 1
-
-.rentsLogic:{
-    query = house2
-    set = trigger
-}
-\`\`\`
-
-**Load & Run** prints:
-
-\`\`\`text
-10
-\`\`\`
-
-### Example — find index of an element
-
-\`\`\`logts-play
-inline [logic] .world:
-
-    query q:
-        nth0(I, [red, green, blue], green),
-        show(I)
-
-:
-
-comp [logic] .worldLogic:
-    on: 1
-    .world { }
-:
-
-1wire trigger = 1
-
-.worldLogic:{
-    query = q
-    set = trigger
-}
-\`\`\`
-
-**Load & Run** prints:
-
-\`\`\`text
-1
-\`\`\`
+**\`nth0/3\`** (0-based) and **\`nth1/3\`** (1-based) are reserved list indexing builtins. Full syntax, behaviour, and examples: [logic-builtins.md — \`nth0/3\` · \`nth1/3\`](logic-builtins.md#nth03-and-nth13).
 
 ---
 
@@ -20432,7 +20352,7 @@ The word **\`is\`** appears in three different places in LogTScript. Only **logi
 | **Program block (component wiring)** | \`scoreIn is number pin\` | Pin type declaration inside **\`.module { … }\`** — different parser, not this builtin |
 | **User predicate / atom (allowed)** | \`flag(is).\`, \`is(1).\` | Ordinary terms — **\`is/1\`**, **\`is/3\`**, etc. User **cannot** define **\`is/2\`** as a fact or rule head |
 
-**\`is/2\`** is a **reserved built-in** (like **\`show/N\`** and **\`nth0/3\`**). The engine handles it when you call it in a rule, query, or constraint body. You **cannot** write \`is(X, Y) <- …\` as your own clause.
+**\`is/2\`** is a **reserved built-in** — see [logic-builtins.md — \`is/2\`](logic-builtins.md#is2). You **cannot** write \`is(X, Y) <- …\` as your own clause. The **\`=\` vs \`is/2\`** contrast below stays here because unification and arithmetic often appear together in rules.
 
 ### \`=\` vs \`is/2\` vs \`=:=\`
 
@@ -20946,77 +20866,9 @@ Both modules merge once each — no error. Plain **\`use\`** on both sides would
 
 ## Built-in \`show/N\` (logic debug output)
 
-**\`show(T1, T2, …)\`** is a **reserved built-in predicate** in the logic engine — not the top-level LogTScript **\`show(wire)\`** statement. Same name, different rules:
+**\`show/N\`** is a reserved logic predicate for printing terms during query execution — not script **\`show(wire)\`**. Full reference (semantics, limits, examples): [logic-builtins.md — \`show/N\`](logic-builtins.md#shown).
 
-| | **Logic \`show/N\`** | **Script \`show(...)\`** |
-|--|-------------------|-------------------------|
-| Where | Query / rule / constraint **bodies** | Top-level script, exec blocks |
-| Arguments | Logic **terms** (atom, number, compound, list, var, \`"string"\`) | Wires, expressions, \`; dec\` / \`; hex\` tags |
-| Output | Prolog-style term text → run **output buffer** | Wire / vector / decode formatting |
-
-**Semantics:**
-
-- **\`N\`** from **1** to **32** — one output line per successful goal, terms space-separated.
-- **\`show()\`** with zero arguments → **parse error**.
-- Always **succeeds** (side-effect goal); does not fail the surrounding query.
-- On **backtracking**, prints again for each successful branch (Prolog-style).
-- **\`show/N\`** cannot be defined as a fact, rule, or constraint head — reserved name.
-
-Works in named queries on **\`comp [logic]\`**, and in ad-hoc **\`.world:query({ show(...) })\`** — output appears in the same buffer as script **\`show\`**.
-
-String literals print **without** surrounding quotes.
-
-**Spacing:** arguments are joined with a **single space**. A string literal that already ends with a space adds **another** space from the join — e.g. \`show("found ", X)\` prints \`found  john\` (two spaces). Prefer \`show("found", X)\` or put the space in the next literal: \`show("found ", " ", X)\` only if you need explicit control.
-
-Also see built-in **\`count/2\`** in [logic-indexing.md](logic-indexing.md).
-
-### Example — trace inside relations
-
-\`\`\`logts-play
-inline [logic] .world:
-
-    inside(john, johnsCar)
-    inside(mary, marysBike)
-
-    query trace:
-        inside(P, Obj),
-        show("inside:", inside(P, Obj))
-
-:
-
-comp [logic] .worldLogic:
-    on: 1
-    .world { }
-:
-
-1wire trigger = 1
-
-.worldLogic:{
-    query = trace
-    set = trigger
-}
-\`\`\`
-
-**Load & Run** prints two lines (one per solution):
-
-\`\`\`text
-inside: inside(john, johnsCar)
-inside: inside(mary, marysBike)
-\`\`\`
-
-### Example — ad-hoc query
-
-\`\`\`logts-play
-inline [logic] .world:
-
-    person(john)
-    person(mary)
-
-:
-
-1wire run = 1
-8wire[4] who = .world:query({ person(X), show("found", X) })
-\`\`\`
+Also see **\`count/2\`** in [logic-builtins.md](logic-builtins.md#count2) and [logic-indexing.md](logic-indexing.md) (index attributes).
 
 ---
 
@@ -21042,6 +20894,7 @@ show(doc(.character))
 ## Related
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
+- **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
 - Static vs dynamic KB, \`logic { + / - }\`, tombstones → [logic-runtime.md](logic-runtime.md)
 - Constraints \`<=\` vs rules \`<-\` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
@@ -23044,6 +22897,532 @@ comp [led] .name:
 - The \`color\` attribute applies to all LEDs in the group. Individual LED colors are not supported within a single component — declare separate \`led\` components for different colors.
 - \`nl\` places a line break after the **last** LED in the group.
 `,
+    'logic-builtins.md': `# Logic built-ins
+
+Reserved **built-in predicates** in the logic engine — evaluated directly by \`comp [logic]\` and **\`.world:query({ … })\`**, not by user clauses.
+
+Related: [inline-logic.md](inline-logic.md) (syntax) · [comp-logic.md](comp-logic.md) (wiring) · [logic-indexing.md](logic-indexing.md) (\`indexFacts\`, \`count/2\` in constraints)
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run**.
+
+---
+
+## Quick reference
+
+| Builtin | Arity | Reserved head | Side effects | Summary |
+|---------|-------|---------------|--------------|---------|
+| **\`show/N\`** | 1–32 | yes | yes (output buffer) | Print logic terms |
+| **\`count/2\`** | 2 | no¹ | no | Number of solutions to a goal |
+| **\`nth0/3\`** | 3 | yes | no | List element at **0-based** index |
+| **\`nth1/3\`** | 3 | yes | no | List element at **1-based** index |
+| **\`is/2\`** | 2 | yes | no | Integer arithmetic (+ infix **\`M is Expr\`**) |
+| **\`member/2\`** | 2 | yes | no | List membership with backtracking |
+| **\`append/3\`** | 3 | yes | no | Concatenate or decompose lists |
+| **\`length/2\`** | 2 | yes | no | List length; generative when **\`N\`** is ground |
+| **\`reverse/2\`** | 2 | yes | no | Reverse list order (bidirectional) |
+| **\`sort/2\`** | 2 | yes | no | Sort ground list by standard term order |
+
+¹ Only **\`count/2\`** is intercepted — other arities named \`count\` remain user predicates.
+
+**Scope:** all builtins work in rule bodies, named queries, constraint bodies, **\`.world:query({ … })\`**, and **\`.world:check({ … })\`**.
+
+**Not in this table:** **\`!\`** (cut) and **\`\\+\`** (negation) are goal operators — see [inline-logic.md](inline-logic.md).
+
+---
+
+## \`show/N\`
+
+Print logic terms to the run **output buffer** (Prolog-style). Not the top-level script **\`show(wire)\`** statement.
+
+| | **Logic \`show/N\`** | **Script \`show(...)\`** |
+|--|-------------------|-------------------------|
+| Where | Query / rule / constraint **bodies** | Top-level script, exec blocks |
+| Arguments | Logic **terms** | Wires, expressions |
+| Output | Prolog-style term text | Wire / vector formatting |
+
+**Behaviour:**
+
+- **\`N\`** from **1** to **32** — one output line per successful goal, terms space-separated.
+- **\`show()\`** with zero arguments → **parse error**.
+- Always **succeeds**; does not fail the surrounding query.
+- On **backtracking**, prints again for each branch.
+- Cannot be used as a fact, rule, or constraint **head**.
+
+String literals print **without** surrounding quotes.
+
+### Example — trace solutions
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    inside(john, johnsCar)
+    inside(mary, marysBike)
+
+    query trace:
+        inside(P, Obj),
+        show("inside:", inside(P, Obj))
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = trace
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints two lines (one per solution):
+
+\`\`\`text
+inside: inside(john, johnsCar)
+inside: inside(mary, marysBike)
+\`\`\`
+
+---
+
+## \`count/2\`
+
+**Syntax:** \`count(Goal, N)\` — goal first, count second.
+
+| \`N\` in call | Behaviour |
+|-------------|-----------|
+| **Variable** | Bound to the solution count on the current KB |
+| **Ground number** | Must equal the solution count (test) |
+
+Works with the fact index when **\`indexFacts: 1\`** on the component — see [logic-indexing.md](logic-indexing.md) for indexing attributes.
+
+### Example — capacity check
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    object(box3)
+    container(c1)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    constraint atMostTwo <= count(inside(_, c1), 2)
+
+    query ok:
+        count(inside(_, c1), 2)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire trigger = 1
+1wire ok = 0
+
+.whLogic:{
+    ok >= ok
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — exactly two \`inside(_, c1)\` facts.
+
+---
+
+## \`nth0/3\` and \`nth1/3\`
+
+List indexing builtins. **Reserved** — cannot define **\`nth0/3\`** or **\`nth1/3\`** as clause heads.
+
+| Builtin | Index base | Example |
+|---------|------------|---------|
+| **\`nth0/3\`** | **0-based** | \`nth0(0, [a, b, c], X)\` → \`X = a\` |
+| **\`nth1/3\`** | **1-based** (SWI style) | \`nth1(2, [a, b, c], X)\` → \`X = b\` |
+
+**Behaviour:**
+
+- **\`List\`** must unify with a list; non-list → **fail**.
+- **\`I\`** integer (ground or variable); other types → **fail**.
+- Ground **\`I\`** out of range → **fail**.
+- **\`I\`** unbound → backtracking over matching indices.
+
+### Example — rent by house number
+
+\`\`\`logts-play
+inline [logic] .rents:
+
+    rents_list([2, 10, 30, 90, 160, 250])
+
+    rent(N, C) <- nth1(N, rents_list([2, 10, 30, 90, 160, 250]), C)
+
+    query house2:
+        rent(2, C),
+        show(C)
+
+:
+
+comp [logic] .rentsLogic:
+    on: 1
+    .rents { }
+:
+
+1wire trigger = 1
+
+.rentsLogic:{
+    query = house2
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints:
+
+\`\`\`text
+10
+\`\`\`
+
+---
+
+## \`is/2\`
+
+Integer arithmetic evaluation in logic bodies. Also written infix: **\`M is Expr\`**.
+
+**Reserved:** **\`is/2\`** cannot be a fact, rule, or constraint head. **\`is/1\`**, **\`is/3\`**, atom **\`is\`**, etc. remain ordinary terms.
+
+| Goal | When \`N\` is free in \`N + 1\` | Use |
+|------|----------------------------|-----|
+| \`M = N + 1\` | **\`M\`** ← structure \`+(N, 1)\` | Unification |
+| \`M is N + 1\` | **Fail** | Arithmetic |
+| \`M =:= N + 1\` | **Fail** | Numeric equality test |
+
+RHS must fully evaluate to an integer. Free variables, divide-by-zero, or non-numeric RHS → **fail**. Integer **\`/\`** truncates toward zero.
+
+See also [inline-logic.md — \`=\` vs \`is/2\`](inline-logic.md#arithmetic-is2) for the full contrast table.
+
+### Example — counter
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    tick(0)
+    tick(N) <- M is N + 1, M =< 5, tick(M)
+
+    query run:
+        tick(3),
+        show("done")
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = run
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`done\`**.
+
+---
+
+## \`member/2\`
+
+**\`member(X, List)\`** — **\`X\`** is an element of **\`List\`**. Standard Prolog backtracking over list spines.
+
+**Reserved head:** use another name (e.g. **\`userMember/2\`**) for user-defined membership rules.
+
+| Call | Behaviour |
+|------|-----------|
+| \`member(C, [a, b, c])\` | **\`C\`** = \`a\`, then \`b\`, then \`c\` (backtracking) |
+| \`member(red, L)\` | **\`L\`** must unify with a list containing **\`red\`** |
+| Non-list second arg | **Fail** |
+
+### Example — enumerate colors
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+
+    query allColors:
+        colors(L),
+        member(C, L),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = allColors
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`**, **\`green\`**, **\`blue\`** (one line each).
+
+### Example — ad-hoc query
+
+\`\`\`logts-play
+inline [logic] .world:
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ member(X, [red, green]), show(X) })
+\`\`\`
+
+**Load & Run** prints **\`red\`** and **\`green\`**.
+
+---
+
+## \`append/3\`
+
+**\`append(L1, L2, L3)\`** — **\`L3\`** is the concatenation of **\`L1\`** and **\`L2\`**. Full Prolog modes: concatenate, decompose, and backtracking splits.
+
+| Call | Result |
+|------|--------|
+| \`append([a, b], [c], L3)\` | \`L3 = [a, b, c]\` |
+| \`append(L1, L2, [a, b, c])\` | Decompose (multiple solutions) |
+| \`append([a], L2, [a, b])\` | \`L2 = [b]\` |
+
+### Example — build and split
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query build:
+        append([a, b], [c, d], L),
+        show(L)
+
+    query split:
+        append(L1, L2, [x, y, z]),
+        show(L1, L2)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = build
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[a, b, c, d]\`**. Use **Load**, switch to **\`query = split\`**, **Load & Run** to see decompositions such as **\`[] [x, y, z]\`** and **\`[x] [y, z]\`**.
+
+---
+
+## \`length/2\`
+
+**\`length(List, N)\`** — **\`N\`** is the number of elements in the cons spine of **\`List\`**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`length([a, b, c], N)\` | \`N = 3\` |
+| \`length([a, b], 3)\` | **Fail** (length mismatch) |
+| \`length(L, 3)\` | **\`L = [_, _, _]\`** (three anonymous variables) |
+| \`N < 0\` | **Fail** |
+| Open or partial list | **Fail** when counting |
+
+### Example — generative length
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        length(L, 3),
+        append(L, [tail], Long),
+        show(Long)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints a four-element list ending with **\`tail\`**.
+
+---
+
+## \`reverse/2\`
+
+**\`reverse(List, Rev)\`** — **\`Rev\`** is **\`List\`** with element order reversed.
+
+| Call | Behaviour |
+|------|-----------|
+| \`reverse([1, 2, 3], R)\` | \`R = [3, 2, 1]\` |
+| \`reverse(L, [3, 2, 1])\` | \`L = [1, 2, 3]\` |
+| Both arguments variables | **Fail** |
+| Non-list | **Fail** |
+
+### Example — forward
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        reverse([1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[3, 2, 1]\`**.
+
+---
+
+## \`sort/2\`
+
+**\`sort(List, Sorted)\`** — **\`Sorted\`** is **\`List\`** sorted by standard term order **\`@<\`**. **Duplicates are kept.** Sort is **not stable**.
+
+**\`List\`** must be a **ground** closed list. Variables inside elements or an open tail → **fail**.
+
+### Term order \`@<\`
+
+**Type rank (ascending):** \`number\` **<** \`atom\` **<** \`list\` **<** \`compound\`
+
+| Comparison | Rule |
+|------------|------|
+| Two **numbers** | Numeric ascending |
+| Two **atoms** | Lexicographic on name (string literals count as atoms) |
+| Two **lists** | Element-by-element; if prefix equal, shorter list is smaller |
+| Two **compounds** | Functor name, then arity, then arguments left-to-right |
+
+### Example — numbers and atoms
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query nums:
+        sort([3, 1, 2], S),
+        show(S)
+
+    query mixed:
+        sort([1, a, 2], S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = nums
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[1, 2, 3]\`**. Switch to **\`query = mixed\`** → **\`[1, 2, a]\`** (numbers before atoms).
+
+### Example — pipeline
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query pipeline:
+        append([c, a], [b], L),
+        sort(L, S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = pipeline
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[a, b, c]\`**.
+
+---
+
+## User-defined membership (\`userMember/2\`)
+
+When you need custom membership logic, pick a **non-reserved** predicate name:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    userMember(X, [X | _]) <- X = X
+    userMember(X, [_ | T]) <- userMember(X, T)
+
+    query viaUser:
+        userMember(C, [red, green]),
+        show(C)
+
+    query viaBuiltin:
+        member(C, [red, green]),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = viaUser
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`** then **\`green\`**. Switch to **\`viaBuiltin\`** for the same behaviour using the built-in **\`member/2\`**.
+`,
     'logic-constraints.md': `# Logic constraints — validate runtime state
 
 \`constraint\` declarations in \`inline [logic]\` define **which ground facts are allowed** in the effective knowledge base. Validation runs at **component init** (static facts) and at **mutation commit** (proposed state after \`logic { + / - }\`).
@@ -23555,11 +23934,9 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | Built-in | Syntax | Meaning |
 |----------|--------|---------|
 | **\`count/2\`** | \`count(Goal, N)\` | **\`N\`** = number of solutions to **\`Goal\`** on the current KB |
-| **\`show/N\`** | \`show(T1, …, TN)\` | Print dereferenced terms (1–32 args); always succeeds; reserved predicate |
-| **\`nth0/3\`** | \`nth0(I, List, Elem)\` | List element at **0-based** index **\`I\`**; reserved predicate |
-| **\`nth1/3\`** | \`nth1(I, List, Elem)\` | List element at **1-based** index **\`I\`**; reserved predicate |
+| **\`show/N\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`is/2\`**, list builtins | — | Full catalogue: [logic-builtins.md](logic-builtins.md) |
 
-**\`count/2\`** detail below. **\`show/N\`** — see [inline-logic.md](inline-logic.md#built-in-shown-logic-debug-output). **\`nth0/3\`**, **\`nth1/3\`** — see [inline-logic.md](inline-logic.md#built-in-nth0--nth1-list-indexing).
+**\`count/2\`** detail below. All other logic builtins — see [logic-builtins.md](logic-builtins.md).
 
 ---
 

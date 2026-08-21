@@ -40273,7 +40273,7 @@ comp [logic] .worldLogic:
   });
 
   reg(3700, 'logic', 'parse list cons pattern', function(h) {
-    const t = parseLogicBody('member(X, [X | Rest])').clauses[0].head.args[1];
+    const t = parseLogicBody('item(X, [X | Rest])').clauses[0].head.args[1];
     h.assert('cons head var', t.head.name, 'X');
     h.assert('cons tail var', t.tail.name, 'Rest');
   });
@@ -40345,9 +40345,6 @@ comp [logic] .worldLogic:
 
     colors([red, green, blue])
 
-    member(X, [X | _]) <- X = X
-    member(X, [_ | T]) <- member(X, T)
-
     query allColors:
         colors(L),
         member(C, L),
@@ -40410,9 +40407,6 @@ comp [logic] .worldLogic:
   const INLINE_LIST_MONO = `inline [logic] .mono:
 
     proprietati([prop(mediterranean, rents(2, 10, 30, 90, 160, 250), 50, 50)])
-
-    member(X, [X | _]) <- X = X
-    member(X, [_ | T]) <- member(X, T)
 
     query firstProp:
         proprietati([prop(N, _, _, _) | _]),
@@ -40749,9 +40743,6 @@ comp [logic] .tagLogic:
 
     object(box1)
 
-    member(X, [X | _]) <- X = X
-    member(X, [_ | T]) <- member(X, T)
-
     constraint tags(O, L) <= object(O), member(red, L)
 
     query hasTag:
@@ -40943,9 +40934,6 @@ comp [logic] .worldLogic:
   const INLINE_CUT_MEMBER = `inline [logic] .world:
 
     items([apple, pear, plum])
-
-    member(X, [X | _]) <- X = X
-    member(X, [_ | T]) <- member(X, T)
 
     first_item(X) <- items(L), member(X, L), !
 
@@ -41281,6 +41269,246 @@ comp [logic] .worldLogic:
       () => parseLogicBody('query q: M is'),
       'expected expression after is',
     );
+  });
+
+  reg(3778, 'logic', 'member/2 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved member',
+      () => parseLogicBody('member(X, Y) <- X = Y'),
+      "'member/2' is reserved",
+    );
+  });
+
+  const INLINE_MEMBER_BUILTIN = `inline [logic] .world:
+
+    query allColors:
+        member(C, [red, green, blue]),
+        show(C)
+
+:`;
+
+  function runLogicBuiltinMember(h, session) {
+    const src = INLINE_MEMBER_BUILTIN + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = allColors
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+    h.assert('blue', String(session.outIncludes(interp, 'blue')), 'true');
+  }
+
+  reg(3779, 'logic', 'builtin member/2 backtracking show (legacy)', runLogicBuiltinMember);
+  reg(3780, 'logic', 'builtin member/2 backtracking show (wave)', runLogicBuiltinMember, { propagation: 'wave' });
+
+  reg(3781, 'logic', 'append/3 concatenation', function(h) {
+    const prog = parseLogicBody('query q: append([a, b], [c], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    const r = sols[0].R;
+    h.assert('R is list', String(r && r.kind === 'list'), 'true');
+    h.assert('head a', r.head.name, 'a');
+  });
+
+  function runLogicAppendDecompose(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        append(L1, L2, [a, b, c]),
+        show(L1, L2)
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ append(L1, L2, [a, b, c]), show(L1, L2) })`;
+    const { interp } = session.run(src);
+    h.assert('empty L1', String(session.outIncludes(interp, '[] [a, b, c]')), 'true');
+    h.assert('split a', String(session.outIncludes(interp, '[a] [b, c]')), 'true');
+  }
+
+  reg(3782, 'logic', 'append/3 decompose backtrack (legacy)', runLogicAppendDecompose);
+  reg(3783, 'logic', 'append/3 decompose backtrack (wave)', runLogicAppendDecompose, { propagation: 'wave' });
+
+  reg(3784, 'logic', 'length/2 ground match and mismatch', function(h) {
+    const ok = parseLogicBody('query ok: length([a, b, c], 3)');
+    const eng = new LogicEngine([]);
+    h.assert('match', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+    const bad = parseLogicBody('query bad: length([a, b], 3)');
+    h.assert('mismatch', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+
+  reg(3796, 'logic', 'length/2 generative L with N ground', function(h) {
+    const prog = parseLogicBody('query q: length(L, 3)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    let cur = sols[0].L;
+    let n = 0;
+    while (cur && cur.kind === 'list' && !cur.nil) {
+      n++;
+      cur = cur.tail;
+    }
+    h.assert('len 3', String(n), '3');
+  });
+
+  function runLogicReverse(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        reverse([1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('reversed', String(session.outIncludes(interp, '[3, 2, 1]')), 'true');
+  }
+
+  reg(3785, 'logic', 'reverse/2 forward (legacy)', runLogicReverse);
+  reg(3793, 'logic', 'reverse/2 forward (wave)', runLogicReverse, { propagation: 'wave' });
+
+  reg(3797, 'logic', 'reverse/2 bidirectional bind L', function(h) {
+    const prog = parseLogicBody('query q: reverse(L, [3, 2, 1])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('L head', sols[0].L.head.value, 1);
+  });
+
+  function runLogicSort(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        sort([3, 1, 2], S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sorted nums', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  }
+
+  reg(3786, 'logic', 'sort/2 numbers (legacy)', runLogicSort);
+  reg(3794, 'logic', 'sort/2 numbers (wave)', runLogicSort, { propagation: 'wave' });
+
+  reg(3798, 'logic', 'sort/2 number before atom', function(h) {
+    const prog = parseLogicBody('query q: sort([1, a, 2], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first num', sols[0].S.head.value, 1);
+    h.assert('second num', sols[0].S.tail.head.value, 2);
+    h.assert('third atom', sols[0].S.tail.tail.head.name, 'a');
+  });
+
+  reg(3787, 'logic', 'sort/2 atoms lexicographic', function(h) {
+    const prog = parseLogicBody('query q: sort([c, a, b], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('a first', sols[0].S.head.name, 'a');
+  });
+
+  reg(3799, 'logic', 'sort/2 nested lists structural', function(h) {
+    const prog = parseLogicBody('query q: sort([[b, a], [a]], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('shorter first', sols[0].S.head.head.name, 'a');
+  });
+
+  function runLogicMemberWorldQuery(h, session) {
+    const src = `inline [logic] .world:
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ member(X, [red, green]), show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+  }
+
+  reg(3788, 'logic', 'member/2 .world:query show (legacy)', runLogicMemberWorldQuery);
+  reg(3795, 'logic', 'member/2 .world:query show (wave)', runLogicMemberWorldQuery, { propagation: 'wave' });
+
+  reg(3789, 'logic', 'user marker/1 head still allowed', function(h) {
+    const prog = parseLogicBody('marker(x)');
+    h.assert('one clause', String(prog.clauses.length), '1');
+    h.assert('marker pred', prog.clauses[0].head.predicate, 'marker');
+  });
+
+  const INLINE_USER_MEMBER = `inline [logic] .world:
+
+    userMember(X, [X | _]) <- X = X
+    userMember(X, [_ | T]) <- userMember(X, T)
+
+    query viaUser:
+        userMember(C, [red, green]),
+        show(C)
+
+:`;
+
+  function runLogicUserMember(h, session) {
+    const src = INLINE_USER_MEMBER + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = viaUser
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+  }
+
+  reg(3790, 'logic', 'userMember/2 user rules show (legacy)', runLogicUserMember);
+  reg(3791, 'logic', 'userMember/2 user rules show (wave)', runLogicUserMember, { propagation: 'wave' });
+
+  reg(3792, 'logic', 'userMember head ok member head reserved', function(h) {
+    h.assertThrows(
+      'member reserved',
+      () => parseLogicBody('member(X, Y) <- X = Y'),
+      "'member/2' is reserved",
+    );
+    const prog = parseLogicBody('userMember(X, Y) <- X = Y');
+    h.assert('userMember ok', prog.clauses[0].head.predicate, 'userMember');
   });
 
   window.LogTScriptTestSuite.finalize();

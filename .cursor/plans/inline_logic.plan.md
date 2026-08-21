@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24, F26 complete; F25 (liste pe wire) deferred.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24, F26 complete; F27 (builtins listă, ex-2+d) ready-to-implement; F25 (liste pe wire) deferred.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
@@ -79,7 +79,10 @@ todos:
     status: completed
   - id: logic-is
     content: "Faza 26: is/2 evaluare aritmetică Prolog — D152–D159 (completed)"
-    status: pending
+    status: completed
+  - id: logic-list-builtins
+    content: "Faza 27: builtins listă + doc logic-builtins.md — D160–D169 (completed)"
+    status: completed
 isProject: false
 ---
 
@@ -94,7 +97,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate |
 | **(completed)** | Decizie luată / implementată |
 | **1+a … 1+v** | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan) |
-| **2+a … 2+f** | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2f) |
+| **2+a … 2+g** | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2g) |
 | ✅ | Backlog **promovat / livrat** (fază completed) |
 | ❌ | Backlog **respins** definitiv |
 | 🟠✗ | Backlog **închis** — alternativa nu se face; livrat altfel |
@@ -1206,7 +1209,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (`2+a` … `2+f`):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2f).
+> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (`2+a` … `2+g`):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2g).
 
 ---
 
@@ -1242,6 +1245,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 23** builtin `nth0` / `nth1` | D143–D146 | **(completed)** |
 | **Faza 24** Cut `!` (**1+i** promovat) | D147–D151 | **(completed)** |
 | **Faza 26** `is/2` evaluare aritmetică | D152–D159 | **(completed)** |
+| **Faza 27** Builtins listă + doc `logic-builtins.md` | D160–D169 | **(confirmed — ready-to-implement)** |
 | **Faza 25** Liste pe wire / vector redirect | **2+c** (D140) | **(deferred)** |
 
 ---
@@ -4228,7 +4232,7 @@ comp [logic] .peopleLogic:
 ## Decizii Faza 22 — Liste Prolog (D128–D142) **(completed)**
 
 > **Scop:** termeni **listă** Prolog-like — literale `[a, b, c]`, listă goală `[]`, cons **`[H|T]`** (și **`[A, B, …|Rest]`**), unificare + traversare recursivă în reguli/query.  
-> **Nu include:** `nth0`/`nth1` (→ **F23**), cut `!` (→ **F24**), dif-list/lazy/char-list (→ **2+e**), liste pe wire (→ **2+c**), builtins `member`/`append` (→ **2+d**).  
+> **Nu include:** `nth0`/`nth1` (→ **F23** **completed**), cut `!` (→ **F24** **completed**), dif-list/lazy/char-list (→ **2+e**), liste pe wire (→ **2+c**), builtins `member`/`append`/… (→ **F27**, ex-**2+d**).  
 > **User confirmări:** 2026-08-21. **Livrat:** 2026-08-21.
 
 ### Rezumat decizii **(confirmed)**
@@ -4244,7 +4248,7 @@ comp [logic] .peopleLogic:
 | **D134** | **Limită lungime literal** | **A (confirmed)** — max **1024** elemente într-un literal `[…]`; parse/elaboration error peste cap |
 | **D135** | **`show/N`** | **A (confirmed)** — afișare `[a, b, c]` (round-trip ground) |
 | **D136** | **Out of scope F22** | **A (confirmed)** — dif-list, lazy, char-list; vezi [D136 — explicație](#d136--out-of-scope-explicație) |
-| **D137** | **Builtins listă** | **A (confirmed)** — **`nth` → F23**; **`member`/`append`/altele builtin** → **2+d** (reguli user + exemple doc în F22) |
+| **D137** | **Builtins listă** | **A (confirmed)** — **`nth` → F23** **(completed)**; **`member`/`append`/`length`/`reverse`/`sort` builtin** → **F27** (promovat din **2+d**); reguli user + exemple doc rămân valide până la F27 |
 | **D138** | **Cut în F22** | **A (confirmed)** — **fără cut**; traversare cu backtracking normal; **`!` → F24** (nimic de decis suplimentar) |
 | **D139** | **Unde e permis** | **A (confirmed)** — facts, reguli, query, constraints, **`.world:query`**, **`.world:check`**, mutation ground |
 | **D140** | **Wire / redirect listă** | **Amânat → 2+c** — vector/matrix/wire pack pentru liste → **F25** |
@@ -4348,7 +4352,7 @@ inline [logic] .monopoly:
 | **D145** | **Out of range** | **A (confirmed)** — index ground în afara listei → goal **eșuează** (ca Prolog), **fără** exception runtime |
 | **D146** | **Moduri** | **A (confirmed)** — **`I` variabilă** → generează poziții (backtracking); **`List`/`Elem`** ca Prolog (unificare) |
 
-**Out of scope F23 (implicit, fără decizie separată):** index negativ, index non-integer, `append/3`/`member/2` builtin (→ **2+d**), liste pe wire (→ **2+c**).
+**Out of scope F23 (implicit):** index negativ, index non-integer, `append/3`/`member/2` builtin (→ **F27**), liste pe wire (→ **2+c**).
 
 **Unde se aplică (ca alte builtins):** query, reguli, constraints, **`.world:query`**, **`.world:check`** — același scope ca **D139** / `show/N`.
 
@@ -4739,6 +4743,400 @@ query q:
 
 ---
 
+## Decizii Faza 27 — builtins bibliotecă listă + doc dedicată (D160–D169) **(confirmed — ready-to-implement)**
+
+> **User confirmări:** 2026-08-21 — **D160 A · D161 A · D162 A · D163 A · D164 B · D165 B · D166 A · D167 A · D168 A · D169 A**.  
+> **Notă D167:** păstrăm teste cu predicate user **`userMember/2`** (fost pattern F22 `member`) — acoperire builtin vs user-defined.
+
+> **Sursă:** backlog **2+d** **promovat → Faza 27**.  
+> **User:** 2026-08-21 — promovare **2+d** ca fază următoare; scope extins: **`length/2`**, **`reverse/2`**, **`sort/2`** (pe lângă **`member/2`**, **`append/3`** din plan original).  
+> **User (2026-08-21, doc):** pagină dedicată **`logic-builtins.md`** — tabel master **toate** builtins logic (existente F13/F21/F23/F26 + noile F27); sub tabel, secțiune per builtin (sintaxă, comportament, exemple); migrare/restructurare conținut din **`inline-logic.md`** și **`logic-indexing.md`**.  
+> **Dependență:** **F22** (liste) **(completed)**; **F23** (`nth0`/`nth1`) **(completed)**; **F26** (`is/2`) **(completed)** — util pentru `length` / indexări.  
+> **Scop:** predicate Prolog uzuale pentru liste — **builtin engine**, head **rezervat** (pattern `show/N`, `nth0/3`, `is/2`); **catalog unic documentat** pentru toate builtins logic.
+
+### Catalog builtins F27 **(propus — de confirmat la implementare)**
+
+| Builtin | Aritate | Semantica Prolog (țintă) | Moduri principale |
+|---------|---------|-------------------------|-------------------|
+| **`member/2`** | 2 | `member(X, List)` — X în List | X variabilă → backtracking pe elemente; List parțial ground |
+| **`append/3`** | 3 | `append(L1, L2, L3)` — L3 = L1++L2 | orice argument variabil (decompune / concatenează) |
+| **`length/2`** | 2 | `length(List, N)` — N = număr elemente | List ground → N; N ground → listă de variabile (ca SWI) **sau** fail dacă List liber (vezi D163) |
+| **`reverse/2`** | 2 | `reverse(List, Rev)` — ordine inversă | List ground → Rev; Rev variabilă → bind |
+| **`sort/2`** | 2 | `sort(List, Sorted)` — sortare **standard order** | List ground → Sorted; fără `keysort` / `msort` la MVP |
+
+**Nu în F27 (→ backlog [2+g](#2g--builtins-listă-suplimentare-post-f27)):** restul bibliotecii Prolog pentru liste — vezi catalog complet acolo.
+
+### Rezumat decizii **(confirmed)**
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D160** | **Predicate rezervate** | **A (confirmed)** — head rezervat strict (5 predicate+arity) |
+| **D161** | **Unde / scope** | **A (confirmed)** — ca `nth0`/`is`: reguli, query, constraints, `.world:query`/`.check` |
+| **D162** | **`member/2`** | **A (confirmed)** — SWI backtracking full |
+| **D163** | **`append/3`** | **A (confirmed)** — concat + decompunere Prolog |
+| **D164** | **`length/2`** | **B (confirmed)** — SWI generativ: `length(L, N)` cu N ground → listă de N elemente |
+| **D165** | **`reverse/2`** | **B (confirmed)** — bidirectional: `reverse(L, Rev)` ambele direcții |
+| **D166** | **`sort/2`** | **A (confirmed)** — ordine standard `@<` (spec normativă mai jos) |
+| **D167** | **Migrare / user rules** | **A (confirmed)** — head `member/2` rezervat; teste **`userMember/2`** user |
+| **D168** | **Teste & livrare** | **A (confirmed)** — 3778+ legacy+wave + `userMember` + logts-play |
+| **D169** | **Doc pagină dedicată** | **A (confirmed)** — `logic-builtins.md` + migrare doc existent |
+
+---
+
+### D160 — Predicate rezervate **(completed: A)**
+
+**Pattern implementare (ca F23/F26):**
+
+```javascript
+LOGIC_BUILTIN_MEMBER_PRED = 'member';   // arity 2
+LOGIC_BUILTIN_APPEND_PRED = 'append';   // arity 3
+LOGIC_BUILTIN_LENGTH_PRED = 'length'; // arity 2
+LOGIC_BUILTIN_REVERSE_PRED = 'reverse'; // arity 2
+LOGIC_BUILTIN_SORT_PRED = 'sort';       // arity 2
+```
+
+Verificare head: `logicIsReservedPredicateHead` — predicate + arity fixă (nu `show/N` variabil).
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — rezervare strictă (recommended)** | User **nu** poate `member(X,Y) <- …` (etc.) — parse error | Un singur semantics; match `nth0`/`is` | KB cu reguli user `member/2` → **parse error** |
+| **B — warning la parse** | Permite head user + warning elaboration | Migrare soft | Două semantics posibile — confuz |
+| **C — fără rezervare** | User poate redefini `member/2` — apelul merge la reguli user | Zero breaking la head | **Nu** e model builtin; contradict D137/F27 |
+
+**Migrare (A):** doc — șterge clauzele user `member/2` din F22; apelul rămâne identic sintactic.
+
+---
+
+### D161 — Unde e permis **(completed: A)**
+
+| Opțiune | Scope | Pro | Contra |
+|---------|-------|-----|--------|
+| **A — ca nth0 / is (recommended)** | Reguli, query, constraint body, **`.world:query`**, **`.world:check`** | Consistent F12+ / F23 / F26 | — |
+| **B — doar query + reguli** | Fără constraints | Evită validate constraint + list traversal | Constraints cu `member` devin verbose |
+| **C — exclude mutation** | Ca A, dar nu documentăm mutation heads | Clar ground-only mutation | Liste deja permise în mutation F22 |
+
+**Notă:** mutation heads cu liste ground — **neschimbat** (F22); builtins in **body** only (ca `nth0`).
+
+---
+
+### D162 — `member/2` **(completed: A)**
+
+```logts
+colors([red, green, blue])
+query q:
+    member(C, colors([red, green, blue])), show(C)
+; soluții: red, green, blue
+```
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — Prolog SWI (recommended)** | Backtracking pe toate elemente; `[H\|T]`; List variabilă unificabilă | Identic doc F22 user rules | — |
+| **B — doar List ground** | Fail dacă List e variabilă nelegată | Implementare simplă | Pierde mod Prolog |
+| **C — prima soluție doar** | Fără backtracking (determinist) | Rapid | **Nu** e `member/2` Prolog |
+
+**Non-list** (atom, number ca List): **fail** (toate opțiunile).
+
+---
+
+### D163 — `append/3` **(completed: A)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — Prolog full (recommended)** | Concat + decompunere + backtracking pe split-uri | Standard Prolog | Cod mai lung |
+| **B — doar concatenare** | Doar `append(L1,L2,L3)` cu L3 variabilă; fără decompunere | Simplu | `append(L1,L2,[a,b,c])` fail |
+| **C — doar ground** | Toate args ground sau fail | Foarte simplu | Pierde mod Prolog |
+
+**Exemple (A):**
+
+| Apel | Rezultat |
+|------|----------|
+| `append([a,b], [c], L3)` | `L3 = [a,b,c]` |
+| `append(L1, L2, [a,b,c])` | decompune (backtracking) |
+| `append([a], L2, [a,b])` | `L2 = [b]` |
+
+**Occurs-check** la unificare L3: **da** (A/C).
+
+---
+
+### D164 — `length/2` **(completed: B)**
+
+#### A vs B — diferența esențială
+
+| Situație | **A — MVP subset** | **B — SWI generativ (confirmed)** |
+|----------|-------------------|-----------------------------------|
+| `length([a,b,c], N)` | `N = 3` ✓ | `N = 3` ✓ |
+| `length([a,b], 3)` | **fail** (lungimi diferite) | **fail** ✓ |
+| `length(L, 3)` — **L liber** | **fail** — nu poți genera listă | **ok** — `L = [_,_,_]` (3 elemente anonime) |
+| `length(L, N)` — ambele libere | fail (A) / backtracking (B parțial) | backtracking pe N (SWI) — optional MVP: fail dacă prea complex |
+| Utilitate | doar „cât e lista?” | și „dă-mi o listă cu N elemente” (placeholder) |
+
+**Exemplu B:**
+
+```logts
+query q:
+    length(L, 3),
+    append(L, [tail], Long),
+    show(Long)
+; L = [_,_,_]  →  Long = [_,_,_,tail]  (variabile anonime distincte în cons chain)
+```
+
+**Implementare B:** construiește cons chain cu **`_`** × N când `List` e variabilă nelegată și `N` e integer ground ≥ 0; `N = 0` → `[]`. Când `List` e ground → numără și testează/unifică `N`.
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — MVP subset** | List ground ↔ N; List liber → **fail** | Simplu | Nu generativ |
+| **B — SWI generativ (confirmed)** | + `length(L, N)` cu N ground → listă N anonimi | Prolog complet; util cu `append` | ~30 linii extra engine |
+| **C — doar forward** | Doar `length(List, N)` List ground | Minimal | `length(L,3)` fail |
+
+Traversare **cons** (nu dif-list). **`N`** integer; `N < 0` → **fail**.
+
+---
+
+### D165 — `reverse/2` **(completed: B)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — forward ground (recommended)** | `reverse([a,b,c], R)` → `[c,b,a]`; R variabilă; **List liber → fail** | Acoperă Monopoly / doc | Nu bidirectional |
+| **B — bidirectional (confirmed)** | `reverse([a,b,c], R)` → `[c,b,a]` **și** `reverse(L, [c,b,a])` → `[a,b,c]` | Prolog pur | Mai mult cod engine |
+| **C — doar ground ambele** | Fail dacă List sau Rev liber | Minimal | Pierde bind pe R |
+
+---
+
+### D166 — `sort/2` **(completed: A — spec normativă)**
+
+**Moduri apel (MVP):**
+
+| Argument | Cerință | Rezultat |
+|----------|---------|----------|
+| **`List`** | listă **ground** (fără variabile nelegate în elemente sau tail) | sortare pe copie |
+| **`List`** | non-list sau conține var nelegată | **fail** |
+| **`Sorted`** | variabilă | unifică cu lista sortată |
+| **`Sorted`** | listă ground | trebuie să unifice cu rezultatul (altfel **fail**) |
+
+**Algoritm:** sortare totală (SWI **`sort/2`**, **nu** `msort/2` — **instabilă**; duplicate **păstrate**, ordinea egalelor poate schimba).
+
+Helper engine: **`logicCompareTerms(a, b)`** → `< 0` dacă `a @< b`, `0` dacă egal, `> 0` dacă `a @> b`.
+
+#### Ordinea termenilor `@<` (normativ)
+
+**1. Clase de tip** (rank crescător — termeni din clase diferite):
+
+```text
+number  <  atom  <  list  <  compound
+```
+
+- Literal string `"hello"` (atom cu flag trace) = **atom** — compară pe `name`.
+- **Variabile** în elementele sortate: **interzise** (List trebuie ground) — nu intră în `@<` la sort.
+- **Float** — out of scope (ca restul logic).
+
+**2. `number` vs `number`:** comparare **numerică integer** (`value`).
+
+**3. `atom` vs `atom`:** lexicografic pe **`name`** (ordine UTF-16 code unit, ca `String` JS `<`).
+
+**4. `list` vs `list`:** comparare **structurală element-cu-element**:
+
+- Parcurge capetele în paralel cu `logicCompareTerms`.
+- Primul element diferit decide ordinea.
+- Dacă prefixul comun e egal: **lista mai scurtă @< lista mai lungă**.
+- `[]` @< orice listă nevidă.
+
+**5. `compound` vs `compound`:**
+
+1. Compară **`predicate`** (functor) lexicografic.
+2. Dacă egal → compară **`arity`** (numeric).
+3. Dacă egal → compară **`args`** stânga-dreapta cu `logicCompareTerms`.
+
+#### Exemple normative
+
+| Apel | `Sorted` așteptat | Notă |
+|------|---------------------|------|
+| `sort([3, 1, 2], S)` | `[1, 2, 3]` | numere |
+| `sort([c, a, b], S)` | `[a, b, c]` | atomi |
+| `sort([1, a, 2], S)` | `[1, 2, a]` | **number** înainte de **atom** |
+| `sort([b, a, a], S)` | `[a, a, b]` | duplicate păstrate |
+| `sort([[b, a], [a]], S)` | `[[a], [b, a]]` | liste imbricate — `@<` structural |
+| `sort([f(2), f(1)], S)` | `[f(1), f(2)]` | compound — args |
+| `sort([3, 1, 2], [1, 2, 3])` | success | test ground ambele |
+| `sort([3, 1, 2], [1, 3, 2])` | **fail** | Sorted ground greșit |
+
+**Nu în F27 (→ [2+g](#2g--builtins-listă-suplimentare-post-f27)):** `keysort/2`, `msort/2`, sort descrescător, sort pe cheie.
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — standard order (confirmed)** | Ca mai sus — `@<` pe termeni ground; duplicate păstrate | Acoperă mix number/atom/list/compound | Nu `keysort`/`msort` |
+| **B — doar numere** | Fail dacă listă conține atomi/liste | Foarte simplu | Limitat |
+| **C — doar atomi** | Fail dacă conține numere | Rar util | Limitat |
+| **D — stable sort (`msort`)** | Păstrează ordinea egalelor | Prolog stabil | Overlap cu **2+g**; mai mult cod |
+
+**List liber → fail** (toate opțiunile).
+
+---
+
+### D167 — Migrare & doc față de F22 **(completed: A + userMember tests)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — head rezervat + doc (confirmed)** | Parse error pe `member/2` head; doc: builtin `member`; **user rules → alt nume** (ex. `userMember/2`) | Clar; separă builtin vs user | Edit KB cu head `member/2` |
+| **B — păstrează ambele** | Builtin vs reguli user | Migrare zero | Confuz |
+| **C — rename builtin** | `list_member/2` | Zero conflict | Nu e Prolog |
+
+**Teste user-defined (D167 — user request):** păstrăm acoperire F22-style cu predicate **`userMember/2`**:
+
+```logts
+userMember(X, [X | _]) <- X = X
+userMember(X, [_ | T]) <- userMember(X, T)
+
+query viaUser:
+    userMember(C, [red, green]), show(C)
+
+query viaBuiltin:
+    member(C, [red, green]), show(C)
+```
+
+Ambele coexistă: **`member/2`** = builtin; **`userMember/2`** = reguli user (head **permis**).
+
+---
+
+### D168 — Teste & livrare **(completed: A)**
+
+| Opțiune | Suite | Pro | Contra |
+|---------|-------|-----|--------|
+| **A — 3778+ legacy+wave (recommended)** | Toate 5 builtins + reserved + `.world:query` + regresie F22 | Paritate wave/legacy | ~12–14 teste |
+| **B — doar engine unit** | Fără comp redirect | Rapid | Nu prinde wiring |
+| **C — doar legacy** | Fără wave | Mai puțin efort | Risc diferențe propagare |
+
+**Checklist teste (A):**
+
+| ID | Scenariu |
+|----|----------|
+| 3778 | parse error: `member(X,Y) <- …` head rezervat |
+| 3779–3780 | `member(C, [a,b,c])` backtracking + show (legacy/wave) |
+| 3781 | `append([a],[b,c], R)` → `[a,b,c]` |
+| 3782–3783 | `append/3` decompunere (legacy/wave) |
+| 3784 | `length([a,b,c], 3)` ok / `length([a,b], 3)` fail |
+| 3784b | `length(L, 3)` generativ — L = listă 3 anonimi (D164-B) |
+| 3785 | `reverse([1,2,3], [3,2,1])` |
+| 3785b | `reverse(L, [3,2,1])` → L = `[1,2,3]` (D165-B) |
+| 3786 | `sort([3,1,2], [1,2,3])` |
+| 3786b | `sort([1, a, 2], S)` → `[1, 2, a]` (number \< atom — D166) |
+| 3787 | `sort([c,a,b], Sorted)` lexicografic |
+| 3787b | `sort([[b,a], [a]], S)` — sort liste imbricate (D166 structural) |
+| 3788 | `.world:query({ member(X, [red,green]), show(X) })` (legacy/wave) |
+| 3789 | regresie: user `marker/1` încă permis (arity ≠ rezervate) |
+| 3790–3791 | **`userMember/2`** user rules + show (legacy/wave) — distinct de builtin `member/2` |
+| 3792 | parse error: `member(X,Y) <- …` dar **`userMember(X,Y) <- …` ok** |
+
+**Exemple logts-play (doc EN):**
+
+1. **member + show** — înlocuiește user rules din F22 (Load & Run).
+2. **append + length + sort** — pipeline simplu pe listă ground.
+3. **sort mixed + nested** — demonstrează D166 (`[1, a, 2]`, liste imbricate).
+
+**Doc EN checklist (D169 — pagină dedicată):**
+
+- [ ] Fișier nou **`v0_3_2/doc/logic-builtins.md`** — EN, același stil ca restul doc logic
+- [ ] **Tabel master** (toate builtins logic rezervate):
+
+| Builtin | Arity | Head rezervat | Side effects | Rezumat |
+|---------|-------|---------------|--------------|---------|
+| **`show/N`** | 1–32 | da | da (output buffer) | print termeni logic |
+| **`count/2`** | 2 | nu¹ | nu | număr soluții la Goal |
+| **`nth0/3`** | 3 | da | nu | index listă 0-based |
+| **`nth1/3`** | 3 | da | nu | index listă 1-based |
+| **`is/2`** | 2 | da | nu | eval aritmetică integer (+ infix **`M is Expr`**) |
+| **`member/2`** | 2 | da | nu | apartenență listă + backtracking |
+| **`append/3`** | 3 | da | nu | concat / decompunere listă |
+| **`length/2`** | 2 | da | nu | lungime / generativ (D164-B) |
+| **`reverse/2`** | 2 | da | nu | inversare bidirectional (D165-B) |
+| **`sort/2`** | 2 | da | nu | sortare `@<` standard (D166) |
+
+¹ **`count/2`** — nume comun permis ca predicate user la alte arități; doar **`count/2`** e interceptat engine (ca acum).
+
+- [ ] **Sub tabel:** secțiune `## show/N`, `## count/2`, … — fiecare cu: sintaxă, head rezervat (da/nu), scope (D161), comportament, erori/fail, 1–2 **`logts-play`** Load & Load & Run
+- [ ] **`sort/2`:** include tabelul ordine `@<` din D166 (normativ)
+- [ ] **`is/2`:** mențiune infix + compound; link înapoi la contrast `=` vs `is` în inline-logic (sau sub-secțiune scurtă aici + detaliu acolo)
+- [ ] **Notă separată** (nu în tabel master): **`!`** cut și **`\+`** — goal operators, nu predicate builtin → rămân în [inline-logic.md](inline-logic.md)
+- [ ] **Migrare `inline-logic.md`:**
+  - Quick reference → link **`logic-builtins.md`**
+  - Secțiunile lungi **`Built-in show/N`**, **`nth0/nth1`**, **`Arithmetic is/2`** → scurtate la 2–4 rânduri + link ancoră; exemple migrate în `logic-builtins.md`
+  - Păstrează în inline-logic: sintaxă generală Prolog, liste, cut, negation, `=` vs `is` (overview) — nu duplicăm tot
+- [ ] **Migrare `logic-indexing.md`:** Quick reference builtins → link `logic-builtins.md`; secțiunea **`count/2`** — rezumat + link (detaliu + exemple în builtins); păstrează focus pe **`indexFacts`** / **`indexRebuild`**
+- [ ] **`doc-index.json`:** intrare **`logic-builtins.md`** în grup Logic (lângă inline-logic)
+- [ ] Link-uri înapoi actualizate: `logic-constraints.md`, `logic-runtime.md`, `comp-logic.md` (dacă referă show/count/nth)
+- [ ] Mențiune F22: exemplul user **`member/2`** → builtin; **`userMember/2`** ca pattern user-defined
+- [ ] **Fără** referințe la faze viitoare în doc EN
+
+### D169 — Pagină dedicată builtins **(completed: A)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — `logic-builtins.md` (confirmed)** | Catalog unic: tabel + secțiuni per builtin; migrare doc existent | O singură sursă de adevăr; ușor de extins la **2+g** | Edit mai multe fișiere doc |
+| **B — secțiune mare în inline-logic** | Tot în același fișier | Un singur fișier | inline-logic deja lung; greu de navigat |
+| **C — câte o pagină per builtin** | Ca `builtin-ADD.md` | Granular | Overkill pentru ~10 predicate logic |
+
+**Structură țintă `logic-builtins.md`:**
+
+```markdown
+# Logic built-ins
+
+Intro + link inline-logic / comp-logic
+
+## Quick reference (master table)
+| Builtin | Arity | … |
+
+## show/N
+(sintaxă, comportament, exemple logts-play)
+
+## count/2
+…
+
+## nth0/3 · nth1/3
+…
+
+## is/2
+…
+
+## member/2 · append/3 · length/2 · reverse/2 · sort/2
+(F27 — secțiuni noi)
+
+## Related (not built-in predicates)
+! cut · \+ negation · = unification
+```
+
+**Ordine secțiuni:** cronologic / utilitate — show → count → nth → is → liste (member…sort).
+
+### Sketch implementare
+
+| Layer | Schimbare |
+|-------|-----------|
+| **Assembler** | `logicIsReservedPredicateHead` — predicate+arity pentru cele 5 builtins; mesaje `'member/2' is reserved` … |
+| **Engine** | `_solveMember`, `_solveAppend`, `_solveLength`, `_solveReverse`, `_solveSort` — helpers pe cons list |
+| **Engine** | `_solveCall` intercept per predicate+arity (ca `nth0`, `is/2`) |
+| **Engine** | `logicCompareTerms` / `logicSortList` pentru D166 (spec `@<` normativă) |
+| **Doc** | **`logic-builtins.md`** (nou) — tabel master + secțiuni per builtin (existente + F27) |
+| **Doc** | **`inline-logic.md`** — restructurare: linkuri + stub-uri scurte; exemple migrate |
+| **Doc** | **`logic-indexing.md`** — `count/2` detail → link builtins; păstrează indexing |
+| **Doc** | **`doc-index.json`** — intrare logic-builtins |
+| **Teste** | 3778–3792+ legacy+wave (inclusiv 3786b, 3787b sort D166) |
+
+**Estimare:** medie (~1 fază); fără breaking la termeni liste / unificare; **breaking soft** doar dacă user avea **head** cu același nume+arity (parse error).
+
+**Exemplu țintă (post-F27):**
+
+```logts
+colors([red, green, blue])
+
+query allColors:
+    member(C, colors([red, green, blue])),
+    show(C)
+
+query sorted:
+    sort([3, 1, 2], S),
+    show(S)
+```
+
+---
+
 ## Comparație sketch v1 → v2 ( ce s-a schimbat )
 
 | Topic | Sketch v1 | Sketch v2 (current) |
@@ -4769,11 +5167,13 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 23** `nth0` / `nth1` | **(completed)** — D143–D146 |
 | **Faza 24** Cut `!` (**1+i**) | **(completed)** — D147–D151 |
 | **Faza 26** `is/2` arithmetic | D152–D159 | **(completed)** — teste 3760–3777, doc EN |
+| **Faza 27** builtins listă + doc | D160–D169 | **(completed)** |
 | **F20b** scope blocks | **2+a** **(deferred)** |
 | **F20c** reguli import relative | **2+b** **(deferred)** |
 | **F25** liste pe wire | **2+c** **(deferred)** — D140 |
-| **Builtins listă** member/append | **2+d** **(deferred)** — D137 |
+| ~~**Builtins listă** member/append~~ | ~~**2+d**~~ | **✅ → F27** |
 | **Liste avansate** dif/lazy/char | **2+e** **(deferred)** — D136 |
+| **Builtins listă suplimentare** | **2+g** **(deferred)** — post-F27; catalog Prolog complet |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
 | Constraint `#K (line L)` trace | **1+v** **(pause)** |
 | POUT declarate comp | **1+k** |
@@ -4785,10 +5185,11 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 24~~ **(completed)**
-2. **F25** liste pe wire când e nevoie
-3. Apoi backlog **1+p**, **1+s**, **1+o**, …
-4. Apoi faze amânate **2+a … 2+f**
+1. ~~Faza 0~~ → ~~Faza 26~~ **(completed)**
+2. **Faza 27** — builtins listă + **`logic-builtins.md`** **(2+d promovat)** — `member`, `append`, `length`, `reverse`, `sort` + migrare doc builtins existente
+3. **F25** liste pe wire când e nevoie
+4. Apoi backlog **1+p**, **1+s**, **1+o**, …
+5. Apoi faze amânate **2+a … 2+g** (fără **2+d** — promovat → F27)
 
 ---
 
@@ -4824,20 +5225,21 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 
 ---
 
-## Backlog faze amânate (2+a … 2+f)
+## Backlog faze amânate (2+a … 2+g)
 
-Tabel master **2+a … 2+f** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+Tabel master **2+a … 2+g** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 | Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
 |-------|-----|---------|---------|------------|----------|
 | ⏳ | **2+a** | Scope blocks nested | `warehouse { inside(…) … }` — path relativ în același inline | **F20b** | F20a, D107 |
 | ⏳ | **2+b** | Reguli sub prefix import | `v.c.carSize <- carWheel` → `v.c.carWheel`; body relativ la `use as` | **F20c** | F20a, D107 |
 | ⏳ | **2+c** | Liste pe wire / vector | Pack redirect listă Prolog pe wire vector/matrix; query output liste | **F25** | D140, F22 |
-| ⏳ | **2+d** | Builtins listă | `member/2`, `append/3`, eventual `length/2` — rezervate ca `count/2` | — | D137, F22 |
+| ✅ | ~~**2+d**~~ | Builtins listă (core) | **`member/2` `append/3` `length/2` `reverse/2` `sort/2`** | **F27** | D137, D160–D168, F22 |
 | ⏳ | **2+e** | Liste avansate Prolog | Dif-list, lazy lists, string ↔ char list | — | D136, F22 |
 | ⏳ | **2+f** | Cut în NAF — local cut | **`\+ (Goal, !)`** — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | — | D149, F24 |
+| ⏳ | **2+g** | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități | **F28?** | **2+d**, **F27**, F22–F23 |
 
-**Ordine recomandată (când se promovează):** **2+a** / **2+b** (composiție) independent de **2+c–2+f** (liste/cut); **2+d** după **F22** **(completed)**; **2+c** după **F22–F24**; **2+f** după **F24** (când e nevoie de NAF + cut combinat).
+**Ordine recomandată (când se promovează):** **2+a** / **2+b** (composiție) independent de **2+c–2+g**; ~~**2+d**~~ **→ F27 (next)**; **2+g** după **F27** (dacă apare nevoie); **2+c** după **F22–F26**; **2+e** independent; **2+f** după **F24**.
 
 ### Note backlog 2+x — explicații
 
@@ -4853,9 +5255,9 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 Liste ca rezultate pe wire — vector/matrix redirect, pack soluții listă; **out of scope F22**.
 
-#### **2+d** ⏳ (D137)
+#### ~~**2+d**~~ ✅ → **F27** (D160–D168)
 
-Builtins bibliotecă listă — **`member`**, **`append`**, etc. **F22** livrează termeni + reguli user; **`nth0`/`nth1`** → **F23** **(completed)** (nu 2+d).
+Builtins bibliotecă listă — **`member/2`**, **`append/3`**, **`length/2`**, **`reverse/2`**, **`sort/2`**. **F22** livrează termeni + reguli user (exemple doc); **`nth0`/`nth1`** → **F23** **(completed)**. User 2026-08-21: scope extins cu **`length`**, **`reverse`**, **`sort`**.
 
 #### **2+e** ⏳ (D136)
 
@@ -4864,6 +5266,110 @@ Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Pro
 #### **2+f** ⏳ — Cut în NAF (local cut)
 
 **Amânat post-F24 MVP.** F24 livrează **`!`** în query/reguli + **interzice** `!` în `\+ (…)` (D149-A). Cazul **`\+ (p(X), !)`** — cut **inner contorizat** în subdovada negată (spec ISO/SWI: taie doar choice point-urile din paranteză, nu pe cele din query/regulă exterioară) — **elaborare + implementare** când promovăm **2+f**. Până atunci: parse/validate → **elaboration error** clar (ex. `cut is not allowed inside \\+ (...)`).
+
+#### **2+g** ⏳ — Builtins listă suplimentare (post-**F27**)
+
+**Legat de:** **2+d** (promovat → **F27**), **F22** (liste), **F23** (`nth0`/`nth1`).  
+**Scop:** la promovare, adăugare incrementală de predicate Prolog pentru liste **peste** pachetul core **F27** (`member`, `append`, `length`, `reverse`, `sort`). Fiecare subset devine fază proprie (draft **F28+**) cu decizii D169+ — același pattern: head rezervat, engine builtin, teste legacy+wave, doc EN.
+
+**Deja livrat / planificat (nu e 2+g):**
+
+| Predicate | Unde |
+|-----------|------|
+| **`nth0/3`**, **`nth1/3`** | **F23** **(completed)** |
+| **`member/2`**, **`append/3`**, **`length/2`**, **`reverse/2`**, **`sort/2`** | **F27** (ex-**2+d**) |
+| **Liste ca termeni** (`[]`, `[H\|T]`, unificare) | **F22** **(completed)** |
+| **Dif-list, lazy, char-list** | **2+e** (model listă, nu builtin library) |
+| **Liste pe wire** | **2+c** → **F25** |
+
+---
+
+##### Catalog complet Prolog (SWI / ISO-style) — referință **2+g**
+
+**Sortare / mulțimi**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`keysort/2`** | Sortează listă de perechi după **Key** (`Key-Value`) |
+| **`msort/2`** | Ca `sort/2`, dar **stabil** (păstrează ordinea elementelor egale) |
+| **`list_to_set/2`** | Elimină duplicate, păstrează prima apariție |
+| **`is_set/1`** | Adevărat dacă lista nu are duplicate |
+| **`union/3`** | Reuniune (fără duplicate) |
+| **`intersection/3`** | Intersecție |
+| **`subtract/3`** | Scade din prima listă elementele din a doua |
+
+**Acces / structură listă**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`last/2`** | Ultimul element |
+| **`prefix/2`** | Prefix al listei |
+| **`suffix/2`** | Sufix al listei |
+| **`select/3`** | `select(X, L, R)` — R = L fără o apariție a lui X |
+| **`selectchk/3`** | Ca `select/3`, determinist (fără choice point) |
+| **`same_length/2`** | Aceeași lungime |
+| **`flatten/2`** | Aplatizează liste imbricate |
+
+**Generare / agregare numerică pe listă**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`numlist/3`** | `numlist(From, To, L)` — listă de integers consecutivi |
+| **`sum_list/2`** | Suma elementelor numerice |
+| **`max_list/2`**, **`min_list/2`** | Max / min într-o listă de numere |
+
+**Filtrare / map / fold (higher-order)**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`include/3`** | Păstrează elementele pentru care goal reușește |
+| **`exclude/3`** | Inversul lui `include` |
+| **`partition/4`** | Împarte lista în pass / fail |
+| **`maplist/2`**, **`maplist/3`**, … | Aplică predicate fiecărui element |
+| **`foldl/4`**, **`foldl/5`** | Reduce lista (fold stânga) |
+| **`convlist/3`** | Map + elimină eșecurile |
+
+**Permutări / combinatorică**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`permutation/2`** | Toate permutările (backtracking) |
+
+**Colectare soluții (produc liste — nu „listă pură”, dar related)**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`findall/3`** | Toate soluțiile unui goal într-o listă |
+| **`bagof/3`** | Ca findall, cu setări variabile |
+| **`setof/3`** | Soluții unice, sortate |
+
+**Avansate / marginal MVP**
+
+| Predicate | Ce face |
+|-----------|---------|
+| **`length/2` + listă parțială** | `length(L, N)` generează listă de N variabile (SWI) |
+| **`append/2`** (DCG / dif-list) | Variantă cu dif-list în grammars |
+| **`sublist/3`**, **`nth1/4`** (SWI) | Sublistă / nth cu rest |
+| **`combinations/3`** | Submulțimi de lungime fixă (extensii) |
+
+---
+
+##### Ce merită după **F27** (prioritate la promovare **2+g**)
+
+Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi mici**, câte o fază:
+
+| Prioritate | Predicate | Motiv |
+|------------|-----------|-------|
+| **1** | **`keysort/2`** | Sortare pe perechi `(Key, Val)` — foarte uzual |
+| **2** | **`last/2`**, **`select/3`** | Acces / eliminare simplă, implementare mică |
+| **3** | **`list_to_set/2`**, **`union/3`** | Mulțimi pe liste ground |
+| **4** | **`numlist/3`**, **`sum_list/2`** | Aritmetică / generare range |
+| **5** | **`flatten/2`** | Liste imbricate în facts |
+| **6** | **`include/3`**, **`maplist/2`** | Necesită **call/N** sau eval goal — complexitate mai mare |
+| **7** | **`findall/3`**, **`bagof/3`**, **`setof/3`** | Model execution + scope vars — fază separată mare |
+| **8** | **`permutation/2`**, **`msort/2`** | Nice-to-have, rar critic |
+
+**Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
 
 ### Note backlog — explicații (1+x)
 

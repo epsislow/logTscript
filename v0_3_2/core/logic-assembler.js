@@ -6,11 +6,23 @@ const LOGIC_BUILTIN_SHOW_PRED = 'show';
 const LOGIC_BUILTIN_NTH0_PRED = 'nth0';
 const LOGIC_BUILTIN_NTH1_PRED = 'nth1';
 const LOGIC_BUILTIN_IS_PRED = 'is';
+const LOGIC_BUILTIN_MEMBER_PRED = 'member';
+const LOGIC_BUILTIN_APPEND_PRED = 'append';
+const LOGIC_BUILTIN_LENGTH_PRED = 'length';
+const LOGIC_BUILTIN_REVERSE_PRED = 'reverse';
+const LOGIC_BUILTIN_SORT_PRED = 'sort';
 const LOGIC_BUILTIN_RESERVED_HEADS = new Set([
   LOGIC_BUILTIN_SHOW_PRED,
   LOGIC_BUILTIN_NTH0_PRED,
   LOGIC_BUILTIN_NTH1_PRED,
 ]);
+const LOGIC_BUILTIN_RESERVED_ARITIES = {
+  [LOGIC_BUILTIN_MEMBER_PRED]: [2],
+  [LOGIC_BUILTIN_APPEND_PRED]: [3],
+  [LOGIC_BUILTIN_LENGTH_PRED]: [2],
+  [LOGIC_BUILTIN_REVERSE_PRED]: [2],
+  [LOGIC_BUILTIN_SORT_PRED]: [2],
+};
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
 
@@ -451,6 +463,8 @@ function logicIsReservedPredicateHead(head) {
   if (!head || head.kind !== 'compound') return false;
   if (LOGIC_BUILTIN_RESERVED_HEADS.has(head.predicate)) return true;
   if (head.predicate === LOGIC_BUILTIN_IS_PRED && (head.args || []).length === 2) return true;
+  const arities = LOGIC_BUILTIN_RESERVED_ARITIES[head.predicate];
+  if (arities && arities.includes((head.args || []).length)) return true;
   return false;
 }
 
@@ -461,6 +475,21 @@ function logicReservedHeadError(predicate, arity) {
   }
   if (predicate === LOGIC_BUILTIN_IS_PRED && arity === 2) {
     return "'is/2' is reserved — cannot define is as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_MEMBER_PRED && arity === 2) {
+    return "'member/2' is reserved — cannot define member as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_APPEND_PRED && arity === 3) {
+    return "'append/3' is reserved — cannot define append as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_LENGTH_PRED && arity === 2) {
+    return "'length/2' is reserved — cannot define length as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_REVERSE_PRED && arity === 2) {
+    return "'reverse/2' is reserved — cannot define reverse as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SORT_PRED && arity === 2) {
+    return "'sort/2' is reserved — cannot define sort as fact or rule head";
   }
   return `'${predicate}' is reserved`;
 }
@@ -524,6 +553,16 @@ function logicValidateProgram(prog) {
         logicError("'show/N' is reserved — cannot define show as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_IS_PRED && arity === 2) {
         logicError("'is/2' is reserved — cannot define is as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_MEMBER_PRED && arity === 2) {
+        logicError("'member/2' is reserved — cannot define member as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_APPEND_PRED && arity === 3) {
+        logicError("'append/3' is reserved — cannot define append as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_LENGTH_PRED && arity === 2) {
+        logicError("'length/2' is reserved — cannot define length as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_REVERSE_PRED && arity === 2) {
+        logicError("'reverse/2' is reserved — cannot define reverse as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SORT_PRED && arity === 2) {
+        logicError("'sort/2' is reserved — cannot define sort as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

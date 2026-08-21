@@ -22,11 +22,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | Built-in | Syntax | Meaning |
 |----------|--------|---------|
 | **`count/2`** | `count(Goal, N)` | **`N`** = number of solutions to **`Goal`** on the current KB |
-| **`show/N`** | `show(T1, …, TN)` | Print dereferenced terms (1–32 args); always succeeds; reserved predicate |
-| **`nth0/3`** | `nth0(I, List, Elem)` | List element at **0-based** index **`I`**; reserved predicate |
-| **`nth1/3`** | `nth1(I, List, Elem)` | List element at **1-based** index **`I`**; reserved predicate |
+| **`show/N`**, **`nth0/3`**, **`nth1/3`**, **`is/2`**, list builtins | — | Full catalogue: [logic-builtins.md](logic-builtins.md) |
 
-**`count/2`** detail below. **`show/N`** — see [inline-logic.md](inline-logic.md#built-in-shown-logic-debug-output). **`nth0/3`**, **`nth1/3`** — see [inline-logic.md](inline-logic.md#built-in-nth0--nth1-list-indexing).
+**`count/2`** detail below. All other logic builtins — see [logic-builtins.md](logic-builtins.md).
 
 ---
 
