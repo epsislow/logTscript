@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24, F26 complete; F27 (builtins listă, ex-2+d) ready-to-implement; F25 (liste pe wire) deferred.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24, F26–F27, F29 complete; **Faza 25** (liste tipate pe wire, 2+c) — următoarea, D182+ draft.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -86,6 +86,9 @@ todos:
   - id: logic-query-sel
     content: "Faza 29: N query vars + ;sel(i,j) — implemented"
     status: completed
+  - id: logic-list-wire
+    content: "Faza 25: liste tipate pe wire (2+c) — text|number|bool [list], D182+ — următoarea fază"
+    status: pending
 isProject: false
 ---
 
@@ -1338,8 +1341,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 24** Cut `!` (**1+i** promovat)                  | D147–D151                                                                                            | **(completed)**                                   |
 | **Faza 26** `is/2` evaluare aritmetică                  | D152–D159                                                                                            | **(completed)**                                   |
 | **Faza 27** Builtins listă + doc `logic-builtins.md`    | D160–D169                                                                                            | **(completed)**                                   |
-| **Faza 29** Query N vars + `;sel(i,j)` redirect         | D170–D181                                                                                            | **(completed)**                 |
-| **Faza 25** Liste pe wire / vector redirect             | **2+c** (D140)                                                                                       | **(deferred — după F29)**                         |
+| **Faza 29** Query N vars + `;sel(i,j)` redirect         | D170–D181                                                                                            | **(completed)**                                   |
+| **Faza 25** Liste tipate pe wire (**2+c**)                | D182–D199 (extinde D59, D32, D140)                                                                   | **(următoarea — draft confirmed parțial)**        |
 
 
 ---
@@ -4645,7 +4648,7 @@ comp [logic] .peopleLogic:
 | **D137** | **Builtins listă**         | **A (confirmed)** — `nth` **→ F23** **(completed)**; `member`**/**`append`**/**`length`**/**`reverse`**/**`sort` **builtin** → **F27** (promovat din **2+d**); reguli user + exemple doc rămân valide până la F27 |
 | **D138** | **Cut în F22**             | **A (confirmed)** — **fără cut**; traversare cu backtracking normal; `!` **→ F24** (nimic de decis suplimentar)                                                                                                   |
 | **D139** | **Unde e permis**          | **A (confirmed)** — facts, reguli, query, constraints, `.world:query`, `.world:check`, mutation ground                                                                                                            |
-| **D140** | **Wire / redirect listă**  | **Amânat → 2+c** — vector/matrix/wire pack pentru liste → **F25**                                                                                                                                                 |
+| **D140** | **Wire / redirect listă**  | **Amânat → F25** — superseded de **D182–D199** (liste tipate + binding explicit)                                                                                                                                 |
 | **D141** | **Scope tokenizer**        | **A (confirmed)** — `[` `]` `|` parse logic în: `inline [logic] … :`, `logic { }` (comp exec), `.world:query({ })`, `.world:check({ })`; tokenizer logic separat de script top-level                              |
 | **D142** | **Teste & livrare**        | **A (confirmed)** — implementare: teste **3699+** legacy+wave, doc logts-play, sketch Monopoly fără cut; **nu e decizie user** — checklist dev                                                                    |
 
@@ -5972,6 +5975,246 @@ comp [logic] .worldLogic:
 
 ---
 
+## Decizii Faza 25 — liste tipate pe wire + binding explicit (**2+c**, D182+) **(draft — următoarea fază)**
+
+> **User / design:** 2026-08-21 — model **unificat** `text` | `number` | `bool` + modificator opțional **`list`** pe **trei suprafețe**: mutation/check (D59), program block comp, `.world:query` (D32).  
+> **Relație F29:** `;sel` proiectează **cols scalare** din N vars; F25 = **un termen listă** ↔ **vector** (flatten omogen). **Distinct.**  
+> **Relație F22:** liste Prolog în engine **(completed)**; F25 = **codec wire** (pack/unpack). D140 amânat → **D182+**.  
+> **Neproducție:** tip explicit la query = îmbunătățire claritate; legacy `Var=wire` infer păstrat (D187).
+
+### Context — problema
+
+| Azi | Limită |
+|-----|--------|
+| **Mutation/check** (D59) | `text w`, `number w`, `bool w` — **scalar**; fără listă |
+| **Program block** | `X is text pin` — scalar; fără listă |
+| **`.world:query`** (D32) | `Var=wire` — tip **inferat din lățime** (`logicInferBindType`) |
+| **Redirect output** | listă Prolog → **fill** (`logicEncodeSolutionTerm` ignoră `list`) |
+
+**Bug design query infer:** `32wire` → infer **text** (multiplu de 8), nu number — `N=scoreIn` pe `8wire`/`32wire` numeric e ambiguu/incorect fără tip explicit.
+
+### Vocabular tip (confirmed intent)
+
+```text
+scalarType := text | number | bool
+listType   := scalarType list          ; listă omogenă Prolog ↔ vector wire
+```
+
+**Ordine canonică:** tip → opțional `list` → sursă (wire / pin / expr).
+
+### Trei suprafețe — sintaxă țintă **(confirmed parțial)**
+
+#### (1) Mutation + `:check` — extinde D59
+
+```logts
+.whLogic:{
+    logic {
+        + inside(box1, text list containers)
+        + level(box1, number list scores)
+        + active(box1, bool list flags)
+    }
+}
+
+1wire ok = .whLogic:check({
+    + path(a, text list routeVec)
+})
+```
+
+| Formă | Wire | Prolog |
+|-------|------|--------|
+| `text w` | scalar | atom |
+| `number w` | scalar | integer |
+| `bool w` | scalar | 0/1 |
+| **`text list w`** | **`Kwire[N]` vector** | `[atom, …]` |
+| **`number list w`** | vector | `[n, …]` |
+| **`bool list w`** | vector (`1wire[N]` sau `8wire[N]` — vezi D193) | `[0\|1, …]` |
+
+#### (2) Program block `comp [logic]`
+
+```logts
+comp [logic] .pathLogic:
+    .path {
+        Start is text list textsPin
+        Score is number list scoresPin
+        Alive is bool list aliveFlagsPin
+    }
+```
+
+Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar, N de la wire).
+
+#### (3) `.world:query` — binding **tip explicit**
+
+```logts
+1wire ok = .world:query({ owns(john, X) }, X=bool flagWire)
+40wire name = .world:query({ owns(john, X) }, X=text carWire)
+8wire score = .world:query({ level(box1, N) }, N=number scoreIn)
+32wire[8] path = .world:query({ route(A, Nodes) }, Nodes=text list routeVec)
+```
+
+**Formă binding:** `Var = scalarType [list] wireExpr` (spații flexibile după `=`).
+
+### Rezumat decizii
+
+| ID | Subiect | Decizie | Status |
+|----|---------|---------|--------|
+| **D182** | **Model unificat** | **A** — același vocabular `text\|number\|bool` + `list` pe mutation, program block, query | **(confirmed)** |
+| **D183** | **Listă omogenă MVP** | **A** — flatten `[e1,…,eN]` ↔ vector; **fără** imbricare / eterogen | **(confirmed)** |
+| **D184** | **Mutation/check list** | **A** — `text list w`, `number list w`, `bool list w` (extinde D59) | **(confirmed)** |
+| **D185** | **Program block list** | **A** — `Var is text list pin`, etc. | **(confirmed)** |
+| **D186** | **Query binding explicit** | **A** — `Var=text w`, `Var=number w`, `Var=text list w`, … | **(confirmed)** |
+| **D187** | **Legacy `Var=wire` infer** | **A (recommended)** — păstrat compat; infer din lățime ca azi; doc: prefer explicit | **(confirmed)** |
+| **D188** | **Encode element listă** | **A** — același codec ca scalar per slot (D12b): text→ASCII, number→binary, bool→0/1 | **(confirmed)** |
+| **D189** | **Output redirect listă** | **A** — query cu var listă + `>= vector` / LHS vector inline → flatten listă ground | **(confirmed)** |
+| **D190** | **Out of scope MVP** | **A** — listă imbricată, listă eterogenă, vector-of-lists (blob per soluție) → backlog | **(confirmed)** |
+| **D191** | **`bool list` wire shape** | **A / B** — vezi mai jos | **de confirmat** |
+| **D192** | **Lungime listă N** | **A / B** — vezi mai jos | **de confirmat** |
+| **D193** | **Underfill (listă scurtă)** | **A / B** — vezi mai jos | **de confirmat** |
+| **D194** | **Overflow listă > N** | **A / B** — vezi mai jos | **de confirmat** |
+| **D195** | **Stop listă la fill** | **A / B** — primul slot fill = cap listă la decode | **de confirmat** |
+| **D196** | **Query: tip obligatoriu** | **A / B** — infer permis vs warning vs error | **de confirmat** |
+| **D197** | **Output fără binding** | **A / B** — infer listă doar din LHS vector vs eroare | **de confirmat** |
+| **D198** | **Parser query binding** | **A** — `Var=text list expr` parse după `=` (keywords rezervate în context query) | **(ready — implicit A)** |
+| **D199** | **Teste & livrare** | **A** — 3816+ legacy+wave; mutation list, pin list, query typed, redirect flatten | **(draft checklist)** |
+
+---
+
+### D191 — `bool list` — shape wire **(de confirmat)**
+
+| Opțiune | Wire | Pro | Contra |
+|---------|------|-----|--------|
+| **A — `1wire[N]` (recommended)** | N biți, un bool/slot | Compact | Diferit de text/number (multiplu 8) |
+| **B — `8wire[N]`** | 0/1 pe octet | Uniform element width | 8× bits |
+
+---
+
+### D192 — Plafon lungime listă **(de confirmat)**
+
+| Opțiune | Regulă | Pro | Contra |
+|---------|--------|-----|--------|
+| **A — N = dimensiune vector (recommended)** | `32wire[8]` → max 8 elemente; fără cap global suplimentar | Predictibil la elaboration | Vector mic = listă scurtă |
+| **B — cap global** | ex. max 1024 (ca D134 literal) | Protecție | Dublează regula |
+
+---
+
+### D193 — Underfill la decode (listă mai scurtă decât N) **(de confirmat)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — stop la primul fill (recommended)** | `[a,b]` din prefix până la fill sentinel | Aliniat D12a vector bulk | Trebuie fill distinct de date valide |
+| **B — lungime fixă N** | mereu N elemente; rest fill = atom `''` / 0 | Simplu pack | Listă Prolog poate avea „găuri” |
+
+---
+
+### D194 — Overflow (listă Prolog > N slots) **(de confirmat)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — truncate (recommended)** | primele N elemente pe wire; rest dropped | Aliniat D12a overflow soluții | Surpriză silent |
+| **B — elaboration/runtime error** | listă prea lungă → error | Sigur | Mai strict |
+
+---
+
+### D195 — Decode: fill = cap listă **(de confirmat)**
+
+La **wire → Prolog list** (pin input, query binding): primul slot egal cu **fill pattern** (D12a) → listă se termină acolo (nu include fill ca element).
+
+**Decizie recomandată:** **A** — aliniat padding vector solutions.
+
+---
+
+### D196 — Query infer legacy **(de confirmat)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — infer păstrat, doc prefer explicit (recommended)** | `X=wire` ca azi; exemple noi cu `X=text w` | Zero breaking teste | Ambiguitate rămâne dacă user uita tipul |
+| **B — warning elaboration** | infer + mesaj doc viewer | Educație | Zgomot |
+| **C — tip obligatoriu** | `X=wire` fără keyword → error | Claritate totală | Breaking teste 3544+ |
+
+**Notă user:** neproducție — **A** suficient; reconsider **C** dacă vrei hardening.
+
+---
+
+### D197 — Output query fără binding input **(de confirmat)**
+
+```logts
+32wire[8] flat = .world:query({ path(a, Nodes) })
+```
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — LHS vector + var listă liberă → flatten (recommended)** | encoder detectează listă ground pe var | DX simplu | Trebuie validat shape LHS |
+| **B — obligă tip pe LHS viitor** | `32wire[8] flat = … ;as text list` | Explicit | Parser extra |
+
+---
+
+### D199 — Teste & livrare **(draft checklist)**
+
+| ID | Scenariu |
+|----|----------|
+| 3816 | parse mutation: `+ fact(X, text list w)` |
+| 3817 | parse program: `Nodes is number list pin` |
+| 3818 | parse query: `Nodes=text list routeVec` |
+| 3819 | query `N=number scoreIn` pe `8wire` — round-trip numeric (nu text infer) |
+| 3820–3821 | mutation list text in/out legacy+wave |
+| 3822–3823 | pin `is text list` round-trip legacy+wave |
+| 3824–3825 | query output flatten `[a,b,c]` → `32wire[8]` legacy+wave |
+| 3826 | regresie: `X=carWire` infer text încă funcționează |
+| 3827 | `:check` cu `text list w` |
+| 3828 | listă imbricată la pack → error sau fill (per D190) |
+
+**Doc EN:** `logic-runtime.md`, `comp-logic.md`, `logic-query-exec.md`, `inline-logic.md` — secțiuni typed list; exemple logts-play Load & Run.
+
+### Sketch implementare
+
+| Layer | Schimbare |
+|-------|-----------|
+| **`logic-assembler.js`** | `parseMutationTerm`: `text list w`; `parseLogicProgramBlock`: `is text list pin`; keywords `list` în context tip |
+| **`parser.js`** | Query bindings: `Var=text [list] expr` |
+| **`logic-engine.js`** | `logicWireRefToTerm(bits, bindType, listFlag)`; `logicListToVector` / `logicVectorToList`; extinde encode redirect |
+| **`logic.js`** | Pin storage list (N × ew); redirect când sol[var] e list |
+| **`interpreter.js`** | `evalLogicInlineQuery` bindings cu bindType explicit |
+| **Teste** | 3816–3828+ legacy+wave |
+
+**Estimare:** medie-mare — trei suprafețe parse + codec listă; **fără** schimbare engine unify/list (F22).
+
+### Exemplu țintă (post-F25)
+
+```logts
+inline [logic] .world:
+
+    path(a, [a, b, c])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world {
+        RouteIn is text list routePin
+    }
+
+:
+
+32wire[8] routeOut = 0
+32wire[8] routeIn = 0
+1wire trigger = 1
+
+.worldLogic:{
+    routePin = routeIn
+    route >= routeOut
+    set = trigger
+}
+
+32wire[8] inlinePath = .world:query(
+    { path(a, Nodes) },
+    A=text atomWire,
+    Nodes=text list routeIn)
+```
+
+---
+
 ## Comparație sketch v1 → v2 ( ce s-a schimbat )
 
 
@@ -6007,9 +6250,9 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 26** `is/2` arithmetic          | D152–D159                                                 |
 | **Faza 27** builtins listă + doc       | D160–D169                                                 |
 | **Faza 29** query N vars + `;sel`      | D170–D181                                                 | **(completed)** |
+| **Faza 25** liste tipate pe wire       | **2+c** D182–D199                                         | **(următoarea)** |
 | **F20b** scope blocks                  | **2+a** **(deferred)**                                    |
 | **F20c** reguli import relative        | **2+b** **(deferred)**                                    |
-| **F25** liste pe wire                  | **2+c** **(deferred — după F29)** — D140                  |
 | ~~**Builtins listă** member/append~~   | ~~**2+d**~~                                               |
 | **Liste avansate** dif/lazy/char       | **2+e** **(deferred)** — D136                             |
 | **Builtins listă suplimentare**        | **2+g** **(deferred)** — post-F27; catalog Prolog complet |
@@ -6025,11 +6268,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 27~~ **(completed)**
-2. **Faza 29** — query **N** vars + `;sel(i,j)` — **înainte de F25/2+c**
-3. **Faza 25** — liste pe wire (**2+c**, D140) — după F29
-4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a … 2+g** (fără **2+d** — livrat F27)
+1. ~~Faza 0~~ → ~~Faza 29~~ **(completed)**
+2. **Faza 25** — liste tipate pe wire + binding explicit (**2+c**, D182–D199) — **următoarea**
+3. Apoi backlog **1+p**, **1+s**, **1+o**, …
+4. Apoi faze amânate **2+a … 2+g** (fără **2+d** — livrat F27; **2+c** → F25 activ)
 
 ---
 
@@ -6076,7 +6318,7 @@ Tabel master **2+a … 2+g** — faze **amânate** discutate/planificate, distin
 | ----- | ----------- | --------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------- |
 | ⏳     | **2+a**     | Scope blocks nested         | `warehouse { inside(…) … }` — path relativ în același inline                                                   | **F20b**   | F20a, D107                |
 | ⏳     | **2+b**     | Reguli sub prefix import    | `v.c.carSize <- carWheel` → `v.c.carWheel`; body relativ la `use as`                                           | **F20c**   | F20a, D107                |
-| ⏳     | **2+c**     | Liste pe wire / vector      | Pack redirect listă Prolog pe wire; **după F29**                                                               | **F25**    | D140, F22, **F29**        |
+| ⏳     | **2+c**     | Liste tipate pe wire        | **F25 următoarea** — D182–D199; mutation/program/query + codec listă                                           | **F25**    | D182+, F22, F29 **(completed)** |
 | ✅     | ~~**2+d**~~ | Builtins listă (core)       | `member/2` ****`append/3` ****`length/2` ****`reverse/2` ****`sort/2`                                          | **F27**    | D137, D160–D168, F22      |
 | ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                 |
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                 |
@@ -6095,9 +6337,13 @@ Blocuri nested în același modul inline — scope/path relativ local (`warehous
 
 Reguli noi declarate sub prefix importat + referințe relative în body (`carSize <- carWheel` în scope `v.c`). Draft opțiuni în plan (B+C vs block F20b).
 
-#### **2+c** ⏳ → **F25** (D140)
+#### **2+c** ⏳ → **F25** (D182–D199, extinde D59/D32/D140)
 
-Liste ca rezultate pe wire — pack termen listă Prolog; **după F29** (N vars + sel distinct de listă ca termen). **Out of scope F22.**
+**Următoarea fază** — secțiune completă: [Decizii Faza 25](#decizii-faza-25--liste-tipate-pe-wire--binding-explicit-2c-d182-draft--următoarea-fază).
+
+**Confirmed:** model unificat `text|number|bool` + `list` pe mutation/check, program block, query binding explicit; listă omogenă flatten ↔ vector; legacy `Var=wire` infer păstrat.
+
+**De confirmat:** D191–D197 (bool list wire, fill/overflow, infer obligatoriu?, output infer).
 
 #### ~~**2+d**~~ ✅ → **F27** (D160–D168)
 
