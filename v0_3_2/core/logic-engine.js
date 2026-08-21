@@ -952,6 +952,11 @@ function logicTermsEqualGround(a, b) {
     }
     return true;
   }
+  if (a.kind === 'list') {
+    if (logicListIsNil(a) && logicListIsNil(b)) return true;
+    if (logicListIsNil(a) || logicListIsNil(b)) return false;
+    return logicTermsEqualGround(a.head, b.head) && logicTermsEqualGround(a.tail, b.tail);
+  }
   return false;
 }
 
@@ -1512,6 +1517,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicCollectStaticGroundFacts = logicCollectStaticGroundFacts;
   globalThis.logicFactClauseKey = logicFactClauseKey;
   globalThis.logicTermIsGround = logicTermIsGround;
+  globalThis.logicTermsEqualGround = logicTermsEqualGround;
+  globalThis.logicBindConstraintHead = logicBindConstraintHead;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

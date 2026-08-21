@@ -40598,5 +40598,289 @@ comp [logic] .worldLogic:
     h.assert('no sol', String(sols.length), '0');
   });
 
+  const INLINE_LOGIC_LIST_MUT = `inline [logic] .tags:
+
+    query hasColors:
+        colors([red, green, blue])
+
+:`;
+
+  reg(3729, 'logic', 'parse mutation block with list fact', function(h) {
+    const ops = parseLogicMutationBlock(
+      '+ colors(box1, [red, green, blue])\n- colors(box1, [red, green, blue])',
+    );
+    h.assert('two ops', String(ops.length), '2');
+    h.assert('add op', ops[0].op, 'add');
+    h.assert('remove op', ops[1].op, 'remove');
+    h.assert('list arg kind', ops[0].head.args[1].kind, 'list');
+    h.assert('list head atom', ops[0].head.args[1].head.name, 'red');
+    h.assert('ground head', String(logicTermIsGround(ops[0].head)), 'true');
+  });
+
+  function runLogicMutationListAdd(h, session) {
+    const src = INLINE_LOGIC_LIST_MUT + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + colors([red, green, blue]) }
+    hasColors >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+
+1wire trigger2 = 1
+
+.tagLogic:{
+    hasColors >= ok
+    set = trigger2
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1 after persist', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3730, 'logic', 'runtime mutation + list fact persists (legacy)', runLogicMutationListAdd);
+  reg(3731, 'logic', 'runtime mutation + list fact persists (wave)', runLogicMutationListAdd, { propagation: 'wave' });
+
+  function runLogicMutationListRemove(h, session) {
+    const src = INLINE_LOGIC_LIST_MUT + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + colors([red, green, blue]) }
+    hasColors >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+
+1wire trigger2 = 1
+
+.tagLogic:{
+    logic { - colors([red, green, blue]) }
+    hasColors >= ok
+    mutationFailed >= failed
+    set = trigger2
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=0 after remove', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(3732, 'logic', 'runtime mutation - list fact remove (legacy)', runLogicMutationListRemove);
+  reg(3733, 'logic', 'runtime mutation - list fact remove (wave)', runLogicMutationListRemove, { propagation: 'wave' });
+
+  const INLINE_LOGIC_LIST_MUT_REPLACE = `inline [logic] .tags:
+
+    colors([red, green, blue])
+
+    query hasCyan:
+        colors([cyan, magenta])
+
+:`;
+
+  function runLogicMutationListReplace(h, session) {
+    const src = INLINE_LOGIC_LIST_MUT_REPLACE + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic {
+        - colors([red, green, blue])
+        + colors([cyan, magenta])
+    }
+    hasCyan >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1 after replace', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3734, 'logic', 'runtime mutation atomic list replace (legacy)', runLogicMutationListReplace);
+  reg(3735, 'logic', 'runtime mutation atomic list replace (wave)', runLogicMutationListReplace, { propagation: 'wave' });
+
+  function runLogicMutationListNonGround(h, session) {
+    const src = INLINE_LOGIC_LIST_MUT + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 0
+1wire still = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + colors([X, red]) }
+    hasColors >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('still=0', interp.getWireEffectiveValue('still'), '0');
+  }
+
+  reg(3736, 'logic', 'runtime mutation non-ground list fact fails (legacy)', runLogicMutationListNonGround);
+  reg(3737, 'logic', 'runtime mutation non-ground list fact fails (wave)', runLogicMutationListNonGround, { propagation: 'wave' });
+
+  const INLINE_LOGIC_LIST_CONSTRAINT = `inline [logic] .tags:
+
+    object(box1)
+
+    member(X, [X | _]) <- X = X
+    member(X, [_ | T]) <- member(X, T)
+
+    constraint tags(O, L) <= object(O), member(red, L)
+
+    query hasTag:
+        tags(box1, [red, green, blue])
+
+:`;
+
+  reg(3738, 'logic', 'logicTermsEqualGround and bind constraint head with list', function(h) {
+    const listA = parseLogicBody('colors([red, green])').clauses[0].head.args[0];
+    const listB = parseLogicBody('colors([red, green])').clauses[0].head.args[0];
+    const listC = parseLogicBody('colors([red, blue])').clauses[0].head.args[0];
+    h.assert('equal ground lists', String(logicTermsEqualGround(listA, listB)), 'true');
+    h.assert('unequal ground lists', String(logicTermsEqualGround(listA, listC)), 'false');
+    const prog = parseLogicBody(`object(box1)
+constraint tags(box1, [red, green]) <= object(box1)`);
+    const fact = parseLogicMutationBlock('+ tags(box1, [red, green])')[0].head;
+    const env = logicBindConstraintHead(prog.constraints[0].head, fact);
+    h.assert('bind matching list head', String(env != null), 'true');
+    const badFact = parseLogicMutationBlock('+ tags(box1, [red, blue])')[0].head;
+    h.assert('bind mismatch list head', String(logicBindConstraintHead(prog.constraints[0].head, badFact) == null), 'true');
+  });
+
+  function runLogicConstraintListMutPass(h, session) {
+    const src = INLINE_LOGIC_LIST_CONSTRAINT + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + tags(box1, [red, green, blue]) }
+    hasTag >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3739, 'logic', 'constraint member on list mutation pass (legacy)', runLogicConstraintListMutPass);
+  reg(3740, 'logic', 'constraint member on list mutation pass (wave)', runLogicConstraintListMutPass, { propagation: 'wave' });
+
+  function runLogicConstraintListMutFail(h, session) {
+    const src = INLINE_LOGIC_LIST_CONSTRAINT + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 0
+1wire still = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + tags(box1, [green, blue]) }
+    hasTag >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('still=0', interp.getWireEffectiveValue('still'), '0');
+  }
+
+  reg(3741, 'logic', 'constraint member on list mutation rollback (legacy)', runLogicConstraintListMutFail);
+  reg(3742, 'logic', 'constraint member on list mutation rollback (wave)', runLogicConstraintListMutFail, { propagation: 'wave' });
+
+  const INLINE_LOGIC_LIST_CONSTRAINT_GROUND = `inline [logic] .tags:
+
+    object(box1)
+
+    constraint tags(box1, [red, green]) <= object(box1)
+
+    query hasTag:
+        tags(box1, [red, green])
+
+:`;
+
+  function runLogicConstraintGroundListHead(h, session) {
+    const src = INLINE_LOGIC_LIST_CONSTRAINT_GROUND + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + tags(box1, [red, green]) }
+    hasTag >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3743, 'logic', 'constraint ground list in head mutation pass (legacy)', runLogicConstraintGroundListHead);
+  reg(3744, 'logic', 'constraint ground list in head mutation pass (wave)', runLogicConstraintGroundListHead, { propagation: 'wave' });
+
+  reg(3745, 'logic', 'constraint ground list head mismatch fails mutation', function(h, session) {
+    const src = INLINE_LOGIC_LIST_CONSTRAINT_GROUND + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire failed = 0
+1wire still = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic { + tags(box1, [red, blue]) }
+    hasTag >= still
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('still=0', interp.getWireEffectiveValue('still'), '0');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
