@@ -20115,6 +20115,7 @@ LogTScript logic follows common Prolog conventions:
 | **Atom** | \`john\`, \`chevy\`, \`might\` | Lowercase identifier — constant symbol |
 | **Number** | \`15\`, \`-4\` | Integer literal |
 | **String literal** | \`"hello "\`, \`"line\\n"\` | Double-quoted text (for **\`show/N\`** labels); escapes \`\\"\`, \`\\\\\` |
+| **List** | \`[]\`, \`[a, b, c]\`, \`[H \\| T]\` | Prolog-style lists — empty, comma literals, or head \\| tail |
 | **Fact** | \`owns(john, chevy)\` | Ground clause (no body) |
 | **Rule** | \`modifier2(X, 0) <- X >= 9, X =< 12\` | Head \`<-\` body goals (comma = AND) |
 | **Negation** | \`\\+ age(peter, _)\` | Negation as failure — goal cannot be proven |
@@ -20132,7 +20133,7 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | \`:-\` rule neck | \`<-\` rule neck |
 | \`\\+ Goal\` | \`\\+ Goal\` — negation as failure (same idea as Prolog) |
 | \`true\` / \`fail\` | Not built-in — use facts, \`\\+\`, or empty query failure |
-| Lists, floats | **Not supported** — atoms + integers + string literals |
+| Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms \`'John'\` | Use **\`"John"\`** string literals (show labels) or lowercase atoms |
 | Arbitrary arity / DCG / modules | Single inline namespace + \`use\` merge |
 | Top-level consult | **\`inline [logic]\`** + **\`comp [logic]\`** split |
@@ -20147,6 +20148,205 @@ Operators in rule bodies:
 | \`=\\=\` | Numeric inequality test |
 | \`>=\`, \`=<\`, \`>\`, \`<\` | Numeric comparison |
 | \`+\`, \`-\`, \`*\`, \`/\` | Integer arithmetic |
+
+---
+
+## Prolog lists
+
+Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **\`.world:query({ … })\`**, and mutation heads):
+
+| Form | Example | Meaning |
+|------|---------|---------|
+| Empty | \`[]\` | Nil list |
+| Literal | \`[red, green, blue]\` | Ground list (internally a cons chain) |
+| Head \\| tail | \`[H \\| T]\` | Cons cell — \`H\` is one element, \`T\` is the rest |
+| Mixed | \`[A, B \\| Rest]\` | Two or more heads, then tail |
+
+**Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as \`X = [X | _]\` fail ). A bare list term cannot stand alone as a goal — bind it with \`=\` or pass it to a predicate.
+
+List literals accept at most **1024** comma-separated elements. Define relations such as **\`member/2\`** as user rules (see below). Built-in **\`nth0/3\`** and **\`nth1/3\`** index into lists (see [List indexing](#built-in-nth0--nth1-list-indexing)).
+
+**\`show/N\`** prints ground lists as \`[a, b, c]\` and partial lists as \`[a, b|Rest]\` when the tail is still a variable.
+
+### Example — unify a list pattern
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        [A, B] = [red, green],
+        show(A, B)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints:
+
+\`\`\`text
+red green
+\`\`\`
+
+For queries with more than two output variables, use **\`.world:query({ … })\`** (see [logic-query-exec.md](logic-query-exec.md)).
+
+### Example — \`member/2\` as user rules
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+
+    member(X, [X | _]) <- X = X
+    member(X, [_ | T]) <- member(X, T)
+
+    query allColors:
+        colors(L),
+        member(C, L),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = allColors
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints one line per color (\`red\`, \`green\`, \`blue\`).
+
+### Example — list inside a compound fact
+
+\`\`\`logts-play
+inline [logic] .mono:
+
+    proprietati([prop(mediterranean, rents(2, 10, 30, 90, 160, 250), 50, 50)])
+
+    query firstProp:
+        proprietati([prop(N, _, _, _) | _]),
+        show(N)
+
+:
+
+comp [logic] .monoLogic:
+    on: 1
+    .mono { }
+:
+
+1wire trigger = 1
+
+.monoLogic:{
+    query = firstProp
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints:
+
+\`\`\`text
+mediterranean
+\`\`\`
+
+---
+
+## Built-in \`nth0/3\` and \`nth1/3\` (list indexing)
+
+**\`nth0(I, List, Elem)\`** and **\`nth1(I, List, Elem)\`** are **reserved built-in predicates** (arity **3**). They cannot be defined as fact, rule, or constraint heads.
+
+| Builtin | Index base | Example |
+|---------|------------|---------|
+| **\`nth0/3\`** | **0-based** (first element = index **0**) | \`nth0(0, [a, b, c], X)\` → \`X = a\` |
+| **\`nth1/3\`** | **1-based** (SWI Prolog style) | \`nth1(2, [a, b, c], X)\` → \`X = b\` |
+
+**Behaviour:**
+
+- **\`List\`** must unify with a list; a non-list second argument fails the goal.
+- **\`I\`** must be an integer variable or a ground integer; other types fail.
+- Ground **\`I\`** out of range → goal **fails** (no runtime exception).
+- Negative index (or **\`nth1\`** with **\`I < 1\`**) → goal **fails**.
+- **\`I\`** unbound → backtracking generates each valid index where **\`Elem\`** unifies with the list element.
+- Works in named queries on **\`comp [logic]\`**, rules, constraints, and **\`.world:query({ … })\`**.
+
+### Example — read rent by house number
+
+\`\`\`logts-play
+inline [logic] .rents:
+
+    rents_list([2, 10, 30, 90, 160, 250])
+
+    rent(N, C) <- nth1(N, rents_list([2, 10, 30, 90, 160, 250]), C)
+
+    query house2:
+        rent(2, C),
+        show(C)
+
+:
+
+comp [logic] .rentsLogic:
+    on: 1
+    .rents { }
+:
+
+1wire trigger = 1
+
+.rentsLogic:{
+    query = house2
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints:
+
+\`\`\`text
+10
+\`\`\`
+
+### Example — find index of an element
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        nth0(I, [red, green, blue], green),
+        show(I)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints:
+
+\`\`\`text
+1
+\`\`\`
 
 ---
 
@@ -20554,7 +20754,7 @@ Both modules merge once each — no error. Plain **\`use\`** on both sides would
 | | **Logic \`show/N\`** | **Script \`show(...)\`** |
 |--|-------------------|-------------------------|
 | Where | Query / rule / constraint **bodies** | Top-level script, exec blocks |
-| Arguments | Logic **terms** (atom, number, compound, var, \`"string"\`) | Wires, expressions, \`; dec\` / \`; hex\` tags |
+| Arguments | Logic **terms** (atom, number, compound, list, var, \`"string"\`) | Wires, expressions, \`; dec\` / \`; hex\` tags |
 | Output | Prolog-style term text → run **output buffer** | Wire / vector / decode formatting |
 
 **Semantics:**
@@ -23159,8 +23359,10 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 |----------|--------|---------|
 | **\`count/2\`** | \`count(Goal, N)\` | **\`N\`** = number of solutions to **\`Goal\`** on the current KB |
 | **\`show/N\`** | \`show(T1, …, TN)\` | Print dereferenced terms (1–32 args); always succeeds; reserved predicate |
+| **\`nth0/3\`** | \`nth0(I, List, Elem)\` | List element at **0-based** index **\`I\`**; reserved predicate |
+| **\`nth1/3\`** | \`nth1(I, List, Elem)\` | List element at **1-based** index **\`I\`**; reserved predicate |
 
-**\`count/2\`** detail below. **\`show/N\`** — see [inline-logic.md](inline-logic.md#built-in-shown-logic-debug-output).
+**\`count/2\`** detail below. **\`show/N\`** — see [inline-logic.md](inline-logic.md#built-in-shown-logic-debug-output). **\`nth0/3\`**, **\`nth1/3\`** — see [inline-logic.md](inline-logic.md#built-in-nth0--nth1-list-indexing).
 
 ---
 

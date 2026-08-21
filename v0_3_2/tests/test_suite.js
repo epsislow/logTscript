@@ -40262,5 +40262,341 @@ comp [logic] .worldLogic:
     h.assert('compound line', String(session.outIncludes(interp, 'inside(john, johnsCar)')), 'true');
   });
 
+  reg(3699, 'logic', 'parse list nil and literal', function(h) {
+    const nil = parseLogicBody('colors([])').clauses[0].head.args[0];
+    h.assert('nil kind', String(nil.kind === 'list' && nil.nil === true), 'true');
+    const list = parseLogicBody('colors([red, green, blue])').clauses[0].head.args[0];
+    h.assert('head atom', list.head.name, 'red');
+    h.assert('second atom', list.tail.head.name, 'green');
+    h.assert('third atom', list.tail.tail.head.name, 'blue');
+    h.assert('tail nil', String(list.tail.tail.tail.nil === true), 'true');
+  });
+
+  reg(3700, 'logic', 'parse list cons pattern', function(h) {
+    const t = parseLogicBody('member(X, [X | Rest])').clauses[0].head.args[1];
+    h.assert('cons head var', t.head.name, 'X');
+    h.assert('cons tail var', t.tail.name, 'Rest');
+  });
+
+  reg(3701, 'logic', 'list literal max 1024 elements parse error', function(h) {
+    const elems = Array.from({ length: 1025 }, (_, i) => `a${i}`).join(', ');
+    h.assertThrows(
+      'list cap',
+      () => parseLogicBody(`colors([${elems}])`),
+      'list literal accepts at most 1024 elements',
+    );
+  });
+
+  reg(3702, 'logic', 'bare list term is not a goal', function(h) {
+    h.assertThrows(
+      'bare list',
+      () => parseLogicBody('query q: [a, b]'),
+      'bare list term is not a goal',
+    );
+  });
+
+  const INLINE_LIST_UNIFY = `inline [logic] .world:
+
+    query q:
+        [A, B] = [red, green],
+        show(A, B)
+
+:`;
+
+  function runLogicListUnifyShow(h, session) {
+    const src = INLINE_LIST_UNIFY + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('unify show line', String(session.outIncludes(interp, 'red green')), 'true');
+  }
+
+  reg(3703, 'logic', 'list unify and show/N output (legacy)', runLogicListUnifyShow);
+  reg(3704, 'logic', 'list unify and show/N output (wave)', runLogicListUnifyShow, { propagation: 'wave' });
+
+  function runLogicListUnifyThree(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        [A, B, C] = [red, green, blue],
+        show(A, B, C)
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ [A, B, C] = [red, green, blue], show(A, B, C) })`;
+    const { interp } = session.run(src);
+    h.assert('three elem line', String(session.outIncludes(interp, 'red green blue')), 'true');
+  }
+
+  reg(3715, 'logic', 'list unify three elements .world:query (legacy)', runLogicListUnifyThree);
+  reg(3716, 'logic', 'list unify three elements .world:query (wave)', runLogicListUnifyThree, { propagation: 'wave' });
+
+  const INLINE_LIST_MEMBER = `inline [logic] .world:
+
+    colors([red, green, blue])
+
+    member(X, [X | _]) <- X = X
+    member(X, [_ | T]) <- member(X, T)
+
+    query allColors:
+        colors(L),
+        member(C, L),
+        show(C)
+
+:`;
+
+  function runLogicListMember(h, session) {
+    const src = INLINE_LIST_MEMBER + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = allColors
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const out = session.outLines(interp).join('\n');
+    h.assert('red', String(out.includes('red')), 'true');
+    h.assert('green', String(out.includes('green')), 'true');
+    h.assert('blue', String(out.includes('blue')), 'true');
+  }
+
+  reg(3705, 'logic', 'member/2 user rules on lists (legacy)', runLogicListMember);
+  reg(3706, 'logic', 'member/2 user rules on lists (wave)', runLogicListMember, { propagation: 'wave' });
+
+  reg(3707, 'logic', 'list unify occurs-check fails', function(h) {
+    const prog = parseLogicBody('query q: X = [X | _]');
+    const eng = new LogicEngine([]);
+    const goals = logicQueryGoals(prog.queries[0]);
+    const sols = eng.solveQuery(goals, {});
+    h.assert('no cyclic unify', String(sols.length), '0');
+  });
+
+  const INLINE_LIST_NESTED = `inline [logic] .world:
+
+    pairs([pair(a, [1, 2]), pair(b, [3])])
+
+    query q:
+        pairs([pair(N, Ls) | _]),
+        show(N, Ls)
+
+:`;
+
+  function runLogicListNestedFact(h, session) {
+    const src = INLINE_LIST_NESTED + `
+1wire run = 1
+1wire ok = .world:query({ pairs([pair(N, Ls) | _]), show(N, Ls) })`;
+    const { interp } = session.run(src);
+    h.assert('pair a', String(session.outIncludes(interp, 'a [1, 2]')), 'true');
+  }
+
+  reg(3708, 'logic', 'nested list fact show output (legacy)', runLogicListNestedFact);
+  reg(3709, 'logic', 'nested list fact show output (wave)', runLogicListNestedFact, { propagation: 'wave' });
+
+  const INLINE_LIST_MONO = `inline [logic] .mono:
+
+    proprietati([prop(mediterranean, rents(2, 10, 30, 90, 160, 250), 50, 50)])
+
+    member(X, [X | _]) <- X = X
+    member(X, [_ | T]) <- member(X, T)
+
+    query firstProp:
+        proprietati([prop(N, _, _, _) | _]),
+        show(N)
+
+:`;
+
+  function runLogicListMonopolySketch(h, session) {
+    const src = INLINE_LIST_MONO + `
+comp [logic] .monoLogic:
+    on: 1
+    .mono { }
+:
+
+1wire trigger = 1
+
+.monoLogic:{
+    query = firstProp
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('mediterranean', String(session.outIncludes(interp, 'mediterranean')), 'true');
+  }
+
+  reg(3710, 'logic', 'list in compound fact monopoly sketch (legacy)', runLogicListMonopolySketch);
+  reg(3711, 'logic', 'list in compound fact monopoly sketch (wave)', runLogicListMonopolySketch, { propagation: 'wave' });
+
+  function runLogicListQueryInvoke(h, session) {
+    const src = INLINE_LIST_MEMBER + `
+1wire run = 1
+1wire ok = .world:query({ colors(L), member(C, L), show("color", C) })`;
+    const { interp } = session.run(src);
+    h.assert('color red', String(session.outIncludes(interp, 'color red')), 'true');
+    h.assert('color blue', String(session.outIncludes(interp, 'color blue')), 'true');
+  }
+
+  reg(3712, 'logic', 'list .world:query with show (legacy)', runLogicListQueryInvoke);
+  reg(3713, 'logic', 'list .world:query with show (wave)', runLogicListQueryInvoke, { propagation: 'wave' });
+
+  reg(3714, 'logic', 'list format in show pipe tail', function(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        show([a, b | Rest])
+
+:
+
+1wire dummy = .world:query({ show([a, b | Rest]) })`;
+    const { interp } = session.run(src);
+    h.assert('pipe format', String(session.outIncludes(interp, '[a, b|Rest]')), 'true');
+  });
+
+  reg(3717, 'logic', 'nth0 reserved as fact head', function(h) {
+    h.assertThrows(
+      'reserved nth0',
+      () => parseLogicBody('nth0(1, L, E)'),
+      "'nth0/3' is reserved",
+    );
+  });
+
+  reg(3718, 'logic', 'nth1 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved nth1',
+      () => parseLogicBody('nth1(I, L, E) <- L = E'),
+      "'nth1/3' is reserved",
+    );
+  });
+
+  const INLINE_NTH_RENT = `inline [logic] .rents:
+
+    rent(N, C) <- nth1(N, [2, 10, 30, 90, 160, 250], C)
+
+    query house2:
+        rent(2, C),
+        show(C)
+
+:`;
+
+  function runLogicNthRent(h, session) {
+    const src = INLINE_NTH_RENT + `
+comp [logic] .rentsLogic:
+    on: 1
+    .rents { }
+:
+
+1wire trigger = 1
+
+.rentsLogic:{
+    query = house2
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('rent 10', String(session.outIncludes(interp, '10')), 'true');
+  }
+
+  reg(3719, 'logic', 'nth1 rent by house number (legacy)', runLogicNthRent);
+  reg(3720, 'logic', 'nth1 rent by house number (wave)', runLogicNthRent, { propagation: 'wave' });
+
+  function runLogicNth0Index(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        nth0(0, [red, green, blue], X),
+        show(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('nth0 first', String(session.outIncludes(interp, 'red')), 'true');
+  }
+
+  reg(3721, 'logic', 'nth0 ground 0-based index (legacy)', runLogicNth0Index);
+  reg(3722, 'logic', 'nth0 ground 0-based index (wave)', runLogicNth0Index, { propagation: 'wave' });
+
+  reg(3723, 'logic', 'nth0 out of range no solution', function(h) {
+    const prog = parseLogicBody('query q: nth0(5, [1, 2], X)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('no sol', String(sols.length), '0');
+  });
+
+  const INLINE_NTH_SCAN = `inline [logic] .world:
+
+    query q:
+        nth0(I, [red, green, blue], green),
+        show(I)
+
+:`;
+
+  function runLogicNthVarIndex(h, session) {
+    const src = INLINE_NTH_SCAN + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('index 1', String(session.outIncludes(interp, '1')), 'true');
+  }
+
+  reg(3724, 'logic', 'nth0 variable index backtrack (legacy)', runLogicNthVarIndex);
+  reg(3725, 'logic', 'nth0 variable index backtrack (wave)', runLogicNthVarIndex, { propagation: 'wave' });
+
+  function runLogicNthQueryInvoke(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        nth1(3, [2, 10, 30], C),
+        show(C)
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ nth1(3, [2, 10, 30], C), show(C) })`;
+    const { interp } = session.run(src);
+    h.assert('nth1 via query', String(session.outIncludes(interp, '30')), 'true');
+  }
+
+  reg(3726, 'logic', 'nth1 via .world:query show (legacy)', runLogicNthQueryInvoke);
+  reg(3727, 'logic', 'nth1 via .world:query show (wave)', runLogicNthQueryInvoke, { propagation: 'wave' });
+
+  reg(3728, 'logic', 'nth0 non-list second arg fails', function(h) {
+    const prog = parseLogicBody('query q: nth0(0, notalist, X)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('no sol', String(sols.length), '0');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -3,7 +3,15 @@
 const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as']);
 const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number']);
 const LOGIC_BUILTIN_SHOW_PRED = 'show';
+const LOGIC_BUILTIN_NTH0_PRED = 'nth0';
+const LOGIC_BUILTIN_NTH1_PRED = 'nth1';
+const LOGIC_BUILTIN_RESERVED_HEADS = new Set([
+  LOGIC_BUILTIN_SHOW_PRED,
+  LOGIC_BUILTIN_NTH0_PRED,
+  LOGIC_BUILTIN_NTH1_PRED,
+]);
 const LOGIC_SHOW_MAX_ARGS = 32;
+const LOGIC_LIST_MAX_ELEMENTS = 1024;
 
 function logicError(msg, line) {
   if (line != null) throw new Error(`logic program line ${line}: ${msg}`);
@@ -36,6 +44,9 @@ function logicTokenize(src) {
     }
     const startLine = line;
     if (ch === ',' ) { tokens.push({ type: 'COMMA', value: ',', line: startLine }); i++; continue; }
+    if (ch === '[' ) { tokens.push({ type: 'LBRACKET', value: '[', line: startLine }); i++; continue; }
+    if (ch === ']' ) { tokens.push({ type: 'RBRACKET', value: ']', line: startLine }); i++; continue; }
+    if (ch === '|' ) { tokens.push({ type: 'PIPE', value: '|', line: startLine }); i++; continue; }
     if (ch === '(' ) { tokens.push({ type: 'LP', value: '(', line: startLine }); i++; continue; }
     if (ch === ')' ) { tokens.push({ type: 'RP', value: ')', line: startLine }); i++; continue; }
     if (ch === '.' ) { tokens.push({ type: 'DOT', value: '.', line: startLine }); i++; continue; }
@@ -226,6 +237,9 @@ class LogicParser {
       return { kind: 'unify', left, right };
     }
     if (left.kind === 'compound') return { kind: 'call', ...left };
+    if (left.kind === 'list') {
+      logicError('bare list term is not a goal — use = or call a predicate', this.peek().line);
+    }
     logicError('invalid body goal', this.peek().line);
   }
 
@@ -267,6 +281,9 @@ class LogicParser {
   }
 
   parseTerm() {
+    if (this.at('LBRACKET')) {
+      return this.parseList();
+    }
     if (this.at('OP', '-')) {
       this.advance();
       if (this.at('NUMBER')) {
@@ -307,6 +324,43 @@ class LogicParser {
       node = { kind: 'arith', op, left: node, right };
     }
     return node;
+  }
+
+  parseList() {
+    const line = this.peek().line;
+    this.expect('LBRACKET');
+    if (this.at('RBRACKET')) {
+      this.advance();
+      return { kind: 'list', nil: true };
+    }
+    const first = this.parseTerm();
+    return this.finishListChain(first, 1, line);
+  }
+
+  finishListChain(head, count, line) {
+    if (this.at('RBRACKET')) {
+      this.advance();
+      logicValidateListElementCount(count, line);
+      return { kind: 'list', head, tail: { kind: 'list', nil: true } };
+    }
+    if (this.at('PIPE')) {
+      this.advance();
+      const tail = this.parseTerm();
+      this.expect('RBRACKET');
+      logicValidateListElementCount(count, line);
+      return { kind: 'list', head, tail };
+    }
+    if (this.at('COMMA')) {
+      this.advance();
+      const nextCount = count + 1;
+      if (nextCount > LOGIC_LIST_MAX_ELEMENTS) {
+        logicError(`list literal accepts at most ${LOGIC_LIST_MAX_ELEMENTS} elements`, line);
+      }
+      const nextHead = this.parseTerm();
+      const rest = this.finishListChain(nextHead, nextCount, line);
+      return { kind: 'list', head, tail: rest };
+    }
+    logicError('expected , | or ] in list', this.peek().line);
   }
 
   parseMutationTerm() {
@@ -364,8 +418,22 @@ function logicValidateShowCall(args, line) {
   }
 }
 
+function logicValidateListElementCount(count, line) {
+  if (count > LOGIC_LIST_MAX_ELEMENTS) {
+    logicError(`list literal accepts at most ${LOGIC_LIST_MAX_ELEMENTS} elements`, line);
+  }
+}
+
 function logicIsReservedPredicateHead(head) {
-  return head && head.kind === 'compound' && head.predicate === LOGIC_BUILTIN_SHOW_PRED;
+  return head && head.kind === 'compound' && LOGIC_BUILTIN_RESERVED_HEADS.has(head.predicate);
+}
+
+function logicReservedHeadError(predicate) {
+  if (predicate === LOGIC_BUILTIN_SHOW_PRED) return "'show/N' is reserved — cannot define show as fact or rule head";
+  if (predicate === LOGIC_BUILTIN_NTH0_PRED || predicate === LOGIC_BUILTIN_NTH1_PRED) {
+    return `'${predicate}/3' is reserved — cannot define ${predicate} as fact or rule head`;
+  }
+  return `'${predicate}' is reserved`;
 }
 
 function logicValidateProgram(prog) {
@@ -387,12 +455,17 @@ function logicValidateProgram(prog) {
   }
   for (const c of prog.clauses || []) {
     if (logicIsReservedPredicateHead(c.head)) {
-      logicError("'show/N' is reserved — cannot define show as fact or rule head", c.line);
+      logicError(logicReservedHeadError(c.head.predicate), c.line);
     }
   }
   for (const c of prog.constraints || []) {
     if (logicIsReservedPredicateHead(c.head)) {
-      logicError("'show/N' is reserved — cannot define show as constraint head", c.line);
+      const pred = c.head.predicate;
+      if (pred === LOGIC_BUILTIN_SHOW_PRED) {
+        logicError("'show/N' is reserved — cannot define show as constraint head", c.line);
+      } else {
+        logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
+      }
     }
   }
 }
@@ -410,6 +483,11 @@ function logicListFreeVarsInGoal(goal) {
     if (t.kind === 'var' && t.name !== '_') free.add(t.name);
     else if (t.kind === 'compound') {
       for (const a of t.args || []) walkTerm(a);
+    } else if (t.kind === 'list') {
+      if (!t.nil) {
+        walkTerm(t.head);
+        walkTerm(t.tail);
+      }
     } else if (t.kind === 'arith') {
       walkTerm(t.left); walkTerm(t.right);
     }
@@ -762,9 +840,29 @@ function logicFormatTerm(t) {
   if (t.kind === 'var') return t.name;
   if (t.kind === 'atom') return t.name;
   if (t.kind === 'number') return String(t.value);
+  if (t.kind === 'list') return logicFormatListTermStatic(t);
   if (t.kind === 'compound') return logicFormatCompound(t);
   if (t.kind === 'arith') return `${logicFormatTerm(t.left)} ${t.op} ${logicFormatTerm(t.right)}`;
   return '';
+}
+
+function logicFormatListTermStatic(term) {
+  if (!term || term.kind !== 'list') return '';
+  if (term.nil) return '[]';
+  const elems = [];
+  let cur = term;
+  while (cur && cur.kind === 'list' && !cur.nil) {
+    elems.push(logicFormatTerm(cur.head));
+    if (cur.tail && cur.tail.kind === 'list') {
+      if (cur.tail.nil) return `[${elems.join(', ')}]`;
+      cur = cur.tail;
+    } else if (cur.tail && cur.tail.kind === 'var') {
+      return `[${elems.join(', ')}|${cur.tail.name}]`;
+    } else {
+      return `[${elems.join(', ')}|${logicFormatTerm(cur.tail)}]`;
+    }
+  }
+  return `[${elems.join(', ')}]`;
 }
 
 function formatLogicTypeDoc() {

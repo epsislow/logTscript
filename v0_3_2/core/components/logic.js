@@ -528,6 +528,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         args: (term.args || []).map((a) => this._resolveMutationTerm(a, ctx, compName)),
       };
     }
+    if (term.kind === 'list') {
+      if (term.nil) return { kind: 'list', nil: true };
+      return {
+        kind: 'list',
+        head: this._resolveMutationTerm(term.head, ctx, compName),
+        tail: this._resolveMutationTerm(term.tail, ctx, compName),
+      };
+    }
     return term;
   }
 

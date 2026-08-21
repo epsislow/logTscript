@@ -34,6 +34,14 @@ function logicInternTerm(term, table) {
       args: (term.args || []).map((a) => logicInternTerm(a, table)),
     };
   }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicInternTerm(term.head, table),
+      tail: logicInternTerm(term.tail, table),
+    };
+  }
   if (term.kind === 'arith') {
     return {
       kind: 'arith',
@@ -96,6 +104,7 @@ class LogicEngine {
     this.truncated = false;
     this.depthExceeded = false;
     this.onShowLine = typeof opts.onShowLine === 'function' ? opts.onShowLine : null;
+    this._renameSerial = 0;
     if (opts.factIndex) {
       const rules = opts.ruleClauses || (clauses || []).filter((c) => c.body && c.body.length);
       for (const c of rules) {
@@ -186,6 +195,12 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'show' && g0.arity >= 1) {
       return this._solveShow(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'nth0' && g0.arity === 3) {
+      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, false);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'nth1' && g0.arity === 3) {
+      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, true);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -245,6 +260,83 @@ class LogicEngine {
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
+  _solveNth(goal, rest, env, depth, onSuccess, onDepthExceeded, oneBased) {
+    const iTerm = goal.args[0];
+    const listTerm = goal.args[1];
+    const elemTerm = goal.args[2];
+    const iD = logicDeref(iTerm, env);
+    const listD = logicDeref(listTerm, env);
+    if (iD.kind !== 'number' && iD.kind !== 'var') return false;
+    if (listD.kind !== 'list' && listD.kind !== 'var') return false;
+    if (iD.kind === 'number') {
+      let idx = iD.value;
+      if (oneBased) {
+        if (idx < 1) return false;
+        idx -= 1;
+      } else if (idx < 0) {
+        return false;
+      }
+      return this._solveNthGroundIndex(idx, listTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (listD.kind === 'var') return false;
+    return this._solveNthVarIndex(iTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded, oneBased);
+  }
+
+  _solveNthGroundIndex(idx, listTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    if (listD.kind === 'var') {
+      if (idx !== 0) return false;
+      const trail = env.trailLength();
+      const cons = { kind: 'list', head: elemTerm, tail: { kind: 'var', name: '_' } };
+      if (!logicUnify(listTerm, cons, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    let cur = listD;
+    let pos = 0;
+    while (pos < idx) {
+      if (logicListIsNil(cur)) return false;
+      if (cur.kind !== 'list' || cur.nil) return false;
+      cur = logicDeref(cur.tail, env);
+      if (cur.kind === 'var') return false;
+      pos++;
+    }
+    if (logicListIsNil(cur) || cur.kind !== 'list' || cur.nil) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(elemTerm, cur.head, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveNthVarIndex(iTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded, oneBased) {
+    let cur = listD;
+    let pos = 0;
+    let any = false;
+    while (cur && cur.kind === 'list' && !cur.nil) {
+      const trail = env.trailLength();
+      const iVal = oneBased ? pos + 1 : pos;
+      if (iTerm.name !== '_') env.bind(iTerm.name, { kind: 'number', value: iVal });
+      if (!logicUnify(elemTerm, cur.head, env, this.table)) {
+        env.undo(trail);
+        cur = logicDeref(cur.tail, env);
+        if (cur.kind === 'var') break;
+        pos++;
+        continue;
+      }
+      const ok = this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      env.undo(trail);
+      if (this._solutionCapReached) return true;
+      if (ok) any = true;
+      cur = logicDeref(cur.tail, env);
+      if (cur.kind === 'var') break;
+      pos++;
+    }
+    return any;
+  }
+
   _solveCall(goal, rest, env, depth, onSuccess, onDepthExceeded) {
     const key = logicPredicateKey(goal.predicate, goal.arity);
     const clauses = this.index.get(key) || [];
@@ -252,12 +344,14 @@ class LogicEngine {
     for (const clause of clauses) {
       if (this._solutionCapReached) break;
       const trail = env.trailLength();
-      const head = logicDerefCompound(clause.head, env);
+      this._renameSerial += 1;
+      const renamed = logicRenameApartClause(clause, { n: this._renameSerial });
+      const head = logicDerefCompound(renamed.head, env);
       if (!logicUnifyCompound(goal, head, env, this.table)) {
         env.undo(trail);
         continue;
       }
-      const newGoals = (clause.body || []).concat(rest);
+      const newGoals = (renamed.body || []).concat(rest);
       const ok = this._solveGoals(newGoals, env, depth + 1, onSuccess, onDepthExceeded);
       env.undo(trail);
       if (this._solutionCapReached) {
@@ -268,6 +362,60 @@ class LogicEngine {
     }
     return any;
   }
+}
+
+function logicRenameApartClause(clause, idRef) {
+  const map = new Map();
+  const suffix = idRef && idRef.n != null ? idRef.n : 0;
+  let n = 0;
+  function mapVar(name) {
+    if (name === '_') return '_';
+    if (!map.has(name)) map.set(name, `__ra${suffix}_${n++}`);
+    return map.get(name);
+  }
+  function walkTerm(t) {
+    if (!t) return t;
+    if (t.kind === 'var') return { kind: 'var', name: mapVar(t.name) };
+    if (t.kind === 'compound') {
+      return {
+        kind: 'compound',
+        predicate: t.predicate,
+        arity: t.arity != null ? t.arity : (t.args || []).length,
+        args: (t.args || []).map(walkTerm),
+      };
+    }
+    if (t.kind === 'list') {
+      if (t.nil) return { kind: 'list', nil: true };
+      return { kind: 'list', head: walkTerm(t.head), tail: walkTerm(t.tail) };
+    }
+    if (t.kind === 'arith') {
+      return { kind: 'arith', op: t.op, left: walkTerm(t.left), right: walkTerm(t.right) };
+    }
+    return t;
+  }
+  function walkGoal(g) {
+    if (!g) return g;
+    if (g.kind === 'not') return { kind: 'not', goal: walkGoal(g.goal) };
+    if (g.kind === 'call') {
+      return {
+        kind: 'call',
+        predicate: g.predicate,
+        arity: g.arity != null ? g.arity : (g.args || []).length,
+        args: (g.args || []).map(walkTerm),
+      };
+    }
+    if (g.kind === 'cmp') {
+      return { kind: 'cmp', op: g.op, left: walkTerm(g.left), right: walkTerm(g.right) };
+    }
+    if (g.kind === 'unify') {
+      return { kind: 'unify', left: walkTerm(g.left), right: walkTerm(g.right) };
+    }
+    return g;
+  }
+  return {
+    head: walkTerm(clause.head),
+    body: (clause.body || []).map(walkGoal),
+  };
 }
 
 function logicEnv() {
@@ -305,6 +453,14 @@ function logicInternInputValue(term, table) {
       predicate: term.predicate,
       arity: (term.args || []).length,
       args: (term.args || []).map((a) => logicInternInputValue(a, table)),
+    };
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicInternInputValue(term.head, table),
+      tail: logicInternInputValue(term.tail, table),
     };
   }
   if (term.kind === 'arith') {
@@ -349,6 +505,14 @@ function logicDeref(term, env) {
       args: term.args.map((a) => logicDeref(a, env)),
     };
   }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicDeref(term.head, env),
+      tail: logicDeref(term.tail, env),
+    };
+  }
   if (term.kind === 'arith') {
     return {
       kind: 'arith', op: term.op,
@@ -385,6 +549,19 @@ function logicUnify(t1, t2, env, table) {
     }
     return true;
   }
+  if (logicListIsNil(a) && logicListIsNil(b)) return true;
+  if (logicListIsNil(a) && b.kind === 'var') {
+    if (b.name === '_') return true;
+    if (logicOccurs(b.name, a, env)) return false;
+    env.bind(b.name, { kind: 'list', nil: true });
+    return true;
+  }
+  if (logicListIsNil(b) && a.kind === 'var') return logicUnify(a, b, env, table);
+  if (logicListIsNil(a) || logicListIsNil(b)) return false;
+  if (a.kind === 'list' && b.kind === 'list') {
+    if (!logicUnify(a.head, b.head, env, table)) return false;
+    return logicUnify(a.tail, b.tail, env, table);
+  }
   return false;
 }
 
@@ -400,7 +577,15 @@ function logicOccurs(name, term, env) {
   const d = logicDeref(term, env);
   if (d.kind === 'var') return d.name === name;
   if (d.kind === 'compound') return d.args.some((a) => logicOccurs(name, a, env));
+  if (d.kind === 'list') {
+    if (d.nil) return false;
+    return logicOccurs(name, d.head, env) || logicOccurs(name, d.tail, env);
+  }
   return false;
+}
+
+function logicListIsNil(term) {
+  return term && term.kind === 'list' && term.nil === true;
 }
 
 function logicEvalNumber(term, env, table) {
@@ -460,6 +645,14 @@ function logicResolveTerm(term, env, table) {
       args: d.args.map((a) => logicResolveTerm(a, env, table)),
     };
   }
+  if (logicListIsNil(d)) return { kind: 'list', nil: true };
+  if (d.kind === 'list') {
+    return {
+      kind: 'list',
+      head: logicResolveTerm(d.head, env, table),
+      tail: logicResolveTerm(d.tail, env, table),
+    };
+  }
   return d;
 }
 
@@ -476,6 +669,11 @@ function logicCollectFreeVarsInGoal(goal) {
     if (t.kind === 'var' && t.name !== '_') free.add(t.name);
     else if (t.kind === 'compound' || t.kind === 'call') {
       for (const a of t.args || []) walkTerm(a);
+    } else if (t.kind === 'list') {
+      if (!t.nil) {
+        walkTerm(t.head);
+        walkTerm(t.tail);
+      }
     } else if (t.kind === 'arith') { walkTerm(t.left); walkTerm(t.right); }
   }
   function walkGoal(g) {
@@ -536,6 +734,10 @@ function logicPrepareGoalsForInvoke(goals) {
     if (t.kind === 'compound') {
       return { kind: 'compound', predicate: t.predicate, args: (t.args || []).map(mapTerm) };
     }
+    if (t.kind === 'list') {
+      if (t.nil) return { kind: 'list', nil: true };
+      return { kind: 'list', head: mapTerm(t.head), tail: mapTerm(t.tail) };
+    }
     if (t.kind === 'arith') {
       return { kind: 'arith', op: t.op, left: mapTerm(t.left), right: mapTerm(t.right) };
     }
@@ -579,6 +781,7 @@ function logicSolutionTupleKey(sol, freeVars) {
     else if (term.kind === 'atom') parts.push(`a:${term.name}`);
     else if (term.kind === 'number') parts.push(`n:${term.value}`);
     else if (term.kind === 'var') parts.push(`v:${term.name}`);
+    else if (term.kind === 'list') parts.push(logicGroundTermKey(term));
     else parts.push('?');
   }
   return parts.join('\0');
@@ -613,6 +816,10 @@ function logicGroundTermKey(term) {
     const arity = term.arity != null ? term.arity : (term.args || []).length;
     return `c:${term.predicate}/${arity}:${args}`;
   }
+  if (term.kind === 'list') {
+    if (logicListIsNil(term)) return 'l:[]';
+    return `l:${logicGroundTermKey(term.head)}${'\x01'}${logicGroundTermKey(term.tail)}`;
+  }
   return '?';
 }
 
@@ -629,6 +836,10 @@ function logicTermIsGround(term) {
   if (term.kind === 'wireRef') return false;
   if (term.kind === 'var') return false;
   if (term.kind === 'compound') return (term.args || []).every(logicTermIsGround);
+  if (term.kind === 'list') {
+    if (term.nil) return true;
+    return logicTermIsGround(term.head) && logicTermIsGround(term.tail);
+  }
   if (term.kind === 'arith') return logicTermIsGround(term.left) && logicTermIsGround(term.right);
   return true;
 }
@@ -801,7 +1012,33 @@ function logicFormatShowTerm(term, env, table) {
     const pred = d.predicate != null ? d.predicate : '';
     return `${pred}(${args})`;
   }
+  if (d.kind === 'list') return logicFormatListShow(d, env, table);
   return '?';
+}
+
+function logicFormatListShow(term, env, table) {
+  if (logicListIsNil(term)) return '[]';
+  const elems = [];
+  let cur = term;
+  while (cur && cur.kind === 'list' && !cur.nil) {
+    elems.push(logicFormatShowTerm(cur.head, env, table));
+    const tailRaw = cur.tail;
+    const tailD = tailRaw && tailRaw.kind === 'var'
+      ? logicDeref(tailRaw, env)
+      : logicDeref(tailRaw, env);
+    if (tailD.kind === 'var') {
+      return `[${elems.join(', ')}|${tailD.name}]`;
+    }
+    if (logicListIsNil(tailD)) {
+      return `[${elems.join(', ')}]`;
+    }
+    if (tailD.kind === 'list') {
+      cur = tailD;
+      continue;
+    }
+    return `[${elems.join(', ')}|${logicFormatShowTerm(tailD, env, table)}]`;
+  }
+  return `[${elems.join(', ')}]`;
 }
 
 function logicFormatFactForTrace(term) {
@@ -816,7 +1053,26 @@ function logicFormatFactForTrace(term) {
     const pred = term.predicate != null ? term.predicate : '';
     return `${pred}(${args})`;
   }
+  if (term.kind === 'list') return logicFormatListStatic(term);
   return '?';
+}
+
+function logicFormatListStatic(term) {
+  if (logicListIsNil(term)) return '[]';
+  const elems = [];
+  let cur = term;
+  while (cur && cur.kind === 'list' && !cur.nil) {
+    elems.push(logicFormatFactForTrace(cur.head));
+    if (cur.tail && cur.tail.kind === 'list') {
+      if (cur.tail.nil) return `[${elems.join(', ')}]`;
+      cur = cur.tail;
+    } else if (cur.tail && cur.tail.kind === 'var') {
+      return `[${elems.join(', ')}|${cur.tail.name}]`;
+    } else {
+      return `[${elems.join(', ')}|${logicFormatFactForTrace(cur.tail)}]`;
+    }
+  }
+  return `[${elems.join(', ')}]`;
 }
 
 function logicFormatMutationOpForTrace(op) {

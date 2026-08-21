@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–20a complete; Faza 21 (show/N) completed.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–23 complete; F24 (cut) ready-to-implement.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
@@ -68,6 +68,15 @@ todos:
   - id: logic-show-builtin
     content: "Faza 21: builtin show/N + string literals — D117–D127 completed"
     status: completed
+  - id: logic-lists
+    content: "Faza 22: liste Prolog [] [H|T] — D128–D142 completed"
+    status: completed
+  - id: logic-nth
+    content: "Faza 23: builtin nth0/nth1 — D143–D146 completed"
+    status: completed
+  - id: logic-cut
+    content: "Faza 24: Cut ! — D147–D151; promovat din 1+i (ready-to-implement, după F23)"
+    status: pending
 isProject: false
 ---
 
@@ -82,6 +91,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate |
 | **(completed)** | Decizie luată / implementată |
 | **1+a … 1+v** | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan) |
+| **2+a … 2+e** | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2e) |
 | ✅ | Backlog **promovat / livrat** (fază completed) |
 | ❌ | Backlog **respins** definitiv |
 | 🟠✗ | Backlog **închis** — alternativa nu se face; livrat altfel |
@@ -1193,7 +1203,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet + note — [Backlog post-MVP](#backlog-post-mvp) (final plan).
+> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (`2+a` … `2+e`):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2e).
 
 ---
 
@@ -1222,8 +1232,13 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 18** `query = …` explicit (1+l) | D95–D99 | **(completed)** |
 | **Faza 19** constraint-as-query helper (1+u) | D100–D106 | **(completed)** |
 | **Faza 20a** `use .mod as alias` (prefixed import) | D107–D116 | **(completed)** |
-| **Faza 20b** scope blocks nested `{ }` | — | **(deferred)** |
-| **Faza 20c** reguli calificate + body relativ la import | — | **(deferred)** — draft în plan |
+| **Faza 20b** scope blocks nested `{ }` | **2+a** | **(deferred)** |
+| **Faza 20c** reguli calificate + body relativ la import | **2+b** | **(deferred)** — draft în plan |
+| **Faza 21** builtin `show/N` | D117–D127 | **(completed)** |
+| **Faza 22** Liste Prolog | D128–D142 | **(completed)** |
+| **Faza 23** builtin `nth0` / `nth1` | D143–D146 | **(completed)** |
+| **Faza 24** Cut `!` (**1+i** promovat) | D147–D151 | **(ready-to-implement)** — după F23 |
+| **Faza 25** Liste pe wire / vector redirect | **2+c** (D140) | **(deferred)** |
 
 ---
 
@@ -3817,7 +3832,7 @@ Un fact **ground** = complet instanțiat, **fără variabile Prolog**:
 
 > **Sursă:** organizare KB la scară mare — izolare la import fără merge plat; extinde F15.  
 > **Stare:** **D107–D116 implemented** — F20a **complete** (2026-08-21).  
-> **F20b** (blocuri nested `a { b { } }`) — **amânat**.
+> **F20b** (blocuri nested `a { b { } }`) — **amânat → 2+a**.
 
 ### Rezumat decizii F20a
 
@@ -4065,13 +4080,13 @@ logic { + veh.inside(box2, c1) }
 - [x] **`use once .mod as v`** + **`use once .mod as w`** (același modul) → doar **`v.*`** (D111)
 - [x] Teste **3678–3687** — incl. lanț `v.c.carWheel`, duplicate alias; legacy + wave; doc EN; suite verde (**2849/2849**)
 
-**Amânat (F20b):** blocuri nested `warehouse { … }`, path relativ în bloc.
+**Amânat (2+a / F20b):** blocuri nested `warehouse { … }`, path relativ în bloc.
 
-**Amânat (F20c — scope la extindere):** reguli noi sub prefix importat + rezolvare relativă în body — vezi mai jos.
+**Amânat (2+b / F20c):** reguli noi sub prefix importat + rezolvare relativă în body — vezi mai jos.
 
 ---
 
-### F20c (backlog) — reguli calificate + scope relativ în body **(nu F20a)**
+### F20c / **2+b** (backlog) — reguli calificate + scope relativ în body **(nu F20a)**
 
 > **Întrebare user 2026-08-21:** în `.world`, după `use .veh as v`, poate exista:
 >
@@ -4081,7 +4096,7 @@ logic { + veh.inside(box2, c1) }
 >
 > Două idei: (1) **definire** predicate noi sub `v.c.`; (2) în body, **`carWheel`** rezolvat relativ la scope-ul `v.c` (fără prefix complet).
 
-**Verdict:** **prea complex pentru F20a** — amânăm ca **F20c** (sau subset în F20b dacă blocurile nested acoperă același caz).
+**Verdict:** **prea complex pentru F20a** — amânăm ca **2+b / F20c** (sau subset în **2+a / F20b** dacă blocurile nested acoperă acel caz).
 
 | Idee | Ce înseamnă | F20a |
 |------|-------------|------|
@@ -4206,6 +4221,165 @@ comp [logic] .peopleLogic:
 
 ---
 
+## Decizii Faza 22 — Liste Prolog (D128–D142) **(completed)**
+
+> **Scop:** termeni **listă** Prolog-like — literale `[a, b, c]`, listă goală `[]`, cons **`[H|T]`** (și **`[A, B, …|Rest]`**), unificare + traversare recursivă în reguli/query.  
+> **Nu include:** `nth0`/`nth1` (→ **F23**), cut `!` (→ **F24**), dif-list/lazy/char-list (→ **2+e**), liste pe wire (→ **2+c**), builtins `member`/`append` (→ **2+d**).  
+> **User confirmări:** 2026-08-21. **Livrat:** 2026-08-21.
+
+### Rezumat decizii **(confirmed)**
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D128** | **Sintaxă listă literală** | **A (confirmed)** — **`[T1, T2, …, Tn]`** |
+| **D129** | **Listă goală** | **A (confirmed)** — **`[]`** |
+| **D130** | **Cons / pipe** | **A (confirmed)** — token **`|`** în blocuri logic (SWI/ISO); vezi **D141** |
+| **D131** | **Reprezentare engine** | **A (confirmed)** — literal ground desugar → **lanț cons** `[a\|[b\|[c\|[]]]]`; **`[]`** = nil; **`[H\|T]`** = cons cell; **un singur** path unify |
+| **D132** | **Unificare** | **A (confirmed)** — Prolog standard + **occurs-check**; vezi [D132 — explicație](#d132--unificare-explicație) |
+| **D133** | **Imbricare** | **A (confirmed)** — liste imbricate permise |
+| **D134** | **Limită lungime literal** | **A (confirmed)** — max **1024** elemente într-un literal `[…]`; parse/elaboration error peste cap |
+| **D135** | **`show/N`** | **A (confirmed)** — afișare `[a, b, c]` (round-trip ground) |
+| **D136** | **Out of scope F22** | **A (confirmed)** — dif-list, lazy, char-list; vezi [D136 — explicație](#d136--out-of-scope-explicație) |
+| **D137** | **Builtins listă** | **A (confirmed)** — **`nth` → F23**; **`member`/`append`/altele builtin** → **2+d** (reguli user + exemple doc în F22) |
+| **D138** | **Cut în F22** | **A (confirmed)** — **fără cut**; traversare cu backtracking normal; **`!` → F24** (nimic de decis suplimentar) |
+| **D139** | **Unde e permis** | **A (confirmed)** — facts, reguli, query, constraints, **`.world:query`**, **`.world:check`**, mutation ground |
+| **D140** | **Wire / redirect listă** | **Amânat → 2+c** — vector/matrix/wire pack pentru liste → **F25** |
+| **D141** | **Scope tokenizer** | **A (confirmed)** — `[` `]` `\|` parse logic în: **`inline [logic] … :`**, **`logic { }`** (comp exec), **`.world:query({ })`**, **`.world:check({ })`**; tokenizer logic separat de script top-level |
+| **D142** | **Teste & livrare** | **A (confirmed)** — implementare: teste **3699+** legacy+wave, doc logts-play, sketch Monopoly fără cut; **nu e decizie user** — checklist dev |
+
+### D132 — Unificare (explicație)
+
+**Unificare listă** = aceleași reguli ca în Prolog:
+
+| Situație | Rezultat |
+|----------|----------|
+| `[] = []` | succes |
+| `[] = [a\|_]` | **eșec** |
+| `[H\|T] = [1, 2, 3]` | `H=1`, `T=[2,3]` (restul ca listă) |
+| `X = [john, mary]` | leagă variabila `X` |
+| `[A,B\|C] = [1,2,3]` | `A=1`, `B=2`, `C=[]` |
+
+**Occurs-check:** `X = [X|_]` → **eșec** (lista ar conține pe X în mod infinit — ca la compound). Fără asta, motorul ar accepta structuri imposibile.
+
+### D136 — Out of scope (explicație)
+
+| Concept | Ce e | De ce nu în F22 |
+|---------|------|-----------------|
+| **Dif-list** | `[H\|T]-Tail` — listă cu „coadă deschisă” la ambele capete | Pattern avansat Prolog; Monopoly nu îl cere |
+| **Lazy list** | Elemente generate la demand | Model execution diferit; out of scope |
+| **String = char list** | `"abc"` ≡ `[97,98,99]` | Avem **`"..."`** string literals (F21); nu convertim automat string ↔ listă |
+
+### D131 — Reprezentare internă (decizie implementare)
+
+La **intern/parse**, literal `[a, b, c]` devine **lanț cons** (nu array paralel):
+
+```text
+[a, b, c]  →  [a | [b | [c | []]]]
+```
+
+- **`[]`** — listă nil (kind dedicat)
+- **`[H|T]`** — cons cell `{ head: H, tail: T }`
+- **Afișare / show:** ground list → formă **`[a, b, c]`** (round-trip lizibil)
+- **Unificare:** un singur algoritm pe nil + cons (ca Prolog)
+
+### Sketch sintaxă **(confirmed)**
+
+```logts
+inline [logic] .monopoly:
+
+    proprietati([
+        prop(mediterranean, rents(2, 10, 30, 90, 160, 250), 50, 50),
+        prop(boardwalk, rents(50, 200, 600, 1400, 1700, 2000), 200, 200)
+    ])
+
+    member(X, [X | _]) <- X = X
+    member(X, [_ | T]) <- member(X, T)
+
+    query firstProp:
+        proprietati([prop(N, _, _, _) | _]),
+        show(N)
+
+:
+```
+
+### Fișiere (plan)
+
+| Fișier | Schimbări |
+|--------|-----------|
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | Token `[` `]` `\|`; `parseListTerm`; validate |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `kind:'list'`, intern, unify, deref, resolve, occurs-check |
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `logicFormatTerm` / fingerprint liste |
+| [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) | Secțiune liste; actualizează „Differences from Prolog” |
+
+**Blocuri unde tokenizer logic (D141) se aplică:**
+
+| Bloc | Exemplu |
+|------|---------|
+| Modul inline | `inline [logic] .world: … :` |
+| Exec comp | `.whLogic:{ logic { + fact([a,b]) } }` |
+| Query ad-hoc | `.world:query({ member(X, [john \| _]) })` |
+| Check ad-hoc | `.world:check({ … liste … })` |
+
+**Fișiere:** [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js), [`logic-engine.js`](../v0_3_2/core/logic-engine.js), [`components/logic.js`](../v0_3_2/core/components/logic.js)  
+**Teste:** **3699–3716** legacy+wave (inclusiv sketch Monopoly, occurs-check, cap 1024)  
+**Doc:** [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) — secțiune **Prolog lists**, exemple logts-play Load & Load & Run  
+**Suite:** **2878/2878**
+
+**Notă implementare:** `logicRenameApartClause` per apel `_solveCall` (suffix unic) — evită coliziune variabile head/body la recursivitate (ex. `member/2` cu `T` în `[H|T]`).
+
+---
+
+## Decizii Faza 23 — builtin `nth0` / `nth1` (D143–D146) **(completed)**
+
+> **Scop:** indexare în listă — înlocuiește clauze manuale tip `extrage_chirie/3` când chiriile sunt **`[…]`**.  
+> **Dependență:** **F22** (liste) **(completed)**.  
+> **User confirmări:** 2026-08-21 — **D143 da · D144 da · D145 da · D146 da**. **Livrat:** 2026-08-21.
+
+### Rezumat decizii **(confirmed)**
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D143** | **Predicate rezervate** | **A (confirmed)** — **`nth0(I, List, Elem)`**, **`nth1(I, List, Elem)`** — builtin; user **nu** le poate redefine ca head (ca `show/N`, `count/2`) |
+| **D144** | **Indexing** | **A (confirmed)** — **`nth0`** = index **0-based**; **`nth1`** = **1-based** (SWI) |
+| **D145** | **Out of range** | **A (confirmed)** — index ground în afara listei → goal **eșuează** (ca Prolog), **fără** exception runtime |
+| **D146** | **Moduri** | **A (confirmed)** — **`I` variabilă** → generează poziții (backtracking); **`List`/`Elem`** ca Prolog (unificare) |
+
+**Out of scope F23 (implicit, fără decizie separată):** index negativ, index non-integer, `append/3`/`member/2` builtin (→ **2+d**), liste pe wire (→ **2+c**).
+
+**Unde se aplică (ca alte builtins):** query, reguli, constraints, **`.world:query`**, **`.world:check`** — același scope ca **D139** / `show/N`.
+
+**Fișiere:** [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js), [`logic-engine.js`](../v0_3_2/core/logic-engine.js)  
+**Teste:** **3717–3728** legacy+wave (reserved head, rent `nth1`, 0/1-based, out of range, var index, `.world:query`)  
+**Doc:** [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) — secțiune **Built-in nth0/3 and nth1/3**, exemple logts-play; [`logic-indexing.md`](../v0_3_2/doc/logic-indexing.md) — quick reference  
+**Suite:** **2890/2890**
+
+**Exemplu:**
+
+```logts
+rents_list([2, 10, 30, 90, 160, 250])
+chirie(N, L, C) <- nth1(N, L, C)
+```
+
+---
+
+## Decizii Faza 24 — Cut `!` (D147–D151) **(ready-to-implement)**
+
+> **Sursă:** backlog **1+i** **promovat → Faza 24**.  
+> **Dependență:** **F22** (liste) **(completed)**; **F23** **(completed)** — teste reale cu `nth0`/`nth1`; recomandat după ambele.  
+> **Scop:** commit Prolog — oprește backtracking în choice point-urile create de la intrarea în clauza curentă.
+
+| ID | Subiect | Propunere **(recommended)** |
+|----|---------|----------------------------|
+| **D147** | **Sintaxă** | Goal **`!`** — token dedicat (ca `\`) |
+| **D148** | **Semantica** | După succes la **`!`**, nu se mai backtrack în alternativele **clauzei curente**; alternative din goals **anterioare** în același body rămân |
+| **D149** | **`\+` + cut** | **`\+ (Goal, !)`** — inner cut contorizat; **`!` în negated context** — spec ISO/SWI simplificat: **cut în NAF → elaboration warning sau interzis MVP** | Prefer **interzis în `\+`** la MVP (D149-A) |
+| **D150** | **Builtins** | `show`, `count`, `nth0`/`nth1` — comportament neschimbat; cut după ele taie ramuri, nu anulează side-effecte deja produse |
+| **D151** | **Teste** | **3718+** — commit list traversal, interacțiune depth, **fără** cut în constraint body la MVP (sau permis doar query/reguli) | Doc + logts-play |
+
+**Note plan vechi (F7/F8):** interacțiune **cut + depth** — acoperită de D151 + `maxDepth` existent.
+
+---
+
 ## Comparație sketch v1 → v2 ( ce s-a schimbat )
 
 | Topic | Sketch v1 | Sketch v2 (current) |
@@ -4232,7 +4406,14 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 19** constraint-as-query helper | **1+u** **(completed)** |
 | **Faza 20a** `use .mod as alias` | **(completed)** — D107–D116 |
 | **Faza 21** builtin `show/N` | **(completed)** — D117–D127 |
-| **Faza 20b** scope blocks | **(deferred)** |
+| **Faza 22** Liste Prolog | **(completed)** — D128–D142 |
+| **Faza 23** `nth0` / `nth1` | **(completed)** — D143–D146 |
+| **Faza 24** Cut `!` (**1+i**) | **(ready-to-implement)** — D147–D151 |
+| **F20b** scope blocks | **2+a** **(deferred)** |
+| **F20c** reguli import relative | **2+b** **(deferred)** |
+| **F25** liste pe wire | **2+c** **(deferred)** — D140 |
+| **Builtins listă** member/append | **2+d** **(deferred)** — D137 |
+| **Liste avansate** dif/lazy/char | **2+e** **(deferred)** — D136 |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
 | Constraint `#K (line L)` trace | **1+v** **(pause)** |
 | POUT declarate comp | **1+k** |
@@ -4244,9 +4425,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 21~~ **(completed)**
-2. Apoi backlog: **1+p**, **1+s**, **1+o**, …
-3. **F20b** scope blocks — când e nevoie
+1. ~~Faza 0~~ → ~~Faza 23~~ **(completed)**
+2. **Faza 24** — Cut `!` (**1+i**) — D147–D151
+3. Apoi backlog **1+p**, **1+s**, **1+o**, …
+4. Apoi faze amânate **2+a … 2+e** (după F24 sau când e nevoie)
 
 ---
 
@@ -4264,7 +4446,7 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ✅ | ~~**1+f**~~ | Multi-var vague | **Mutat în Faza 5** — redirect matrix/vector | D12 |
 | ✅ | ~~**1+g**~~ | **`use` / `use once`** | **Promovat → Faza 15** — strict vs modifier **`once`** (D77–D81) | D16 |
 | ✅ | ~~**1+h**~~ | Invoke `.world:query({ goal })` | **Promovat → Faza 9** (D30–D32) | D12, D30–D32 |
-| ⏳ | **1+i** | Cut | Prolog cut — interacție NAF / depth | D5 |
+| ✅ | ~~**1+i**~~ | Cut | **Promovat → Faza 24** — D147–D151 | D5, F22 |
 | ⏳ | **1+j** | Integrare PHZ | | |
 | ⏳ | **1+k** | POUT declarate pe comp (D7-B) | Low priority — probe/debug | D7 |
 | ✅ | ~~**1+l**~~ | **`query = …` explicit** | **Promovat → Faza 18** — D95–D99 **(completed)** | D2, D19 |
@@ -4280,7 +4462,45 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ✅ | ~~**1+u**~~ | **Constraint-as-query helper** | **Promovat → Faza 19** — D100–D106 **(ready-to-implement)** | F12, F14 |
 | ⏸ | **1+v** | Constraint trace `#K (line L)` | **Pause** — nu se promovează fază; D72-A (`#K`) e suficient acum | F14, D72-B |
 
-### Note backlog — explicații
+---
+
+## Backlog faze amânate (2+a … 2+e)
+
+Tabel master **2+a … 2+e** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+
+| Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
+|-------|-----|---------|---------|------------|----------|
+| ⏳ | **2+a** | Scope blocks nested | `warehouse { inside(…) … }` — path relativ în același inline | **F20b** | F20a, D107 |
+| ⏳ | **2+b** | Reguli sub prefix import | `v.c.carSize <- carWheel` → `v.c.carWheel`; body relativ la `use as` | **F20c** | F20a, D107 |
+| ⏳ | **2+c** | Liste pe wire / vector | Pack redirect listă Prolog pe wire vector/matrix; query output liste | **F25** | D140, F22 |
+| ⏳ | **2+d** | Builtins listă | `member/2`, `append/3`, eventual `length/2` — rezervate ca `count/2` | — | D137, F22 |
+| ⏳ | **2+e** | Liste avansate Prolog | Dif-list, lazy lists, string ↔ char list | — | D136, F22 |
+
+**Ordine recomandată (când se promovează):** **2+a** / **2+b** (composiție) independent de **2+c–2+e** (liste); **2+d** după **F22** **(completed)**; **2+c** după **F22–F24**.
+
+### Note backlog 2+x — explicații
+
+#### **2+a** ⏳ → **F20b**
+
+Blocuri nested în același modul inline — scope/path relativ local (`warehouse { … }`), distinct de prefix flatten **F20a** (`use .mod as alias`).
+
+#### **2+b** ⏳ → **F20c**
+
+Reguli noi declarate sub prefix importat + referințe relative în body (`carSize <- carWheel` în scope `v.c`). Draft opțiuni în plan (B+C vs block F20b).
+
+#### **2+c** ⏳ → **F25** (D140)
+
+Liste ca rezultate pe wire — vector/matrix redirect, pack soluții listă; **out of scope F22**.
+
+#### **2+d** ⏳ (D137)
+
+Builtins bibliotecă listă — **`member`**, **`append`**, etc. **F22** livrează termeni + reguli user; **`nth0`/`nth1`** → **F23** **(completed)** (nu 2+d).
+
+#### **2+e** ⏳ (D136)
+
+Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Prolog avansat; Monopoly nu le cere.
+
+### Note backlog — explicații (1+x)
 
 #### **1+a** ❌ — respins (inline-native)
 
@@ -4331,6 +4551,10 @@ Filter toolbar **Logic** dedicat — **`logic-mut` exclusiv** (D82–D85): scoas
 #### ~~**1+u**~~ → **Faza 19**
 
 **Scope:** **`.whLogic:check({ + / - })`** — simulare read-only constraints (debug fără COMMIT). Decizii **D100–D106** — vezi **Faza 19**. Distinct de **1+p** (validare stare curentă la query).
+
+#### ~~**1+i**~~ → **Faza 24**
+
+**Scope:** Cut Prolog **`!`** — commit choice points; interacțiune **`\+`**, depth, liste. Decizii **D147–D151** — vezi **Faza 24**. **După F22–F23 (completed).**
 
 #### **1+v** ⏸ — pause
 
