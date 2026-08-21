@@ -63,8 +63,8 @@ todos:
     content: "Faza 19: constraint-as-query helper (1+u) — D100–D106 completed"
     status: completed
   - id: logic-use-as
-    content: "Faza 20a: use .mod as alias (prefixed import) — D107–D116 confirmed, ready-to-implement"
-    status: pending
+    content: "Faza 20a: use .mod as alias (prefixed import) — D107–D116 completed"
+    status: completed
 isProject: false
 ---
 
@@ -1218,8 +1218,9 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 17** `comp [logic] data:` static + seed (1+r) | D88–D94 | **(completed)** |
 | **Faza 18** `query = …` explicit (1+l) | D95–D99 | **(completed)** |
 | **Faza 19** constraint-as-query helper (1+u) | D100–D106 | **(completed)** |
-| **Faza 20a** `use .mod as alias` (prefixed import) | D107–D116 | **(ready-to-implement)** |
+| **Faza 20a** `use .mod as alias` (prefixed import) | D107–D116 | **(completed)** |
 | **Faza 20b** scope blocks nested `{ }` | — | **(deferred)** |
+| **Faza 20c** reguli calificate + body relativ la import | — | **(deferred)** — draft în plan |
 
 ---
 
@@ -3812,7 +3813,7 @@ Un fact **ground** = complet instanțiat, **fără variabile Prolog**:
 ## Decizii Faza 20a — `use .mod as alias` (prefixed import) **(D107–D116)**
 
 > **Sursă:** organizare KB la scară mare — izolare la import fără merge plat; extinde F15.  
-> **Stare:** **D107–D116 confirmed** (user 2026-08-20) — F20a **(ready-to-implement)**.  
+> **Stare:** **D107–D116 implemented** — F20a **complete** (2026-08-21).  
 > **F20b** (blocuri nested `a { b { } }`) — **amânat**.
 
 ### Rezumat decizii F20a
@@ -3821,11 +3822,11 @@ Un fact **ground** = complet instanțiat, **fără variabile Prolog**:
 |----|---------|------|
 | **D107** | **A** | Syntax **`use [once] .mod as alias`** — un singur keyword `use` |
 | **D108** | **A** | Prefix **predicate** (facts, rules, constraints importate); **nu** atomii argument |
-| **D109** | **A** | Rezolvă modul importat complet (inclusiv `use` interne), **apoi** prefix `alias.` la graniță |
-| **D110** | **A** | Referințe **`alias.predicate(args)`** — un nivel; necalificat = doar local |
+| **D109** | **A** | Rezolvă modul importat complet (inclusiv `use … as` interne), **apoi** prefix `alias.` la graniță; prefixe **stivuite** |
+| **D110** | **A rev.** | **`alias.predicatePath(args)`** — un alias local + cale predicate (poate conține `.` din importuri imbricate); nu scope F20b |
 | **D111** | **A** | **O singură** importare per `.mod` per rezolvare — a doua linie nu adaugă alt prefix |
 | **D112** | **A** | Mix permis: `use .shared` (plat) + `use .veh as veh` (module diferite) |
-| **D113** | **A** | Alias lowercase atom; duplicate alias → error |
+| **D113** | **A** | Alias unic per modul; **duplicate `as c`** (module diferite) → elaboration error |
 | **D114** | **A** | Mutations / `check` / `.world:query` — aceleași predicate calificate |
 | **D115** | **A** | **`use once … as`** — skip F15; **nu** re-prefix cu al doilea alias (vezi D111) |
 | **D116** | **A** | **`use .mod`** fără `as` neschimbat; F20a opt-in; fără breaking |
@@ -3865,13 +3866,21 @@ query hasCar:
 
 ---
 
-### D109 — Momentul prefixării **(confirmed: A — user 2026-08-20)**
+### D109 — Momentul prefixării + lanț `as` imbricat **(confirmed: A — user 2026-08-20; rev. lanț 2026-08-21)**
 
-1. **`logicResolveMerged(.vehicles)`** — rezolvare completă (inclusiv `use` / `use once` **interne**, merge plat ca F15).
-2. Prefix **`alias.`** pe **toate** clauzele + constraints rezultate.
-3. Concat la modulul curent. Clauze **proprii** — fără prefix.
+1. **`logicResolveMerged(.mod)`** — rezolvare completă a modulului importat (inclusiv `use` / `use once` **și** `use … as` **interne**).
+2. Prefix **`alias.`** pe **toate** clauzele + constraints rezultate (inclusiv predicate deja prefixate în submodule).
+3. Concat la modulul curent. Clauze **proprii** ale modulului curent — fără prefix.
 
-**Nu** se prefixează per-`use` în submodule — o singură graniță `as`.
+**Prefixe stivuite (flatten la merge):** fiecare graniță `as` **prepend** un segment; nu e scope live imbricat (F20b), ci **nume predicate compus**:
+
+| Modul | După rezolvare |
+|-------|----------------|
+| `.vehConstr` | `carWheel/2`, … |
+| `.veh` + `use .vehConstr as c` | **`c.carWheel/2`**, `car/1`, … |
+| `.world` + `use .veh as v` | **`v.c.carWheel/2`**, **`v.car/1`**, … |
+
+**Nu** re-prefixăm clauzele **proprii** ale submodulelor la export — doar clauzele **returnate** de `logicResolveMerged(child)` primesc `alias.` la granița părintelui.
 
 ---
 
@@ -3907,11 +3916,59 @@ inline [logic] .world:
 
 ---
 
-### D110 — Referințe calificate **(confirmed: A — implicit F20a)**
+### D110 — Referințe calificate + predicate cu puncte **(confirmed: A rev. — user 2026-08-21)**
 
-- Syntax: **`alias.predicate(term, …)`** — parser extins (predicate cu dot sau pereche alias+pred).
-- **Un nivel** — `a.b.c.pred` amânat (F20b).
-- Necalificat = predicate **locale** modul curent.
+**Revizie față de draft „un singur dot”:** lanțurile `use … as` produc predicate **`v.c.carWheel`**, nu doar `veh.wheeled`.
+
+| Regulă | Detaliu |
+|--------|---------|
+| **Formă apel** | **`alias.predicatePath(args)`** |
+| **`alias`** | Singurul alias declarat în modulul **curent** (`use … as alias`) |
+| **`predicatePath`** | Restul numelui predicate — **poate conține `.`** (segmente din importuri ancestrale) |
+| **Necalificat** | Doar predicate **locale** modul curent (fără prefix din import) |
+
+**Nu** e path relativ F20b: `c` din `v.c.carWheel` **nu** e alias în `.world` — e parte din numele flatten-uit `v.c.carWheel/2`.
+
+| Modul | Apel valid |
+|-------|------------|
+| `.vehConstr` | `carWheel(toyota, 2)` |
+| `.veh` (are `use .vehConstr as c`) | `c.carWheel(toyota, 2)` — **nu** `carWheel` unprefixed din constr |
+| `.world` (are `use .veh as v`) | `v.c.carWheel(toyota, 2)`, `v.car(toyota)` — **nu** `c.carWheel` (c nu e alias aici) |
+
+**Parser:** primul segment înainte de `.` = alias (dacă există `use … as`); restul = predicate path atom (un singur nume predicate cu puncte interne).
+
+**Distinct F20b:** F20b ar adăuga scope **sintactic** în același fișier (`warehouse { inside(...) }` relativ); F20a doar **nume compuse** din lanț de importuri.
+
+#### Exemplu țintă — lanț `.vehConstr → .veh → .world`
+
+```logts
+inline [logic] .vehConstr:
+
+    carWheel(X, Y) <- wheel(X), axle(Y)
+
+    constraint carWheel(X, Y) <= wheel(X), axle(Y)
+
+:
+
+inline [logic] .veh:
+
+    use once .vehConstr as c
+
+    car(toyota)
+
+:
+
+inline [logic] .world:
+
+    use once .veh as v
+
+    query wheelOk:
+        v.c.carWheel(toyota, 2)
+
+:
+```
+
+După merge în `.world`: KB conține `v.car/1`, `v.c.carWheel/2` (+ constraints prefixate la fel). **`v.c.carWheel(toyota, 2)`** — OK.
 
 ---
 
@@ -3926,11 +3983,47 @@ Interzis: `use .vehicles` + `use .vehicles as veh` (a doua = reuse / conflict F1
 
 ---
 
-### D113 — Alias naming **(confirmed: A — implicit F20a)**
+### D113 — Alias unic per modul **(confirmed: A — rev. user 2026-08-21)**
 
-- Alias = atom lowercase (`veh`, `wh`) — fără `.`.
-- Duplicate **`as veh`** în același modul → elaboration error.
-- Alias necunoscut în goal → elaboration / resolve error.
+| Regulă | Detaliu |
+|--------|---------|
+| **Formă alias** | Atom lowercase (`veh`, `c`, `wh`) — fără `.` |
+| **Un alias = o singură linie `use … as`** | Același alias pe **module diferite** → **elaboration error** |
+| **Alias necunoscut** în goal → elaboration / resolve error |
+| **Conflict cu predicate local** | Dacă modulul curent definește deja predicate care ar coliziona cu prefixul alias (implementare: alias rezervat la primul `as`) |
+
+**Alias already used** — indiferent de modul țintă:
+
+```logts
+inline [logic] .world:
+
+    use once .veh as c
+    use once .vehConstr as c    ; ERROR — alias 'c' already used
+
+    query bad:
+        c.car(toyota)            ; ambiguu / invalid — nu se ajunge aici
+:
+```
+
+| Linii | Rezultat |
+|-------|----------|
+| `use once .veh as c` | OK — prefix **`c.*`** din `.veh` |
+| `use once .vehConstr as c` | **Error** — `c` deja legat de primul import |
+| Remediere | Alias diferit: `use once .vehConstr as vc` → apel **`vc.carWheel(...)`** |
+
+**Mesaj (sketch):** `logic program line N: alias 'c' already used (first use line M)`.
+
+**Distinct D111:** D111 = același **modul** (`.veh`) importat de două ori; D113 = același **alias** pe **module diferite**.
+
+```logts
+; D111 — același modul, alias diferit sau același (a doua linie skip/error pe .veh)
+use once .veh as v
+use once .veh as w          ; skip (once) sau error (strict) — nu e conflict de alias
+
+; D113 — module diferite, același alias
+use once .veh as c
+use once .vehConstr as c    ; ERROR alias deja folosit
+```
 
 ---
 
@@ -3958,17 +4051,67 @@ logic { + veh.inside(box2, c1) }
 | Parse | [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `use [once] .mod as alias`; `alias.predicate` în compound |
 | Merge | `logicResolveMerged` | branch `as` → resolve child → prefix predicates |
 | Engine | [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | predicate `veh.wheeled` în atom table (dacă e nevoie) |
-| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3678+** — prefix OK, unprefixed fail, mix plat+as, use once double-as, mutations/check/query; legacy+wave |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3678+** — prefix OK, unprefixed fail, **lanț v.c.**, duplicate alias, mix plat+as, use once double-as, … |
 | Doc | [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) | secțiune **`use … as`** + logts-play |
 
 ### Criterii done F20a
 
-- [ ] **D107–D116** implementate
-- [ ] **`use .mod as alias`** — prefix la graniță; **`use .mod`** neschimbat
-- [ ] **`use once .mod as v`** + **`use once .mod as w`** → doar **`v.*`**
-- [ ] Teste **3678+** legacy + wave; doc EN; suite verde
+- [x] **D107–D116** implementate
+- [x] **`use .mod as alias`** — prefix la graniță; lanț imbricat → `v.c.predicate`; **`use .mod`** neschimbat
+- [x] Duplicate alias → elaboration error (D113)
+- [x] **`use once .mod as v`** + **`use once .mod as w`** (același modul) → doar **`v.*`** (D111)
+- [x] Teste **3678–3687** — incl. lanț `v.c.carWheel`, duplicate alias; legacy + wave; doc EN; suite verde (**2849/2849**)
 
 **Amânat (F20b):** blocuri nested `warehouse { … }`, path relativ în bloc.
+
+**Amânat (F20c — scope la extindere):** reguli noi sub prefix importat + rezolvare relativă în body — vezi mai jos.
+
+---
+
+### F20c (backlog) — reguli calificate + scope relativ în body **(nu F20a)**
+
+> **Întrebare user 2026-08-21:** în `.world`, după `use .veh as v`, poate exista:
+>
+> ```logts
+> v.c.carSize(X, Y) <- \+ carWheel(X, Y), ...
+> ```
+>
+> Două idei: (1) **definire** predicate noi sub `v.c.`; (2) în body, **`carWheel`** rezolvat relativ la scope-ul `v.c` (fără prefix complet).
+
+**Verdict:** **prea complex pentru F20a** — amânăm ca **F20c** (sau subset în F20b dacă blocurile nested acoperă același caz).
+
+| Idee | Ce înseamnă | F20a |
+|------|-------------|------|
+| **A — Apel calificat** | `v.c.carWheel(X, Y)` în query/fact | **Da** |
+| **B — Regulă cu head calificat** | `v.c.carSize(X, Y) <- …` definită în `.world` | **Nu** — backlog |
+| **C — Body relativ la prefix** | în regula de mai sus, `carWheel` → `v.c.carWheel` automat | **Nu** — backlog |
+
+#### Opțiuni (când implementăm F20c / F20b)
+
+| Opțiune | Descriere | Pro / contra |
+|---------|-----------|--------------|
+| **1 — Full qualify în F20a (recommended acum)** | Reguli **locale** doar unprefixed; body cu prefix complet: `carSize(X,Y) <- \+ v.c.carWheel(X,Y)` | Simplu, zero scope magic; verbos |
+| **2 — Head calificat, body tot explicit** | Permite `v.c.carSize <- …` dar body tot `v.c.carWheel` | Organizare fără scope relativ; medium |
+| **3 — Scope relativ (propunerea ta)** | Head `v.c.carSize`, body `carWheel` → `v.c.carWheel` | Ergonomic; necesită context scope la parse/eval; confuzii cross-alias |
+| **4 — Extinde în modul sursă** | `carSize` definit în `.vehConstr` sau `.veh`, nu în `.world` | Prolog-clasic; fără syntax nou |
+| **5 — F20b block** | `v.c { carSize(X,Y) <- \+ carWheel(X,Y) }` | Scope vizual; o faza dedicată |
+
+**Recomandare F20a:** doar **opțiunea 1**. Exemplu acceptat în `.world`:
+
+```logts
+inline [logic] .world:
+    use once .veh as v
+
+    ; regulă locală — head necalificat
+    carSize(X, Y) <- \+ v.c.carWheel(X, Y), ...
+
+    query ok:
+        carSize(toyota, 2)
+```
+
+Sau mută `carSize` în `.veh` / `.vehConstr` dacă aparține domeniului vehicul.
+
+**Decizie F20c (draft, neconfirmată):** TBD — B+C vs F20b block vs respinge head calificat.
 
 ---
 

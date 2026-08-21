@@ -15,7 +15,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Role** | Definition layer — facts, rules, queries |
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
-| **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits |
+| **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits; **`use .mod as alias`** prefixes imported predicates |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
 
@@ -272,8 +272,13 @@ inline [logic] .world:
 |------|-----------|
 | **`use .module`** | Merge that module’s facts, rules, and constraints. If the target was **already merged** in this resolution, elaboration stops with an error. |
 | **`use once .module`** | Same merge on first visit; **skip silently** if the module is already merged or currently open (idempotent — like `#include_once`). |
+| **`use .module as alias`** | Import with **prefix** — imported predicates become **`alias.predicate/…`** (arguments stay unprefixed). Unprefixed names from the import are **not** visible. |
+| **`use once .module as alias`** | Prefixed import on first visit; **skip** on repeat (same module or duplicate `use once`). |
 
 - **Queries are never imported** — each inline defines its own query list.
+- **One alias per name** — duplicate `as alias` in the same module → elaboration error.
+- **One import per module** — second `use once .veh as w` after `use once .veh as v` is skipped; only **`v.*`** exists.
+- **Nested imports** stack prefixes: `.vehConstr` → `c.*` inside `.veh` → **`v.c.*`** inside `.world` when using `use .veh as v`.
 - **Missing module** or non-`[logic]` target → error for both forms.
 - **Strict reuse error** (single message, with chain):
 
@@ -319,6 +324,89 @@ show(carFlag)
 ```
 
 After **Load & Run**, `carFlag` is `1` because `wheeled(car)` comes from `.vehicles`.
+
+### Example — prefixed import `use … as` (Load & Run)
+
+```logts-play
+inline [logic] .vehicles:
+
+    wheeled(car)
+
+:
+
+inline [logic] .world:
+
+    use .vehicles as veh
+
+    query hasCar:
+        veh.wheeled(car)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire carFlag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasCar >= carFlag
+    set = trigger
+}
+
+show(carFlag)
+```
+
+After **Load & Run**, `carFlag` is `1`. A query goal `wheeled(car)` (without `veh.`) would **not** see the imported fact.
+
+### Example — nested prefix chain (Load & Run)
+
+```logts-play
+inline [logic] .vehConstr:
+
+    wheel(w2)
+    axle(a2)
+
+    carWheel(X, Y) <- wheel(X), axle(Y)
+
+:
+
+inline [logic] .veh:
+
+    use once .vehConstr as c
+
+    car(toyota)
+
+:
+
+inline [logic] .world:
+
+    use once .veh as v
+
+    query wheelOk:
+        v.c.carWheel(w2, a2)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.worldLogic:{
+    wheelOk >= ok
+    set = trigger
+}
+
+show(ok)
+```
+
+After **Load & Run**, `ok` is `1`. Inside `.veh`, the same rule is called as `c.carWheel(w2, a2)`.
 
 ### Example — duplicate import with `use once` (Load)
 

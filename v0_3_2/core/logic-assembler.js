@@ -1,6 +1,6 @@
 /* ================= LOGIC ASSEMBLER (inline [logic]) ================= */
 
-const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint']);
+const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as']);
 const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number']);
 
 function logicError(msg, line) {
@@ -124,7 +124,18 @@ class LogicParser {
         if (!this.at('DOT')) logicError('expected inline reference after use', this.peek().line);
         this.advance();
         const refName = this.expect('ID').value;
-        uses.push({ ref: '.' + refName, mode, line: useLine });
+        let alias = null;
+        if (this.at('KW', 'as')) {
+          this.advance();
+          if (!this.at('ID')) {
+            logicError('expected alias name after as', this.peek().line);
+          }
+          alias = this.advance().value;
+          if (!logicIsAtomName(alias)) {
+            logicError(`alias '${alias}' must be a lowercase atom`, this.peek().line);
+          }
+        }
+        uses.push({ ref: '.' + refName, mode, line: useLine, alias });
         continue;
       }
       if (this.at('KW', 'query')) {
@@ -177,7 +188,7 @@ class LogicParser {
       this.advance();
       return { kind: 'not', goal: this.parseBodyGoal() };
     }
-    if (this.at('ID') && this.tokens[this.pos + 1] && this.tokens[this.pos + 1].type === 'LP') {
+    if (this.looksLikeCompound()) {
       const compound = this.parseCompound();
       return { kind: 'call', predicate: compound.predicate, args: compound.args };
     }
@@ -196,8 +207,27 @@ class LogicParser {
     logicError('invalid body goal', this.peek().line);
   }
 
+  looksLikeCompound() {
+    let look = this.pos;
+    if (look >= this.tokens.length || this.tokens[look].type !== 'ID') return false;
+    look++;
+    while (look < this.tokens.length && this.tokens[look].type === 'DOT') {
+      look++;
+      if (look >= this.tokens.length || this.tokens[look].type !== 'ID') return false;
+      look++;
+    }
+    return look < this.tokens.length && this.tokens[look].type === 'LP';
+  }
+
   parseCompound() {
-    const predicate = this.expect('ID').value;
+    let predicate = this.expect('ID').value;
+    while (this.at('DOT')) {
+      this.advance();
+      if (!this.at('ID')) {
+        logicError('expected predicate name after .', this.peek().line);
+      }
+      predicate += '.' + this.advance().value;
+    }
     this.expect('LP');
     const args = [];
     if (!this.at('RP')) {
@@ -223,7 +253,7 @@ class LogicParser {
       const v = this.advance().value;
       return { kind: 'number', value: v };
     }
-    if (this.at('ID') && this.tokens[this.pos + 1] && this.tokens[this.pos + 1].type === 'LP') {
+    if (this.looksLikeCompound()) {
       return this.parseCompound();
     }
     if (this.at('ID')) {
@@ -263,7 +293,14 @@ class LogicParser {
   }
 
   parseMutationCompound() {
-    const predicate = this.expect('ID').value;
+    let predicate = this.expect('ID').value;
+    while (this.at('DOT')) {
+      this.advance();
+      if (!this.at('ID')) {
+        logicError('expected predicate name after .', this.peek().line);
+      }
+      predicate += '.' + this.advance().value;
+    }
     this.expect('LP');
     const args = [];
     if (!this.at('RP')) {
@@ -291,6 +328,17 @@ function parseLogicBody(bodyRaw) {
 }
 
 function logicValidateProgram(prog) {
+  const aliases = new Set();
+  for (const raw of prog.uses || []) {
+    const u = logicNormalizeUseEntry(raw);
+    if (u && u.alias) {
+      if (aliases.has(u.alias)) {
+        const line = u.line != null ? u.line : null;
+        logicError(`alias '${u.alias}' already used`, line);
+      }
+      aliases.add(u.alias);
+    }
+  }
   for (const q of prog.queries || []) {
     if (!q.name || !logicQueryGoals(q).length) {
       throw new Error('logic query requires name and goal');
@@ -342,18 +390,21 @@ function logicCountFreeVarsInGoal(goal) {
 
 function logicNormalizeUseEntry(u) {
   if (u == null) return null;
-  if (typeof u === 'string') return { ref: u, mode: 'strict', line: null };
+  if (typeof u === 'string') return { ref: u, mode: 'strict', line: null, alias: null };
   return {
     ref: u.ref,
     mode: u.mode === 'once' ? 'once' : 'strict',
     line: u.line != null ? u.line : null,
+    alias: u.alias || null,
   };
 }
 
 function logicFormatUseEntry(u) {
   const e = logicNormalizeUseEntry(u);
   if (!e) return 'use ?';
-  return e.mode === 'once' ? `use once ${e.ref}` : `use ${e.ref}`;
+  let s = e.mode === 'once' ? `use once ${e.ref}` : `use ${e.ref}`;
+  if (e.alias) s += ` as ${e.alias}`;
+  return s;
 }
 
 function logicReuseUseError(targetRef, chain, useLine) {
@@ -389,14 +440,114 @@ function mergeLogicDefinitions(base, usedInst) {
   return merged;
 }
 
-function logicResolveMerged(inlineInst, inlineInstances) {
-  const rootName = inlineInst.name;
-  const mergedSet = new Set([rootName]);
-  const visiting = new Set();
-  const clauses = [...(inlineInst.clauses || [])];
-  const constraints = [...(inlineInst.constraints || [])];
+function logicPrefixPredicateName(name, prefix) {
+  if (!prefix || !name) return name;
+  return `${prefix}.${name}`;
+}
 
-  function applyUse(use, chain) {
+function logicPrefixCompound(compound, prefix) {
+  if (!compound || !prefix || compound.kind !== 'compound') return compound;
+  return {
+    kind: 'compound',
+    predicate: logicPrefixPredicateName(compound.predicate, prefix),
+    arity: compound.arity != null ? compound.arity : (compound.args || []).length,
+    args: compound.args || [],
+  };
+}
+
+function logicPrefixGoal(goal, prefix) {
+  if (!goal || !prefix) return goal;
+  if (goal.kind === 'not') {
+    return { kind: 'not', goal: logicPrefixGoal(goal.goal, prefix) };
+  }
+  if (goal.kind === 'call' || goal.kind === 'compound') {
+    return {
+      ...goal,
+      predicate: logicPrefixPredicateName(goal.predicate, prefix),
+    };
+  }
+  return goal;
+}
+
+function logicPrefixClause(clause, prefix) {
+  if (!prefix || !clause) return clause;
+  return {
+    head: logicPrefixCompound(clause.head, prefix),
+    body: (clause.body || []).map((g) => logicPrefixGoal(g, prefix)),
+  };
+}
+
+function logicPrefixConstraint(c, prefix) {
+  if (!prefix || !c) return c;
+  return {
+    ...c,
+    head: logicPrefixCompound(c.head, prefix),
+    body: (c.body || []).map((g) => logicPrefixGoal(g, prefix)),
+  };
+}
+
+function logicPrefixClauses(clauses, prefix) {
+  return (clauses || []).map((c) => logicPrefixClause(c, prefix));
+}
+
+function logicPrefixConstraints(constraints, prefix) {
+  return (constraints || []).map((c) => logicPrefixConstraint(c, prefix));
+}
+
+function logicResolveMerged(inlineInst, inlineInstances) {
+  const mergedSet = new Set([inlineInst.name]);
+  const visiting = new Set();
+
+  function expandModule(ref, chain) {
+    const inst = inlineInstances.get(ref);
+    if (!inst || inst.kind !== 'logic') {
+      throw new Error(`logic use ${ref} must reference inline [logic]`);
+    }
+    let clauses = [...(inst.clauses || [])];
+    let constraints = [...(inst.constraints || [])];
+    const aliasSeen = new Set();
+
+    for (const rawUse of inst.uses || []) {
+      const use = logicNormalizeUseEntry(rawUse);
+      if (!use || !use.ref) continue;
+
+      if (use.alias) {
+        if (aliasSeen.has(use.alias)) {
+          logicError(`alias '${use.alias}' already used`, use.line);
+        }
+        aliasSeen.add(use.alias);
+        const imported = importPrefixed(use, chain);
+        clauses.push(...logicPrefixClauses(imported.clauses, use.alias));
+        constraints.push(...logicPrefixConstraints(imported.constraints, use.alias));
+      } else {
+        importFlat(use, chain, clauses, constraints);
+      }
+    }
+    return { clauses, constraints };
+  }
+
+  function importPrefixed(use, chain) {
+    const ref = use.ref;
+    const mode = use.mode === 'once' ? 'once' : 'strict';
+    const useLine = use.line;
+
+    if (mergedSet.has(ref)) {
+      if (mode === 'once') return { clauses: [], constraints: [] };
+      logicReuseUseError(ref, [...chain, ref], useLine);
+    }
+    if (visiting.has(ref)) {
+      if (mode === 'once') return { clauses: [], constraints: [] };
+      logicReuseUseError(ref, [...chain, ref], useLine);
+    }
+
+    visiting.add(ref);
+    const content = expandModule(ref, [...chain, ref]);
+    visiting.delete(ref);
+    mergedSet.add(ref);
+    return content;
+  }
+
+  function importFlat(use, chain, clauses, constraints) {
     const ref = use.ref;
     const mode = use.mode === 'once' ? 'once' : 'strict';
     const useLine = use.line;
@@ -419,7 +570,13 @@ function logicResolveMerged(inlineInst, inlineInstances) {
     for (const rawChild of used.uses || []) {
       const child = logicNormalizeUseEntry(rawChild);
       if (!child || !child.ref) continue;
-      applyUse(child, [...chain, ref]);
+      if (child.alias) {
+        const imported = importPrefixed(child, [...chain, ref]);
+        clauses.push(...logicPrefixClauses(imported.clauses, child.alias));
+        constraints.push(...logicPrefixConstraints(imported.constraints, child.alias));
+      } else {
+        importFlat(child, [...chain, ref], clauses, constraints);
+      }
     }
     visiting.delete(ref);
     mergedSet.add(ref);
@@ -427,17 +584,13 @@ function logicResolveMerged(inlineInst, inlineInstances) {
     constraints.push(...(used.constraints || []));
   }
 
-  for (const rawUse of inlineInst.uses || []) {
-    const use = logicNormalizeUseEntry(rawUse);
-    if (!use || !use.ref) continue;
-    applyUse(use, [rootName]);
-  }
+  const root = expandModule(inlineInst.name, [inlineInst.name]);
 
   return {
     uses: inlineInst.uses || [],
     queries: inlineInst.queries || [],
-    clauses,
-    constraints,
+    clauses: root.clauses,
+    constraints: root.constraints,
   };
 }
 
@@ -531,7 +684,7 @@ function formatLogicInstanceDoc(name, inst) {
   lines.push('');
   lines.push('  execution:');
   lines.push('    definition only — no inline execution');
-  lines.push('    compose: use .module merges facts, rules, constraints; use once skips revisits');
+  lines.push('    compose: use .module merges facts, rules, constraints; use once skips revisits; use .module as alias prefixes imported predicates');
   lines.push('    runtime: comp [logic] or .module:query({ … })');
   lines.push('');
   lines.push('  see doc(inline.logic)  doc(comp.logic)');

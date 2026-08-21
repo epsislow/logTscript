@@ -39844,5 +39844,297 @@ comp [logic] .whLogic:
     }, 'comp [logic]');
   }, { propagation: 'wave' });
 
+  const INLINE_LOGIC_VEH_PREFIX = `inline [logic] .vehicles:
+
+    wheeled(car)
+
+:`;
+
+  const INLINE_LOGIC_WORLD_PREFIX = `inline [logic] .world:
+
+    use .vehicles as veh
+
+    query hasCar:
+        veh.wheeled(car)
+
+:`;
+
+  const INLINE_LOGIC_VEH_CONSTR = `inline [logic] .vehConstr:
+
+    wheel(w2)
+    axle(a2)
+
+    carWheel(X, Y) <- wheel(X), axle(Y)
+
+:`;
+
+  const INLINE_LOGIC_VEH_NESTED = `inline [logic] .veh:
+
+    use once .vehConstr as c
+
+    car(toyota)
+
+:`;
+
+  const INLINE_LOGIC_WORLD_NESTED = `inline [logic] .world:
+
+    use once .veh as v
+
+    query wheelOk:
+        v.c.carWheel(w2, a2)
+
+:`;
+
+  reg(3678, 'logic', 'parse use as alias', function(h, session) {
+    const prog = parseLogicBody('use .vehicles as veh\nuse once .parts as p');
+    h.assert('uses count', String(prog.uses.length), '2');
+    h.assert('alias veh', prog.uses[0].alias, 'veh');
+    h.assert('alias p', prog.uses[1].alias, 'p');
+    h.assert('once+as mode', prog.uses[1].mode, 'once');
+  });
+
+  reg(3679, 'logic', 'use as prefixes imported predicates (legacy)', function(h, session) {
+    session.run(logicJoinInlines(INLINE_LOGIC_VEH_PREFIX, INLINE_LOGIC_WORLD_PREFIX));
+    const inst = session.interp.inlineInstances.get('.world');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    h.assert('veh.wheeled in merged', String(merged.clauses.some((c) => c.head && c.head.predicate === 'veh.wheeled')), 'true');
+    h.assert('plain wheeled absent', String(merged.clauses.some((c) => c.head && c.head.predicate === 'wheeled')), 'false');
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX, INLINE_LOGIC_WORLD_PREFIX) + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire carFlag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasCar >= carFlag
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('hasCar=1', interp.getWireEffectiveValue('carFlag'), '1');
+  });
+
+  reg(3680, 'logic', 'use as prefixes imported predicates (wave)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX, INLINE_LOGIC_WORLD_PREFIX) + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire carFlag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasCar >= carFlag
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('hasCar=1 wave', interp.getWireEffectiveValue('carFlag'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3681, 'logic', 'nested use as chain v.c.predicate (legacy)', function(h, session) {
+    session.run(logicJoinInlines(
+      INLINE_LOGIC_VEH_CONSTR,
+      INLINE_LOGIC_VEH_NESTED,
+      INLINE_LOGIC_WORLD_NESTED,
+    ));
+    const inst = session.interp.inlineInstances.get('.world');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    h.assert('v.c.carWheel rule', String(merged.clauses.some((c) => c.head && c.head.predicate === 'v.c.carWheel')), 'true');
+    h.assert('v.car fact', String(merged.clauses.some((c) => c.head && c.head.predicate === 'v.car')), 'true');
+    const src = logicJoinInlines(
+      INLINE_LOGIC_VEH_CONSTR,
+      INLINE_LOGIC_VEH_NESTED,
+      INLINE_LOGIC_WORLD_NESTED,
+    ) + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.worldLogic:{
+    wheelOk >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('wheelOk=1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
+  reg(3682, 'logic', 'nested use as chain v.c.predicate (wave)', function(h, session) {
+    const src = logicJoinInlines(
+      INLINE_LOGIC_VEH_CONSTR,
+      INLINE_LOGIC_VEH_NESTED,
+      INLINE_LOGIC_WORLD_NESTED,
+    ) + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.worldLogic:{
+    wheelOk >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('wheelOk=1 wave', interp.getWireEffectiveValue('ok'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3683, 'logic', 'duplicate use as alias elaboration error', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX, INLINE_LOGIC_VEH_CONSTR) + `
+inline [logic] .bad:
+
+    use once .vehicles as c
+    use once .vehConstr as c
+
+:`;
+    h.assertThrows('duplicate alias', function() {
+      session.run(src);
+    }, "alias 'c' already used");
+  });
+
+  reg(3684, 'logic', 'use once same mod two aliases only first (legacy)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX) + `
+inline [logic] .world:
+
+    use once .vehicles as v
+    use once .vehicles as w
+
+    query hasV:
+        v.wheeled(car)
+
+    query hasW:
+        w.wheeled(car)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire vOk = 0
+1wire wOk = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasV >= vOk
+    hasW >= wOk
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('vOk=1', interp.getWireEffectiveValue('vOk'), '1');
+    h.assert('wOk=0', interp.getWireEffectiveValue('wOk'), '0');
+  });
+
+  reg(3685, 'logic', 'use once same mod two aliases only first (wave)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX) + `
+inline [logic] .world:
+
+    use once .vehicles as v
+    use once .vehicles as w
+
+    query hasV:
+        v.wheeled(car)
+
+    query hasW:
+        w.wheeled(car)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire vOk = 0
+1wire wOk = 0
+1wire trigger = 1
+
+.worldLogic:{
+    hasV >= vOk
+    hasW >= wOk
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('vOk=1 wave', interp.getWireEffectiveValue('vOk'), '1');
+    h.assert('wOk=0 wave', interp.getWireEffectiveValue('wOk'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3686, 'logic', 'mix flat use and use as (legacy)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX, INLINE_LOGIC_BASE) + `
+inline [logic] .mix:
+
+    use .base
+    use .vehicles as veh
+
+    query hasRoot:
+        shared(root)
+
+    query hasCar:
+        veh.wheeled(car)
+
+:
+
+comp [logic] .mixLogic:
+    on: 1
+    .mix { }
+:
+
+1wire rootOk = 0
+1wire carOk = 0
+1wire trigger = 1
+
+.mixLogic:{
+    hasRoot >= rootOk
+    hasCar >= carOk
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('shared flat', interp.getWireEffectiveValue('rootOk'), '1');
+    h.assert('veh prefixed', interp.getWireEffectiveValue('carOk'), '1');
+  });
+
+  reg(3687, 'logic', 'mix flat use and use as (wave)', function(h, session) {
+    const src = logicJoinInlines(INLINE_LOGIC_VEH_PREFIX, INLINE_LOGIC_BASE) + `
+inline [logic] .mix:
+
+    use .base
+    use .vehicles as veh
+
+    query hasRoot:
+        shared(root)
+
+    query hasCar:
+        veh.wheeled(car)
+
+:
+
+comp [logic] .mixLogic:
+    on: 1
+    .mix { }
+:
+
+1wire rootOk = 0
+1wire carOk = 0
+1wire trigger = 1
+
+.mixLogic:{
+    hasRoot >= rootOk
+    hasCar >= carOk
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('shared flat wave', interp.getWireEffectiveValue('rootOk'), '1');
+    h.assert('veh prefixed wave', interp.getWireEffectiveValue('carOk'), '1');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
