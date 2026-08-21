@@ -709,6 +709,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     } else if (queryOpts && queryOpts.queryNames && queryOpts.queryNames.length) {
       execOpts.queryNames = queryOpts.queryNames;
     }
+    if (ctx.out) {
+      execOpts.onShowLine = (line) => { ctx.out.push(line); };
+    }
     const raw = execFn(runtimeMerged, inputEnv, execOpts);
     const meta = raw._logicMeta || {};
     delete raw._logicMeta;

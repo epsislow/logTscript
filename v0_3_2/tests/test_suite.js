@@ -40136,5 +40136,131 @@ comp [logic] .mixLogic:
     h.assert('veh prefixed wave', interp.getWireEffectiveValue('carOk'), '1');
   }, { propagation: 'wave' });
 
+  reg(3688, 'logic', 'parse string literal in logic term', function(h, session) {
+    const prog = parseLogicBody('query q: show("hello ", X)');
+    const goals = logicQueryGoals(prog.queries[0]);
+    h.assert('one goal', String(goals.length), '1');
+    const arg0 = goals[0].args[0];
+    h.assert('string atom', String(arg0.kind === 'atom' && arg0.logicTraceAsString === true), 'true');
+    h.assert('string value', arg0.name, 'hello ');
+  });
+
+  reg(3689, 'logic', 'show/0 parse error', function(h, session) {
+    h.assertThrows(
+      'show/0',
+      () => parseLogicBody('query q: show()'),
+      'show requires at least 1 argument',
+    );
+  });
+
+  reg(3690, 'logic', 'show max 32 args parse error', function(h, session) {
+    const args = Array.from({ length: 33 }, (_, i) => `a${i}`).join(', ');
+    h.assertThrows(
+      'show arity cap',
+      () => parseLogicBody(`query q: show(${args})`),
+      'show accepts at most 32 arguments',
+    );
+  });
+
+  reg(3691, 'logic', 'show reserved as fact head', function(h, session) {
+    h.assertThrows(
+      'reserved show fact',
+      () => parseLogicBody('show(test)'),
+      'show/N',
+    );
+  });
+
+  const INLINE_LOGIC_SHOW = `inline [logic] .world:
+
+    inside(john, johnsCar)
+    inside(mary, marysBike)
+
+    query trace:
+        inside(P, Obj),
+        show("inside:", inside(P, Obj))
+
+:`;
+
+  function runLogicShowCompLegacy(h, session) {
+    const src = INLINE_LOGIC_SHOW + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = trace
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('line john', String(session.outIncludes(interp, 'inside: inside(john, johnsCar)')), 'true');
+    h.assert('line mary', String(session.outIncludes(interp, 'inside: inside(mary, marysBike)')), 'true');
+  }
+
+  reg(3692, 'logic', 'builtin show/N comp query output (legacy)', runLogicShowCompLegacy);
+  reg(3693, 'logic', 'builtin show/N comp query output (wave)', runLogicShowCompLegacy, { propagation: 'wave' });
+
+  const INLINE_LOGIC_SHOW_BACKTRACK = `inline [logic] .world:
+
+    person(john)
+    person(mary)
+
+    query all:
+        person(X),
+        show(X)
+
+:`;
+
+  function runLogicShowBacktrack(h, session) {
+    const src = INLINE_LOGIC_SHOW_BACKTRACK + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = all
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const out = session.outLines(interp).join('\n');
+    h.assert('john line', String(out.includes('john')), 'true');
+    h.assert('mary line', String(out.includes('mary')), 'true');
+    h.assert('two show lines', String((out.match(/^john$/gm) || []).length + (out.match(/^mary$/gm) || []).length >= 2), 'true');
+  }
+
+  reg(3694, 'logic', 'show/N prints on each backtrack branch (legacy)', runLogicShowBacktrack);
+  reg(3695, 'logic', 'show/N prints on each backtrack branch (wave)', runLogicShowBacktrack, { propagation: 'wave' });
+
+  function runLogicShowQueryInvoke(h, session) {
+    const src = INLINE_LOGIC_SHOW_BACKTRACK + `
+8wire[4] who = .world:query({ person(X), show("found", X) })`;
+    const { interp } = session.run(src);
+    h.assert('found john', String(session.outIncludes(interp, 'found john')), 'true');
+    h.assert('found mary', String(session.outIncludes(interp, 'found mary')), 'true');
+  }
+
+  reg(3696, 'logic', 'show/N via .world:query output (legacy)', runLogicShowQueryInvoke);
+  reg(3697, 'logic', 'show/N via .world:query output (wave)', runLogicShowQueryInvoke, { propagation: 'wave' });
+
+  reg(3698, 'logic', 'show/N compound term arg', function(h, session) {
+    const src = `inline [logic] .world:
+
+    inside(john, johnsCar)
+
+    query q:
+        show(inside(john, johnsCar))
+
+:
+
+1wire dummy = .world:query({ show(inside(john, johnsCar)) })`;
+    const { interp } = session.run(src);
+    h.assert('compound line', String(session.outIncludes(interp, 'inside(john, johnsCar)')), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

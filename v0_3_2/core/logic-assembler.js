@@ -2,6 +2,8 @@
 
 const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as']);
 const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number']);
+const LOGIC_BUILTIN_SHOW_PRED = 'show';
+const LOGIC_SHOW_MAX_ARGS = 32;
 
 function logicError(msg, line) {
   if (line != null) throw new Error(`logic program line ${line}: ${msg}`);
@@ -65,6 +67,24 @@ function logicTokenize(src) {
     if (ch === '<') { tokens.push({ type: 'CMP', value: '<', line: startLine }); i++; continue; }
     if (ch === '>') { tokens.push({ type: 'CMP', value: '>', line: startLine }); i++; continue; }
     if (ch === '=') { tokens.push({ type: 'EQ', value: '=', line: startLine }); i++; continue; }
+    if (ch === '"') {
+      i++;
+      let s = '';
+      while (i < src.length) {
+        const c = src[i];
+        if (c === '"') { i++; break; }
+        if (c === '\\' && i + 1 < src.length) {
+          const esc = src[i + 1];
+          if (esc === '"' || esc === '\\') { s += esc; i += 2; continue; }
+          logicError('invalid escape in string literal', startLine);
+        }
+        if (c === '\n') logicError('unterminated string literal', startLine);
+        s += c;
+        i++;
+      }
+      tokens.push({ type: 'STRING', value: s, line: startLine });
+      continue;
+    }
     if (/[0-9]/.test(ch) || (ch === '-' && i + 1 < src.length && /[0-9]/.test(src[i + 1]))) {
       let n = '';
       if (ch === '-') { n += '-'; i++; }
@@ -147,6 +167,7 @@ class LogicParser {
         continue;
       }
       if (this.at('KW', 'constraint')) {
+        const constraintLine = this.peek().line;
         this.advance();
         const head = this.parseCompound();
         if (!this.at('CMP', '=<')) {
@@ -154,7 +175,7 @@ class LogicParser {
         }
         this.advance();
         const body = this.parseBodyGoals();
-        constraints.push({ head, body, constraintIndex: constraints.length + 1 });
+        constraints.push({ head, body, constraintIndex: constraints.length + 1, line: constraintLine });
         continue;
       }
       const clause = this.parseClause();
@@ -164,13 +185,14 @@ class LogicParser {
   }
 
   parseClause() {
+    const line = this.peek().line;
     const head = this.parseCompound();
     let body = [];
     if (this.at('ARROW')) {
       this.advance();
       body = this.parseBodyGoals();
     }
-    return { head, body };
+    return { head, body, line };
   }
 
   parseBodyGoals() {
@@ -220,6 +242,7 @@ class LogicParser {
   }
 
   parseCompound() {
+    const startLine = this.peek().line;
     let predicate = this.expect('ID').value;
     while (this.at('DOT')) {
       this.advance();
@@ -238,7 +261,9 @@ class LogicParser {
       }
     }
     this.expect('RP');
-    return { kind: 'compound', predicate, args };
+    const compound = { kind: 'compound', predicate, args };
+    if (predicate === LOGIC_BUILTIN_SHOW_PRED) logicValidateShowCall(args, startLine);
+    return compound;
   }
 
   parseTerm() {
@@ -252,6 +277,10 @@ class LogicParser {
     if (this.at('NUMBER')) {
       const v = this.advance().value;
       return { kind: 'number', value: v };
+    }
+    if (this.at('STRING')) {
+      const v = this.advance().value;
+      return { kind: 'atom', name: v, logicTraceAsString: true };
     }
     if (this.looksLikeCompound()) {
       return this.parseCompound();
@@ -327,6 +356,18 @@ function parseLogicBody(bodyRaw) {
   return parsed;
 }
 
+function logicValidateShowCall(args, line) {
+  const n = (args || []).length;
+  if (n === 0) logicError('show requires at least 1 argument', line);
+  if (n > LOGIC_SHOW_MAX_ARGS) {
+    logicError(`show accepts at most ${LOGIC_SHOW_MAX_ARGS} arguments`, line);
+  }
+}
+
+function logicIsReservedPredicateHead(head) {
+  return head && head.kind === 'compound' && head.predicate === LOGIC_BUILTIN_SHOW_PRED;
+}
+
 function logicValidateProgram(prog) {
   const aliases = new Set();
   for (const raw of prog.uses || []) {
@@ -342,6 +383,16 @@ function logicValidateProgram(prog) {
   for (const q of prog.queries || []) {
     if (!q.name || !logicQueryGoals(q).length) {
       throw new Error('logic query requires name and goal');
+    }
+  }
+  for (const c of prog.clauses || []) {
+    if (logicIsReservedPredicateHead(c.head)) {
+      logicError("'show/N' is reserved — cannot define show as fact or rule head", c.line);
+    }
+  }
+  for (const c of prog.constraints || []) {
+    if (logicIsReservedPredicateHead(c.head)) {
+      logicError("'show/N' is reserved — cannot define show as constraint head", c.line);
     }
   }
 }

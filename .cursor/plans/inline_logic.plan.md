@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–19 complete; Faza 20a (use as) ready-to-implement.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–20a complete; Faza 21 (show/N) completed.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
@@ -64,6 +64,9 @@ todos:
     status: completed
   - id: logic-use-as
     content: "Faza 20a: use .mod as alias (prefixed import) — D107–D116 completed"
+    status: completed
+  - id: logic-show-builtin
+    content: "Faza 21: builtin show/N + string literals — D117–D127 completed"
     status: completed
 isProject: false
 ---
@@ -4179,6 +4182,30 @@ comp [logic] .peopleLogic:
 
 ---
 
+## Decizii Faza 21 — builtin `show/N` (D117–D127) **(completed)**
+
+> **Scop:** predicat builtin **`show(T1, …, TN)`** în motorul logic — output termeni Prolog-style; distinct de statement-ul logTscript **`show(wire)`**.
+
+| ID | Decizie |
+|----|---------|
+| **D117** | **`show/N`** rezervat, **N ≥ 1** |
+| **D118** | Întotdeauna reușește (side-effect) |
+| **D119** | Format Prolog; fără tag-uri wire |
+| **D120** | Print la fiecare succes pe ramură (backtracking Prolog) |
+| **D121** | Query, reguli, constraints, **`.world:query`** |
+| **D122** | Output → **`interp.out`** via `onShowLine` |
+| **D123** | Head user `show(...)` → eroare reserved |
+| **D124** | Max **32** args; peste → parse error |
+| **D125** | **`show/0`** → parse error |
+| **D126** | Compound / atom / number / var ca args |
+| **D127** | String literals **`"..."`** în termeni logic |
+
+**Fișiere:** `logic-assembler.js`, `logic-engine.js`, `logic.js`, `interpreter.js`  
+**Teste:** **3688–3698** legacy+wave  
+**Doc:** `inline-logic.md`, `logic-indexing.md`
+
+---
+
 ## Comparație sketch v1 → v2 ( ce s-a schimbat )
 
 | Topic | Sketch v1 | Sketch v2 (current) |
@@ -4203,7 +4230,8 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | Fazele 0–17 | **(completed)** |
 | **Faza 18** `query = …` explicit | **1+l** **(completed)** |
 | **Faza 19** constraint-as-query helper | **1+u** **(completed)** |
-| **Faza 20a** `use .mod as alias` | **(ready-to-implement)** — D107–D116 |
+| **Faza 20a** `use .mod as alias` | **(completed)** — D107–D116 |
+| **Faza 21** builtin `show/N` | **(completed)** — D117–D127 |
 | **Faza 20b** scope blocks | **(deferred)** |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
 | Constraint `#K (line L)` trace | **1+v** **(pause)** |
@@ -4216,10 +4244,9 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 19~~ **(completed)**
-2. **Faza 20a** — **`use .mod as alias`** — D107–D116 **(ready-to-implement)**
-3. Apoi backlog: **1+p**, **1+s**, **1+o**, …
-4. **F20b** scope blocks — când e nevoie
+1. ~~Faza 0~~ → ~~Faza 21~~ **(completed)**
+2. Apoi backlog: **1+p**, **1+s**, **1+o**, …
+3. **F20b** scope blocks — când e nevoie
 
 ---
 

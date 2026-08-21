@@ -1743,6 +1743,9 @@ class Interpreter {
       const n = this._evalCallArgDecimalInt(opt.expr, label);
       execOpts[opt.name] = n;
     }
+    if (this.out) {
+      execOpts.onShowLine = (line) => { this.out.push(line); };
+    }
     const execResult = execFn(merged, goals, inputEnv, execOpts);
     let solutions = execResult.solutions || [];
     const freeVars = outVarsFn(preparedGoals, inputEnv);

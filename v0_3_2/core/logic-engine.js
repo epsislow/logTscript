@@ -19,7 +19,11 @@ class LogicAtomTable {
 
 function logicInternTerm(term, table) {
   if (!term) return term;
-  if (term.kind === 'atom') return { kind: 'atom', id: table.intern(term.name) };
+  if (term.kind === 'atom') {
+    const r = { kind: 'atom', id: table.intern(term.name) };
+    if (term.logicTraceAsString) r.logicTraceAsString = true;
+    return r;
+  }
   if (term.kind === 'var') return { kind: 'var', name: term.name };
   if (term.kind === 'number') return { kind: 'number', value: term.value };
   if (term.kind === 'compound') {
@@ -91,6 +95,7 @@ class LogicEngine {
     this.maxDepth = 256;
     this.truncated = false;
     this.depthExceeded = false;
+    this.onShowLine = typeof opts.onShowLine === 'function' ? opts.onShowLine : null;
     if (opts.factIndex) {
       const rules = opts.ruleClauses || (clauses || []).filter((c) => c.body && c.body.length);
       for (const c of rules) {
@@ -178,6 +183,9 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'count' && g0.arity === 2) {
       return this._solveCount(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'show' && g0.arity >= 1) {
+      return this._solveShow(g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -224,6 +232,16 @@ class LogicEngine {
     } else {
       return false;
     }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveShow(goal, rest, env, depth, onSuccess, onDepthExceeded) {
+    const parts = [];
+    for (const arg of goal.args || []) {
+      parts.push(logicFormatShowTerm(arg, env, this.table));
+    }
+    const line = parts.join(' ');
+    if (typeof this.onShowLine === 'function') this.onShowLine(line);
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
@@ -276,7 +294,9 @@ function logicInternInputValue(term, table) {
   if (!term) return term;
   if (term.kind === 'atom') {
     const name = term.name != null ? term.name : (term.id != null ? table.name(term.id) : '');
-    return { kind: 'atom', id: table.intern(name) };
+    const r = { kind: 'atom', id: table.intern(name) };
+    if (term.logicTraceAsString) r.logicTraceAsString = true;
+    return r;
   }
   if (term.kind === 'number') return term;
   if (term.kind === 'compound') {
@@ -427,7 +447,11 @@ function logicEvalCmp(goal, env, table) {
 function logicResolveTerm(term, env, table) {
   const d = logicDeref(term, env);
   if (d.kind === 'number') return { kind: 'number', value: d.value };
-  if (d.kind === 'atom') return { kind: 'atom', name: table.name(d.id) };
+  if (d.kind === 'atom') {
+    const r = { kind: 'atom', name: table.name(d.id) };
+    if (d.logicTraceAsString) r.logicTraceAsString = true;
+    return r;
+  }
   if (d.kind === 'var') return { kind: 'var', name: d.name };
   if (d.kind === 'compound') {
     return {
@@ -496,6 +520,7 @@ function executeLogicQueries(mergedDef, inputEnv, options) {
     : new LogicEngine(mergedDef.clauses || []);
   if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
+  if (opts.onShowLine) engine.onShowLine = opts.onShowLine;
   const out = engine.executeQueries(queries, inputEnv);
   out._logicMeta = { truncated: engine.truncated, depthExceeded: engine.depthExceeded };
   return out;
@@ -762,6 +787,23 @@ function logicValidateConstraintBody(bodyGoals, proposedClauses, inputEnv, optio
   return solutions && solutions.length > 0;
 }
 
+function logicFormatShowTerm(term, env, table) {
+  const d = logicDeref(term, env);
+  if (!d) return '?';
+  if (d.kind === 'var') return d.name != null ? String(d.name) : '?';
+  if (d.kind === 'number') return String(d.value);
+  if (d.kind === 'atom') {
+    const name = d.name != null ? String(d.name) : (d.id != null && table ? table.name(d.id) : '');
+    return name;
+  }
+  if (d.kind === 'compound') {
+    const args = (d.args || []).map((a) => logicFormatShowTerm(a, env, table)).join(', ');
+    const pred = d.predicate != null ? d.predicate : '';
+    return `${pred}(${args})`;
+  }
+  return '?';
+}
+
 function logicFormatFactForTrace(term) {
   if (!term) return '?';
   if (term.kind === 'atom') {
@@ -1008,6 +1050,7 @@ function executeLogicGoals(mergedDef, goals, inputEnv, options) {
     : new LogicEngine(mergedDef.clauses || []);
   if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
+  if (opts.onShowLine) engine.onShowLine = opts.onShowLine;
   const prepared = logicPrepareGoalsForInvoke(goals);
   const solutions = engine.solveQuery(prepared, inputEnv || {});
   return {

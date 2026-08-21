@@ -22,6 +22,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | Built-in | Syntax | Meaning |
 |----------|--------|---------|
 | **`count/2`** | `count(Goal, N)` | **`N`** = number of solutions to **`Goal`** on the current KB |
+| **`show/N`** | `show(T1, …, TN)` | Print dereferenced terms (1–32 args); always succeeds; reserved predicate |
+
+**`count/2`** detail below. **`show/N`** — see [inline-logic.md](inline-logic.md#built-in-shown-logic-debug-output).
 
 ---
 

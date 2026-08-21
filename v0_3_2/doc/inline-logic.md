@@ -16,6 +16,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits; **`use .mod as alias`** prefixes imported predicates |
+| **Debug output** | Built-in **`show/N`** — print logic terms during query / rule / constraint execution |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
 
@@ -40,6 +41,7 @@ LogTScript logic follows common Prolog conventions:
 | **Variable** | `X`, `Person`, `_` | Uppercase or `_` — unbound until unified |
 | **Atom** | `john`, `chevy`, `might` | Lowercase identifier — constant symbol |
 | **Number** | `15`, `-4` | Integer literal |
+| **String literal** | `"hello "`, `"line\n"` | Double-quoted text (for **`show/N`** labels); escapes `\"`, `\\` |
 | **Fact** | `owns(john, chevy)` | Ground clause (no body) |
 | **Rule** | `modifier2(X, 0) <- X >= 9, X =< 12` | Head `<-` body goals (comma = AND) |
 | **Negation** | `\+ age(peter, _)` | Negation as failure — goal cannot be proven |
@@ -57,8 +59,8 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | `:-` rule neck | `<-` rule neck |
 | `\+ Goal` | `\+ Goal` — negation as failure (same idea as Prolog) |
 | `true` / `fail` | Not built-in — use facts, `\+`, or empty query failure |
-| Lists, strings, floats | **Not supported** — atoms + integers only |
-| Quoted atoms `'John'` | **Not supported** — use lowercase atoms |
+| Lists, floats | **Not supported** — atoms + integers + string literals |
+| Quoted atoms `'John'` | Use **`"John"`** string literals (show labels) or lowercase atoms |
 | Arbitrary arity / DCG / modules | Single inline namespace + `use` merge |
 | Top-level consult | **`inline [logic]`** + **`comp [logic]`** split |
 | Depth / solution limits | Configurable on **`comp [logic]`** — see [comp-logic.md](comp-logic.md) |
@@ -469,6 +471,82 @@ show(ok)
 ```
 
 Both modules merge once each — no error. Plain **`use`** on both sides would fail at elaboration.
+
+---
+
+## Built-in `show/N` (logic debug output)
+
+**`show(T1, T2, …)`** is a **reserved built-in predicate** in the logic engine — not the top-level LogTScript **`show(wire)`** statement. Same name, different rules:
+
+| | **Logic `show/N`** | **Script `show(...)`** |
+|--|-------------------|-------------------------|
+| Where | Query / rule / constraint **bodies** | Top-level script, exec blocks |
+| Arguments | Logic **terms** (atom, number, compound, var, `"string"`) | Wires, expressions, `; dec` / `; hex` tags |
+| Output | Prolog-style term text → run **output buffer** | Wire / vector / decode formatting |
+
+**Semantics:**
+
+- **`N`** from **1** to **32** — one output line per successful goal, terms space-separated.
+- **`show()`** with zero arguments → **parse error**.
+- Always **succeeds** (side-effect goal); does not fail the surrounding query.
+- On **backtracking**, prints again for each successful branch (Prolog-style).
+- **`show/N`** cannot be defined as a fact, rule, or constraint head — reserved name.
+
+Works in named queries on **`comp [logic]`**, and in ad-hoc **`.world:query({ show(...) })`** — output appears in the same buffer as script **`show`**.
+
+String literals print **without** surrounding quotes.
+
+**Spacing:** arguments are joined with a **single space**. A string literal that already ends with a space adds **another** space from the join — e.g. `show("found ", X)` prints `found  john` (two spaces). Prefer `show("found", X)` or put the space in the next literal: `show("found ", " ", X)` only if you need explicit control.
+
+Also see built-in **`count/2`** in [logic-indexing.md](logic-indexing.md).
+
+### Example — trace inside relations
+
+```logts-play
+inline [logic] .world:
+
+    inside(john, johnsCar)
+    inside(mary, marysBike)
+
+    query trace:
+        inside(P, Obj),
+        show("inside:", inside(P, Obj))
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = trace
+    set = trigger
+}
+```
+
+**Load & Run** prints two lines (one per solution):
+
+```text
+inside: inside(john, johnsCar)
+inside: inside(mary, marysBike)
+```
+
+### Example — ad-hoc query
+
+```logts-play
+inline [logic] .world:
+
+    person(john)
+    person(mary)
+
+:
+
+1wire run = 1
+8wire[4] who = .world:query({ person(X), show("found", X) })
+```
 
 ---
 
