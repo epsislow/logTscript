@@ -41511,5 +41511,283 @@ comp [logic] .worldLogic:
     h.assert('userMember ok', prog.clauses[0].head.predicate, 'userMember');
   });
 
+  const INLINE_LOGIC_CARS = `inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+    query allCarInfos:
+        carInfo(X, Y, Z, K)
+
+:`;
+
+  function runF29SelUniqueMatrix(h, session) {
+    const zeros192 = '0'.repeat(192);
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[3, 2] table = ${zeros192}
+8wire numRows = 00000000
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(0,2);unique >= table
+    allCarInfos;sel(0,2);unique:count >= numRows
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const table = interp.getWireEffectiveValue('table');
+    h.assert('row0 brand toyota', table.slice(0, 32), '01110100011011110111100101101111');
+    h.assert('row0 year 2020', table.slice(32, 64), '00000000000000000000011111100100');
+    h.assert('row1 brand ford', table.slice(64, 96), '01100110011011110111001001100100');
+    h.assert('row1 year 2018', table.slice(96, 128), '00000000000000000000011111100010');
+    h.assert('row2 fill', table.slice(128, 160), '0'.repeat(32));
+    h.assert('count=2 after sel unique', interp.getWireEffectiveValue('numRows'), '00000010');
+  }
+
+  reg(3800, 'logic', 'F29 comp redirect ;sel(0,2);unique matrix pack (legacy)', runF29SelUniqueMatrix);
+  reg(3801, 'logic', 'F29 comp redirect ;sel(0,2);unique matrix pack (wave)', runF29SelUniqueMatrix, { propagation: 'wave' });
+
+  reg(3802, 'logic', 'F29 query 4 vars elaborates without max-2 error (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ran', interp.getWireEffectiveValue('trigger'), '1');
+  });
+
+  reg(3803, 'logic', 'F29 query 4 vars elaborates without max-2 error (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ran', interp.getWireEffectiveValue('trigger'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3804, 'logic', 'F29 matrix bulk N=4 without sel throws (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[3, 2] table = ${'0'.repeat(192)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos >= table
+    set = trigger
+}`;
+    h.assertThrows(
+      'matrix requires sel',
+      () => session.run(src),
+      'matrix bulk requires ;sel',
+    );
+  });
+
+  reg(3805, 'logic', 'F29 matrix bulk N=4 without sel throws (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[3, 2] table = ${'0'.repeat(192)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos >= table
+    set = trigger
+}`;
+    h.assertThrows(
+      'matrix requires sel',
+      () => session.run(src),
+      'matrix bulk requires ;sel',
+    );
+  }, { propagation: 'wave' });
+
+  function runF29ColSlices(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[5] colBrand = ${'0'.repeat(160)}
+32wire[5] colYear = ${'0'.repeat(160)}
+32wire[5] colType = ${'0'.repeat(160)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos::0 >= colBrand
+    allCarInfos::2 >= colYear
+    allCarInfos::3 >= colType
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('col0 row0 toyota', interp.getWireEffectiveValue('colBrand').slice(0, 32),
+      '01110100011011110111100101101111');
+    h.assert('col2 row0 2020', interp.getWireEffectiveValue('colYear').slice(0, 32),
+      '00000000000000000000011111100100');
+    h.assert('col3 row0 sedan', interp.getWireEffectiveValue('colType').slice(0, 32),
+      '01110011011001010110010001100001');
+  }
+
+  reg(3806, 'logic', 'F29 column slices ::0 ::2 ::3 original indices (legacy)', runF29ColSlices);
+  reg(3807, 'logic', 'F29 column slices ::0 ::2 ::3 original indices (wave)', runF29ColSlices, { propagation: 'wave' });
+
+  reg(3808, 'logic', 'F29 cell :0:2 uses original col index (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire yearWire = ${'0'.repeat(32)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos:0:2 >= yearWire
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('year 2020', interp.getWireEffectiveValue('yearWire'),
+      '00000000000000000000011111100100');
+  });
+
+  reg(3809, 'logic', 'F29 cell :0:2 uses original col index (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire yearWire = ${'0'.repeat(32)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos:0:2 >= yearWire
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('year 2020', interp.getWireEffectiveValue('yearWire'),
+      '00000000000000000000011111100100');
+  }, { propagation: 'wave' });
+
+  function runF29RowFullAndSel(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[4] rowAll = ${'0'.repeat(128)}
+32wire[2] rowXZ = ${'0'.repeat(64)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos:0 >= rowAll
+    allCarInfos;sel(0,2):0 >= rowXZ
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const rowAll = interp.getWireEffectiveValue('rowAll');
+    h.assert('rowAll brand', rowAll.slice(0, 32), '01110100011011110111100101101111');
+    h.assert('rowAll color red', rowAll.slice(32, 64), '01110010011001010110010000000000');
+    h.assert('rowAll year', rowAll.slice(64, 96), '00000000000000000000011111100100');
+    h.assert('rowAll type sedan', rowAll.slice(96, 128), '01110011011001010110010001100001');
+    const rowXZ = interp.getWireEffectiveValue('rowXZ');
+    h.assert('rowXZ brand', rowXZ.slice(0, 32), '01110100011011110111100101101111');
+    h.assert('rowXZ year', rowXZ.slice(32, 64), '00000000000000000000011111100100');
+  }
+
+  reg(3810, 'logic', 'F29 row :0 full N cols and ;sel(0,2):0 pair (legacy)', runF29RowFullAndSel);
+  reg(3811, 'logic', 'F29 row :0 full N cols and ;sel(0,2):0 pair (wave)', runF29RowFullAndSel, { propagation: 'wave' });
+
+  function runF29WidthAndInline(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+8wire nCols = 00000000
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos:width >= nCols
+    set = trigger
+}
+
+32wire[2, 2] inlineTable = .world:query({ carInfo(X, Y, Z, K) };sel(0,2);unique)`;
+    const { interp } = session.run(src);
+    h.assert('width=4', interp.getWireEffectiveValue('nCols'), '00000100');
+    const inlineTable = interp.getWireEffectiveValue('inlineTable');
+    h.assert('inline row0 toyota', inlineTable.slice(0, 32), '01110100011011110111100101101111');
+    h.assert('inline row0 2020', inlineTable.slice(32, 64), '00000000000000000000011111100100');
+    h.assert('inline row1 ford', inlineTable.slice(64, 96), '01100110011011110111001001100100');
+  }
+
+  reg(3812, 'logic', 'F29 :width N and inline ;sel(0,2);unique (legacy)', runF29WidthAndInline);
+  reg(3813, 'logic', 'F29 :width N and inline ;sel(0,2);unique (wave)', runF29WidthAndInline, { propagation: 'wave' });
+
+  reg(3814, 'logic', 'F29 regresie query 2 vars matrix fara sel (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WORLD + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[5, 2] table = ${'0'.repeat(320)}
+1wire trigger = 1
+
+.worldLogic:{
+    allAges >= table
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('row0 john', interp.getWireEffectiveValue('table').slice(0, 32),
+      '01101010011011110110100001101110');
+  });
+
+  reg(3815, 'logic', 'F29 regresie query 2 vars matrix fara sel (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WORLD + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+32wire[5, 2] table = ${'0'.repeat(320)}
+1wire trigger = 1
+
+.worldLogic:{
+    allAges >= table
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('row0 john', interp.getWireEffectiveValue('table').slice(0, 32),
+      '01101010011011110110100001101110');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

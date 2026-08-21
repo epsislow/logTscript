@@ -11482,10 +11482,16 @@ Exemplu: \`8wire scoreIn\` + \`myX = scoreIn\` → pin **8** biți; \`128wire bi
 | **1 free** | \`johnOwns:count >= numRows\` | Solution count (capped at vector length) |
 | **1 free** | \`johnOwns;unique:count >= numRows\` | Count **after** \`;unique\` dedupe |
 | **2 free** | \`allAges >= table\` | **Matrix bulk** — row = solution, col = variable (\`32wire[R,C]\`) |
-| **2 free** | \`allAges:0 >= row0\` | **Row slice** (\`32wire[C]\`) |
-| **2 free** | \`allAges::0 >= col0\` | **Column slice** |
+| **N free (1…16)** | \`allCarInfos;sel(0,2) >= table\` | **Matrix bulk** on **two selected columns** (0-based indices) |
+| **N free** | \`allCarInfos >= table\` | **Error** at elaboration when **N > 2** — use **\`;sel(i,j)\`** |
+| **N free** | \`allCarInfos:0 >= rowAll\` | **Full row** vector \`wire[N]\` (all query variables) |
+| **N free** | \`allCarInfos;sel(0,2):0 >= pair\` | **Projected row** vector \`wire[2]\` |
+| **2 free** | \`allAges:0 >= row0\` | **Row slice** (\`32wire[C]\`) — at N=2, same as full row |
+| **2 free** | \`allAges::0 >= col0\` | **Column slice** — index is **original query column** (0-based) |
+| **N free** | \`allCarInfos::2 >= colYear\` | **Column slice** on variable index **2** (independent of \`;sel\` on other redirects) |
 | **2 free** | \`allAges:0:1 >= ageWire\` | **Single cell** (scalar wire) |
-| **2 free** | \`allAges:count >= numRows\` | Rows written; \`allAges:width >= numCols\` → column count |
+| **2 free** | \`allAges:count >= numRows\` | Rows written |
+| **N free** | \`allCarInfos:width >= numCols\` | **Logical column count** = number of free variables (**N**, not 2) |
 | **pout** | \`truncated >= wire\` | **\`1\`** if any query hit \`maxSolutions\` cap this pass |
 | **pout** | \`depthExceeded >= wire\` | **\`1\`** if any query hit \`maxDepth\` this pass |
 | **pout** | \`mutationFailed >= wire\` | **\`1\`** if the last \`logic { }\` transaction failed |
@@ -11502,26 +11508,44 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 
 **Encoding:** atoms → **ASCII + \`\\0\` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or \`\\0\` per cell if undeclared).
 
-**Limits:** max **2** free variables per query at the redirect interface.
+**Limits:** up to **16** free variables per query. **Matrix bulk** (\`query >= matrix\`) supports **two columns** on the wire — use **\`;sel(i,j)\`** when **N > 2**. At **N = 2**, columns **0** and **1** are implicit (same as **\`;sel(0,1)\`**).
+
+### Column select (\`;sel(i,j)\`)
+
+Select **two query columns** (0-based, left-to-right in the goal) before policies and packing:
+
+\`\`\`logts
+allCarInfos;sel(0,2);unique >= table
+allCarInfos;sel(0,2):0 >= brandYearPair
+\`\`\`
+
+| Rule | Behaviour |
+|------|-----------|
+| **Indices** | **\`i\`**, **\`j\`** integers, **\`0 ≤ i,j < N\`**, **\`i ≠ j\`** |
+| **Order** | **\`;sel\` → \`;unique\` / \`;first\` / \`;last\` → redirect** (\`>=\`, \`:count\`, …) |
+| **Matrix bulk** | Required when **N > 2**; optional at **N = 2** |
+| **Row \`:r\`** | Without **\`;sel\`** → full row **\`wire[N]\`**; with **\`;sel(i,j):r\`** → **\`wire[2]\`** |
+| **\`::c\` / \`:r:c\`** | Index **original** query columns, not post-**\`;sel\`** |
 
 ### Result policies (\`;unique\`, \`;first\`, \`;last\`)
 
-Place **\`;policy\`** immediately after the query name, **before** redirect selectors (\`:0\`, \`:count\`, \`>=\`):
+Place modifiers after the query name, **before** redirect selectors (\`:0\`, \`:count\`, \`>=\`):
 
 \`\`\`logts
 johnOwns;unique >= allCars
+allCarInfos;sel(0,2);unique >= table
 johnOwns;unique:count >= numRows
 johnOwns;last >= lastCar
 \`\`\`
 
 | Policy | When applied | Effect |
 |--------|--------------|--------|
-| **\`;unique\`** | After solve, before pack | Dedupe by binding tuple — vector: one column; matrix: full row |
-| **\`;first\`** | After solve | First solution only (useful when vector length > 1 but you want slot 0) |
-| **\`;last\`** | After solve | Last solution in **discovery order** (engine still enumerates up to limits) |
+| **\`;unique\`** | After **\`;sel\`**, before pack | Dedupe by **projected** binding tuple (two cols after sel, full row at N=2) |
+| **\`;first\`** | After **\`;sel\`** | First solution only |
+| **\`;last\`** | After **\`;sel\`** | Last solution in **discovery order** |
 | *(none)* | — | All solutions within \`maxSolutions\` (default behaviour) |
 
-**\`:count\`** reflects the list **after** the policy runs — e.g. three raw solutions with one duplicate → **\`;unique:count\`** returns **2**.
+**\`:count\`** reflects the list **after** the policy runs — e.g. three raw solutions with one duplicate pair after **\`;sel(0,2)\`** → **\`;unique:count\`** returns **2**.
 
 ---
 
@@ -11950,6 +11974,44 @@ comp [logic] .peopleLogic:
 \`\`\`
 
 After **Load & Run**: \`uniqCars\` holds **\`c\`**, **\`f\`** (not two \`c\` slots); **\`numUniq = 2\`**.
+
+---
+
+## Example — \`;sel(0,2);unique\` on a 4-variable query
+
+Query **\`carInfo(X, Y, Z, K)\`** has four free variables. Matrix bulk needs **\`;sel(i,j)\`** to pick two columns (brand **X** = 0, year **Z** = 2). **\`;unique\`** dedupes on the **projected** pair.
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+    query allCarInfos:
+        carInfo(X, Y, Z, K)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world { }
+
+:
+
+32wire[3, 2] table = 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+8wire numUniq = 00000000
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(0,2);unique >= table
+    allCarInfos;sel(0,2);unique:count >= numUniq
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`numUniq = 2\`**. **\`::2\`** and **\`:0:2\`** still use **original** column index **2** (= year **Z**).
 
 ---
 
@@ -20565,13 +20627,14 @@ query personWithoutAge:
 
 ## Queries and free variables
 
-Each \`query\` may expose **at most two** free variables (see matrix/vector redirects in [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside \`\\+\`) are not “output columns” by themselves.
+Each \`query\` may expose up to **16** free variables. **Matrix bulk** on \`comp [logic]\` still writes **two columns** per row — use **\`;sel(i,j)\`** when **N > 2** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside \`\\+\`) are not output columns.
 
 | Free vars | Redirect pattern (on comp) |
 |-----------|----------------------------|
 | **0** | \`queryName >= wire\` — \`1\` if any solution, else \`0\` |
 | **1** | \`queryName:0 >= wire\`, \`queryName:1 >= wire\`, … — solution index |
-| **2** | \`query >= matrix\`, \`query:r >= vector\`, … — see comp-logic |
+| **2** | \`query >= matrix\`, \`query:r >= vector\`, … — implicit columns 0 and 1 |
+| **N > 2** | \`query;sel(i,j) >= matrix\`, \`query:0 >= rowAll\` (N cells), \`query;sel(i,j):0 >= pair\` — see comp-logic |
 
 ---
 
@@ -24211,6 +24274,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Goals** | Prolog body in \`{ }\` — comma = AND, \`\\+\`, \`=:=\`, etc. |
 | **Inputs** | Optional \`, X=wire\` after the block |
 | **Limits** | Optional \`, maxDepth=\\\\N\`, \`, maxSolutions=\\\\N\` (decimal literals; default **256** / **64**) |
+| **Column select** | Optional \`;sel(i,j)\` before policy — 0-based column indices into free variables |
 | **Result policy** | Optional trailing \`;unique\`, \`;first\`, or \`;last\` (after bindings/options) |
 | **\`_\`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | \`1wire\` LHS + all vars bound → \`1\` / \`0\` |
@@ -24236,7 +24300,8 @@ result = .world:query({ owns(john, X) }, X=car)
 | **\`, Var=expr\`** | Bind logic variables before solve (wire → atom/number/bool) |
 | **\`, maxDepth=\\\\N\`** | Optional — max goal steps (default **256**) |
 | **\`, maxSolutions=\\\\N\`** | Optional — max solutions collected (default **64**) |
-| **\`;unique\` / \`;first\` / \`;last\`** | Optional — post-process solutions before pack (see below) |
+| **\`;sel(i,j)\`** | Optional — project to two columns before policy/pack (required for \`32wire[R,C]\` when more than two free vars) |
+| **\`;unique\` / \`;first\` / \`;last\`** | Optional — post-process **projected** solutions before pack (see below) |
 
 **No pout flags:** inline \`query\` does **not** expose \`truncated\` / \`depthExceeded\` — caps apply silently (extra solutions dropped, depth failure = unprovable / boolean \`0\`).
 
@@ -24271,7 +24336,8 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 | All Prolog vars bound (in goal or via \`, Var=wire\`) | \`1wire\` | **\`1\`** if satisfiable, **\`0\`** otherwise |
 | One free var — **first solution only** | \`8wire\`, \`40wire\`, \`80wire\`, … (no \`[N]\`) | First binding for that var, encoded on **full wire width** (atom → ASCII + \`\\0\` pad) |
 | One collected var (\`_\` or free name) — **all solutions** | \`8wire[N]\`, \`40wire[N]\`, … | Vector — one solution per slot (discovery order, \`\\0\` fill on unused slots) |
-| Two free vars | \`32wire[R,C]\` | Matrix — row = solution, column = variable |
+| Two free vars (or after \`;sel\`) | \`32wire[R,C]\` | Matrix — row = solution, two columns |
+| More than two free vars | \`32wire[R,C]\` with \`;sel(i,j)\` | Matrix on selected columns; error without \`;sel\` |
 | Existence with free vars | \`1wire\` | **\`1\`** / **\`0\`** (boolean — not first binding) |
 
 **Wire width = cell width:** an atom such as \`chevy\` (5 letters) needs **\`40wire\`** (5×8 bits) for the full name. **\`8wire\`** holds only **one ASCII character** (the first letter). Same rule as [comp-logic.md](comp-logic.md) redirects.
@@ -24466,6 +24532,24 @@ show(lastChar; ascii)
 \`\`\`
 
 Discovery order is \`chevy\` → \`ford\` → \`bike\`. **\`;first\`** → \`c\`, **\`;last\`** → \`b\`.
+
+### Column select — \`;sel(0,2);unique\` on four variables
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+:
+
+32wire[2, 2] table = .world:query({ carInfo(X, Y, Z, K) };sel(0,2);unique)
+
+show(table; ascii)
+\`\`\`
+
+**Load & Run** packs two columns (brand + year) after dedupe — two matrix rows, not three.
 
 ---
 

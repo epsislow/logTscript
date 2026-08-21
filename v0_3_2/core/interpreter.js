@@ -1749,9 +1749,23 @@ class Interpreter {
     const execResult = execFn(merged, goals, inputEnv, execOpts);
     let solutions = execResult.solutions || [];
     const freeVars = outVarsFn(preparedGoals, inputEnv);
+    const validateCountFn = typeof logicValidateQueryVarCount === 'function'
+      ? logicValidateQueryVarCount : null;
+    const validateSelFn = typeof logicValidateColumnSelect === 'function'
+      ? logicValidateColumnSelect : null;
+    const policyVarsFn = typeof logicPolicyVarsForRedirect === 'function'
+      ? logicPolicyVarsForRedirect : null;
+    const ctxLabel = `${instName}:query`;
+    if (validateCountFn) validateCountFn(freeVars.length, ctxLabel);
+    if (invoke.columnSelect && validateSelFn) {
+      validateSelFn(invoke.columnSelect, freeVars.length, ctxLabel);
+    }
     const applyFn = typeof logicApplyResultPolicy === 'function' ? logicApplyResultPolicy : null;
     if (invoke.resultPolicy && applyFn) {
-      solutions = applyFn(solutions, invoke.resultPolicy, freeVars);
+      const policyVars = policyVarsFn
+        ? policyVarsFn(freeVars, invoke.columnSelect || null)
+        : freeVars;
+      solutions = applyFn(solutions, invoke.resultPolicy, policyVars);
     }
 
     const targetWireName = this._inlineLogicAssignWire;
@@ -1784,7 +1798,7 @@ class Interpreter {
       encodeFreeVars = [];
     }
 
-    const bits = encFn(solutions, encodeFreeVars, shape, fillBits, scalarWidth);
+    const bits = encFn(solutions, encodeFreeVars, shape, fillBits, scalarWidth, invoke.columnSelect || null);
     return {
       value: bits,
       ref: null,
@@ -11211,6 +11225,7 @@ if (this.isBuiltinDEMUX(name)) {
         if (compForBlock && compForBlock.type === 'logic' && typeof LogicComponent !== 'undefined') {
           LogicComponent.assertNoMutationBlocks(compForBlock, component, properties);
           LogicComponent.validateQuerySelection(compForBlock, component, properties, this);
+          LogicComponent.validateQueryRedirects(compForBlock, component, properties, this);
         }
         const setExprComponentRefs = (typeof collectSetExprComponentRefs === 'function')
           ? collectSetExprComponentRefs(setExpr, this)
@@ -14444,6 +14459,7 @@ if (s.assignment) {
       if (typeof LogicComponent !== 'undefined') {
         LogicComponent.assertNoMutationBlocks(comp, component, properties);
         LogicComponent.validateQuerySelection(comp, component, properties, this);
+        LogicComponent.validateQueryRedirects(comp, component, properties, this);
       }
       comp._logicRedirectProps = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
       comp._logicRedirects = comp._logicRedirectProps;

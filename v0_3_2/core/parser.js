@@ -1305,6 +1305,59 @@ parseFuncTags() {
   return tags;
 }
 
+parseLogicQueryModifiers() {
+  const allowedPolicies = new Set(['unique', 'first', 'last']);
+  let columnSelect = null;
+  let resultPolicy = null;
+  while (this.c.type === 'SYM' && this.c.value === ';') {
+    this.eat('SYM', ';');
+    if (this.c.type === 'ID' && this.c.value === 'sel') {
+      if (columnSelect) {
+        throw Error(`Only one ;sel(i,j) allowed at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('ID');
+      if (this.c.type !== 'SYM' || this.c.value !== '(') {
+        throw Error(`Expected '(' after sel at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', '(');
+      this.t.skip();
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected integer column index in sel( at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const i = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      this.t.skip();
+      if (this.c.type !== 'SYM' || this.c.value !== ',') {
+        throw Error(`Expected ',' in sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ',');
+      this.t.skip();
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected second integer in sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const j = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      this.t.skip();
+      if (this.c.type !== 'SYM' || this.c.value !== ')') {
+        throw Error(`Expected ')' after sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ')');
+      columnSelect = [i, j];
+      continue;
+    }
+    if (this.c.type === 'ID' && allowedPolicies.has(this.c.value)) {
+      if (resultPolicy) {
+        throw Error(`Only one result policy allowed (got '${resultPolicy}' and '${this.c.value}') at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      resultPolicy = this.c.value;
+      this.eat('ID');
+      continue;
+    }
+    throw Error(`Expected sel, unique, first, or last after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  return { columnSelect, resultPolicy };
+}
+
 parseLogicResultPolicy() {
   const allowed = new Set(['unique', 'first', 'last']);
   if (this.c.type !== 'SYM' || this.c.value !== ';') {
@@ -2272,7 +2325,7 @@ parseBoardInstance() {
     this.c = savedC;
   }
 
-  tryParseLogicQueryRedirect(propName, resultPolicy) {
+  tryParseLogicQueryRedirect(propName, resultPolicy, columnSelect) {
     if (this.c.type !== 'SYM' || this.c.value !== ':') return null;
     const savedPos = this.t.i;
     const savedLine = this.t.line;
@@ -2355,6 +2408,7 @@ parseBoardInstance() {
       rowIndex,
       colIndex,
       resultPolicy: resultPolicy || null,
+      columnSelect: columnSelect || null,
       target: targetAtom,
       expr: null,
       ...enableSuffix,
@@ -2399,8 +2453,11 @@ parseBoardInstance() {
     let propName = this.c.value;
     this.eat('ID');
     let resultPolicy = null;
+    let columnSelect = null;
     if (this.c.type === 'SYM' && this.c.value === ';') {
-      resultPolicy = this.parseLogicResultPolicy();
+      const mods = this.parseLogicQueryModifiers();
+      resultPolicy = mods.resultPolicy;
+      columnSelect = mods.columnSelect;
     }
     while (this.c.type === 'SYM' && this.c.value === ':') {
       const next = this.t.peekToken();
@@ -2524,11 +2581,11 @@ parseBoardInstance() {
       }
 
       const enableSuffix = this.parseOptionalBusEnableSuffix();
-      return { property: 'pout>', poutName: propName, target: targetAtom, expr: null, resultPolicy, ...enableSuffix };
+      return { property: 'pout>', poutName: propName, target: targetAtom, expr: null, resultPolicy, columnSelect, ...enableSuffix };
     }
 
     if (this.c.type === 'SYM' && this.c.value === ':') {
-      const logicRedirect = this.tryParseLogicQueryRedirect(propName, resultPolicy);
+      const logicRedirect = this.tryParseLogicQueryRedirect(propName, resultPolicy, columnSelect);
       if (logicRedirect) return logicRedirect;
     }
 
@@ -5184,6 +5241,7 @@ assignment() {
         let methodBindings = null;
         let methodQueryOptions = null;
         let methodResultPolicy = null;
+        let methodColumnSelect = null;
         this.eat('SYM', '(');
         this.t.skip();
         let callTags = null;
@@ -5224,7 +5282,9 @@ assignment() {
             this.t.skip();
           }
           if (this.c.type === 'SYM' && this.c.value === ';') {
-            methodResultPolicy = this.parseLogicResultPolicy();
+            const mods = this.parseLogicQueryModifiers();
+            methodResultPolicy = mods.resultPolicy;
+            methodColumnSelect = mods.columnSelect;
           }
         } else {
           while (!(this.c.type === 'SYM' && this.c.value === ')')) {
@@ -5250,6 +5310,7 @@ assignment() {
           method.queryOptions = methodQueryOptions;
         }
         if (methodResultPolicy) method.resultPolicy = methodResultPolicy;
+        if (methodColumnSelect) method.columnSelect = methodColumnSelect;
         if (callTags) method.callTags = callTags;
         if (globalRef) method.globalRef = true;
         return tagGlobal({ inlineMethod: method });

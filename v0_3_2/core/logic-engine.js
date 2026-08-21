@@ -1125,6 +1125,48 @@ function logicInferBindType(bitWidth) {
   return 'number';
 }
 
+const LOGIC_MAX_QUERY_VARS = 16;
+
+function logicValidateQueryVarCount(count, context) {
+  if (count < 0 || count > LOGIC_MAX_QUERY_VARS) {
+    throw Error(`${context}: query has ${count} output variables (maximum ${LOGIC_MAX_QUERY_VARS})`);
+  }
+}
+
+function logicValidateColumnSelect(columnSelect, varCount, context) {
+  if (!columnSelect) return;
+  if (!Array.isArray(columnSelect) || columnSelect.length !== 2) {
+    throw Error(`${context}: ;sel requires exactly two column indices`);
+  }
+  const [i, j] = columnSelect;
+  if (!Number.isInteger(i) || !Number.isInteger(j)) {
+    throw Error(`${context}: ;sel indices must be integers`);
+  }
+  if (i < 0 || j < 0 || i >= varCount || j >= varCount) {
+    throw Error(`${context}: ;sel(${i},${j}) out of range for ${varCount} query variables (0-based)`);
+  }
+  if (i === j) {
+    throw Error(`${context}: ;sel(${i},${j}) requires two distinct column indices`);
+  }
+}
+
+function logicPackVarsFromSelect(freeVars, columnSelect) {
+  if (!columnSelect) return freeVars;
+  const [i, j] = columnSelect;
+  return [freeVars[i], freeVars[j]];
+}
+
+function logicResolveMatrixPackVars(freeVars, columnSelect) {
+  if (columnSelect) return logicPackVarsFromSelect(freeVars, columnSelect);
+  if (freeVars.length === 2) return freeVars;
+  return null;
+}
+
+function logicPolicyVarsForRedirect(freeVars, columnSelect) {
+  if (columnSelect) return logicPackVarsFromSelect(freeVars, columnSelect);
+  return freeVars;
+}
+
 function logicSolutionTupleKey(sol, freeVars) {
   if (!sol || !freeVars || !freeVars.length) return '';
   const parts = [];
@@ -1673,25 +1715,31 @@ function executeLogicGoals(mergedDef, goals, inputEnv, options) {
   };
 }
 
-function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth) {
+function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth, columnSelect) {
   if (!freeVars || freeVars.length === 0) {
     const val = solutions && solutions.length > 0 ? 1 : 0;
     const w = shape && shape.kind === 'scalar' ? (scalarWidth || shape.ew || 1) : 1;
     return logicNumberToBits(val, w);
   }
-  if (freeVars.length === 1 && shape && shape.kind === 'vector') {
+  let packVars = freeVars;
+  if (columnSelect) {
+    packVars = logicPackVarsFromSelect(freeVars, columnSelect);
+  } else if (shape && shape.kind === 'matrix' && freeVars.length > 2) {
+    throw Error(`logic query: matrix result requires ;sel(i,j) when ${freeVars.length} output variables`);
+  }
+  if (packVars.length === 1 && shape && shape.kind === 'vector') {
     return logicPackVectorSolutions(
-      solutions, freeVars, shape.count, shape.ew, fillBits,
+      solutions, packVars, shape.count, shape.ew, fillBits,
     );
   }
-  if (freeVars.length === 2 && shape && shape.kind === 'matrix') {
+  if (packVars.length === 2 && shape && shape.kind === 'matrix') {
     return logicPackMatrixSolutions(
-      solutions, freeVars, shape.rows, shape.cols, shape.ew, fillBits,
+      solutions, packVars, shape.rows, shape.cols, shape.ew, fillBits,
     );
   }
-  if (freeVars.length >= 1 && solutions && solutions.length > 0) {
+  if (packVars.length >= 1 && solutions && solutions.length > 0) {
     const w = scalarWidth || (shape && shape.ew) || 8;
-    return logicEncodeSolutionTerm(solutions[0][freeVars[0]], w);
+    return logicEncodeSolutionTerm(solutions[0][packVars[0]], w);
   }
   if (shape && shape.kind === 'vector') {
     return fillBits.repeat(shape.count);
@@ -1844,6 +1892,12 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicPackMatrixSolutions = logicPackMatrixSolutions;
   globalThis.logicPackMatrixRow = logicPackMatrixRow;
   globalThis.logicPackMatrixCol = logicPackMatrixCol;
+  globalThis.LOGIC_MAX_QUERY_VARS = LOGIC_MAX_QUERY_VARS;
+  globalThis.logicValidateQueryVarCount = logicValidateQueryVarCount;
+  globalThis.logicValidateColumnSelect = logicValidateColumnSelect;
+  globalThis.logicPackVarsFromSelect = logicPackVarsFromSelect;
+  globalThis.logicResolveMatrixPackVars = logicResolveMatrixPackVars;
+  globalThis.logicPolicyVarsForRedirect = logicPolicyVarsForRedirect;
   globalThis.logicApplyResultPolicy = logicApplyResultPolicy;
   globalThis.logicSolutionTupleKey = logicSolutionTupleKey;
   globalThis.logicBuildFactIndex = logicBuildFactIndex;
@@ -1892,6 +1946,12 @@ if (typeof module !== 'undefined' && module.exports) {
     logicPackMatrixRow,
     logicPackMatrixCol,
     logicApplyResultPolicy,
+    logicPolicyVarsForRedirect,
+    logicResolveMatrixPackVars,
+    logicValidateColumnSelect,
+    logicValidateQueryVarCount,
+    logicPackVarsFromSelect,
+    LOGIC_MAX_QUERY_VARS,
     logicSolutionTupleKey,
     logicBuildFactIndex,
     logicApplyFactIndexDelta,

@@ -14,6 +14,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Goals** | Prolog body in `{ }` — comma = AND, `\+`, `=:=`, etc. |
 | **Inputs** | Optional `, X=wire` after the block |
 | **Limits** | Optional `, maxDepth=\\N`, `, maxSolutions=\\N` (decimal literals; default **256** / **64**) |
+| **Column select** | Optional `;sel(i,j)` before policy — 0-based column indices into free variables |
 | **Result policy** | Optional trailing `;unique`, `;first`, or `;last` (after bindings/options) |
 | **`_`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | `1wire` LHS + all vars bound → `1` / `0` |
@@ -39,7 +40,8 @@ result = .world:query({ owns(john, X) }, X=car)
 | **`, Var=expr`** | Bind logic variables before solve (wire → atom/number/bool) |
 | **`, maxDepth=\\N`** | Optional — max goal steps (default **256**) |
 | **`, maxSolutions=\\N`** | Optional — max solutions collected (default **64**) |
-| **`;unique` / `;first` / `;last`** | Optional — post-process solutions before pack (see below) |
+| **`;sel(i,j)`** | Optional — project to two columns before policy/pack (required for `32wire[R,C]` when more than two free vars) |
+| **`;unique` / `;first` / `;last`** | Optional — post-process **projected** solutions before pack (see below) |
 
 **No pout flags:** inline `query` does **not** expose `truncated` / `depthExceeded` — caps apply silently (extra solutions dropped, depth failure = unprovable / boolean `0`).
 
@@ -74,7 +76,8 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 | All Prolog vars bound (in goal or via `, Var=wire`) | `1wire` | **`1`** if satisfiable, **`0`** otherwise |
 | One free var — **first solution only** | `8wire`, `40wire`, `80wire`, … (no `[N]`) | First binding for that var, encoded on **full wire width** (atom → ASCII + `\0` pad) |
 | One collected var (`_` or free name) — **all solutions** | `8wire[N]`, `40wire[N]`, … | Vector — one solution per slot (discovery order, `\0` fill on unused slots) |
-| Two free vars | `32wire[R,C]` | Matrix — row = solution, column = variable |
+| Two free vars (or after `;sel`) | `32wire[R,C]` | Matrix — row = solution, two columns |
+| More than two free vars | `32wire[R,C]` with `;sel(i,j)` | Matrix on selected columns; error without `;sel` |
 | Existence with free vars | `1wire` | **`1`** / **`0`** (boolean — not first binding) |
 
 **Wire width = cell width:** an atom such as `chevy` (5 letters) needs **`40wire`** (5×8 bits) for the full name. **`8wire`** holds only **one ASCII character** (the first letter). Same rule as [comp-logic.md](comp-logic.md) redirects.
@@ -269,6 +272,24 @@ show(lastChar; ascii)
 ```
 
 Discovery order is `chevy` → `ford` → `bike`. **`;first`** → `c`, **`;last`** → `b`.
+
+### Column select — `;sel(0,2);unique` on four variables
+
+```logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+:
+
+32wire[2, 2] table = .world:query({ carInfo(X, Y, Z, K) };sel(0,2);unique)
+
+show(table; ascii)
+```
+
+**Load & Run** packs two columns (brand + year) after dedupe — two matrix rows, not three.
 
 ---
 

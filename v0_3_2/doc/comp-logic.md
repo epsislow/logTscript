@@ -155,10 +155,16 @@ Exemplu: `8wire scoreIn` + `myX = scoreIn` → pin **8** biți; `128wire big` �
 | **1 free** | `johnOwns:count >= numRows` | Solution count (capped at vector length) |
 | **1 free** | `johnOwns;unique:count >= numRows` | Count **after** `;unique` dedupe |
 | **2 free** | `allAges >= table` | **Matrix bulk** — row = solution, col = variable (`32wire[R,C]`) |
-| **2 free** | `allAges:0 >= row0` | **Row slice** (`32wire[C]`) |
-| **2 free** | `allAges::0 >= col0` | **Column slice** |
+| **N free (1…16)** | `allCarInfos;sel(0,2) >= table` | **Matrix bulk** on **two selected columns** (0-based indices) |
+| **N free** | `allCarInfos >= table` | **Error** at elaboration when **N > 2** — use **`;sel(i,j)`** |
+| **N free** | `allCarInfos:0 >= rowAll` | **Full row** vector `wire[N]` (all query variables) |
+| **N free** | `allCarInfos;sel(0,2):0 >= pair` | **Projected row** vector `wire[2]` |
+| **2 free** | `allAges:0 >= row0` | **Row slice** (`32wire[C]`) — at N=2, same as full row |
+| **2 free** | `allAges::0 >= col0` | **Column slice** — index is **original query column** (0-based) |
+| **N free** | `allCarInfos::2 >= colYear` | **Column slice** on variable index **2** (independent of `;sel` on other redirects) |
 | **2 free** | `allAges:0:1 >= ageWire` | **Single cell** (scalar wire) |
-| **2 free** | `allAges:count >= numRows` | Rows written; `allAges:width >= numCols` → column count |
+| **2 free** | `allAges:count >= numRows` | Rows written |
+| **N free** | `allCarInfos:width >= numCols` | **Logical column count** = number of free variables (**N**, not 2) |
 | **pout** | `truncated >= wire` | **`1`** if any query hit `maxSolutions` cap this pass |
 | **pout** | `depthExceeded >= wire` | **`1`** if any query hit `maxDepth` this pass |
 | **pout** | `mutationFailed >= wire` | **`1`** if the last `logic { }` transaction failed |
@@ -175,26 +181,44 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 
 **Encoding:** atoms → **ASCII + `\0` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or `\0` per cell if undeclared).
 
-**Limits:** max **2** free variables per query at the redirect interface.
+**Limits:** up to **16** free variables per query. **Matrix bulk** (`query >= matrix`) supports **two columns** on the wire — use **`;sel(i,j)`** when **N > 2**. At **N = 2**, columns **0** and **1** are implicit (same as **`;sel(0,1)`**).
+
+### Column select (`;sel(i,j)`)
+
+Select **two query columns** (0-based, left-to-right in the goal) before policies and packing:
+
+```logts
+allCarInfos;sel(0,2);unique >= table
+allCarInfos;sel(0,2):0 >= brandYearPair
+```
+
+| Rule | Behaviour |
+|------|-----------|
+| **Indices** | **`i`**, **`j`** integers, **`0 ≤ i,j < N`**, **`i ≠ j`** |
+| **Order** | **`;sel` → `;unique` / `;first` / `;last` → redirect** (`>=`, `:count`, …) |
+| **Matrix bulk** | Required when **N > 2**; optional at **N = 2** |
+| **Row `:r`** | Without **`;sel`** → full row **`wire[N]`**; with **`;sel(i,j):r`** → **`wire[2]`** |
+| **`::c` / `:r:c`** | Index **original** query columns, not post-**`;sel`** |
 
 ### Result policies (`;unique`, `;first`, `;last`)
 
-Place **`;policy`** immediately after the query name, **before** redirect selectors (`:0`, `:count`, `>=`):
+Place modifiers after the query name, **before** redirect selectors (`:0`, `:count`, `>=`):
 
 ```logts
 johnOwns;unique >= allCars
+allCarInfos;sel(0,2);unique >= table
 johnOwns;unique:count >= numRows
 johnOwns;last >= lastCar
 ```
 
 | Policy | When applied | Effect |
 |--------|--------------|--------|
-| **`;unique`** | After solve, before pack | Dedupe by binding tuple — vector: one column; matrix: full row |
-| **`;first`** | After solve | First solution only (useful when vector length > 1 but you want slot 0) |
-| **`;last`** | After solve | Last solution in **discovery order** (engine still enumerates up to limits) |
+| **`;unique`** | After **`;sel`**, before pack | Dedupe by **projected** binding tuple (two cols after sel, full row at N=2) |
+| **`;first`** | After **`;sel`** | First solution only |
+| **`;last`** | After **`;sel`** | Last solution in **discovery order** |
 | *(none)* | — | All solutions within `maxSolutions` (default behaviour) |
 
-**`:count`** reflects the list **after** the policy runs — e.g. three raw solutions with one duplicate → **`;unique:count`** returns **2**.
+**`:count`** reflects the list **after** the policy runs — e.g. three raw solutions with one duplicate pair after **`;sel(0,2)`** → **`;unique:count`** returns **2**.
 
 ---
 
@@ -623,6 +647,44 @@ comp [logic] .peopleLogic:
 ```
 
 After **Load & Run**: `uniqCars` holds **`c`**, **`f`** (not two `c` slots); **`numUniq = 2`**.
+
+---
+
+## Example — `;sel(0,2);unique` on a 4-variable query
+
+Query **`carInfo(X, Y, Z, K)`** has four free variables. Matrix bulk needs **`;sel(i,j)`** to pick two columns (brand **X** = 0, year **Z** = 2). **`;unique`** dedupes on the **projected** pair.
+
+```logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+    query allCarInfos:
+        carInfo(X, Y, Z, K)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world { }
+
+:
+
+32wire[3, 2] table = 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+8wire numUniq = 00000000
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(0,2);unique >= table
+    allCarInfos;sel(0,2);unique:count >= numUniq
+    set = trigger
+}
+```
+
+After **Load & Run**: **`numUniq = 2`**. **`::2`** and **`:0:2`** still use **original** column index **2** (= year **Z**).
 
 ---
 
