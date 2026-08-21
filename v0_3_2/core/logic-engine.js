@@ -84,6 +84,13 @@ function logicInternGoal(goal, table) {
       right: logicInternTerm(goal.right, table),
     };
   }
+  if (goal.kind === 'is') {
+    return {
+      kind: 'is',
+      left: logicInternTerm(goal.left, table),
+      right: logicInternTerm(goal.right, table),
+    };
+  }
   if (goal.kind === 'not') {
     return { kind: 'not', goal: logicInternGoal(goal.goal, table) };
   }
@@ -192,6 +199,9 @@ class LogicEngine {
       if (!logicUnifyExpr(g0.left, g0.right, env, this.table)) return false;
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'is') {
+      return this._solveIs(g0.left, g0.right, rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call' && g0.predicate === 'count' && g0.arity === 2) {
       return this._solveCount(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -203,6 +213,9 @@ class LogicEngine {
     }
     if (g0.kind === 'call' && g0.predicate === 'nth1' && g0.arity === 3) {
       return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, true);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'is' && g0.arity === 2) {
+      return this._solveIs(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
@@ -265,6 +278,21 @@ class LogicEngine {
     const line = parts.join(' ');
     if (typeof this.onShowLine === 'function') this.onShowLine(line);
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveIs(left, right, rest, env, depth, onSuccess, onDepthExceeded) {
+    const val = logicEvalNumber(right, env, this.table);
+    if (val == null) return false;
+    const ld = logicDeref(left, env);
+    if (ld.kind === 'var') {
+      if (ld.name !== '_') env.bind(ld.name, { kind: 'number', value: val });
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (ld.kind === 'number') {
+      if (ld.value !== val) return false;
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
   }
 
   _solveNth(goal, rest, env, depth, onSuccess, onDepthExceeded, oneBased) {
@@ -434,6 +462,9 @@ function logicRenameApartClause(clause, idRef) {
     }
     if (g.kind === 'unify') {
       return { kind: 'unify', left: walkTerm(g.left), right: walkTerm(g.right) };
+    }
+    if (g.kind === 'is') {
+      return { kind: 'is', left: walkTerm(g.left), right: walkTerm(g.right) };
     }
     return g;
   }
@@ -723,7 +754,7 @@ function logicCollectFreeVarsInGoal(goal) {
     if (g.kind === 'not') walkGoal(g.goal);
     else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
-    } else if (g.kind === 'cmp' || g.kind === 'unify') {
+    } else if (g.kind === 'cmp' || g.kind === 'unify' || g.kind === 'is') {
       walkTerm(g.left); walkTerm(g.right);
     }
   }

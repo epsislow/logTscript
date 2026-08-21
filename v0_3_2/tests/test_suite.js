@@ -41118,5 +41118,170 @@ comp [logic] .worldLogic:
   reg(3758, 'logic', 'cut with maxDepth sets depthExceeded (legacy)', runLogicCutMaxDepth);
   reg(3759, 'logic', 'cut with maxDepth sets depthExceeded (wave)', runLogicCutMaxDepth, { propagation: 'wave' });
 
+  reg(3760, 'logic', 'parse is goal infix AST', function(h) {
+    const prog = parseLogicBody('step(N) <- M is N + 1');
+    h.assert('is kind', prog.clauses[0].body[0].kind, 'is');
+    h.assert('left var', prog.clauses[0].body[0].left.name, 'M');
+  });
+
+  reg(3761, 'logic', 'is fails when RHS not evaluable', function(h) {
+    const prog = parseLogicBody('query q: M is N + 1');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('no sol', String(sols.length), '0');
+  });
+
+  const INLINE_IS_STEP = `inline [logic] .world:
+
+    bump(N) <- M is N + 1, show("out", M)
+
+    query q:
+        bump(4)
+
+:`;
+
+  function runLogicIsStep(h, session) {
+    const src = INLINE_IS_STEP + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('shows 5', String(session.outIncludes(interp, 'out 5')), 'true');
+  }
+
+  reg(3762, 'logic', 'recursive rule with is infix (legacy)', runLogicIsStep);
+  reg(3763, 'logic', 'recursive rule with is infix (wave)', runLogicIsStep, { propagation: 'wave' });
+
+  reg(3764, 'logic', 'is ground LHS test succeeds', function(h) {
+    const prog = parseLogicBody('query q: 7 is 3 + 4');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+  });
+
+  reg(3765, 'logic', 'is ground LHS mismatch fails', function(h) {
+    const prog = parseLogicBody('query q: 7 is 3 + 3');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('no sol', String(sols.length), '0');
+  });
+
+  function runLogicIsConstraint(h) {
+    const prog = parseLogicBody(`object(box1)
+level(box1, 0)
+constraint level(O, N) <= object(O), N > 0, level(O, Base), N is Base + 1`);
+    const fact = {
+      kind: 'compound',
+      predicate: 'level',
+      args: [{ kind: 'atom', name: 'box1' }, { kind: 'number', value: 1 }],
+    };
+    const r = logicValidateConstraintsForFacts(prog.constraints, prog.clauses, [fact], {});
+    h.assert('constraint with is passes', String(r.ok), 'true');
+  }
+
+  reg(3766, 'logic', 'constraint body with is (legacy)', runLogicIsConstraint);
+  reg(3767, 'logic', 'constraint body with is (wave)', runLogicIsConstraint, { propagation: 'wave' });
+
+  reg(3768, 'logic', 'unify M = N + 1 still binds structure', function(h) {
+    const prog = parseLogicBody('query q: M = N + 1');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('M arith struct', sols[0].M.kind, 'arith');
+  });
+
+  function runLogicIsWorldQuery(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 10 + 5,
+        show(X)
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ X is 10 + 5, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('shows 15', String(session.outIncludes(interp, '15')), 'true');
+  }
+
+  reg(3769, 'logic', 'is via .world:query show (legacy)', runLogicIsWorldQuery);
+  reg(3770, 'logic', 'is via .world:query show (wave)', runLogicIsWorldQuery, { propagation: 'wave' });
+
+  reg(3771, 'logic', 'parse error is/2 reserved rule head', function(h) {
+    h.assertThrows(
+      'is head',
+      () => parseLogicBody('is(X, Y) <- foo(X)'),
+      "'is/2' is reserved",
+    );
+  });
+
+  reg(3772, 'logic', 'compound is/2 binds like infix', function(h) {
+    const prog = parseLogicBody('query q: is(M, 5 + 3)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('M is 8', String(sols[0].M.value), '8');
+  });
+
+  const INLINE_IS_STEP2 = `inline [logic] .world:
+
+    bump2(N) <- is(M, N + 1), show("out", M)
+
+    query q:
+        bump2(4)
+
+:`;
+
+  function runLogicIsStepCompound(h, session) {
+    const src = INLINE_IS_STEP2 + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('compound shows 5', String(session.outIncludes(interp, 'out 5')), 'true');
+  }
+
+  reg(3773, 'logic', 'recursive rule with is compound (legacy)', runLogicIsStepCompound);
+  reg(3774, 'logic', 'recursive rule with is compound (wave)', runLogicIsStepCompound, { propagation: 'wave' });
+
+  reg(3775, 'logic', 'compound is fails when RHS not evaluable', function(h) {
+    const prog = parseLogicBody('query q: is(M, N + 1)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('no sol', String(sols.length), '0');
+  });
+
+  reg(3776, 'logic', 'user fact is/1 allowed', function(h) {
+    const prog = parseLogicBody('is(1)');
+    h.assert('one clause', String(prog.clauses.length), '1');
+    h.assert('is/1 head', prog.clauses[0].head.predicate, 'is');
+    h.assert('is/1 arity', String(prog.clauses[0].head.args.length), '1');
+  });
+
+  reg(3777, 'logic', 'parse error M is without RHS', function(h) {
+    h.assertThrows(
+      'missing rhs',
+      () => parseLogicBody('query q: M is'),
+      'expected expression after is',
+    );
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

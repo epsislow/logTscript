@@ -20120,6 +20120,7 @@ LogTScript logic follows common Prolog conventions:
 | **Rule** | \`modifier2(X, 0) <- X >= 9, X =< 12\` | Head \`<-\` body goals (comma = AND) |
 | **Negation** | \`\\+ age(peter, _)\` | Negation as failure — goal cannot be proven |
 | **Cut** | \`!\` | Commit — discard backtracking choices from the current clause |
+| **Arithmetic eval** | \`M is Expr\`, \`is(M, Expr)\` | Built-in integer evaluation (see [Arithmetic \`is/2\`](#arithmetic-is2)) |
 | **Query** | \`query johnOwns: owns(john, X)\` | Named goal(s) exported to runtime |
 
 Multiple clauses with the same predicate name and arity are **OR** alternatives (first successful match in discovery order, with backtracking).
@@ -20134,6 +20135,7 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | \`:-\` rule neck | \`<-\` rule neck |
 | \`\\+ Goal\` | \`\\+ Goal\` — negation as failure (same idea as Prolog) |
 | \`!\` | Cut — commit current clause (same idea as Prolog) |
+| \`is\` | Arithmetic evaluate-and-bind — **\`Left is Right\`** or **\`is(Left, Right)\`** (built-in) |
 | \`true\` / \`fail\` | Not built-in — use facts, \`\\+\`, or empty query failure |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms \`'John'\` | Use **\`"John"\`** string literals (show labels) or lowercase atoms |
@@ -20145,7 +20147,8 @@ Operators in rule bodies:
 
 | Operator | Role |
 |----------|------|
-| \`=\` | Bind / unify / arithmetic solve |
+| \`=\` | Bind / unify / structural terms |
+| **\`is\`** | Evaluate integer expression — **\`Left is Right\`** or **\`is(Left, Right)\`** (see [Arithmetic \`is/2\`](#arithmetic-is2)) |
 | \`=:=\` | Numeric equality test |
 | \`=\\=\` | Numeric inequality test |
 | \`>=\`, \`=<\`, \`>\`, \`<\` | Numeric comparison |
@@ -20414,6 +20417,98 @@ eligible(X) <- person(X), \\+ banned(X)
 **Not** classical logical negation — it is a procedural test: try to prove the goal; if the engine finds **any** solution, \`\\+\` fails.
 
 **Cut inside negation:** \`!\` is **not** allowed inside \`\\+ (…)\` — elaboration error at parse time.
+
+---
+
+## Arithmetic \`is/2\`
+
+The word **\`is\`** appears in three different places in LogTScript. Only **logic body goals** use the built-in arithmetic evaluator described here.
+
+| Context | Example | Meaning |
+|---------|---------|---------|
+| **Logic body — infix (usual)** | \`M is N + 1\` | Built-in: evaluate **\`N + 1\`**, bind **\`M\`** |
+| **Logic body — compound (same builtin)** | \`is(M, N + 1)\` | Same as **\`M is N + 1\`** |
+| **Unification (not evaluation)** | \`M = N + 1\` | Unify — if **\`N\`** is free, **\`M\`** gets structure **\`+(N, 1)\`** |
+| **Program block (component wiring)** | \`scoreIn is number pin\` | Pin type declaration inside **\`.module { … }\`** — different parser, not this builtin |
+| **User predicate / atom (allowed)** | \`flag(is).\`, \`is(1).\` | Ordinary terms — **\`is/1\`**, **\`is/3\`**, etc. User **cannot** define **\`is/2\`** as a fact or rule head |
+
+**\`is/2\`** is a **reserved built-in** (like **\`show/N\`** and **\`nth0/3\`**). The engine handles it when you call it in a rule, query, or constraint body. You **cannot** write \`is(X, Y) <- …\` as your own clause.
+
+### \`=\` vs \`is/2\` vs \`=:=\`
+
+| Goal | When \`N\` is free in \`N + 1\` | Typical use |
+|------|----------------------------|-------------|
+| \`M = N + 1\` | **\`M\`** ← structure \`{+, N, 1}\` | Unify terms, lists, structures |
+| \`M is N + 1\` | **Fail** | Integer calculation, counters |
+| \`is(M, N + 1)\` | **Fail** | Same builtin as **\`M is N + 1\`** |
+| \`M =:= N + 1\` | **Fail** | Test numeric equality (both sides must evaluate) |
+| \`7 is 3 + 4\` | — | **Success** (ground test) |
+| \`7 is 3 + 3\` | — | **Fail** (7 ≠ 6) |
+
+The right-hand side must **fully evaluate** to an integer before binding. If any variable in the expression is still free, division by zero occurs, or the expression is not numeric, the goal **fails** (Prolog-style, no exception).
+
+**Left-hand side:** a variable is bound to the computed value; a ground number must match; **\`_\`** accepts any result.
+
+Integer division **\`/\`** truncates toward zero (same as comparisons and **\`=:=\`**).
+
+### Example — counter with \`is\` (Load & Run)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    tick(0)
+    tick(N) <- M is N + 1, M =< 5, tick(M)
+
+    query run:
+        tick(3),
+        show("done")
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = run
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`done\`** because **\`tick(3)\`** succeeds via repeated **\`M is N + 1\`**.
+
+### Example — compound \`is/2\` and \`=\` contrast (Load & Run)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query calc:
+        is(Total, 10 + 5),
+        show("total", Total)
+
+    query unify:
+        M = N + 1,
+        show("struct", M)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = calc
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`total 15\`**. Run again with **\`query = unify\`** (use **Load**, change the query name, **Load & Run**) to see **\`struct +(N, 1)\`**-style output for **\`M = N + 1\`** when **\`N\`** is free — unification, not arithmetic.
 
 ---
 

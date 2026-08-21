@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24 complete.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24, F26 complete; F25 (liste pe wire) deferred.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
@@ -77,6 +77,9 @@ todos:
   - id: logic-cut
     content: "Faza 24: Cut ! — D147–D151 completed"
     status: completed
+  - id: logic-is
+    content: "Faza 26: is/2 evaluare aritmetică Prolog — D152–D159 (completed)"
+    status: pending
 isProject: false
 ---
 
@@ -1238,6 +1241,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 22** Liste Prolog | D128–D142 | **(completed)** |
 | **Faza 23** builtin `nth0` / `nth1` | D143–D146 | **(completed)** |
 | **Faza 24** Cut `!` (**1+i** promovat) | D147–D151 | **(completed)** |
+| **Faza 26** `is/2` evaluare aritmetică | D152–D159 | **(completed)** |
 | **Faza 25** Liste pe wire / vector redirect | **2+c** (D140) | **(deferred)** |
 
 ---
@@ -4391,6 +4395,350 @@ chirie(N, L, C) <- nth1(N, L, C)
 
 ---
 
+## Decizii Faza 26 — `is/2` evaluare aritmetică (D152–D159) **(completed)**
+
+> **Notă:** **Faza 25** rămâne rezervată pentru **liste pe wire** (**2+c**, D140). **`is/2`** este **Faza 26** — feature mic, independent. **Fără F26b** — forma compound **`is(M, Expr)`** intră în aceeași fază.  
+> **Dependență:** aritmetică existentă (`logicEvalNumber`, cmp `=:=`) — **Fazele 2+**; recomandat după **F24** **(completed)**.  
+> **Scop:** builtin Prolog **`is/2`** în body-uri (reguli, query, constraints) — evaluare **obligatorie** a expresiei numerice înainte de legare. Două forme de apel echivalente: **`Left is Right`** (infix) și **`is(Left, Right)`** (compound).
+
+### De ce nu e suficient `=` azi
+
+| Situație | `M = N + 1` (azi) | Prolog `M is N + 1` |
+|----------|-------------------|---------------------|
+| `N` liber | **`M` primește structura** `{+, N, 1}` (unificare) | **Eșec** — expresia nu e evaluabilă |
+| `N` ground `5` | `M = 6` (dacă ambele părți evaluează) | `M = 6` |
+| `M` deja `7`, expr `6` | unificare / eșec după caz | **Eșec** (valori diferite) |
+| RHS atom/listă | poate unifica structuri | **Eșec** — nu e expresie numerică |
+
+Azi **`=`** = unificare generală + shortcut numeric când **ambele** părți sunt evaluabile. **`is`** = doar **evaluate-and-bind** pe integer (ca SWI/SICStus).
+
+**Fără conflict** cu program block comp: **`X is number scoreIn`** rămâne pe alt parser (`.module { … }`), nu în body goal.
+
+> **User confirmări:** 2026-08-21 — **D152 A · D153 A · D154 A · D155 A · D156 A · D157 A · D158 A · D159 A**.  
+> **User confirmări (2):** 2026-08-21 — **F26 include infix + compound `is/2` în body** (ca `show/N`); **head `is/2` rezervat**; **doc obligatorie** diferență builtin vs operator vs program block; **fără F26b**.
+
+### Rezumat decizii **(confirmed)**
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D152** | **Sintaxă** | **A (confirmed)** — infix **`Left is Right`** **și** compound **`is(Left, Right)`** în body (același builtin) |
+| **D153** | **RHS** | **A (confirmed)** — `logicEvalNumber`; neevaluabil → goal **fail** |
+| **D154** | **LHS** | **A (confirmed)** — var bind; number ground test; **`_`** discard |
+| **D155** | **Coexistență cu `=`** | **A (confirmed)** — **`=` neschimbat**; doc **`is`** vs **`=`** |
+| **D156** | **Unde** | **A (confirmed)** — reguli, query, constraints, **`.world:query`**, **`.world:check`** |
+| **D157** | **Out of scope** | **A (confirmed)** — MVP minimal; **head `is/2` rezervat**; **`call(is/2)` meta-call** deferred |
+| **D158** | **Teste & livrare** | **A (confirmed)** — **3760+** legacy+wave + doc logts-play |
+| **D159** | **Erori parse** | **A (confirmed)** — elaboration pentru `is` malformat; **`is/2` head respins** |
+
+### Documentație obligatorie — trei sensuri ale cuvântului **`is`**
+
+> **La livrare F26**, secțiune EN în `v0_3_2/doc/inline-logic.md` — **obligatoriu** clarifică cele trei contexte. Titlu propus: **`Arithmetic is/2` (builtin) vs other uses of `is`**.
+
+| Context | Sintaxă exemplu | Ce face | User poate defini? |
+|---------|----------------|---------|-------------------|
+| **A — Builtin evaluare aritmetică (F26)** | `M is N + 1` sau `is(M, N + 1)` | Evaluează **RHS** la integer; leagă/testează **LHS** | **Nu** — head **`is/2`** rezervat; engine interceptează apelul (ca **`show/N`**) |
+| **B — Unificare / structuri (existent)** | `M = N + 1` | **Unificare** — cu N liber leagă structură `{+, N, 1}` | N/A (operator **`=`**) |
+| **C — Program block comp (existent)** | `.module { X is number scoreIn }` | Declarație tip pin — **alt parser**, **alt sens** | N/A (syntax comp, nu logic body) |
+| **D — Atom / predicate user (permis)** | `flag(is).`, `is(1).`, `marker(is, 1).` | Termeni obișnuiți — **`is`** ca atom sau functor **≠ arity 2 eval** | **`is/1`**, **`is/3`**, … — **da**; **`is/2`** head — **nu** |
+
+**Mesaj central doc (EN, draft):**
+
+> **`is/2`** is a **reserved builtin** for arithmetic evaluation in rule/query/constraint bodies. Write **`M is Expr`** (preferred) or **`is(M, Expr)`** — both invoke the same evaluator. You **cannot** define facts or rules whose head is **`is/2`**. This is **not** the same as **`=`** (unification) or **`Var is type pin`** in a program block (component wiring).
+
+**Tabel comparativ doc — `=` vs `is/2` vs `=:=`:**
+
+| Goal | N liber în expr | Rezultat tipic |
+|------|-----------------|----------------|
+| `M = N + 1` | M ← structură `+(N,1)` | Unificare |
+| `M is N + 1` | **fail** | Evaluare aritmetică |
+| `is(M, N + 1)` | **fail** | Același builtin ca rândul anterior |
+| `M =:= N + 1` | fail (dacă N liber) | Test numeric ground |
+| `7 is 3 + 4` | — | **ok** (test) |
+| `7 is 3 + 3` | — | **fail** |
+
+**Anti-pattern doc (EN):**
+
+```logts
+; WRONG — use is for arithmetic, not =
+step(N) <- M = N + 1, step(M)     ; M gets structure when N free
+
+; RIGHT
+step(N) <- M is N + 1, step(M)    ; fails if N free; binds integer when N ground
+```
+
+**Disambiguare program block vs logic body (doc + plan):**
+
+```
+.comp [logic] myMod {
+    .module {
+        scoreIn is number pin    ; C — comp pin declaration (unchanged)
+    }
+    step(N) <- M is N + 1        ; A — logic builtin is/2
+}
+```
+
+### Notă — poți defini **`is/2`** ca regulă în Prolog?
+
+**Nu (SWI / ISO-style).** **`is/2`** nu e un predicate obișnuit pe care userul îl definește cu `<-` / `:-`:
+
+| Formă | Ce e |
+|-------|------|
+| **`M is Expr`** | Operator infix → **evaluare aritmetică builtin** (system) |
+| **`is(X, Y)`** ca goal compound | Tot **builtin** — **nu** clauze user |
+| **`is(X, Y) :- ...`** | **Interzis / ignorat** — nu poți redefini |
+| **`foo(is)`**, **`flag(is)`** | Atom **`is`** în termeni — **ok** |
+| **`is/1`**, **`is/3`** … (head user) | Alte arități — **ok** în multe Prolog-uri (rar folosit) |
+
+**La noi (F26, aliniat Prolog):** rezervăm **`is/2`** ca head de fact/regulă/constraint (ca **`show/N`**, **`nth0/3`**) — parse error. **Builtin-ul există la apel** (infix sau compound), nu la definire user. **`is/1`**, **`is/3`**, atom **`is`** — permise.
+
+---
+
+### D152 — Sintaxă **`is`** **(completed: A + compound confirmat)**
+
+**Decizie țintă:** două forme echivalente în body (reguli, query, constraints):
+
+1. **Infix (preferat):** **`Left is Right`** → `{ kind: 'is', left, right }`
+2. **Compound (Prolog):** **`is(Left, Right)`** → engine interceptează **`call` `is/2`** → aceeași logică ca (1)
+
+```logts
+step(N) <- M is N + 1, M =< 100, step(M)
+step2(N) <- is(M, N + 1), M =< 100, step2(M)   ; echivalent
+
+query q:
+    Total is 10 + 5
+query q2:
+    is(Total, 10 + 5)                             ; echivalent
+```
+
+| Opțiune | Pro | Contra |
+|---------|-----|--------|
+| **A — infix + compound builtin (confirmed)** | Match SWI; `show/N` pattern deja în codebase | Două surface syntax — doc obligatoriu |
+| **B — doar infix** | Parser simplu | `is(M, Expr)` ar căuta reguli user inexistente — confuz |
+| **C — doar compound** | Fără keyword infix | Nu e sintaxa Prolog uzuală |
+
+**Disambiguare (confirmed):**
+
+- **Program block** comp: **`Var is type pin`** — parser separat (neschimbat).
+- **Body infix:** după `parseTerm()` stânga, dacă urmează token **`is`**, parsează **`parseExpr()`** dreapta → `{ kind: 'is', left, right }`.
+- **Body compound:** `{ kind: 'call', predicate: 'is', args: [left, right] }` — engine branch în `_solveCall` (ca **`show`**, **`nth0`**).
+- Atom **`is`** în termeni: **`foo(is)`**, **`bar(is, 1)`** — rămân valide.
+
+**Implementare:** infix la parser; compound la engine intercept — **aceeași funcție `_solveIs`**.
+
+---
+
+### D153 — RHS (expresia din dreapta) **(completed: A)**
+
+**Comportament Prolog:** RHS trebuie **evaluat complet** la un număr **înainte** de legare; expresia nu poate lăsa variabile libere.
+
+| Opțiune | Comportament când RHS nu e evaluabil | Pro | Contra |
+|---------|--------------------------------------|-----|--------|
+| **A — goal eșuează (recommended)** | `M is N + 1`, N liber → **fail** (ca Prolog) | Semantics corecte; predictibil la backtracking | Fără mesaj explicit (doar fail) |
+| **B — elaboration error** dacă RHS conține vars la parse | Respinge `M is N + 1` la compile dacă N e var | Erori timpurii | Prolog permite sintaxa — vars pot deveni ground mai târziu |
+| **C — exception runtime** | `logicError('instantiation error in is/2')` | Mesaj clar | Nu e pattern-ul engine (fail silent ca Prolog) |
+
+**Evaluare (A):** refolosește **`logicEvalNumber(right, env, table)`** — returnează `null` → goal **fail** pentru: var liberă, `/0`, atom, listă, compound.
+
+| RHS exemplu | Rezultat (A) |
+|-------------|--------------|
+| `5 + 3` | `8` |
+| `N + 1`, N=4 | `5` |
+| `N + 1`, N liber | **fail** |
+| `foo` (atom) | **fail** |
+| `[]` | **fail** |
+| `10 / 0` | **fail** (`null`) |
+
+**Out of scope implicit:** float, `**`, mod — integer trunc ca azi (`/` → `Math.trunc`).
+
+---
+
+### D154 — LHS (termenul din stânga) **(completed: A)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — Prolog standard (recommended)** | **Var** → bind la valoarea calculată; **number ground** → trebuie egal cu RHS evaluat; **`_`** → succes, valoarea ignorată | Match SWI; test ground util (`7 is 3+4` ok, `7 is 3+3` fail) | — |
+| **B — doar variabilă** | Respinge LHS ground la parse | Simplu | `Score is 10 + 5` ground — pattern uzual în Prolog |
+| **C — orice term unificabil** | LHS compound/listă — unificare cu numărul | Flexibil | Nu e `is` Prolog; confuzie cu `=` |
+
+**Detaliu A:**
+
+```logts
+; ok
+M is 5 + 3          → M = 8
+7 is 3 + 4          → ok (test)
+_ is 99             → ok
+
+; fail
+7 is 3 + 3          → fail (7 ≠ 6)
+M is N + 1          → fail (RHS neevaluabil) — indiferent de M
+```
+
+**Var deja legată:** dacă `M` e deja `8` și `M is 5 + 3` → **ok**; dacă `M` e `9` → **fail** (ca unificare ground incompatible).
+
+---
+
+### D155 — Coexistență cu **`=`** **(completed: A)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — `=` neschimbat + `is` nou (recommended)** | **`=`** = unificare (+ shortcut numeric când ambele evaluabile); **`is`** = doar evaluate-and-bind | **Fără breaking changes**; Prolog are ambele | Două operatori — doc obligatoriu |
+| **B — schimbă `=`** | `=` devine strict unificare; aritmetica doar via `is` | Un singur mod pentru numere | **Breaking:** `M = N + 1` nu mai leagă structură — dar nici nu mai face ce credeai |
+| **C — `is` alias intern la `=`** | Parser desugar `is` → același AST ca `=` | Implementare minimă | **Nu** e Prolog — N liber ar lega structură |
+
+**Ghid doc (A):**
+
+| Intenție | Folosește |
+|----------|-----------|
+| Unificare termeni, liste, structuri | **`=`** |
+| Calcule integer, index increment | **`is`** |
+| Test numeric ground | **`=:=`** / **`=\=`** |
+
+---
+
+### D156 — Unde e permis **`is`** **(completed: A)**
+
+| Opțiune | Scope | Pro | Contra |
+|---------|-------|-----|--------|
+| **A — ca cmp / show (recommended)** | Reguli `<-`, query, constraint body, **`.world:query`**, **`.world:check`** | Consistent Faza 12+; util în constraints (`N is Count + 1`) | — |
+| **B — doar reguli + query** | Fără constraints | Evită NAF + `is` interacțiuni | Constraints cu aritmetică devin verbose |
+| **C — include mutation heads** | `+ level(box, N is Score + 1)` | Expressiv | Mutation = ground facts; expr cu vars — incoherent |
+
+**Notă program block:** **`.module { X is number pin }`** — ** în afara scope-ului** (parser comp, D152-A).
+
+---
+
+### D157 — Out of scope **(completed: A)**
+
+| Opțiune | Ce exclude | Pro | Contra |
+|---------|------------|-----|--------|
+| **A — minimal Prolog MVP (recommended)** | float; **`is` în mutation**; **`is` ca head**; redefinire program block | Faza mică, livrabilă rapid | — |
+| **B — allow float în `is`** | Extinde `logicEvalNumber` | Viitor | Nu există float în logic azi |
+| **C — `call(is/2)` meta-call** | `call(is(X, Y))` | Flexibil | Overkill MVP — **deferred post-F26** |
+
+**Lista out of scope (A):**
+
+- Float / rational
+- **`is`** în **`logic { + / - }`** mutation (facts ground)
+- **Head `is/2`** (fact / regulă / constraint) — **rezervat** ca `show/N` (Prolog: builtin, neredefinibil)
+- **`call(is/2)`** meta-call — deferred
+- Modificarea sensului **`Var is type pin`** din program block
+
+**În scope F26 (confirmed):** apel compound **`is(M, Expr)`** în body — builtin engine, **nu** F26b.
+
+---
+
+### D158 — Teste, exemple & livrare **(completed: A + compound)**
+
+| Opțiune | Suite | Pro | Contra |
+|---------|-------|-----|--------|
+| **A — 3760+ legacy+wave (confirmed)** | Parse infix + compound; fail; bind; constraint; regresie `=`; doc examples | Paritate legacy/wave | ~14–18 teste |
+| **B — doar engine unit** | Fără comp redirect | Rapid | Nu prinde wiring comp |
+| **C — doar legacy** | Fără wave | Mai puțin efort | Risc diferențe propagare |
+
+**Checklist teste (A):**
+
+| ID | Scenariu |
+|----|----------|
+| 3760 | parse `M is N + 1` → AST `kind: 'is'` |
+| 3761 | `M is N + 1`, N liber → fail |
+| 3762–3763 | `step/1` recursiv cu `M is N + 1` (legacy/wave) |
+| 3764–3765 | `7 is 3 + 4` ok / `7 is 3 + 3` fail |
+| 3766–3767 | constraint cu `N is Base + 1` (legacy/wave) |
+| 3768 | `M = N + 1` N liber → structură (regresie `=`) |
+| 3769–3770 | `.world:query({ X is 10 + 5 })` (legacy/wave) |
+| 3771 | parse error: `is(X, Y) <- ...` head rezervat |
+| 3772 | `is(M, 5 + 3)` bind M=8 (compound = infix) |
+| 3773–3774 | `step2/1` cu `is(M, N+1)` recursiv (legacy/wave) |
+| 3775 | `is(M, N + 1)` N liber → fail |
+| 3776 | fact `is(1).` ok — **`is/1`** user, nu builtin |
+| 3777 | doc smoke: secțiunea `is/2` există în `inline-logic.md` |
+
+**Exemple logts-play obligatorii (doc EN, Load & Load & Run):**
+
+**Exemplu 1 — infix vs `=` (anti-pattern):**
+
+```logts
+demo(0).
+demo(N) <- M is N + 1, M =< 5, demo(M).
+
+query bad:
+    X = Y + 1
+
+query good:
+    demo(0)
+```
+
+**Exemplu 2 — compound echivalent + constraint:**
+
+```logts
+level(box, 0).
+level(box, N) <= N is Base + 1, level(box, Base).
+
+query q:
+    is(Total, 10 + 5), level(box, Total)
+```
+
+**Doc EN (checklist livrare):**
+
+- [ ] Secțiune **`Arithmetic is/2`** — tabel A/B/C/D (builtin vs `=` vs program block vs atom)
+- [ ] Tabel **`=` vs `is/2` vs `=:=`**
+- [ ] Mențiune explicită: **`is(M, Expr)`** = același builtin ca **`M is Expr`**
+- [ ] Mențiune: **head `is/2` rezervat** — nu poți defini `is(X,Y) <- ...`
+- [ ] 2× **logts-play** Load & Load & Run (exemplele de mai sus)
+- [ ] **Fără** referințe la faze viitoare în doc
+
+---
+
+### D159 — Erori parse / validate **(completed: A)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — elaboration la parse (recommended)** | `is` fără RHS; `is` la început de goal; **`is`** ca fact head (`is(1).`) | Fail fast, mesaj clar | — |
+| **B — doar runtime fail** | Acceptă orice, engine fail | Parser simplu | UX slab |
+| **C — warning + fail** | Warning pentru `is` ambiguu | — | Zgomot inutil la MVP |
+
+**Erori (A):**
+
+| Sursă invalidă | Mesaj (draft) |
+|----------------|---------------|
+| `query q: is 5` | `expected term before is` |
+| `query q: M is` | `expected expression after is` |
+| `is(X, Y) <- ...` | `'is/2' is reserved — cannot define is as fact or rule head` |
+| `5 is M` LHS non-var/non-number | **fail la runtime** (D154), nu parse |
+| fact `flag(is).` | **ok** — atom `is` ca argument |
+| fact `is(1).` | **ok** — **`is/1`**, nu operator **`is/2`** |
+
+**Goal compound `is(A, B)`:** tratare ca **operator/eval builtin** ( echivalent **`A is B`** ) — **nu** apel la regulă user (Prolog-style). User **nu** poate defini **`is/2`** head.
+
+---
+
+### Sketch implementare **(confirmed scope)**
+
+| Layer | Schimbare |
+|-------|-----------|
+| **Assembler** | `LOGIC_BUILTIN_IS_PRED = 'is'`; **`is/2`** în `LOGIC_BUILTIN_RESERVED_HEADS` (ca `show`, `nth0`) |
+| **Parser** | Infix: `{ kind: 'is', left, right }` în `parseBodyGoal` după `parseTerm` + `is` + `parseExpr` |
+| **Engine** | `_solveIs(left, right, env)` — eval RHS via `logicEvalNumber`; bind/check LHS (D154) |
+| **Engine** | `_solveCall`: intercept `predicate === 'is' && arity === 2` → `_solveIs` (compound form) |
+| **Engine** | `_solveGoals`: branch `goal.kind === 'is'` → `_solveIs` (infix form) |
+| **Validate** | `logicInternGoal` pentru `kind: 'is'`; mesaje head rezervat |
+| **Doc EN** | Secțiune completă (tabel A/B/C/D, `=` vs `is`, 2× logts-play) — vezi D158 checklist |
+| **Teste** | 3760–3777 legacy+wave |
+
+**Estimare:** mică (~1 fază), fără breaking changes; **fără F26b**.
+
+**Exemplu țintă:**
+
+```logts
+step(0)
+step(N) <- M is N + 1, M =< 100, step(M)
+
+query q:
+    step(20)
+```
+
+---
+
 ## Comparație sketch v1 → v2 ( ce s-a schimbat )
 
 | Topic | Sketch v1 | Sketch v2 (current) |
@@ -4420,6 +4768,7 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 22** Liste Prolog | **(completed)** — D128–D142 |
 | **Faza 23** `nth0` / `nth1` | **(completed)** — D143–D146 |
 | **Faza 24** Cut `!` (**1+i**) | **(completed)** — D147–D151 |
+| **Faza 26** `is/2` arithmetic | D152–D159 | **(completed)** — teste 3760–3777, doc EN |
 | **F20b** scope blocks | **2+a** **(deferred)** |
 | **F20c** reguli import relative | **2+b** **(deferred)** |
 | **F25** liste pe wire | **2+c** **(deferred)** — D140 |
@@ -4437,8 +4786,9 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 ## Ordine recomandată
 
 1. ~~Faza 0~~ → ~~Faza 24~~ **(completed)**
-2. Apoi backlog **1+p**, **1+s**, **1+o**, …
-3. Apoi faze amânate **2+a … 2+f**
+2. **F25** liste pe wire când e nevoie
+3. Apoi backlog **1+p**, **1+s**, **1+o**, …
+4. Apoi faze amânate **2+a … 2+f**
 
 ---
 

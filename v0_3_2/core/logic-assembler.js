@@ -5,6 +5,7 @@ const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number']);
 const LOGIC_BUILTIN_SHOW_PRED = 'show';
 const LOGIC_BUILTIN_NTH0_PRED = 'nth0';
 const LOGIC_BUILTIN_NTH1_PRED = 'nth1';
+const LOGIC_BUILTIN_IS_PRED = 'is';
 const LOGIC_BUILTIN_RESERVED_HEADS = new Set([
   LOGIC_BUILTIN_SHOW_PRED,
   LOGIC_BUILTIN_NTH0_PRED,
@@ -228,6 +229,9 @@ class LogicParser {
       this.advance();
       return { kind: 'cut' };
     }
+    if (this.at('ID', LOGIC_BUILTIN_IS_PRED) && !this.looksLikeCompound()) {
+      logicError('expected term before is', this.peek().line);
+    }
     if (this.looksLikeCompound()) {
       const compound = this.parseCompound();
       return { kind: 'call', predicate: compound.predicate, args: compound.args };
@@ -242,6 +246,15 @@ class LogicParser {
       this.advance();
       const right = this.parseExpr();
       return { kind: 'unify', left, right };
+    }
+    if (this.at('ID', LOGIC_BUILTIN_IS_PRED)) {
+      const isLine = this.peek().line;
+      this.advance();
+      if (this.at('COMMA') || this.at('RP') || this.at('EOF')) {
+        logicError('expected expression after is', isLine);
+      }
+      const right = this.parseExpr();
+      return { kind: 'is', left, right };
     }
     if (left.kind === 'compound') return { kind: 'call', ...left };
     if (left.kind === 'list') {
@@ -274,11 +287,14 @@ class LogicParser {
     }
     this.expect('LP');
     const args = [];
+    const parseArg = predicate === LOGIC_BUILTIN_IS_PRED
+      ? () => this.parseExpr()
+      : () => this.parseTerm();
     if (!this.at('RP')) {
-      args.push(this.parseTerm());
+      args.push(parseArg());
       while (this.at('COMMA')) {
         this.advance();
-        args.push(this.parseTerm());
+        args.push(parseArg());
       }
     }
     this.expect('RP');
@@ -432,13 +448,19 @@ function logicValidateListElementCount(count, line) {
 }
 
 function logicIsReservedPredicateHead(head) {
-  return head && head.kind === 'compound' && LOGIC_BUILTIN_RESERVED_HEADS.has(head.predicate);
+  if (!head || head.kind !== 'compound') return false;
+  if (LOGIC_BUILTIN_RESERVED_HEADS.has(head.predicate)) return true;
+  if (head.predicate === LOGIC_BUILTIN_IS_PRED && (head.args || []).length === 2) return true;
+  return false;
 }
 
-function logicReservedHeadError(predicate) {
+function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_SHOW_PRED) return "'show/N' is reserved — cannot define show as fact or rule head";
   if (predicate === LOGIC_BUILTIN_NTH0_PRED || predicate === LOGIC_BUILTIN_NTH1_PRED) {
     return `'${predicate}/3' is reserved — cannot define ${predicate} as fact or rule head`;
+  }
+  if (predicate === LOGIC_BUILTIN_IS_PRED && arity === 2) {
+    return "'is/2' is reserved — cannot define is as fact or rule head";
   }
   return `'${predicate}' is reserved`;
 }
@@ -491,14 +513,17 @@ function logicValidateProgram(prog) {
   }
   for (const c of prog.clauses || []) {
     if (logicIsReservedPredicateHead(c.head)) {
-      logicError(logicReservedHeadError(c.head.predicate), c.line);
+      logicError(logicReservedHeadError(c.head.predicate, (c.head.args || []).length), c.line);
     }
   }
   for (const c of prog.constraints || []) {
     if (logicIsReservedPredicateHead(c.head)) {
       const pred = c.head.predicate;
+      const arity = (c.head.args || []).length;
       if (pred === LOGIC_BUILTIN_SHOW_PRED) {
         logicError("'show/N' is reserved — cannot define show as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_IS_PRED && arity === 2) {
+        logicError("'is/2' is reserved — cannot define is as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }
@@ -535,7 +560,7 @@ function logicListFreeVarsInGoal(goal) {
     else if (g.kind === 'cut') { /* no free vars */ }
     else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
-    } else if (g.kind === 'cmp' || g.kind === 'unify') {
+    }     else if (g.kind === 'cmp' || g.kind === 'unify' || g.kind === 'is') {
       walkTerm(g.left); walkTerm(g.right);
     }
   }
@@ -871,6 +896,7 @@ function logicFormatGoal(g) {
   if (g.kind === 'call' || g.kind === 'compound') return logicFormatCompound(g);
   if (g.kind === 'cmp') return `${logicFormatTerm(g.left)} ${g.op} ${logicFormatTerm(g.right)}`;
   if (g.kind === 'unify') return `${logicFormatTerm(g.left)} = ${logicFormatTerm(g.right)}`;
+  if (g.kind === 'is') return `${logicFormatTerm(g.left)} is ${logicFormatTerm(g.right)}`;
   return '';
 }
 
