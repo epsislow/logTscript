@@ -54,6 +54,9 @@ function logicTokenize(src) {
     if (ch === '\\' && src[i + 1] === '+') {
       tokens.push({ type: 'NOT', value: '\\+', line: startLine }); i += 2; continue;
     }
+    if (ch === '!') {
+      tokens.push({ type: 'BANG', value: '!', line: startLine }); i++; continue;
+    }
     if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
       tokens.push({ type: 'OP', value: ch, line: startLine }); i++; continue;
     }
@@ -220,6 +223,10 @@ class LogicParser {
     if (this.at('NOT')) {
       this.advance();
       return { kind: 'not', goal: this.parseBodyGoal() };
+    }
+    if (this.at('BANG')) {
+      this.advance();
+      return { kind: 'cut' };
     }
     if (this.looksLikeCompound()) {
       const compound = this.parseCompound();
@@ -436,6 +443,35 @@ function logicReservedHeadError(predicate) {
   return `'${predicate}' is reserved`;
 }
 
+function logicGoalContainsCut(goal) {
+  if (!goal) return false;
+  if (goal.kind === 'cut') return true;
+  if (goal.kind === 'not') return logicGoalContainsCut(goal.goal);
+  return false;
+}
+
+function logicValidateCutPlacement(prog) {
+  function checkGoals(goals, inConstraint, line) {
+    for (const g of goals || []) {
+      if (g.kind === 'not' && logicGoalContainsCut(g.goal)) {
+        logicError('cut is not allowed inside \\+ (...)', line);
+      }
+      if (g.kind === 'cut' && inConstraint) {
+        logicError('cut is not allowed in constraint bodies', line);
+      }
+    }
+  }
+  for (const c of prog.clauses || []) {
+    checkGoals(c.body, false, c.line);
+  }
+  for (const q of prog.queries || []) {
+    checkGoals(logicQueryGoals(q), false, q.line);
+  }
+  for (const c of prog.constraints || []) {
+    checkGoals(c.body, true, c.line);
+  }
+}
+
 function logicValidateProgram(prog) {
   const aliases = new Set();
   for (const raw of prog.uses || []) {
@@ -468,6 +504,7 @@ function logicValidateProgram(prog) {
       }
     }
   }
+  logicValidateCutPlacement(prog);
 }
 
 function logicQueryGoals(q) {
@@ -495,6 +532,7 @@ function logicListFreeVarsInGoal(goal) {
   function walkGoal(g) {
     if (!g) return;
     if (g.kind === 'not') walkGoal(g.goal);
+    else if (g.kind === 'cut') { /* no free vars */ }
     else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
     } else if (g.kind === 'cmp' || g.kind === 'unify') {
@@ -828,6 +866,7 @@ function logicFormatCompound(c) {
 
 function logicFormatGoal(g) {
   if (!g) return '';
+  if (g.kind === 'cut') return '!';
   if (g.kind === 'not') return `\\+ ${logicFormatGoal(g.goal)}`;
   if (g.kind === 'call' || g.kind === 'compound') return logicFormatCompound(g);
   if (g.kind === 'cmp') return `${logicFormatTerm(g.left)} ${g.op} ${logicFormatTerm(g.right)}`;

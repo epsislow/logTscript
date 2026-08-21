@@ -87,6 +87,9 @@ function logicInternGoal(goal, table) {
   if (goal.kind === 'not') {
     return { kind: 'not', goal: logicInternGoal(goal.goal, table) };
   }
+  if (goal.kind === 'cut') {
+    return { kind: 'cut' };
+  }
   return goal;
 }
 
@@ -215,6 +218,10 @@ class LogicEngine {
       if (found) return false;
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'cut') {
+      env.commitCut();
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
     return false;
   }
 
@@ -341,24 +348,41 @@ class LogicEngine {
     const key = logicPredicateKey(goal.predicate, goal.arity);
     const clauses = this.index.get(key) || [];
     let any = false;
-    for (const clause of clauses) {
+    for (let i = 0; i < clauses.length; i++) {
       if (this._solutionCapReached) break;
+      const clause = clauses[i];
       const trail = env.trailLength();
+      const cutParent = env.choiceDepth();
+      env.pushChoice({ type: 'clause', cutParent, trail });
+
       this._renameSerial += 1;
       const renamed = logicRenameApartClause(clause, { n: this._renameSerial });
       const head = logicDerefCompound(renamed.head, env);
       if (!logicUnifyCompound(goal, head, env, this.table)) {
         env.undo(trail);
+        if (env.choiceDepth() > cutParent) env.popChoice();
         continue;
       }
+
       const newGoals = (renamed.body || []).concat(rest);
+      const savedCut = env.cutDepth;
+      env.cutDepth = cutParent;
+      env.cutCommitted = false;
+
       const ok = this._solveGoals(newGoals, env, depth + 1, onSuccess, onDepthExceeded);
+
+      const cutCommitted = env.cutCommitted;
+      env.cutDepth = savedCut;
+      env.cutCommitted = false;
       env.undo(trail);
+      if (env.choiceDepth() > cutParent) env.popChoice();
+
       if (this._solutionCapReached) {
-        any = true;
+        if (ok) any = true;
         break;
       }
       if (ok) any = true;
+      if (cutCommitted) break;
     }
     return any;
   }
@@ -396,6 +420,7 @@ function logicRenameApartClause(clause, idRef) {
   function walkGoal(g) {
     if (!g) return g;
     if (g.kind === 'not') return { kind: 'not', goal: walkGoal(g.goal) };
+    if (g.kind === 'cut') return { kind: 'cut' };
     if (g.kind === 'call') {
       return {
         kind: 'call',
@@ -423,7 +448,24 @@ function logicEnv() {
   return {
     bindings,
     trail: [],
+    choiceStack: [],
+    cutDepth: null,
+    cutCommitted: false,
     trailLength() { return this.trail.length; },
+    choiceDepth() { return this.choiceStack.length; },
+    pushChoice(entry) { this.choiceStack.push(entry); },
+    popChoice() { return this.choiceStack.pop(); },
+    commitCut() {
+      const d = this.cutDepth;
+      if (d == null) {
+        this.choiceStack.length = 0;
+      } else {
+        while (this.choiceStack.length > d) {
+          this.choiceStack.pop();
+        }
+      }
+      this.cutCommitted = true;
+    },
     bind(name, value) {
       this.bindings.set(name, value);
       this.trail.push(name);
@@ -746,6 +788,7 @@ function logicPrepareGoalsForInvoke(goals) {
   function mapGoal(g) {
     if (!g) return g;
     if (g.kind === 'not') return { kind: 'not', goal: mapGoal(g.goal) };
+    if (g.kind === 'cut') return { kind: 'cut' };
     if (g.kind === 'call' || g.kind === 'compound') {
       return { kind: 'call', predicate: g.predicate, args: (g.args || []).map(mapTerm) };
     }

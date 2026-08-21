@@ -40882,5 +40882,241 @@ comp [logic] .tagLogic:
     h.assert('still=0', interp.getWireEffectiveValue('still'), '0');
   });
 
+  const INLINE_CUT_COLORS = `inline [logic] .world:
+
+    color(red)
+    color(green)
+    color(blue)
+
+    first_color(C) <- color(C), !
+
+    query firstOnly:
+        first_color(C),
+        show(C)
+
+:`;
+
+  function runLogicCutFirstColor(h, session) {
+    const src = INLINE_CUT_COLORS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = firstOnly
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const out = session.outLines(interp).join('\n');
+    h.assert('only red', String(out.includes('red')), 'true');
+    h.assert('no green', String(out.includes('green')), 'false');
+    h.assert('no blue', String(out.includes('blue')), 'false');
+  }
+
+  reg(3746, 'logic', 'parse cut goal in rule body', function(h) {
+    const prog = parseLogicBody('first(C) <- color(C), !');
+    h.assert('one goal cut', String(prog.clauses[0].body[1].kind === 'cut'), 'true');
+  });
+
+  reg(3747, 'logic', 'parse error cut inside negation', function(h) {
+    h.assertThrows(
+      'cut in not',
+      () => parseLogicBody('query q: \\+ !'),
+      'cut is not allowed inside \\+',
+    );
+  });
+
+  reg(3748, 'logic', 'parse error cut in constraint body', function(h) {
+    h.assertThrows(
+      'cut in constraint',
+      () => parseLogicBody('constraint p(X) <= q(X), !'),
+      'cut is not allowed in constraint bodies',
+    );
+  });
+
+  reg(3749, 'logic', 'cut commits color choice first only (legacy)', runLogicCutFirstColor);
+  reg(3750, 'logic', 'cut commits color choice first only (wave)', runLogicCutFirstColor, { propagation: 'wave' });
+
+  const INLINE_CUT_MEMBER = `inline [logic] .world:
+
+    items([apple, pear, plum])
+
+    member(X, [X | _]) <- X = X
+    member(X, [_ | T]) <- member(X, T)
+
+    first_item(X) <- items(L), member(X, L), !
+
+    query first:
+        first_item(X),
+        show(X)
+
+:`;
+
+  function runLogicCutFirstMember(h, session) {
+    const src = INLINE_CUT_MEMBER + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = first
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const out = session.outLines(interp).join('\n');
+    h.assert('apple', String(out.includes('apple')), 'true');
+    h.assert('no pear', String(out.includes('pear')), 'false');
+  }
+
+  reg(3751, 'logic', 'cut on list member first only (legacy)', runLogicCutFirstMember);
+  reg(3752, 'logic', 'cut on list member first only (wave)', runLogicCutFirstMember, { propagation: 'wave' });
+
+  const INLINE_CUT_SHOW = `inline [logic] .world:
+
+    color(red)
+    color(green)
+
+    trace(C) <- color(C), show("pick", C), !, show("done", C)
+
+    query run:
+        trace(C)
+
+:`;
+
+  function runLogicCutShowSideEffect(h, session) {
+    const src = INLINE_CUT_SHOW + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = run
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const lines = session.outLines(interp).filter((l) => l.includes('pick') || l.includes('done'));
+    h.assert('pick red once', String(lines.filter((l) => l.includes('pick red')).length), '1');
+    h.assert('done red once', String(lines.filter((l) => l.includes('done red')).length), '1');
+    h.assert('no pick green', String(lines.some((l) => l.includes('pick green'))), 'false');
+  }
+
+  reg(3753, 'logic', 'cut after show keeps emitted output (legacy)', runLogicCutShowSideEffect);
+  reg(3754, 'logic', 'cut after show keeps emitted output (wave)', runLogicCutShowSideEffect, { propagation: 'wave' });
+
+  reg(3755, 'logic', 'cut fail blocks alternate clause (legacy)', function(h, session) {
+    const src = `inline [logic] .world:
+
+    goal(X) <- mark(a), !, count(mark(a), 0)
+    goal(ok)
+
+    mark(a)
+    mark(ok)
+
+    query q:
+        goal(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.worldLogic:{
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('no solution', interp.getWireEffectiveValue('ok'), '0');
+  });
+
+  reg(3756, 'logic', 'cut fail blocks alternate clause (wave)', function(h, session) {
+    const src = `inline [logic] .world:
+
+    goal(X) <- mark(a), !, count(mark(a), 0)
+    goal(ok)
+
+    mark(a)
+    mark(ok)
+
+    query q:
+        goal(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.worldLogic:{
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('no solution wave', interp.getWireEffectiveValue('ok'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3757, 'logic', 'engine cut query direct color first', function(h) {
+    const prog = parseLogicBody(`color(red)
+color(green)
+color(blue)
+query q: color(C), !`);
+    const eng = new LogicEngine(prog.clauses);
+    const goals = logicQueryGoals(prog.queries[0]);
+    const sols = eng.solveQuery(goals, {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('red', sols[0].C.name, 'red');
+  });
+
+  function runLogicCutMaxDepth(h, session) {
+    const src = `inline [logic] .world:
+
+    deep(0)
+    deep(N) <- M = N + 1, M =< 100, deep(M)
+
+    query q:
+        deep(20), !
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    maxDepth: 6
+    .world { }
+:
+
+1wire depthHit = 0
+1wire ok = 0
+1wire trigger = 1
+
+.worldLogic:{
+    depthExceeded >= depthHit
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('depthExceeded', interp.getWireEffectiveValue('depthHit'), '1');
+    h.assert('no sol', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(3758, 'logic', 'cut with maxDepth sets depthExceeded (legacy)', runLogicCutMaxDepth);
+  reg(3759, 'logic', 'cut with maxDepth sets depthExceeded (wave)', runLogicCutMaxDepth, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

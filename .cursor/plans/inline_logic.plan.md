@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–23 complete; F24 (cut) ready-to-implement.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24 complete.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
@@ -75,8 +75,8 @@ todos:
     content: "Faza 23: builtin nth0/nth1 — D143–D146 completed"
     status: completed
   - id: logic-cut
-    content: "Faza 24: Cut ! — D147–D151; promovat din 1+i (ready-to-implement, după F23)"
-    status: pending
+    content: "Faza 24: Cut ! — D147–D151 completed"
+    status: completed
 isProject: false
 ---
 
@@ -91,7 +91,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate |
 | **(completed)** | Decizie luată / implementată |
 | **1+a … 1+v** | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan) |
-| **2+a … 2+e** | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2e) |
+| **2+a … 2+f** | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2f) |
 | ✅ | Backlog **promovat / livrat** (fază completed) |
 | ❌ | Backlog **respins** definitiv |
 | 🟠✗ | Backlog **închis** — alternativa nu se face; livrat altfel |
@@ -1203,7 +1203,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (`2+a` … `2+e`):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2e).
+> **Backlog post-MVP (`1+a` … `1+v`):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (`2+a` … `2+f`):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2f).
 
 ---
 
@@ -1237,7 +1237,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 21** builtin `show/N` | D117–D127 | **(completed)** |
 | **Faza 22** Liste Prolog | D128–D142 | **(completed)** |
 | **Faza 23** builtin `nth0` / `nth1` | D143–D146 | **(completed)** |
-| **Faza 24** Cut `!` (**1+i** promovat) | D147–D151 | **(ready-to-implement)** — după F23 |
+| **Faza 24** Cut `!` (**1+i** promovat) | D147–D151 | **(completed)** |
 | **Faza 25** Liste pe wire / vector redirect | **2+c** (D140) | **(deferred)** |
 
 ---
@@ -4362,21 +4362,32 @@ chirie(N, L, C) <- nth1(N, L, C)
 
 ---
 
-## Decizii Faza 24 — Cut `!` (D147–D151) **(ready-to-implement)**
+## Decizii Faza 24 — Cut `!` (D147–D151) **(completed)**
 
 > **Sursă:** backlog **1+i** **promovat → Faza 24**.  
-> **Dependență:** **F22** (liste) **(completed)**; **F23** **(completed)** — teste reale cu `nth0`/`nth1`; recomandat după ambele.  
-> **Scop:** commit Prolog — oprește backtracking în choice point-urile create de la intrarea în clauza curentă.
+> **Dependență:** **F22** (liste) **(completed)**; **F23** **(completed)**.  
+> **Scop:** commit Prolog — oprește backtracking în choice point-urile create de la intrarea în clauza curentă.  
+> **User confirmări:** 2026-08-21 — **D147 ok · D148 ok · D149 ok (A) · D150 ok · D151 ok**. **Livrat:** 2026-08-21.
 
-| ID | Subiect | Propunere **(recommended)** |
-|----|---------|----------------------------|
-| **D147** | **Sintaxă** | Goal **`!`** — token dedicat (ca `\`) |
-| **D148** | **Semantica** | După succes la **`!`**, nu se mai backtrack în alternativele **clauzei curente**; alternative din goals **anterioare** în același body rămân |
-| **D149** | **`\+` + cut** | **`\+ (Goal, !)`** — inner cut contorizat; **`!` în negated context** — spec ISO/SWI simplificat: **cut în NAF → elaboration warning sau interzis MVP** | Prefer **interzis în `\+`** la MVP (D149-A) |
-| **D150** | **Builtins** | `show`, `count`, `nth0`/`nth1` — comportament neschimbat; cut după ele taie ramuri, nu anulează side-effecte deja produse |
-| **D151** | **Teste** | **3718+** — commit list traversal, interacțiune depth, **fără** cut în constraint body la MVP (sau permis doar query/reguli) | Doc + logts-play |
+### Rezumat decizii **(confirmed)**
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D147** | **Sintaxă** | **A (confirmed)** — goal dedicat **`!`** — token (ca `\`) |
+| **D148** | **Semantica** | **A (confirmed)** — după succes la **`!`**, nu se mai backtrack în alternativele **clauzei curente**; goals **anterioare** în același body rămân |
+| **D149** | **`\+` + cut** | **A (confirmed)** — **`!` interzis în interiorul oricărui `\+ (…)`** la MVP → **elaboration error** la parse/validate. Comportament ISO/SWI **inner cut contorizat** pentru `\+ (Goal, !)` → **amânat** [**2+f**](#2f--cut-în-naf-local-cut) |
+| **D150** | **Builtins** | **A (confirmed)** — `show`, `count`, `nth0`/`nth1` neschimbate; cut după ele taie ramuri, **nu** anulează side-effecte deja produse |
+| **D151** | **Teste & livrare** | **A (confirmed)** — teste **3746+** legacy+wave: commit pe traversare listă, interacțiune `maxDepth`, parse error `!` în `\+`; **fără** `!` în constraint body la MVP (permis query/reguli); doc EN + logts-play |
+
+**Out of scope F24 (→ 2+f):** `\+ (p(X), !)` cu **local cut** în NAF — la MVP doar **eroare elaborare** (D149-A).
 
 **Note plan vechi (F7/F8):** interacțiune **cut + depth** — acoperită de D151 + `maxDepth` existent.
+
+**Suite curentă (post-F24):** teste **3746–3759** legacy+wave — **2921/2921** passed.
+
+**Fișiere:** [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js), [`logic-engine.js`](../v0_3_2/core/logic-engine.js)  
+**Teste:** **3746–3759** — parse, neg/constraint errors, first color, list member, show side-effect, alternate clause block, engine query, maxDepth  
+**Doc:** [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) — secțiune **Cut — `!`**, exemple logts-play Load & Load & Run
 
 ---
 
@@ -4408,7 +4419,7 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 21** builtin `show/N` | **(completed)** — D117–D127 |
 | **Faza 22** Liste Prolog | **(completed)** — D128–D142 |
 | **Faza 23** `nth0` / `nth1` | **(completed)** — D143–D146 |
-| **Faza 24** Cut `!` (**1+i**) | **(ready-to-implement)** — D147–D151 |
+| **Faza 24** Cut `!` (**1+i**) | **(completed)** — D147–D151 |
 | **F20b** scope blocks | **2+a** **(deferred)** |
 | **F20c** reguli import relative | **2+b** **(deferred)** |
 | **F25** liste pe wire | **2+c** **(deferred)** — D140 |
@@ -4425,10 +4436,9 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 23~~ **(completed)**
-2. **Faza 24** — Cut `!` (**1+i**) — D147–D151
-3. Apoi backlog **1+p**, **1+s**, **1+o**, …
-4. Apoi faze amânate **2+a … 2+e** (după F24 sau când e nevoie)
+1. ~~Faza 0~~ → ~~Faza 24~~ **(completed)**
+2. Apoi backlog **1+p**, **1+s**, **1+o**, …
+3. Apoi faze amânate **2+a … 2+f**
 
 ---
 
@@ -4464,9 +4474,9 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 
 ---
 
-## Backlog faze amânate (2+a … 2+e)
+## Backlog faze amânate (2+a … 2+f)
 
-Tabel master **2+a … 2+e** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+Tabel master **2+a … 2+f** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 | Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
 |-------|-----|---------|---------|------------|----------|
@@ -4475,8 +4485,9 @@ Tabel master **2+a … 2+e** — faze **amânate** discutate/planificate, distin
 | ⏳ | **2+c** | Liste pe wire / vector | Pack redirect listă Prolog pe wire vector/matrix; query output liste | **F25** | D140, F22 |
 | ⏳ | **2+d** | Builtins listă | `member/2`, `append/3`, eventual `length/2` — rezervate ca `count/2` | — | D137, F22 |
 | ⏳ | **2+e** | Liste avansate Prolog | Dif-list, lazy lists, string ↔ char list | — | D136, F22 |
+| ⏳ | **2+f** | Cut în NAF — local cut | **`\+ (Goal, !)`** — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | — | D149, F24 |
 
-**Ordine recomandată (când se promovează):** **2+a** / **2+b** (composiție) independent de **2+c–2+e** (liste); **2+d** după **F22** **(completed)**; **2+c** după **F22–F24**.
+**Ordine recomandată (când se promovează):** **2+a** / **2+b** (composiție) independent de **2+c–2+f** (liste/cut); **2+d** după **F22** **(completed)**; **2+c** după **F22–F24**; **2+f** după **F24** (când e nevoie de NAF + cut combinat).
 
 ### Note backlog 2+x — explicații
 
@@ -4499,6 +4510,10 @@ Builtins bibliotecă listă — **`member`**, **`append`**, etc. **F22** livreaz
 #### **2+e** ⏳ (D136)
 
 Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Prolog avansat; Monopoly nu le cere.
+
+#### **2+f** ⏳ — Cut în NAF (local cut)
+
+**Amânat post-F24 MVP.** F24 livrează **`!`** în query/reguli + **interzice** `!` în `\+ (…)` (D149-A). Cazul **`\+ (p(X), !)`** — cut **inner contorizat** în subdovada negată (spec ISO/SWI: taie doar choice point-urile din paranteză, nu pe cele din query/regulă exterioară) — **elaborare + implementare** când promovăm **2+f**. Până atunci: parse/validate → **elaboration error** clar (ex. `cut is not allowed inside \\+ (...)`).
 
 ### Note backlog — explicații (1+x)
 
@@ -4554,7 +4569,7 @@ Filter toolbar **Logic** dedicat — **`logic-mut` exclusiv** (D82–D85): scoas
 
 #### ~~**1+i**~~ → **Faza 24**
 
-**Scope:** Cut Prolog **`!`** — commit choice points; interacțiune **`\+`**, depth, liste. Decizii **D147–D151** — vezi **Faza 24**. **După F22–F23 (completed).**
+**Scope:** Cut Prolog **`!`** — commit choice points; **`!` interzis în `\+ (…)`** la MVP (D149-A); depth, liste. Decizii **D147–D151** confirmate — vezi **Faza 24**. **Local cut NAF** → **2+f**. **După F22–F23 (completed).**
 
 #### **1+v** ⏸ — pause
 

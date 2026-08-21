@@ -20119,6 +20119,7 @@ LogTScript logic follows common Prolog conventions:
 | **Fact** | \`owns(john, chevy)\` | Ground clause (no body) |
 | **Rule** | \`modifier2(X, 0) <- X >= 9, X =< 12\` | Head \`<-\` body goals (comma = AND) |
 | **Negation** | \`\\+ age(peter, _)\` | Negation as failure — goal cannot be proven |
+| **Cut** | \`!\` | Commit — discard backtracking choices from the current clause |
 | **Query** | \`query johnOwns: owns(john, X)\` | Named goal(s) exported to runtime |
 
 Multiple clauses with the same predicate name and arity are **OR** alternatives (first successful match in discovery order, with backtracking).
@@ -20132,6 +20133,7 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | \`.\` ends every clause | Newline / next clause; module ends with \`:\` |
 | \`:-\` rule neck | \`<-\` rule neck |
 | \`\\+ Goal\` | \`\\+ Goal\` — negation as failure (same idea as Prolog) |
+| \`!\` | Cut — commit current clause (same idea as Prolog) |
 | \`true\` / \`fail\` | Not built-in — use facts, \`\\+\`, or empty query failure |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms \`'John'\` | Use **\`"John"\`** string literals (show labels) or lowercase atoms |
@@ -20410,6 +20412,106 @@ eligible(X) <- person(X), \\+ banned(X)
 \`\\+\` applies only to the **next** goal (prefix). Use \`\\+ \\+ goal\` for double negation if needed.
 
 **Not** classical logical negation — it is a procedural test: try to prove the goal; if the engine finds **any** solution, \`\\+\` fails.
+
+**Cut inside negation:** \`!\` is **not** allowed inside \`\\+ (…)\` — elaboration error at parse time.
+
+---
+
+## Cut — \`!\`
+
+\`!\` is the Prolog **cut** operator. It always **succeeds** immediately. After it succeeds, the engine **commits** to the current path: it will not backtrack to alternative clauses of the predicate being executed, nor to choices made **before** \`!\` in that clause body.
+
+Goals **before** \`!\` in the same rule body can still be backtracked when searching for solutions (until \`!\` is reached).
+
+\`\`\`logts
+color(red)
+color(green)
+color(blue)
+
+first_color(C) <- color(C), !
+\`\`\`
+
+| Query | Solutions for \`C\` |
+|-------|-------------------|
+| \`first_color(C)\` without cut in a rule | \`red\`, \`green\`, \`blue\` (three solutions) |
+| \`first_color(C)\` with \`<- color(C), !\` | **\`red\` only** |
+
+In a query body, comma goals work the same way:
+
+\`\`\`logts
+query pickFirst:
+    color(C), !, show(C)
+\`\`\`
+
+Only the **first** successful \`color(C)\` binding is kept; \`show/1\` prints once.
+
+**Built-in side effects:** if \`show/1\` (or another side-effect goal) runs **before** \`!\`, that output is kept. Cut removes **future** branches, not output already written.
+
+**Constraints:** \`!\` is **not** allowed in \`constraint … <= …\` bodies — parse error.
+
+**Negation:** \`!\` is **not** allowed inside \`\\+ (…)\` — parse error.
+
+### Example — first color only (Load & Run)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    color(red)
+    color(green)
+    color(blue)
+
+    first_color(C) <- color(C), !
+
+    query firstOnly:
+        first_color(C),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = firstOnly
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`** only (not green or blue).
+
+### Example — cut after show keeps output (Load & Run)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    color(red)
+    color(green)
+
+    trace(C) <- color(C), show("pick", C), !, show("done", C)
+
+    query run:
+        trace(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = run
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`pick red\`** and **\`done red\`** once. Without \`!\`, backtracking would also print lines for green.
 
 ---
 
