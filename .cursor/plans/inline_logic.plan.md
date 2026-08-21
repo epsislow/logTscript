@@ -83,7 +83,9 @@ todos:
   - id: logic-list-builtins
     content: "Faza 27: builtins listă + doc logic-builtins.md — D160–D169 (completed)"
     status: completed
-isProject: false
+  - id: logic-query-sel
+    content: "Faza 29: N query vars + ;sel(i,j) — D170–D181 (D176 C confirmed; D179–D181 ready)"
+    status: pending
 ---
 
 # Plan: `inline [logic]` + `comp [logic]` — motor relațional declarativ
@@ -1245,8 +1247,9 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 23** builtin `nth0` / `nth1` | D143–D146 | **(completed)** |
 | **Faza 24** Cut `!` (**1+i** promovat) | D147–D151 | **(completed)** |
 | **Faza 26** `is/2` evaluare aritmetică | D152–D159 | **(completed)** |
-| **Faza 27** Builtins listă + doc `logic-builtins.md` | D160–D169 | **(confirmed — ready-to-implement)** |
-| **Faza 25** Liste pe wire / vector redirect | **2+c** (D140) | **(deferred)** |
+| **Faza 27** Builtins listă + doc `logic-builtins.md` | D160–D169 | **(completed)** |
+| **Faza 29** Query N vars + `;sel(i,j)` redirect | D170–D181 | **(confirmed — D179–D181 ready)** |
+| **Faza 25** Liste pe wire / vector redirect | **2+c** (D140) | **(deferred — după F29)** |
 
 ---
 
@@ -5137,6 +5140,317 @@ query sorted:
 
 ---
 
+## Decizii Faza 29 — query N variabile + `;sel(i,j)` **(confirmed — D179–D181 ready)**
+
+> **User confirmări:** 2026-08-21 — **D170 cap 16 · D171 A · D172 A · D173 A · D174 A · D175 A · D176 C · D177 A · D178 A**.  
+> **Notă breaking:** inline/comp logic **nu sunt în producție** — extinderea N>2 + sel **nu** e tratată ca breaking change (D174).
+
+### Context — problema
+
+| Azi (F5) | După F29 |
+|----------|----------|
+| `query q: p(X,Y,Z,K)` → **elaboration error** (max 2) | **Permis** — `N` vars libere (ordin: stânga→dreapta în goal) |
+| `q >= table` cu `32wire[R,2]` — 2 cols = 2 vars | `q;sel(0,2) >= table` — 2 cols = **subset** din N |
+| `;unique` pe tuple 2-var | `;sel` **apoi** `;unique` pe tuple **proiectat** 2-var |
+| `q::2 >= col` — doar dacă ≤2 vars total | `q::2 >= col` — orice `c ∈ [0, N)` |
+
+**Motiv wire:** LogTScript are tensor **2D** `[R,C]` — nu există matrix `[R,N]` cu `N>2` pe același wire fără selector.
+
+### Pipeline redirect (propus)
+
+```text
+1. solve query          → soluții { X, Y, Z, K, … }
+2. ;sel(i,j) [dacă bulk matrix / row 2-col]  → proiectează la 2 cols
+3. ;unique | ;first | ;last                  → policy pe datele post-sel
+4. >= wire | :r | ::c | :r:c | :count        → pack / slice
+```
+
+### Rezumat decizii
+
+| ID | Subiect | Decizie | Status |
+|----|---------|---------|--------|
+| **D170** | **Plafon N vars** | **A — cap 16** — `1 ≤ N ≤ 16` la elaboration; peste → error | **(completed)** |
+| **D171** | **Sintaxă `;sel(i,j)`** | **A** — indici **0-based** (primul arg = col **0**) | **(completed)** |
+| **D172** | **Ordinea modifierilor** | **A** — **`;sel` → `;unique`/`;first`/`;last` → redirect** | **(completed)** |
+| **D173** | **`;sel` obligatoriu** | **A** — `>= matrix` cu **N>2** fără `;sel` → error | **(completed)** |
+| **D174** | **Compat F5 (N=2)** | **A** — `;sel(0,1)` **implicit**; fără breaking (neproducție) | **(completed)** |
+| **D175** | **`::c` / `:r:c`** | **A** — index **cols query originale** (0-based) | **(completed)** |
+| **D176** | **Row slice `:r`** | **C — ambele:** `:r` fără sel → vector `[N]`; `;sel(i,j):r` → vector `[2]` | **(completed)** |
+| **D177** | **`:width`** | **A** — returnează **N** (cols logice query) | **(completed)** |
+| **D178** | **Policies după sel** | **A** — dedupe pe tuple **proiectat** (explicație mai jos) | **(completed)** |
+| **D179** | **Validare `;sel`** | **A** — 2 indici int, `0 ≤ i,j < N`, `i ≠ j` | **(ready — implicit A)** |
+| **D180** | **`.world:query` inline** | **A** — trailing `;sel(0,2);unique` | **(ready — implicit A)** |
+| **D181** | **Teste & livrare** | **A** — 3800+ legacy+wave | **(ready — implicit A)** |
+
+---
+
+### D170 — Plafon N variabile libere **(completed — cap 16)**
+
+Variabilele libere = vars din goal **minus** vars legate în program block (ca F5).
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — cap elaboration ✅** | **`1 ≤ N ≤ 16`** — peste cap → elaboration error | Wire/docs predictibile; aliniat cap matrix rezonabil | Artificial pentru Prolog pur |
+| **B — fără cap** | Orice N — doar `;sel` limitează pack 2D | Flexibil | Vector `[N]` huge; teste greu |
+| **C — păstrăm max 2** | Status quo | Zero muncă | **Nu** rezolvă cererea user |
+
+**Decizie:** **A — max 16** vars libere la elaboration.
+
+**Notă:** ordinea cols = ordinea apariției în goal (stânga→dreapta, 0-based: primul var = col **0**).
+
+---
+
+### D171 — Sintaxă `;sel(i,j)` **(completed — A, 0-based)**
+
+**Comp redirect** — lanț modifieri pe nume query, **înainte** de `:selector` / `>=`:
+
+```logts
+allCarInfos;sel(0,2);unique >= table    ; cols 0=X și 2=Z (0-based)
+allCarInfos;sel(1,3);last >= pairWire   ; cols 1=Y și 3=K
+allCarInfos;unique >= table             ; error dacă N>2 fără sel
+```
+
+| Opțiune | Formă | Pro | Contra |
+|---------|-------|-----|--------|
+| **A — `;sel(i,j)` ✅** | Scurt, aliniat `;unique`; **i,j ∈ [0, N-1]** | Lizibil în exec | — |
+| **B — `;select(i,j)`** | Explicit | Doc clar | Mai lung |
+| **C — ambele** | Alias | Migrare ușoară | Parser dublu |
+
+**Decizie:** **A** — `;sel(i,j)`; primul argument = coloana **0** (nu 1).
+
+**Parse:** `;sel` + `(` + int + `,` + int + `)` — similar trailing policy din F10.
+
+---
+
+### D172 — Ordinea modifierilor **(completed — A)**
+
+Ordine canonică (stânga → dreapta):
+
+```text
+queryName [ ;sel(i,j) ] [ ;unique | ;first | ;last ] [ :selector ] >= wire
+```
+
+| Opțiune | Ordine | Pro | Contra |
+|---------|--------|-----|--------|
+| **A — sel → policy → redirect ✅** | Proiecție 2D, apoi dedupe/limit pe tuple proiectat | Natural semantic (user intent) | — |
+| **B — policy → sel** | Dedupe pe N-tuple apoi proiectează | — | **Nu** e ce vrea user |
+| **C — sel doar pe `>=`** | `;unique` fără sel pe `:count` | — | Inconsistent |
+
+**Decizie:** **A**.
+
+**`:count` / `:width`:** policy se aplică **înainte** de count (ca F10) — **neschimbat**.
+
+---
+
+### D173 — Când e obligatoriu `;sel` **(completed — A)**
+
+| Redirect | N vars | `;sel` |
+|----------|--------|--------|
+| **`>= matrix` `wire[R,2]`** | **>2** | **obligatoriu** |
+| **`>= matrix` `wire[R,2]`** | **=2** | opțional (implicit `0,1`) |
+| **`::c >= vector`** | orice N≥1 | **nu** (1 col direct) |
+| **`:r:c >= scalar`** | orice | **nu** |
+| **`:r >= vector`** | **>2, fără sel** | **nu** — pack rând complet `[N]` (D176-C) |
+| **`:r >= vector`** | **>2, cu `;sel`** | **da** — pack rând proiectat `[2]` (D176-C) |
+| **`:r >= vector`** | **=2** | opțional sel (implicit `0,1` → `[2]`) |
+| **0 vars boolean `>=`** | 0 | — |
+
+**Decizie:** **A** — matrix bulk fără sel când N>2 → **elaboration error**.
+
+---
+
+### D174 — Compatibilitate F5 (N=2) **(completed — A)**
+
+| Opțiune | Comportament | Pro | Contra |
+|---------|--------------|-----|--------|
+| **A — implicit 0,1 ✅** | `allAges >= table` cu 2 vars — **neschimbat** | Zero breaking | — |
+| **B — sel obligatoriu mereu** | Chiar la N=2 | Explicit | Verbose |
+
+**Decizie:** **A** — `;sel(0,1)` implicit la N=2.
+
+**Breaking:** eliminarea erorii `maximum 2` **nu** e breaking — extindere. Inline/comp logic **nu sunt în producție**; redirect-urile existente cu 2 vars rămân valide.
+
+---
+
+### D175 — Index coloană pentru `::c` și `:r:c` **(completed — A, 0-based original)**
+
+Query: `carInfo(X, Y, Z, K)` → cols **0=X, 1=Y, 2=Z, 3=K** (0-based).
+
+| Opțiune | `allCarInfos::2 >= colZ` | Pro | Contra |
+|---------|--------------------------|-----|--------|
+| **A — index original ✅** | Col **2** = Z indiferent de `;sel` pe alt redirect | Consistent mental | — |
+| **B — index post-sel** | Doar pe redirecturile cu sel | — | `::2` ambiguu între redirecturi |
+
+**Decizie:** **A** — `::c` și `:r:c` folosesc **spațiul cols query originale** (0-based), nu indicii post-`;sel`.
+
+---
+
+### D176 — Row slice `:r >= vector` cu N>2 **(completed — C, ambele)**
+
+**Decizie:** **C** — dual path:
+- **Fără `;sel`:** `:r >= vector` pack **toate N cols** din soluția r → wire `ewire[N]`.
+- **Cu `;sel(i,j)` pe lanț:** `;sel(i,j):r >= vector` pack **2 cols proiectate** → wire `ewire[2]`.
+
+**Setup** — query `carInfo(X,Y,Z,K)` (N=4):
+
+| r | X | Y | Z | K |
+|---|---|---|---|---|
+| 0 | toyota | red | 2020 | sedan |
+| 1 | ford | blue | 2018 | truck |
+
+**Path A (fără sel) — rând complet `[N]`:**
+
+```logts
+allCarInfos:0 >= rowAll       ; wire [4] = [toyota, red, 2020, sedan]
+allCarInfos:1 >= row1         ; wire [4] = [ford, blue, 2018, truck]
+```
+
+**Path B (cu sel) — rând proiectat `[2]`:**
+
+```logts
+allCarInfos;sel(0,2):0 >= rowXZ   ; wire [2] = [toyota, 2020]
+allCarInfos;sel(1,3):1 >= rowYK   ; wire [2] = [blue, truck]
+```
+
+**N=2:** ambele path-uri coincid — `:0 >= v` = vector `[2]` (implicit cols 0,1).
+
+**Regulă implementare:** sel pe lanț **schimbă** shape-ul `:r` (N vs 2); **nu** e error `:r` fără sel la N>2 (spre deosebire de matrix bulk D173).
+
+---
+
+### D177 — `:width` **(completed — A)**
+
+| Opțiune | Valoare | Pro | Contra |
+|---------|---------|-----|--------|
+| **A — N original ✅** | `:width` = număr vars libere query (ex. 4) | Planificare buffer / cols | — |
+| **B — 2 după sel** | Doar pe lanț cu sel | — | Inconsistent fără sel |
+
+**Decizie:** **A** — `:width` = **N** logic al query-ului, indiferent de `;sel`.
+
+**Exemplu:** `allCarInfos:width >= nCols` → `4` pentru `carInfo(X,Y,Z,K)`.
+
+---
+
+### D178 — Policies după proiecție **(completed — A, explicație)**
+
+**Regulă:** policy (`;unique`, `;first`, `;last`) rulează **după** `;sel`, pe tuple-urile **proiectate** la 2 coloane.
+
+**Pipeline:** `solve → N cols → ;sel(i,j) → 2 cols → ;unique|first|last → pack`
+
+**De ce:** `;unique` compară ce ajunge pe wire. Înainte de sel = dedupe pe `(X,Y,Z,K)`; după sel = dedupe pe `(col_i, col_j)` — adică ce vrei pe matrix 2D.
+
+**Exemplu 1 — `;sel(0,2);unique` (marca + an):**
+
+Soluții: `(toyota,red,2020,sedan)`, `(ford,blue,2018,truck)`, `(toyota,silver,2020,coupe)`.
+
+După `;sel(0,2)`: `(toyota,2020)`, `(ford,2018)`, `(toyota,2020)` ← duplicat pe (X,Z).
+
+După `;unique` → **2 rânduri**: `(toyota,2020)`, `(ford,2018)`. Y/K diferă la al doilea toyota — **ignorat** post-sel.
+
+**Exemplu 2 — `;sel(0,1);first` (marca + culoare):**
+
+După `;sel(0,1)`: `(toyota,red)`, `(ford,blue)`, `(toyota,silver)`.
+
+După `;first` → **1 rând**: `(toyota, red)`.
+
+**Contrast:** `;unique >= matrix` fără sel la N=4 → **error** (D173). Inline `.world:query({…};unique)` fără matrix → dedupe pe N-tuple complet.
+
+**Decizie:** **A** — policies pe date **post-sel**; aliniat D172.
+
+---
+
+### D179 — Validare elaboration `;sel` **(de confirmat)**
+
+| Condiție | Rezultat |
+|----------|----------|
+| `;sel(0,2)` cu N=4 | OK |
+| `;sel(0,4)` | **error** — index out of range |
+| `;sel(1,1)` | **error** — duplicate index |
+| `;sel(0,1,2)` | **error** — arity ≠ 2 |
+| `;sel(a,b)` | **error** — non-integer |
+
+---
+
+### D180 — `.world:query` inline **(de confirmat)**
+
+| Opțiune | Sintaxă | Pro | Contra |
+|---------|---------|-----|--------|
+| **A — trailing ca F10 (recommended)** | `32wire[R,2] t = .world:query({ carInfo(X,Y,Z,K) };sel(0,2);unique)` | Paritate comp | — |
+| **B — doar comp** | Fără sel inline | Mai puțin parser | Lipsă paritate F9 |
+
+**Ordine trailing:** `{ goals }, bindings… ;sel(0,2);unique` — sel **după** bindings, **înainte** de pack (aliniat D172).
+
+---
+
+### D181 — Teste & livrare **(draft checklist)**
+
+| ID | Scenariu |
+|----|----------|
+| 3800 | parse: `;sel(0,2);unique >=` pe comp redirect |
+| 3801 | elaboration: query 4 vars **fără** eroare max-2 |
+| 3802 | elaboration: `>= matrix` N=4 **fără** sel → error |
+| 3803–3804 | `;sel(0,2);unique >= table` pack corect (legacy/wave) |
+| 3805 | `::0`…`::3` column slices N=4 |
+| 3806 | `:0:2` cell index original |
+| 3807 | regresie: query 2 vars fără sel — ca F5 |
+| 3808 | regresie: `;unique` F10 neschimbat la N=2 |
+| 3809 | inline `.world:query` cu `;sel(0,2);unique` |
+| 3810 | `:width` = 4 pentru query 4 vars |
+| 3811 | D176-C: `:0 >= rowAll` N=4 fără sel → vector `[4]` |
+| 3812 | D176-C: `;sel(0,2):0 >= rowXZ` → vector `[2]` |
+
+**Doc EN:** [`comp-logic.md`](../v0_3_2/doc/comp-logic.md), [`logic-query-exec.md`](../v0_3_2/doc/logic-query-exec.md), [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) — secțiune N vars + `;sel`; exemple logts-play Load & Load & Run.
+
+### Sketch implementare
+
+| Layer | Schimbare |
+|-------|-----------|
+| **`logic.js` elaboration** | Ridică `free.length > 2` error; stochează `N` în `queryMeta`; validează sel vs N |
+| **`parser.js`** | Parse `;sel(i,j)` în lanț modifieri query redirect; idem trailing `.world:query` |
+| **`logic-engine.js` / pack** | `logicProjectSolutions(solutions, sel, freeVars)` → 2-col; apoi `logicApplyResultPolicy` |
+| **`logic.js` redirects** | Bulk matrix: sel+policy înainte de pack; `:r` fără sel → `[N]`, cu sel → `[2]` (D176-C) |
+| **Teste** | 3800–3812+ legacy+wave |
+
+**Estimare:** medie — parser + elaboration + pack path; **fără** schimbare engine solve.
+
+### Exemplu țintă (post-F29)
+
+```logts
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, sedan)
+
+    query allCarInfos:
+        carInfo(X, Y, Z, K)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+
+:
+
+32wire[10, 2] table = 0
+8wire[10] colors = 0
+8wire numRows = 0
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(0,2);unique >= table
+    allCarInfos::1 >= colors
+    allCarInfos:0:2 >= yearCell
+    allCarInfos:count >= numRows
+    set = trigger
+}
+```
+
+**Load & Run:** `table` = rânduri **(brand, year)** dedupe — `(toyota,2020)` o singură dată; `colors` = toate culorile; `numRows` = după policy.
+
+---
+
 ## Comparație sketch v1 → v2 ( ce s-a schimbat )
 
 | Topic | Sketch v1 | Sketch v2 (current) |
@@ -5168,9 +5482,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 24** Cut `!` (**1+i**) | **(completed)** — D147–D151 |
 | **Faza 26** `is/2` arithmetic | D152–D159 | **(completed)** — teste 3760–3777, doc EN |
 | **Faza 27** builtins listă + doc | D160–D169 | **(completed)** |
+| **Faza 29** query N vars + `;sel` | D170–D181 | **(confirmed — ready implement)** |
 | **F20b** scope blocks | **2+a** **(deferred)** |
 | **F20c** reguli import relative | **2+b** **(deferred)** |
-| **F25** liste pe wire | **2+c** **(deferred)** — D140 |
+| **F25** liste pe wire | **2+c** **(deferred — după F29)** — D140 |
 | ~~**Builtins listă** member/append~~ | ~~**2+d**~~ | **✅ → F27** |
 | **Liste avansate** dif/lazy/char | **2+e** **(deferred)** — D136 |
 | **Builtins listă suplimentare** | **2+g** **(deferred)** — post-F27; catalog Prolog complet |
@@ -5185,11 +5500,11 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 26~~ **(completed)**
-2. **Faza 27** — builtins listă + **`logic-builtins.md`** **(2+d promovat)** — `member`, `append`, `length`, `reverse`, `sort` + migrare doc builtins existente
-3. **F25** liste pe wire când e nevoie
+1. ~~Faza 0~~ → ~~Faza 27~~ **(completed)**
+2. **Faza 29** — query **N** vars + **`;sel(i,j)`** — **înainte de F25/2+c**
+3. **Faza 25** — liste pe wire (**2+c**, D140) — după F29
 4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a … 2+g** (fără **2+d** — promovat → F27)
+5. Apoi faze amânate **2+a … 2+g** (fără **2+d** — livrat F27)
 
 ---
 
@@ -5204,7 +5519,7 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ✅ | ~~**1+c**~~ | Negation | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
 | ✅ | ~~**1+d**~~ | Recursivitate + depth limit | **Promovat → Faza 8** (D25–D29) | D5 |
 | ✅ | ~~**1+e**~~ | Facts dinamice runtime | **Promovat → Faza 11** — `logic { + / - }`, `mutationFailed` | D40–D49 |
-| ✅ | ~~**1+f**~~ | Multi-var vague | **Mutat în Faza 5** — redirect matrix/vector | D12 |
+| ✅ | ~~**1+f**~~ | Multi-var vague | **F5** max 2 cols matrix · **extins → F29** (`;sel`, N vars) | D12, F29 |
 | ✅ | ~~**1+g**~~ | **`use` / `use once`** | **Promovat → Faza 15** — strict vs modifier **`once`** (D77–D81) | D16 |
 | ✅ | ~~**1+h**~~ | Invoke `.world:query({ goal })` | **Promovat → Faza 9** (D30–D32) | D12, D30–D32 |
 | ✅ | ~~**1+i**~~ | Cut | **Promovat → Faza 24** — D147–D151 | D5, F22 |
@@ -5233,13 +5548,13 @@ Tabel master **2+a … 2+g** — faze **amânate** discutate/planificate, distin
 |-------|-----|---------|---------|------------|----------|
 | ⏳ | **2+a** | Scope blocks nested | `warehouse { inside(…) … }` — path relativ în același inline | **F20b** | F20a, D107 |
 | ⏳ | **2+b** | Reguli sub prefix import | `v.c.carSize <- carWheel` → `v.c.carWheel`; body relativ la `use as` | **F20c** | F20a, D107 |
-| ⏳ | **2+c** | Liste pe wire / vector | Pack redirect listă Prolog pe wire vector/matrix; query output liste | **F25** | D140, F22 |
+| ⏳ | **2+c** | Liste pe wire / vector | Pack redirect listă Prolog pe wire; **după F29** | **F25** | D140, F22, **F29** |
 | ✅ | ~~**2+d**~~ | Builtins listă (core) | **`member/2` `append/3` `length/2` `reverse/2` `sort/2`** | **F27** | D137, D160–D168, F22 |
 | ⏳ | **2+e** | Liste avansate Prolog | Dif-list, lazy lists, string ↔ char list | — | D136, F22 |
 | ⏳ | **2+f** | Cut în NAF — local cut | **`\+ (Goal, !)`** — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | — | D149, F24 |
 | ⏳ | **2+g** | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități | **F28?** | **2+d**, **F27**, F22–F23 |
 
-**Ordine recomandată (când se promovează):** **2+a** / **2+b** (composiție) independent de **2+c–2+g**; ~~**2+d**~~ **→ F27 (next)**; **2+g** după **F27** (dacă apare nevoie); **2+c** după **F22–F26**; **2+e** independent; **2+f** după **F24**.
+**Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24.
 
 ### Note backlog 2+x — explicații
 
@@ -5253,7 +5568,7 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 #### **2+c** ⏳ → **F25** (D140)
 
-Liste ca rezultate pe wire — vector/matrix redirect, pack soluții listă; **out of scope F22**.
+Liste ca rezultate pe wire — pack termen listă Prolog; **după F29** (N vars + sel distinct de listă ca termen). **Out of scope F22.**
 
 #### ~~**2+d**~~ ✅ → **F27** (D160–D168)
 
