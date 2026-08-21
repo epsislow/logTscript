@@ -6066,11 +6066,11 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 | **D188** | **Encode element listă** | **A** — același codec ca scalar per slot (D12b): text→ASCII, number→binary, bool→0/1 | **(confirmed)** |
 | **D189** | **Output redirect listă** | **A** — query cu var listă + `>= vector` / LHS vector inline → flatten listă ground | **(confirmed)** |
 | **D190** | **Out of scope MVP** | **A** — listă imbricată, listă eterogenă, vector-of-lists (blob per soluție) → backlog | **(confirmed)** |
-| **D191** | **`bool list` wire shape** | **A / B** — vezi mai jos | **de confirmat** |
-| **D192** | **Lungime listă N** | **A / B** — vezi mai jos | **de confirmat** |
-| **D193** | **Underfill (listă scurtă)** | **A / B** — vezi mai jos | **de confirmat** |
-| **D194** | **Overflow listă > N** | **A / B** — vezi mai jos | **de confirmat** |
-| **D195** | **Stop listă la fill** | **A / B** — primul slot fill = cap listă la decode | **de confirmat** |
+| **D191** | **`bool list` wire shape** | **A** — vector `1wire[N]` (1 bit / element) | **(confirmed)** |
+| **D192** | **Lungime listă N** | **C** — vector → N din `[N]`; scalar → packed per tip (bool 1, text 8, number 16) | **(confirmed)** |
+| **D193** | **Underfill (decode input)** | **C** — skip sloturi fill; 0 elemente → eroare; `""`/`\0` nu e text valid | **(confirmed)** |
+| **D194** | **Overflow (encode input)** | **A** — truncate primele N la pack pe wire input | **(confirmed)** |
+| **D195** | **Fill sentinel** | **C** — slot fill = `\0` (text); ignorat la decode; nu e element valid | **(confirmed)** |
 | **D196** | **Query: tip obligatoriu** | **A / B** — infer permis vs warning vs error | **de confirmat** |
 | **D197** | **Output fără binding** | **A / B** — infer listă doar din LHS vector vs eroare | **de confirmat** |
 | **D198** | **Parser query binding** | **A** — `Var=text list expr` parse după `=` (keywords rezervate în context query) | **(ready — implicit A)** |
@@ -6078,47 +6078,134 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 
 ---
 
-### D191 — `bool list` — shape wire **(de confirmat)**
+### D191 — `bool list` — shape wire **(confirmed: A)**
 
 | Opțiune | Wire | Pro | Contra |
 |---------|------|-----|--------|
-| **A — `1wire[N]` (recommended)** | N biți, un bool/slot | Compact | Diferit de text/number (multiplu 8) |
+| **A — `1wire[N]` ✓** | N biți, un bool/slot | Compact | Diferit de text/number (multiplu 8) |
 | **B — `8wire[N]`** | 0/1 pe octet | Uniform element width | 8× bits |
 
----
-
-### D192 — Plafon lungime listă **(de confirmat)**
-
-| Opțiune | Regulă | Pro | Contra |
-|---------|--------|-----|--------|
-| **A — N = dimensiune vector (recommended)** | `32wire[8]` → max 8 elemente; fără cap global suplimentar | Predictibil la elaboration | Vector mic = listă scurtă |
-| **B — cap global** | ex. max 1024 (ca D134 literal) | Protecție | Dublează regula |
+**Decizie:** **A** — pe vector, `bool list` folosește **`1wire[N]`** (1 bit per element). Pe scalar packed (D192), fiecare bit al wire-ului = un element.
 
 ---
 
-### D193 — Underfill la decode (listă mai scurtă decât N) **(de confirmat)**
+### D192 — Plafon lungime listă N **(confirmed: C — vector sau scalar packed)**
 
-| Opțiune | Comportament | Pro | Contra |
-|---------|--------------|-----|--------|
-| **A — stop la primul fill (recommended)** | `[a,b]` din prefix până la fill sentinel | Aliniat D12a vector bulk | Trebuie fill distinct de date valide |
-| **B — lungime fixă N** | mereu N elemente; rest fill = atom `''` / 0 | Simplu pack | Listă Prolog poate avea „găuri” |
+**N nu vine mereu din dimensiunea vectorului.** Două moduri:
+
+| Mod | Când | N (număr elemente) | Lățime element |
+|-----|------|---------------------|----------------|
+| **Vector** | `Kwire[N]` (sau `1wire[N]` pentru bool list) | **N** = dimensiunea vectorului | **K** biți / slot (bool list: **K=1**) |
+| **Scalar packed** | wire fără `[N]` | derivat din **tip listă + lățime totală wire** | vezi tabelul de mai jos |
+
+**Scalar packed — reguli per tip listă:**
+
+| Tip listă | Biți / element | Exemplu scalar | N | Eroare dacă |
+|-----------|----------------|----------------|---|-------------|
+| **`bool list`** | **1** | `32wire` | 32 | — (orice lățime ≥ 1) |
+| **`text list`** | **8** | `32wire` | 4 | lățime **nu** e multiplu de 8 (ex. `33wire` → eroare) |
+| **`number list`** | **16** (doar scalar) | `32wire` | 2 | lățime **nu** e multiplu de 16 |
+
+**Mesaje eroare EN (elaboration):**
+
+- `text list expects vector or width multiple of 8`
+- `number list expects vector or width multiple of 16`
+
+**Note:**
+
+1. **Vector rămâne calea principală** pentru `number list` când element width ≠ 16 (ex. `32wire[8]` = 8 numere pe 32 biți fiecare).
+2. **Scalar packed** acoperă query/mutation/pin cu wire simplu (`8wire`, `32wire`) fără sintaxă `[N]`.
+3. **Inconsistență documentată:** scalar `number` (D12b) = lățime arbitrară unsigned pe un singur slot; **number list scalar packed** = chunks fixe de **16 biți** — explicit în doc.
+4. Același codec la encode/decode (D188): text→ASCII pe slot, number→binary pe slot, bool→0/1.
+
+| Opțiune (istoric) | Regulă | Status |
+|---------|--------|--------|
+| **A — N = dimensiune vector** | doar vector | parțial — subsumed de **C** |
+| **B — cap global** | ex. max 1024 | respins MVP |
+| **C — vector + scalar packed ✓** | hibrid per tabel | **confirmed** |
 
 ---
 
-### D194 — Overflow (listă Prolog > N slots) **(de confirmat)**
+### D193 — Underfill la decode input wire **(confirmed: C)**
 
-| Opțiune | Comportament | Pro | Contra |
-|---------|--------------|-----|--------|
-| **A — truncate (recommended)** | primele N elemente pe wire; rest dropped | Aliniat D12a overflow soluții | Surpriză silent |
-| **B — elaboration/runtime error** | listă prea lungă → error | Sigur | Mai strict |
+**Doar wire → pin / wire → query binding** (`routePin = routeIn`, `Nodes=text list routeIn`).
+
+| Regulă | Comportament |
+|--------|--------------|
+| **Skip fill** | Sloturi fill (`\0` pe text) **ignorate** — nu contează poziția (nu „stop la primul fill”) |
+| **Compact** | Elementele non-fill, în ordinea sloturilor → listă Prolog |
+| **0 elemente** | Toate sloturi fill → **eroare** |
+| **Text invalid** | `""` și `\0` **nu** sunt text valid pe wire (MVP) — slot `\0` = fill, nu atom gol |
+
+**Exemple decode** (`8wire[4]`):
+
+```text
+north, east, \0, \0   →  [north, east]
+north, \0, \0, east   →  [north, east]
+\0, \0, \0, \0        →  eroare: text list cannot contain 0 elements
+```
+
+**Mesaj eroare EN:** `text list cannot contain 0 elements`
 
 ---
 
-### D195 — Decode: fill = cap listă **(de confirmat)**
+### D194 — Overflow la encode input wire **(confirmed: A — truncate)**
 
-La **wire → Prolog list** (pin input, query binding): primul slot egal cu **fill pattern** (D12a) → listă se termină acolo (nu include fill ca element).
+**Doar listă → wire input** (înainte de decode). Nu e redirect output (`>= routeOut`).
 
-**Decizie recomandată:** **A** — aliniat padding vector solutions.
+Apare când pui pe wire-ul de intrare o listă cu **k > N** elemente (capacitate wire).
+
+| Opțiune | Comportament |
+|---------|--------------|
+| **A — truncate ✓** | Scrii primele **N** elemente pe wire; restul dropped — **fără eroare** |
+| **B — error** | respins MVP |
+
+**Exemplu — query cu binding input:**
+
+```logts
+inline [logic] .routes:
+    path(a, [n1, n2, n3, n4]).          # KB: exact 4 (match după truncate)
+    path(b, [x1, x2, x3, x4, x5, x6]).
+:
+
+8wire[4] routeIn := \0                 # N=4 sloturi input
+
+# routeIn a fost populat cu 6 elemente (pack extern / assign) — D194 truncate → 4 pe wire
+
+1wire ok = .routes:query(
+    { path(a, Nodes) },                # Nodes = variabilă legată de input wire
+    Nodes=text list routeIn
+)
+# decode routeIn → Nodes = [n1,n2,n3,n4] (primele 4; n5,n6 dropped la pack)
+# path(a, Nodes) reușește; path(b, Nodes) eșuează (KB are 6, wire dă 4)
+```
+
+**Exemplu — comp program block (același overflow la pack input):**
+
+```logts
+comp [logic] .pathLogic:
+    .routes { Nodes is text list routePin }
+:
+
+.pathLogic:{
+    routePin = routeIn                 # decode (D193); presupune routeIn deja pack-uit
+    set = trigger
+}
+```
+
+Overflow D194 = la pasul **înainte** când listă > N e scrisă pe `routeIn`.
+
+---
+
+### D195 — Fill sentinel **(confirmed: C — aliniat D193)**
+
+| Tip | Fill per slot | La decode |
+|-----|---------------|-----------|
+| **text list** | `\0` (8 bit) | slot ignorat; **nu** e element `""` |
+| **number list** | `0` pe lățime element | slot ignorat |
+| **bool list** | `0` (1 bit) | slot ignorat |
+
+Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit din runtime.
 
 ---
 
@@ -6343,7 +6430,9 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 **Confirmed:** model unificat `text|number|bool` + `list` pe mutation/check, program block, query binding explicit; listă omogenă flatten ↔ vector; legacy `Var=wire` infer păstrat.
 
-**De confirmat:** D191–D197 (bool list wire, fill/overflow, infer obligatoriu?, output infer).
+**Confirmed:** D191–D195 (bool list wire, N vector/scalar packed, decode skip fill + 0 elem error, encode input truncate, fill sentinel).
+
+**De confirmat:** D196–D197 (infer obligatoriu?, output infer).
 
 #### ~~**2+d**~~ ✅ → **F27** (D160–D168)
 
