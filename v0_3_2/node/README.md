@@ -17,14 +17,56 @@
 
 După modificări în `huffFsmScript` din `tests/test_suite.js`: `node node/_gen_huff_fsm_doc.js` (copie bloc în `doc/huffman-v2.md` dacă e cazul), apoi `node node/_gen_doc_data.js`.
 
+## Verificare exemple doc (`_verify_doc_examples.js`)
+
+Script utilitar (nu face parte din test suite). Rulează exemplele din documentație în Node.
+
+| Comandă | Ce face |
+|---------|---------|
+| `node node/_verify_doc_examples.js PAGE` | Verifică `doc/PAGE.md` |
+| `node node/_verify_doc_examples.js --list` | Pagini cu blocuri `logts-play` (+ marcaj `+extra`) |
+| `node node/_verify_doc_examples.js --all` | Toate paginile (durează) |
+| `node node/_verify_doc_examples.js --blocks-only PAGE` | Doar blocuri MD, fără extra |
+| `node node/_verify_doc_examples.js --include-blocks PAGE` | Forțează blocuri MD chiar dacă `skipBlocks` |
+
+Din rădăcina repo: `node v0_3_2/node/_verify_doc_examples.js comp-logic`
+
+### Ce verifică per pagină
+
+1. **Blocuri `logts-play`** din markdown — programul trebuie să ruleze fără throw.
+2. **Check-uri extra** din `node/doc_verify/<slug>.js` (opțional) — programe complete cu assert-uri pe wire-uri, output `show`, funcții custom.
+
+`<slug>` = numele fișierului doc fără `.md` (ex. `comp-logic` → `doc/comp-logic.md` + `node/doc_verify/comp-logic.js`).
+
+### Directorul `node/doc_verify/`
+
+Addon opțional pentru pagini unde snippet-urile din doc nu sunt suficiente:
+
+| Fișier | Pagină | Rol |
+|--------|--------|-----|
+| `inline-logic.js` | `doc/inline-logic.md` | 18 scenarii (liste, compound, constraints) |
+| `comp-logic.js` | `doc/comp-logic.md` | 9 scenarii (pinuri, liste, mutații); `skipBlocks: true` |
+
+Format modul:
+
+```javascript
+module.exports = {
+  skipBlocks: true,   // opțional — sare blocurile MD (snippet-uri parțiale)
+  cases: [
+    {
+      name: 'descriere scurtă',
+      src: `... program LogTScript complet ...`,
+      wires: { ok: '1' },              // valori așteptate pe wire
+      expect: ['text în output show'], // substring în stdout
+      check: (interp) => true,         // assert custom
+    },
+  ],
+};
+```
+
+Paginile **fără** fișier în `doc_verify/` sunt verificate doar prin blocurile `logts-play` din markdown.
+
 ## Debug (opțional)
-
-- `node node/_verify_doc_examples.js PAGE` — verifică exemplele `logts-play` din `doc/PAGE.md` (+ extra checks dacă există `node/doc_verify/PAGE.js`)
-- `node node/_verify_doc_examples.js --list` — listează paginile doc cu exemple `logts-play`
-- `node node/_verify_doc_examples.js --all` — rulează toate paginile (poate dura)
-- `node node/_verify_doc_examples.js inline-logic comp-logic` — mai multe pagini odată
-
-Poți rula din rădăcina repo: `node v0_3_2/node/_verify_doc_examples.js comp-logic`
 
 - `node node/_debug_show_peek.js`
 - `node node/_debug_test_group.js`
