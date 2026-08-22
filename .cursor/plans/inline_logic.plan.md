@@ -5980,7 +5980,20 @@ comp [logic] .worldLogic:
 > **User / design:** 2026-08-21 — model **unificat** `text` | `number` | `bool` + modificator opțional **`list`** pe **trei suprafețe**: mutation/check (D59), program block comp, `.world:query` (D32).  
 > **Relație F29:** `;sel` proiectează **cols scalare** din N vars; F25 = **un termen listă** ↔ **vector** (flatten omogen). **Distinct.**  
 > **Relație F22:** liste Prolog în engine **(completed)**; F25 = **codec wire** (pack/unpack). D140 amânat → **D182+**.  
-> **Neproducție:** tip explicit la query = îmbunătățire claritate; legacy `Var=wire` infer păstrat (D187).
+> **Neproducție:** F25 **elimină infer** din query — tip obligatoriu peste tot (canonic cu mutation / program block). D187 respins.
+
+### Sintaxă canonică unificată **(D182 + D196 — fără infer)**
+
+Același vocabular `text | number | bool` + opțional `list` pe **toate** suprafețele. **Nicăieri** nu se ghicește tipul din lățimea wire-ului.
+
+| Suprafață | Formă | Exemplu |
+|-----------|--------|---------|
+| **Mutation / `:check`** | `scalarType [list] wire` | `+ path(a, text list w)` |
+| **Program block** | `Var is scalarType [list] pin` | `Nodes is text list routePin` |
+| **Query input** | `Var=scalarType [list] wireExpr` | `Nodes=text list routeIn` |
+| **Query output hint** | `Var=scalarType [list]` (fără wire) | `Nodes=text list` |
+
+**Eliminat F25:** `Var=wire`, `Var=w` fără keyword tip, `logicInferBindType` pe query bindings. Teste **3544+** și doc EN migrate la formă canonică.
 
 ### Context — problema
 
@@ -5988,10 +6001,10 @@ comp [logic] .worldLogic:
 |-----|--------|
 | **Mutation/check** (D59) | `text w`, `number w`, `bool w` — **scalar**; fără listă |
 | **Program block** | `X is text pin` — scalar; fără listă |
-| **`.world:query`** (D32) | `Var=wire` — tip **inferat din lățime** (`logicInferBindType`) |
+| **`.world:query`** (D32) | **D196:** `Var=text\|number\|bool [list] wire` — tip obligatoriu; **fără infer** |
 | **Redirect output** | listă Prolog → **fill** (`logicEncodeSolutionTerm` ignoră `list`) |
 
-**Bug design query infer:** `32wire` → infer **text** (multiplu de 8), nu number — `N=scoreIn` pe `8wire`/`32wire` numeric e ambiguu/incorect fără tip explicit.
+**Motiv eliminare infer:** `32wire` inferat ca text era ambiguu/incorect pentru numeric — tip explicit obligatoriu ca la D59 / program block.
 
 ### Vocabular tip (confirmed intent)
 
@@ -6061,8 +6074,8 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 | **D183** | **Listă omogenă MVP** | **A** — flatten `[e1,…,eN]` ↔ vector; **fără** imbricare / eterogen | **(confirmed)** |
 | **D184** | **Mutation/check list** | **A** — `text list w`, `number list w`, `bool list w` (extinde D59) | **(confirmed)** |
 | **D185** | **Program block list** | **A** — `Var is text list pin`, etc. | **(confirmed)** |
-| **D186** | **Query binding explicit** | **A** — `Var=text w`, `Var=number w`, `Var=text list w`, … | **(confirmed)** |
-| **D187** | **Legacy `Var=wire` infer** | **A (recommended)** — păstrat compat; infer din lățime ca azi; doc: prefer explicit | **(confirmed)** |
+| **D187** | **~~Infer din lățime~~** | **respins** — D196 C; fără `Var=wire`, fără `logicInferBindType` la query | **(eliminated)** |
+| **D186** | **Query binding explicit** | **A** — `Var=text w`, `Var=number w`, `Var=text list w`, … — **singura** formă validă | **(confirmed)** |
 | **D188** | **Encode element listă** | **A** — același codec ca scalar per slot (D12b): text→ASCII, number→binary, bool→0/1 | **(confirmed)** |
 | **D189** | **Output redirect listă** | **A** — query cu var listă + `>= vector` / LHS vector inline → flatten listă ground | **(confirmed)** |
 | **D190** | **Out of scope MVP** | **A** — listă imbricată, listă eterogenă, vector-of-lists (blob per soluție) → backlog | **(confirmed)** |
@@ -6071,8 +6084,8 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 | **D193** | **Underfill (decode input)** | **C** — skip sloturi fill; 0 elemente → eroare; `""`/`\0` nu e text valid | **(confirmed)** |
 | **D194** | **Overflow (encode input)** | **A** — truncate primele N la pack pe wire input | **(confirmed)** |
 | **D195** | **Fill sentinel** | **C** — slot fill = `\0` (text); ignorat la decode; nu e element valid | **(confirmed)** |
-| **D196** | **Query: tip obligatoriu** | **A / B** — infer permis vs warning vs error | **de confirmat** |
-| **D197** | **Output fără binding** | **A / B** — infer listă doar din LHS vector vs eroare | **de confirmat** |
+| **D196** | **Query: fără infer** | **C** — tip obligatoriu input + output; canonic cu mutation/program block | **(confirmed)** |
+| **D197** | **Query output: tip obligatoriu** | **C** — var liberă + LHS wire → `Var=type [list]` fără wire (output hint) | **(confirmed)** |
 | **D198** | **Parser query binding** | **A** — `Var=text list expr` parse după `=` (keywords rezervate în context query) | **(ready — implicit A)** |
 | **D199** | **Teste & livrare** | **A** — 3816+ legacy+wave; mutation list, pin list, query typed, redirect flatten | **(draft checklist)** |
 
@@ -6209,28 +6222,161 @@ Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit d
 
 ---
 
-### D196 — Query infer legacy **(de confirmat)**
+### D196 — Query: fără infer, tip obligatoriu **(confirmed: C)**
 
-| Opțiune | Comportament | Pro | Contra |
-|---------|--------------|-----|--------|
-| **A — infer păstrat, doc prefer explicit (recommended)** | `X=wire` ca azi; exemple noi cu `X=text w` | Zero breaking teste | Ambiguitate rămâne dacă user uita tipul |
-| **B — warning elaboration** | infer + mesaj doc viewer | Educație | Zgomot |
-| **C — tip obligatoriu** | `X=wire` fără keyword → error | Claritate totală | Breaking teste 3544+ |
+#### Istoric — infer pre-F25 **(eliminat)**
 
-**Notă user:** neproducție — **A** suficient; reconsider **C** dacă vrei hardening.
+Înainte de F25, `X=carWire` apela `logicInferBindType(lățime)` — **respins definitiv**. User 2026-08-22: canonic cu mutation / program block; teste migrate.
+
+| Lățime (vechi infer) | Tip ghicit (eliminat) |
+|----------------------|------------------------|
+| 1 | `bool` |
+| multiplu de 8 | `text` |
+| altceva | `number` |
+
+#### Decizie **C** — tip obligatoriu peste tot la query
+
+**Input binding:**
+
+```text
+Var = scalarType [list] wireExpr
+```
+
+| Formă | Rezultat |
+|-------|----------|
+| `X=text carWire` | OK |
+| `X=number scoreIn` | OK |
+| `X=bool flagWire` | OK |
+| `Nodes=text list routeIn` | OK |
+| `X=carWire` | **error** — lipsește tip |
+| `X=wire carWire` | **error** — `wire` nu e tip |
+
+**Implementare:** parser extrage `bindType` + `listFlag` din binding; **`interpreter.js`** nu mai apelează `logicInferBindType` pentru query. Funcția poate rămâne în engine pentru alte contexte interne, dar **nu** pentru `.world:query`.
+
+**Mesaj eroare EN:** `query binding requires explicit type (text, number, bool, or … list)`
+
+**Migrare:** toate testele logic query **3544+**, doc EN (`logic-query-exec.md`, `inline-logic.md`, `comp-logic.md`) — formă canonică; fără mențiune „infer din lățime”.
 
 ---
 
-### D197 — Output query fără binding input **(de confirmat)**
+### D197 — Query output: tip obligatoriu **(confirmed: C)**
 
-```logts
-32wire[8] flat = .world:query({ path(a, Nodes) })
+**Situația:** var liberă în goal, **fără** wire input — rezultatul se scrie pe **LHS** (`32wire[8] flat = .world:query(...)`).
+
+LHS fixează **shape** (scalar / vector / matrix), **nu** semantica (text vs number vs listă Prolog). Trebuie **output type hint** în apelul query.
+
+#### Sintaxă — input vs output **(confirmed user 2026-08-22)**
+
+```text
+; INPUT (D196) — sursă obligatorie după tip (wire, literal binar, ^hex, expr)
+Var = scalarType list wireExpr
+
+; OUTPUT hint (D197) — nimic după list; următorul token , ; )
+Var = scalarType list
 ```
 
-| Opțiune | Comportament | Pro | Contra |
-|---------|--------------|-----|--------|
-| **A — LHS vector + var listă liberă → flatten (recommended)** | encoder detectează listă ground pe var | DX simplu | Trebuie validat shape LHS |
-| **B — obligă tip pe LHS viitor** | `32wire[8] flat = … ;as text list` | Explicit | Parser extra |
+**Input — exemple valide:**
+
+```logts
+Nodes=text list routeIn
+X=bool list 00011011
+Y=bool list ^F
+```
+
+**Output hint — fără RHS:**
+
+```logts
+Nodes=text list
+X=text
+```
+
+**Notă:** în plan, `[list]` = opțional în gramatică; în script scrii `text list`, **nu** `text [list]`.
+
+#### Sintaxă output hint (fără wire pe RHS)
+
+```text
+Var = scalarType [list]        ; fără wireExpr → encode output pentru var liberă Var
+```
+
+**Exemplu corect — listă Prolog → vector wire (inline query):**
+
+```logts
+inline [logic] .routes:
+    path(a, [north, east, south]).
+:
+
+32wire[8] routeOut := \0
+
+32wire[8] routeFlat = .world:query(
+    { path(a, Nodes) },
+    Nodes=text list
+)
+# Nodes liberă; soluție ground [north,east,south] → flatten pe routeFlat (8wire slots)
+```
+
+**Exemplu — scalar atom liber → wire scalar:**
+
+```logts
+inline [logic] .world:
+    owns(john, chevy).
+:
+
+40wire carOut := \0
+
+40wire car = .world:query(
+    { owns(john, X) },
+    X=text
+)
+```
+
+**Exemplu — bulk soluții (var atom, nu listă) → vector:**
+
+```logts
+8wire[4] cars := \0
+
+8wire[4] cars = .world:query(
+    { owns(john, X) },
+    X=text
+)
+# fiecare soluție = un atom în slot; nu e `text list` (nu e termen listă Prolog)
+```
+
+**Exemplu — comp logic (output via exec redirect, nu inline LHS):**
+
+```logts
+inline [logic] .routes:
+    path(a, [north, east, south]).
+    query route:
+        path(a, Nodes)
+:
+
+32wire[8] routeOut := \0
+1wire trigger = 1
+
+comp [logic] .pathLogic:
+    on: 1
+    .routes {
+        Route is text list routePin
+    }
+:
+
+.pathLogic:{
+    route >= routeOut              # redirect: Nodes list → routePin → routeOut
+    set = trigger
+}
+```
+
+Aici tipul e în **program block** (`text list routePin`), nu în apel inline — același codec, suprafață diferită.
+
+#### Erori
+
+| Caz | Eroare |
+|-----|--------|
+| Var liberă, fără output hint | `query output requires explicit type for 'Nodes'` |
+| `Nodes=text list` dar LHS scalar | shape mismatch (elaboration) |
+| Hint `X=text list` dar soluția e atom | encode error / elaboration |
+
+**Respinge D197-A:** infer listă doar din LHS vector — prea implicit; `32wire[8]` nu spune text vs number list.
 
 ---
 
@@ -6241,13 +6387,14 @@ Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit d
 | 3816 | parse mutation: `+ fact(X, text list w)` |
 | 3817 | parse program: `Nodes is number list pin` |
 | 3818 | parse query: `Nodes=text list routeVec` |
-| 3819 | query `N=number scoreIn` pe `8wire` — round-trip numeric (nu text infer) |
+| 3819 | query `N=number scoreIn` pe `8wire` — round-trip numeric |
 | 3820–3821 | mutation list text in/out legacy+wave |
 | 3822–3823 | pin `is text list` round-trip legacy+wave |
-| 3824–3825 | query output flatten `[a,b,c]` → `32wire[8]` legacy+wave |
-| 3826 | regresie: `X=carWire` infer text încă funcționează |
-| 3827 | `:check` cu `text list w` |
-| 3828 | listă imbricată la pack → error sau fill (per D190) |
+| 3824–3825 | query output `Nodes=text list` flatten → `32wire[8]` legacy+wave |
+| 3826 | query binding fără tip → elaboration error |
+| 3827 | query output fără tip hint pe var liberă → error |
+| 3828 | listă imbricată la pack → error (per D190) |
+| 3829 | migrate suite: toate query bindings **3544+** fără infer |
 
 **Doc EN:** `logic-runtime.md`, `comp-logic.md`, `logic-query-exec.md`, `inline-logic.md` — secțiuni typed list; exemple logts-play Load & Run.
 
@@ -6256,11 +6403,11 @@ Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit d
 | Layer | Schimbare |
 |-------|-----------|
 | **`logic-assembler.js`** | `parseMutationTerm`: `text list w`; `parseLogicProgramBlock`: `is text list pin`; keywords `list` în context tip |
-| **`parser.js`** | Query bindings: `Var=text [list] expr` |
-| **`logic-engine.js`** | `logicWireRefToTerm(bits, bindType, listFlag)`; `logicListToVector` / `logicVectorToList`; extinde encode redirect |
+| **`parser.js`** | Query bindings tipate: `Var=text [list] expr`; respinge binding fără tip |
+| **`logic-engine.js`** | codec listă; encode/decode cu `bindType` explicit — **nu** infer pe query |
 | **`logic.js`** | Pin storage list (N × ew); redirect când sol[var] e list |
-| **`interpreter.js`** | `evalLogicInlineQuery` bindings cu bindType explicit |
-| **Teste** | 3816–3828+ legacy+wave |
+| **`interpreter.js`** | `evalLogicInlineQuery`: `bindType`/`listFlag` din parse; **elimină** `logicInferBindType` pe bindings |
+| **Teste** | 3816–3828+; **migrate 3544+** la tip explicit |
 
 **Estimare:** medie-mare — trei suprafețe parse + codec listă; **fără** schimbare engine unify/list (F22).
 
@@ -6296,8 +6443,12 @@ comp [logic] .worldLogic:
 
 32wire[8] inlinePath = .world:query(
     { path(a, Nodes) },
-    A=text atomWire,
     Nodes=text list routeIn)
+
+# sau output-only (Nodes liberă, fără wire input):
+32wire[8] inlinePath = .world:query(
+    { path(a, Nodes) },
+    Nodes=text list)
 ```
 
 ---
@@ -6428,11 +6579,11 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 **Următoarea fază** — secțiune completă: [Decizii Faza 25](#decizii-faza-25--liste-tipate-pe-wire--binding-explicit-2c-d182-draft--următoarea-fază).
 
-**Confirmed:** model unificat `text|number|bool` + `list` pe mutation/check, program block, query binding explicit; listă omogenă flatten ↔ vector; legacy `Var=wire` infer păstrat.
+**Confirmed:** model unificat `text|number|bool` + `list`; tip **obligatoriu** pe mutation, program block, query — **fără infer** (D196 C, D187 eliminat).
 
-**Confirmed:** D191–D195 (bool list wire, N vector/scalar packed, decode skip fill + 0 elem error, encode input truncate, fill sentinel).
+**Confirmed:** D191–D197 (inclus D196/D197 tip obligatoriu input + output hint).
 
-**De confirmat:** D196–D197 (infer obligatoriu?, output infer).
+**De confirmat:** — (F25 decizii complete; rămâne implementare).
 
 #### ~~**2+d**~~ ✅ → **F27** (D160–D168)
 
