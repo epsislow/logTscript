@@ -1358,6 +1358,48 @@ parseLogicQueryModifiers() {
   return { columnSelect, resultPolicy };
 }
 
+parseLogicQueryBindingAfterEq(bindName) {
+  const LOGIC_BIND_TYPES = new Set(['text', 'number', 'bool']);
+  const LOGIC_QUERY_OPTS = new Set(['maxDepth', 'maxSolutions']);
+  if (LOGIC_QUERY_OPTS.has(bindName)) {
+    return { kind: 'option', name: bindName, expr: this.expr() };
+  }
+  if (!/^[A-Z_][A-Za-z0-9_]*$/.test(bindName)) {
+    throw Error(`Logic query: unknown option or invalid variable '${bindName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (this.c.type !== 'ID' || !LOGIC_BIND_TYPES.has(this.c.value)) {
+    throw Error(`query binding requires explicit type (text, number, bool, or … list) for '${bindName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  const bindType = this.c.value;
+  this.eat('ID');
+  this.t.skip();
+  let listFlag = false;
+  if (this.c.type === 'ID' && this.c.value === 'list') {
+    this.eat('ID');
+    listFlag = true;
+    this.t.skip();
+  }
+  const atEnd = this.c.type === 'SYM' && (this.c.value === ',' || this.c.value === ';' || this.c.value === ')');
+  if (atEnd) {
+    return {
+      kind: 'binding',
+      name: bindName,
+      bindType,
+      listFlag,
+      outputHintOnly: true,
+    };
+  }
+  const bindExpr = this.expr();
+  return {
+    kind: 'binding',
+    name: bindName,
+    bindType,
+    listFlag,
+    expr: bindExpr,
+    outputHintOnly: false,
+  };
+}
+
 parseLogicResultPolicy() {
   const allowed = new Set(['unique', 'first', 'last']);
   if (this.c.type !== 'SYM' || this.c.value !== ';') {
@@ -5256,7 +5298,6 @@ assignment() {
           this.t.skip();
           methodBindings = [];
           methodQueryOptions = [];
-          const LOGIC_QUERY_OPTS = new Set(['maxDepth', 'maxSolutions']);
           while (this.c.type === 'SYM' && this.c.value === ',') {
             this.eat('SYM', ',');
             this.t.skip();
@@ -5271,13 +5312,11 @@ assignment() {
             }
             this.eat('SYM', '=');
             this.t.skip();
-            const bindExpr = this.expr();
-            if (LOGIC_QUERY_OPTS.has(bindName)) {
-              methodQueryOptions.push({ name: bindName, expr: bindExpr });
-            } else if (/^[A-Z_][A-Za-z0-9_]*$/.test(bindName)) {
-              methodBindings.push({ name: bindName, expr: bindExpr });
+            const parsedBind = this.parseLogicQueryBindingAfterEq(bindName);
+            if (parsedBind.kind === 'option') {
+              methodQueryOptions.push({ name: parsedBind.name, expr: parsedBind.expr });
             } else {
-              throw Error(`Logic query: unknown option or invalid variable '${bindName}' at ${this.c.line}:${this.c.col}`);
+              methodBindings.push(parsedBind);
             }
             this.t.skip();
           }

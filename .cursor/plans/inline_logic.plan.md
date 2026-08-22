@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–24, F26–F27, F29 complete; **Faza 25** (liste tipate pe wire, 2+c) — următoarea, D182+ draft.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–25, F26–F27, F29 complete; **Faza 26** (`is/2`) — următoarea.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -87,8 +87,8 @@ todos:
     content: "Faza 29: N query vars + ;sel(i,j) — implemented"
     status: completed
   - id: logic-list-wire
-    content: "Faza 25: liste tipate pe wire (2+c) — text|number|bool [list], D182+ — următoarea fază"
-    status: pending
+    content: "Faza 25: liste tipate pe wire (2+c) — text|number|bool [list], D182+ — completed"
+    status: completed
 isProject: false
 ---
 

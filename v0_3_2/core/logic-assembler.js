@@ -401,11 +401,16 @@ class LogicParser {
   parseMutationTerm() {
     if (this.at('ID') && LOGIC_MUTATION_BIND_TYPES.has(this.peek().value)) {
       const bindType = this.advance().value;
+      let listFlag = false;
+      if (this.at('ID') && this.peek().value === 'list') {
+        this.advance();
+        listFlag = true;
+      }
       if (!this.at('ID')) {
-        logicError(`expected wire name after ${bindType}`, this.peek().line);
+        logicError(`expected wire name after ${bindType}${listFlag ? ' list' : ''}`, this.peek().line);
       }
       const wireName = this.advance().value;
-      return { kind: 'wireRef', bindType, wireName };
+      return { kind: 'wireRef', bindType, listFlag, wireName };
     }
     return this.parseTerm();
   }
@@ -651,11 +656,12 @@ function parseLogicProgramBlock(bodyRaw) {
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line || line.startsWith(';')) continue;
-    const m = line.match(/^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)\s+([a-zA-Z_][A-Za-z0-9_]*)$/);
+    const m = line.match(/^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/);
     if (!m) {
-      throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type pin')`);
+      throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type [list] pin')`);
     }
-    bindings.push({ logicVar: m[1], bindType: m[2], pinName: m[3] });
+    const listFlag = /\blist\b/.test(line);
+    bindings.push({ logicVar: m[1], bindType: m[2], listFlag, pinName: m[3] });
   }
   return bindings;
 }

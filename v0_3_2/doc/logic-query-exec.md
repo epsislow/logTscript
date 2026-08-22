@@ -12,23 +12,23 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 |-------|---------|
 | **Syntax** | `.module:query({ goals }, Var=wire, maxDepth=\\N, maxSolutions=\\N;policy)` |
 | **Goals** | Prolog body in `{ }` — comma = AND, `\+`, `=:=`, etc. |
-| **Inputs** | Optional `, X=wire` after the block |
+| **Inputs** | Optional `, Var=text wire`, `Var=number wire`, `Var=bool wire`, or `Var=<type> list wire` |
 | **Limits** | Optional `, maxDepth=\\N`, `, maxSolutions=\\N` (decimal literals; default **256** / **64**) |
 | **Column select** | Optional `;sel(i,j)` before policy — 0-based column indices into free variables |
 | **Result policy** | Optional trailing `;unique`, `;first`, or `;last` (after bindings/options) |
 | **`_`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | `1wire` LHS + all vars bound → `1` / `0` |
 | **Scalar (1st sol.)** | `8wire` / `40wire` / `80wire` LHS + one free var → **first solution** on that width (ASCII atom + `\0` pad) |
-| **Bulk** | `8wire[N]` / `40wire[N]` / `32wire[R,C]` LHS + free vars → vector / matrix |
+| **List I/O** | `Var=text list` (output hint) or `Var=text list wireIn` (input) — packed on vector wires |
 
 ---
 
 ## Syntax
 
 ```logts
-result = .world:query({ owns(john, X) }, X=car)
+result = .world:query({ owns(john, X) }, X=text car)
 
-1wire ok = .world:query({ owns(john, X) }, X=car, maxDepth=\10, maxSolutions=\3)
+1wire ok = .world:query({ owns(john, X) }, X=text car, maxDepth=\10, maxSolutions=\3)
 
 8wire[10] cars = .world:query({ owns(john, _) })
 ```
@@ -37,7 +37,7 @@ result = .world:query({ owns(john, X) }, X=car)
 |------|---------|
 | **`.world:query(...)`** | Single method **`query`** on `inline [logic]` `.world` |
 | **`{ goals }`** | Prolog goals (same grammar as inline query body) |
-| **`, Var=expr`** | Bind logic variables before solve (wire → atom/number/bool) |
+| **`, Var=<type> expr`** | Bind logic variables before solve — **type is required** (`text`, `number`, `bool`, optional `list`) |
 | **`, maxDepth=\\N`** | Optional — max goal steps (default **256**) |
 | **`, maxSolutions=\\N`** | Optional — max solutions collected (default **64**) |
 | **`;sel(i,j)`** | Optional — project to two columns before policy/pack (required for `32wire[R,C]` when more than two free vars) |
@@ -62,7 +62,7 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 ```logts
 8wire[4] cars = .world:query({ owns(john, _) };unique)
 40wire last = .world:query({ owns(john, X) };last)
-1wire ok = .world:query({ owns(john, X) }, X=car;unique)
+1wire ok = .world:query({ owns(john, X) }, X=text car;unique)
 ```
 
 **Not supported:** `.world:available(...)` per query name, or redirect selectors like `{ johnOwns:0 }` inside the block — only **goals**.
@@ -84,15 +84,43 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 
 Encoding matches comp redirects: **atoms → ASCII + padding**, **numbers → unsigned binary** on cell width (see [comp-logic.md](comp-logic.md) D12b).
 
-### Input binding (`Var=wire`)
+### Input binding — explicit type (`Var=<type> wire`)
 
-Wire width selects decode mode:
+Every query binding after the goal block **must** name a decode type. Width alone does **not** select the mode.
 
-| Width | Decode |
-|-------|--------|
-| **1 bit** | Boolean / 0–1 |
-| **≥ 8, multiple of 8** | Text → atom (stop at `\0`) |
-| **Other** | Unsigned number |
+| Form | Meaning |
+|------|---------|
+| `X=text carWire` | Wire → ASCII atom (stop at `\0`; empty / all-zero → error on text) |
+| `N=number scoreIn` | Wire → unsigned integer |
+| `F=bool flag` | 1-bit wire → 0/1 |
+| `Nodes=text list routeIn` | Vector or packed scalar → Prolog list of atoms |
+| `Vals=number list packedIn` | Packed list of integers (16 bits per element on vector wires) |
+| `Flags=bool list bitsIn` | Packed list of booleans (1 bit per element) |
+
+**Output hint (no wire on the right):** when the LHS is a vector wire and the goal has one free list variable, give the type without a source wire:
+
+```logts
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)
+```
+
+The engine flattens the first solution list into consecutive cells (ASCII per atom on text lists). Unused slots use the wire fill pattern (`\0` for text).
+
+### List codec rules
+
+| Type | Vector wire | Scalar packed wire |
+|------|-------------|-------------------|
+| **`text list`** | One atom per cell (`8wire[N]` → N atoms) | Total bits ÷ 8 slots |
+| **`number list`** | One integer per cell (cell width = element width) | Total bits ÷ 16 slots |
+| **`bool list`** | One bit per cell | Total bits = element count |
+
+| Rule | Behaviour |
+|------|-----------|
+| **Fill slots** | All-zero cells (or wire fill pattern) are **skipped** on decode |
+| **Zero elements** | Decode with no non-fill cells → error (`text list cannot contain 0 elements`, etc.) |
+| **Input truncate** | If the Prolog list has more elements than wire slots, extra elements are dropped silently on encode |
+| **Invalid text** | `\0` or empty atom in a non-fill cell → skipped (not a valid list element) |
+
+**Legacy vs wave:** success paths produce identical wire values. Runtime errors are reported the same way as other inline queries (legacy stores `lastReportedError`; wave may throw on assignment — same message text).
 
 ---
 
@@ -111,7 +139,7 @@ inline [logic] .world:
 
 40wire car = 01100011'01101000'01100101'01110110'01111001
 
-1wire ok = .world:query({ owns(john, X) }, X=car)
+1wire ok = .world:query({ owns(john, X) }, X=text car)
 
 show(ok)
 ```
@@ -291,6 +319,122 @@ show(table; ascii)
 
 **Load & Run** packs two columns (brand + year) after dedupe — two matrix rows, not three.
 
+### List output — flatten route to vector
+
+```logts-play
+inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+8wire[4] routeOut = 00000000000000000000000000000000
+
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)
+
+show(routeFlat; ascii)
+```
+
+After **Load & Run**, `routeFlat` holds three ASCII cells `n`, `e`, `s`; slot 4 is fill (`\0`).
+
+### List input — verify path against packed wire
+
+```logts-play
+inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+8wire[4] routeIn = 01101110011001010111001100000000
+
+1wire ok = .routes:query({ path(a, Nodes) }, Nodes=text list routeIn)
+
+show(ok)
+```
+
+`routeIn` encodes `[n,e,s]` plus a fill cell → **`ok = 1`**.
+
+### Scalar number input
+
+```logts-play
+inline [logic] .scores:
+
+    level(box1, 42)
+
+    query q:
+        level(box1, N)
+
+:
+
+16wire scoreIn = 0000000000101010
+
+1wire ok = .scores:query({ level(box1, N) }, N=number scoreIn)
+
+show(ok)
+```
+
+### Bool list — packed 4-bit input
+
+```logts-play
+inline [logic] .flags:
+
+    flags(box1, [1, 0, 1, 1])
+
+    query q:
+        flags(box1, F)
+
+:
+
+4wire flagIn = 1011
+
+1wire ok = .flags:query({ flags(box1, F) }, F=bool list flagIn)
+
+show(ok)
+```
+
+**Load & Run** → **`ok = 1`**.
+
+### Mutation — add path from text list wire
+
+```logts-play
+inline [logic] .routes:
+
+    path(a, [x])
+
+    path(b, [n, e, s])
+
+:
+
+8wire[4] routeVec = 01101110011001010111001100000000
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes { }
+:
+
+1wire trigger = 1
+
+.routeLogic:{
+    logic {
+        + path(b, text list routeVec)
+    }
+    set = trigger
+}
+
+1wire ok = .routes:query({ path(b, Nodes) }, Nodes=text list)
+
+show(ok)
+```
+
+After **Load & Run**: mutation adds `path(b,[n,e,s])` → query succeeds → **`ok = 1`**.
+
 ---
 
 ## vs `comp [logic]`
@@ -299,7 +443,7 @@ show(table; ascii)
 |---|-------------------------|-------------------|
 | **Use** | One-off expression / assign | Circuit trigger + redirects |
 | **Trigger** | Runs when expression evaluates | `set` pin + `on:` |
-| **Inputs** | `, Var=wire` on call | Program block + exec `pin = wire` |
+| **Inputs** | `, Var=<type> wire` on call | Program block + exec `pin = wire` (supports `text list`, `number list`, `bool list`) |
 | **Outputs** | Expression return / LHS wire | `query >= wire` redirects |
 | **Limits** | Per-call `maxDepth` / `maxSolutions` (defaults 256 / 64); no `truncated`/`depthExceeded` pout | `maxDepth` / `maxSolutions` on comp + pout redirects |
 

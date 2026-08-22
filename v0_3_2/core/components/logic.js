@@ -354,6 +354,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       pinDefs[b.pinName] = {
         logicVar: b.logicVar,
         bindType: b.bindType,
+        listFlag: !!b.listFlag,
         bits: b.bindType === 'bool'
           ? 1
           : b.bindType === 'text'
@@ -403,6 +404,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const listGoalsFn = typeof logicListFreeVarsInGoals === 'function' ? logicListFreeVarsInGoals : null;
     const listGoalFn = typeof logicListFreeVarsInGoal === 'function' ? logicListFreeVarsInGoal : null;
     const queryGoalsFn = typeof logicQueryGoals === 'function' ? logicQueryGoals : null;
+    const pinByLogicVar = {};
+    for (const meta of Object.values(pinDefs)) {
+      pinByLogicVar[meta.logicVar] = meta;
+    }
     const queryMeta = {};
     if (listGoalsFn || listGoalFn) {
       for (const q of merged.queries || []) {
@@ -417,7 +422,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           }
           free = [...acc];
         }
-        free = free.filter((v) => !inputVars.has(v));
+        free = free.filter((v) => !inputVars.has(v) || (pinByLogicVar[v] && pinByLogicVar[v].listFlag));
         const maxVars = typeof LOGIC_MAX_QUERY_VARS === 'number' ? LOGIC_MAX_QUERY_VARS : 16;
         if (free.length > maxVars) {
           throw Error(`logic ${name}: query '${q.name}' has ${free.length} output variables (maximum ${maxVars})`);
@@ -465,6 +470,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         ref: `&${storageIdx}`,
         logicVar: meta.logicVar,
         bindType: meta.bindType,
+        listFlag: !!meta.listFlag,
       };
     }
 
@@ -480,6 +486,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   handleImmediateAssignment(comp, property, value, ctx) {
     const pin = comp.pinStorage && comp.pinStorage[property];
     if (!pin) return false;
+    if (pin.listFlag) {
+      let v = value || '0'.repeat(pin.bits);
+      pin.bits = v.length;
+      ctx.setValueAtRef(pin.ref, v);
+      return true;
+    }
     if (pin.bindType === 'text') {
       this._writeTextPinStorage(pin, value, ctx);
       return true;
@@ -525,7 +537,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       } else {
         bits = ctx.getValueFromRef(pin.ref) || '0'.repeat(pin.bits);
       }
-      if (pin.bindType === 'text') {
+      if (pin.listFlag) {
+        if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
+        pin.bits = bits.length;
+      } else if (pin.bindType === 'text') {
         bits = this._writeTextPinStorage(pin, bits, ctx);
       } else if (pin.bindType === 'number') {
         bits = this._writeNumberPinStorage(pin, bits, ctx);
@@ -534,7 +549,13 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         else if (bits.length > pin.bits) bits = bits.slice(-pin.bits);
       }
       const term = typeof logicPinToInputValue === 'function'
-        ? logicPinToInputValue(bits, pin.bindType)
+        ? (pin.listFlag && typeof logicWireBitsToListTerm === 'function'
+          ? logicWireBitsToListTerm(
+            bits, pin.bindType,
+            '0'.repeat(pin.bindType === 'bool' ? 1 : pin.bindType === 'number' ? 16 : 8),
+            null,
+          )
+          : logicPinToInputValue(bits, pin.bindType))
         : { kind: 'number', value: parseInt(bits, 2) || 0 };
       inputEnv[pin.logicVar] = term;
     }
@@ -550,8 +571,19 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       }
       const bits = ctx.getWireEffectiveValue(wireName) || '';
       const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
+      const listFn = typeof logicWireBitsToListTerm === 'function' ? logicWireBitsToListTerm : null;
       if (!pinFn) throw Error('Logic engine is not loaded');
-      const resolved = pinFn(bits, term.bindType);
+      const wire = ctx.wires.get(wireName);
+      const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;
+      const fillFn = typeof logicGetElementFill === 'function' ? logicGetElementFill : null;
+      const wireShape = wire && shapeFn ? shapeFn(wire, ctx) : null;
+      const fillBits = wire && fillFn ? fillFn(wire, ctx) : '0'.repeat(8);
+      let resolved;
+      if (term.listFlag && listFn) {
+        resolved = listFn(bits, term.bindType, fillBits, wireShape);
+      } else {
+        resolved = pinFn(bits, term.bindType);
+      }
       if (term.bindType === 'text' && resolved && resolved.kind === 'atom') {
         return { ...resolved, logicTraceAsString: true };
       }
@@ -815,7 +847,25 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
             const val = solutions.length > 0 ? 1 : 0;
             bits = encFn ? encFn({ kind: 'number', value: val }, width, 'bool') : (val ? '1' : '0');
           } else if (freeVars.length === 1 && shape.kind === 'vector' && packVecFn) {
-            bits = packVecFn(solutions, freeVars, shape.count, shape.ew, fillBits);
+            const sol0 = solutions[0] && solutions[0][freeVars[0]];
+            const listEncFn = typeof logicEncodeListToVectorBits === 'function'
+              ? logicEncodeListToVectorBits : null;
+            const listBtFn = typeof logicListBindTypeFromTerm === 'function'
+              ? logicListBindTypeFromTerm : null;
+            let listBindType = null;
+            for (const pin of Object.values(comp.pinStorage || {})) {
+              if (pin.logicVar === freeVars[0] && pin.listFlag) {
+                listBindType = pin.bindType;
+                break;
+              }
+            }
+            if (sol0 && sol0.kind === 'list' && listEncFn && (listBindType || listBtFn)) {
+              bits = listEncFn(
+                sol0, listBindType || listBtFn(sol0), shape.count, shape.ew, fillBits,
+              );
+            } else {
+              bits = packVecFn(solutions, freeVars, shape.count, shape.ew, fillBits);
+            }
           } else if (shape.kind === 'matrix' && packMatFn) {
             const packVars = matrixPackVarsFn
               ? matrixPackVarsFn(freeVars, columnSelect)

@@ -36953,14 +36953,14 @@ comp [logic] .loopLogic:
   const FORD40 = '01100110' + '01101111' + '01110010' + '01100100' + '00000000';
   const BIKE40 = '01100010' + '01101001' + '01101011' + '01100101' + '00000000';
 
-  reg(3544, 'logic', 'inline query boolean with Var=wire binding', function(h, session) {
+  reg(3544, 'logic', 'inline query boolean with explicit text binding', function(h, session) {
     const src = INLINE_LOGIC_OWNS + `
 40wire car = ${CHEVY40}
 
-1wire ok = .world:query({ owns(john, X) }, X=car)
+1wire ok = .world:query({ owns(john, X) }, X=text car)
 
 40wire notCar = ${BIKE40}
-1wire bad = .world:query({ owns(john, X) }, X=notCar)`;
+1wire bad = .world:query({ owns(john, X) }, X=text notCar)`;
     const { interp } = session.run(src);
     h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
     h.assert('bad=0', interp.getWireEffectiveValue('bad'), '0');
@@ -36991,7 +36991,7 @@ comp [logic] .loopLogic:
 
 1wire ok = .world:query({ person(X), \\+ banned(X) })
 
-8wire[4] who = .world:query({ person(X), \\+ banned(X) })`;
+8wire[4] who = .world:query({ person(X), \\+ banned(X) }, X=text)`;
     const { interp } = session.run(src);
     h.assert('boolean ok', interp.getWireEffectiveValue('ok'), '1');
     const who = interp.getWireEffectiveValue('who');
@@ -37001,7 +37001,7 @@ comp [logic] .loopLogic:
 
   reg(3547, 'logic', 'inline query matrix two free vars', function(h, session) {
     const src = INLINE_LOGIC_WORLD + `
-32wire[3, 2] table = .world:query({ age(X, Y) })`;
+32wire[3, 2] table = .world:query({ age(X, Y) }, X=text, Y=number)`;
     const { interp } = session.run(src);
     const table = interp.getWireEffectiveValue('table');
     h.assert('192 bits', String(table.length), '192');
@@ -37027,7 +37027,7 @@ comp [logic] .loopLogic:
 
   reg(3550, 'logic', 'inline query scalar 40wire first solution full atom', function(h, session) {
     const src = INLINE_LOGIC_OWNS + `
-40wire firstCar = .world:query({ owns(john, X) })`;
+40wire firstCar = .world:query({ owns(john, X) }, X=text)`;
     const { interp } = session.run(src);
     h.assert('40 bits', String(interp.getWireEffectiveValue('firstCar').length), '40');
     h.assert('chevy ascii', interp.getWireEffectiveValue('firstCar'), CHEVY40);
@@ -37035,7 +37035,7 @@ comp [logic] .loopLogic:
 
   reg(3551, 'logic', 'inline query scalar 8wire first solution one char', function(h, session) {
     const src = INLINE_LOGIC_OWNS + `
-8wire firstChar = .world:query({ owns(john, X) })`;
+8wire firstChar = .world:query({ owns(john, X) }, X=text)`;
     const { interp } = session.run(src);
     h.assert('8 bits', String(interp.getWireEffectiveValue('firstChar').length), '8');
     h.assert('letter c', interp.getWireEffectiveValue('firstChar'), '01100011');
@@ -37054,7 +37054,7 @@ comp [logic] .loopLogic:
 
   reg(3553, 'logic', 'inline query scalar 80wire atom zero-padded', function(h, session) {
     const src = INLINE_LOGIC_OWNS + `
-80wire name = .world:query({ owns(john, X) })`;
+80wire name = .world:query({ owns(john, X) }, X=text)`;
     const { interp } = session.run(src);
     const name = interp.getWireEffectiveValue('name');
     h.assert('80 bits', String(name.length), '80');
@@ -37103,8 +37103,8 @@ comp [logic] .loopLogic:
 
   reg(3555, 'logic', 'inline query matrix ;unique dedupes duplicate rows', function(h, session) {
     const src = INLINE_LOGIC_AGE_DUP + `
-32wire[3, 2] raw = .world:query({ age(X, Y) })
-32wire[3, 2] uniq = .world:query({ age(X, Y) };unique)`;
+32wire[3, 2] raw = .world:query({ age(X, Y) }, X=text, Y=number)
+32wire[3, 2] uniq = .world:query({ age(X, Y) }, X=text, Y=number;unique)`;
     const { interp } = session.run(src);
     const raw = interp.getWireEffectiveValue('raw');
     const uniq = interp.getWireEffectiveValue('uniq');
@@ -37121,9 +37121,9 @@ comp [logic] .loopLogic:
 
   reg(3556, 'logic', 'inline query ;last returns final discovery solution', function(h, session) {
     const src = INLINE_LOGIC_OWNS_TRIPLE + `
-8wire firstChar = .world:query({ owns(john, X) };first)
-8wire lastChar = .world:query({ owns(john, X) };last)
-40wire lastCar = .world:query({ owns(john, X) };last)`;
+8wire firstChar = .world:query({ owns(john, X) }, X=text;first)
+8wire lastChar = .world:query({ owns(john, X) }, X=text;last)
+40wire lastCar = .world:query({ owns(john, X) }, X=text;last)`;
     const { interp } = session.run(src);
     h.assert('first c', interp.getWireEffectiveValue('firstChar'), '01100011');
     h.assert('last b', interp.getWireEffectiveValue('lastChar'), '01100010');
@@ -37170,8 +37170,8 @@ comp [logic] .peopleLogic:
     const src = INLINE_LOGIC_OWNS_DUP + `
 40wire car = ${CHEVY40}
 
-1wire ok = .world:query({ owns(john, X) }, X=car;unique)
-1wire bad = .world:query({ owns(john, X) }, X=${BIKE40};unique)`;
+1wire ok = .world:query({ owns(john, X) }, X=text car;unique)
+1wire bad = .world:query({ owns(john, X) }, X=text ${BIKE40};unique)`;
     const { interp } = session.run(src);
     h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
     h.assert('bad=0', interp.getWireEffectiveValue('bad'), '0');
@@ -40238,7 +40238,7 @@ comp [logic] .worldLogic:
 
   function runLogicShowQueryInvoke(h, session) {
     const src = INLINE_LOGIC_SHOW_BACKTRACK + `
-8wire[4] who = .world:query({ person(X), show("found", X) })`;
+8wire[4] who = .world:query({ person(X), show("found", X) }, X=text)`;
     const { interp } = session.run(src);
     h.assert('found john', String(session.outIncludes(interp, 'found john')), 'true');
     h.assert('found mary', String(session.outIncludes(interp, 'found mary')), 'true');
@@ -41739,7 +41739,7 @@ comp [logic] .worldLogic:
     set = trigger
 }
 
-32wire[2, 2] inlineTable = .world:query({ carInfo(X, Y, Z, K) };sel(0,2);unique)`;
+32wire[2, 2] inlineTable = .world:query({ carInfo(X, Y, Z, K) }, X=text, Z=number;sel(0,2);unique)`;
     const { interp } = session.run(src);
     h.assert('width=4', interp.getWireEffectiveValue('nCols'), '00000100');
     const inlineTable = interp.getWireEffectiveValue('inlineTable');
@@ -41787,6 +41787,184 @@ comp [logic] .worldLogic:
     const { interp } = session.run(src);
     h.assert('row0 john', interp.getWireEffectiveValue('table').slice(0, 32),
       '01101010011011110110100001101110');
+  }, { propagation: 'wave' });
+
+  const INLINE_LOGIC_F25_PATH = `inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:`;
+
+  function runF25QueryTextListOutput(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+8wire[4] routeOut = 00000000000000000000000000000000
+
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)`;
+    const { interp } = session.run(src);
+    const flat = interp.getWireEffectiveValue('routeFlat');
+    h.assert('32 bits', String(flat.length), '32');
+    h.assert('n', flat.slice(0, 8), '01101110');
+    h.assert('e', flat.slice(8, 16), '01100101');
+    h.assert('s', flat.slice(16, 24), '01110011');
+    h.assert('fill', flat.slice(24, 32), '00000000');
+  }
+
+  function runF25PinTextListRoundTrip(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+comp [logic] .routeLogic:
+    on: 1
+    .routes {
+        Nodes is text list routePin
+    }
+:
+
+8wire[4] routeIn = 01101110011001010111001100000000
+8wire[4] routeOut = 00000000000000000000000000000000
+1wire trigger = 1
+
+.routeLogic:{
+    routePin = routeIn
+    route >= routeOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const out = interp.getWireEffectiveValue('routeOut');
+    h.assert('round-trip n', out.slice(0, 8), '01101110');
+    h.assert('round-trip e', out.slice(8, 16), '01100101');
+    h.assert('round-trip s', out.slice(16, 24), '01110011');
+  }
+
+  function runF25QueryTextListInput(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+8wire[4] routeIn = 01101110011001010111001100000000
+
+1wire ok = .routes:query({ path(a, Nodes) }, Nodes=text list routeIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  function runF25MutationTextList(h, session) {
+    const src = `inline [logic] .routes:
+
+    path(a, [x])
+
+    path(b, [n, e, s])
+
+:
+
+8wire[4] routeVec = 01101110011001010110100100000000
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes { }
+:
+
+1wire trigger = 1
+
+.routeLogic:{
+    logic {
+        + path(b, text list routeVec)
+    }
+    set = trigger
+}
+
+1wire ok = .routes:query({ path(b, Nodes) }, Nodes=text list)`;
+    const { interp } = session.run(src);
+    h.assert('mutated path', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  function runF25NumberListInput(h, session) {
+    const src = `inline [logic] .scores:
+
+    level(box1, 42)
+
+    query q:
+        level(box1, N)
+
+:
+
+16wire scoreIn = 0000000000101010
+
+1wire ok = .scores:query({ level(box1, N) }, N=number scoreIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  function runF25BoolListPacked(h, session) {
+    const src = `inline [logic] .flags:
+
+    flags(box1, [1, 0, 1, 1])
+
+    query q:
+        flags(box1, F)
+
+:
+
+4wire flagIn = 1011
+
+1wire ok = .flags:query({ flags(box1, F) }, F=bool list flagIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3816, 'logic', 'F25 query output text list flatten (legacy)', runF25QueryTextListOutput);
+  reg(3817, 'logic', 'F25 query output text list flatten (wave)', runF25QueryTextListOutput, { propagation: 'wave' });
+  reg(3818, 'logic', 'F25 comp pin text list round-trip (legacy)', runF25PinTextListRoundTrip);
+  reg(3819, 'logic', 'F25 comp pin text list round-trip (wave)', runF25PinTextListRoundTrip, { propagation: 'wave' });
+  reg(3820, 'logic', 'F25 query input text list binding (legacy)', runF25QueryTextListInput);
+  reg(3821, 'logic', 'F25 query input text list binding (wave)', runF25QueryTextListInput, { propagation: 'wave' });
+  reg(3822, 'logic', 'F25 mutation text list wire (legacy)', runF25MutationTextList);
+  reg(3823, 'logic', 'F25 mutation text list wire (wave)', runF25MutationTextList, { propagation: 'wave' });
+  reg(3824, 'logic', 'F25 query number list scalar packed input (legacy)', runF25NumberListInput);
+  reg(3825, 'logic', 'F25 query number list scalar packed input (wave)', runF25NumberListInput, { propagation: 'wave' });
+  reg(3826, 'logic', 'F25 bool list packed input (legacy)', runF25BoolListPacked);
+  reg(3827, 'logic', 'F25 bool list packed input (wave)', runF25BoolListPacked, { propagation: 'wave' });
+
+  reg(3828, 'logic', 'F25 query binding without type errors (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+1wire ok = .world:query({ owns(john, X) }, X=car)`;
+    h.assertThrows('requires explicit type', function() {
+      session.run(src);
+    }, 'explicit type');
+  });
+
+  reg(3829, 'logic', 'F25 query output without type hint errors (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) })`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('output requires explicit type', err && err.message.includes('output requires explicit type') ? '1' : '0', '1');
+  });
+
+  reg(3830, 'logic', 'F25 query output without type hint errors (wave)', function(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) })`;
+    h.assertThrows('output requires explicit type', function() {
+      session.run(src);
+    }, 'output requires explicit type');
+  }, { propagation: 'wave' });
+
+  reg(3831, 'logic', 'F25 text list zero elements error (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+8wire[4] emptyIn = 00000000000000000000000000000000
+
+1wire ok = .routes:query({ path(a, Nodes) }, Nodes=text list emptyIn)`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('0 elements', err && err.message.includes('0 elements') ? '1' : '0', '1');
+  });
+
+  reg(3832, 'logic', 'F25 text list zero elements error (wave)', function(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+8wire[4] emptyIn = 00000000000000000000000000000000
+
+1wire ok = .routes:query({ path(a, Nodes) }, Nodes=text list emptyIn)`;
+    h.assertThrows('0 elements', function() {
+      session.run(src);
+    }, '0 elements');
   }, { propagation: 'wave' });
 
   window.LogTScriptTestSuite.finalize();

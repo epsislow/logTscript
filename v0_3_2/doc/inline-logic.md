@@ -2,7 +2,7 @@
 
 `inline [logic]` defines a **declarative knowledge base**: ground facts, rules with bodies, and named queries. It is **not executed** by itself — like `inline [asm]` (definition only), not like `inline [protocol]` (invoke recipe).
 
-Runtime wiring lives in [`comp [logic]`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [`logic-query-exec.md`](logic-query-exec.md) — **`.world:query({ goals }, Var=wire)`**.
+Runtime wiring lives in [`comp [logic]`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [`logic-query-exec.md`](logic-query-exec.md) — **`.world:query({ goals }, Var=<type> wire)`** with explicit **`text` / `number` / `bool`** and optional **`list`**.
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run**.
 
@@ -17,6 +17,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits; **`use .mod as alias`** prefixes imported predicates |
 | **Debug output** | Built-in **`show/N`** — see [logic-builtins.md](logic-builtins.md) |
+| **List patterns** | `[H|T]`, `[_, X, _]`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **List builtins** | **`member/2`**, **`append/3`**, **`length/2`**, **`reverse/2`**, **`sort/2`**, **`nth0/3`**, **`nth1/3`** — [logic-builtins.md](logic-builtins.md) |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
@@ -193,6 +194,422 @@ comp [logic] .monoLogic:
 ```text
 mediterranean
 ```
+
+### Pattern matching — quick map
+
+| Pattern | Matches | Typical use |
+|---------|---------|-------------|
+| `[]` | Empty list only | Base case in recursion |
+| `[X]` | Exactly one element | Singleton |
+| `[A, B, C]` | Exactly three elements | Fixed-width unpack |
+| `[H \| T]` | Non-empty list | Head **`H`**, tail **`T`** (may be `[]`) |
+| `[A, B \| Rest]` | At least two elements | First two + remainder |
+| `[_, X, _]` | Exactly three; bind middle | Anonymous slots ignore positions |
+| `[First, _ \| _]` | At least one element | First only (ignore rest with `_`) |
+| `[_, _, Last]` | Exactly three; bind last | Last of three without `\|` |
+| `[_ \| T]` | Any non-empty list | Skip head, keep tail |
+| `[pair(N, Ls) \| _]` | Non-empty list of compounds | First element + ignore rest |
+
+Use **`=`** / unification goals to match patterns against ground facts or variables. **`_`** is an anonymous variable — each `_` is independent. Repeated named variables (e.g. **`X`**) must unify to the **same** term.
+
+**Occurs-check:** cyclic terms such as **`X = [X | _]`** fail (no infinite lists).
+
+---
+
+### Head and tail — `[H | T]`
+
+Decompose a list in a query or rule head. **`H`** binds to the first element; **`T`** binds to the rest (often another list, or `[]` at the end).
+
+```logts-play
+inline [logic] .world:
+
+    route([n, e, s, w])
+
+    query split:
+        route([Head | Tail]),
+        show(Head, Tail)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = split
+    set = trigger
+}
+```
+
+**Load & Run** prints one line such as **`n [e, s, w]`** — atom head, tail printed as a list.
+
+Fixed prefix plus tail — **`[A, B | Rest]`** requires at least two elements:
+
+```logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query firstTwo:
+        route([A, B | Rest]),
+        show(A, B, Rest)
+
+:
+
+1wire ok = .world:query({ route([A, B | Rest]), show(A, B, Rest) })
+```
+
+**Load & Run** → **`n e [s]`**.
+
+---
+
+### Anonymous `_` — pick one slot
+
+Ignore positions you do not care about. Each **`_`** is fresh; only named variables are shared.
+
+**Middle of three:**
+
+```logts-play
+inline [logic] .world:
+
+    items([alpha, beta, gamma])
+
+    query middle:
+        items([_, X, _]),
+        show(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = middle
+    set = trigger
+}
+```
+
+**Load & Run** → **`beta`**.
+
+**First and last without walking the tail manually:**
+
+```logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query ends:
+        route([First, _, Last]),
+        show(First, Last)
+
+:
+
+1wire ok = .world:query({ route([First, _, Last]), show(First, Last) })
+```
+
+**Load & Run** → **`n s`**.
+
+For longer lists, combine **`[_ | T]`** (drop head) with recursion or use **`append/3`** / **`nth0/3`** (below).
+
+---
+
+### Recursive traversal — walk every element
+
+Classic Prolog style: one clause for the empty list, one for **`[H|T]`**. This is the same idea as built-in **`member/2`**, but with your own predicate name (**`member/2`** is reserved).
+
+```logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+
+    walk([]) <- show("done")
+    walk([H | T]) <- show(H), walk(T)
+
+    query demo:
+        colors(L),
+        walk(L)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = demo
+    set = trigger
+}
+```
+
+**Load & Run** prints **`red`**, **`green`**, **`blue`**, then **`done`**.
+
+**Membership** (equivalent spirit to **`member/2`**):
+
+```logts-play
+inline [logic] .world:
+
+    userMember(X, [X | _])
+    userMember(X, [_ | T]) <- userMember(X, T)
+
+    query findGreen:
+        userMember(C, [red, green, blue]),
+        C = green,
+        show(C)
+
+:
+
+1wire ok = .world:query({ userMember(C, [red, green, blue]), show(C) })
+```
+
+Backtracking finds **`red`**, then **`green`**, then **`blue`**. The extra **`C = green`** keeps only the middle solution.
+
+---
+
+### Accumulator — sum a numeric list
+
+Use a second argument to carry the running total; base case **`[]`**, recursive case uses **`is/2`** for arithmetic (see [Arithmetic `is/2`](#arithmetic-is2)).
+
+```logts-play
+inline [logic] .world:
+
+    sumList([], 0)
+    sumList([H | T], Total) <- sumList(T, Rest), Total is H + Rest
+
+    data([1, 2, 3, 4])
+
+    query total:
+        data(L),
+        sumList(L, S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = total
+    set = trigger
+}
+```
+
+**Load & Run** → **`10`**.
+
+**Count elements** (same recursion shape; or use built-in **`length/2`**):
+
+```logts-play
+inline [logic] .world:
+
+    count([], 0)
+    count([_ | T], N) <- count(T, M), N is M + 1
+
+    query len:
+        count([a, b, c, d], N),
+        show(N)
+
+:
+
+1wire ok = .world:query({ count([a, b, c, d], N), show(N) })
+```
+
+→ **`4`**.
+
+---
+
+### Last element — recursion and `append/3`
+
+**Recursive last/2** (standard Prolog textbook pattern):
+
+```logts-play
+inline [logic] .world:
+
+    last([X], X)
+    last([_ | T], X) <- last(T, X)
+
+    route([n, e, s])
+
+    query lastStep:
+        route(L),
+        last(L, X),
+        show(X)
+
+:
+
+1wire ok = .world:query({ route(L), last(L, X), show(X) })
+```
+
+**Load & Run** → **`s`**.
+
+**Via `append/3`** — “prefix + singleton suffix” (many solutions on backtracking; for a **ground** list, take the split where suffix is one element, or use **`;last`** on an inline query):
+
+```logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query splits:
+        route(L),
+        append(Prefix, [Last], L),
+        show(Prefix, Last)
+
+:
+
+1wire ok = .world:query({ route(L), append(Prefix, [Last], L), show(Prefix, Last) })
+```
+
+**Load & Run** prints three lines: **`[] n`**, **`[n] e`**, **`[n, e] s`**. The final line is the usual “last element” split. Full **`append/3`** modes: [logic-builtins.md — `append/3`](logic-builtins.md#append3).
+
+---
+
+### Split and join — `append/3` decompose
+
+Given a ground list, **`append(L1, L2, L3)`** with **`L3`** ground backtracks over all **`L1` / `L2`** pairs.
+
+```logts-play
+inline [logic] .world:
+
+    word([c, a, t])
+
+    query parts:
+        word(W),
+        append(L1, L2, W),
+        show(L1, L2)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = parts
+    set = trigger
+}
+```
+
+**Load & Run** prints four decompositions, ending with **`[c, a, t] []`**.
+
+Generative mode — build a list of known length (see also [logic-builtins.md — `length/2`](logic-builtins.md#length2)):
+
+```logts-play
+inline [logic] .world:
+
+    query gen:
+        length(L, 3),
+        append(L, [z], Long),
+        show(Long)
+
+:
+
+1wire ok = .world:query({ length(L, 3), append(L, [z], Long), show(Long) })
+```
+
+**Load & Run** prints a four-element list **`[..., z]`** with three anonymous cells.
+
+---
+
+### Nested lists and compounds inside lists
+
+Lists may contain other lists or compound terms. Patterns apply at each level.
+
+```logts-play
+inline [logic] .world:
+
+    pairs([pair(a, [1, 2]), pair(b, [3])])
+
+    query firstPair:
+        pairs([pair(N, Ls) | _]),
+        show(N, Ls)
+
+:
+
+1wire ok = .world:query({ pairs([pair(N, Ls) | _]), show(N, Ls) })
+```
+
+**Load & Run** → **`a [1, 2]`**.
+
+Deeper nesting — extract inner list by position:
+
+```logts-play
+inline [logic] .world:
+
+    grid([row([1, 2]), row([3, 4])])
+
+    query topRow:
+        grid([row(Nums) | _]),
+        show(Nums)
+
+:
+
+1wire ok = .world:query({ grid([row(Nums) | _]), show(Nums) })
+```
+
+→ **`[1, 2]`**.
+
+---
+
+### Index by position — `nth0/3` and `nth1/3`
+
+When you know the index, builtins avoid writing recursion:
+
+| Builtin | Index base | Example |
+|---------|------------|---------|
+| **`nth0(I, List, Elem)`** | 0 | `nth0(1, [a,b,c], X)` → **`X = b`** |
+| **`nth1(I, List, Elem)`** | 1 (SWI-style) | `nth1(2, [a,b,c], X)` → **`X = b`** |
+
+```logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query byIndex:
+        route(L),
+        nth0(1, L, Step),
+        nth1(3, L, Last),
+        show(Step, Last)
+
+:
+
+1wire ok = .world:query({ route(L), nth0(1, L, Step), nth1(3, L, Last), show(Step, Last) })
+```
+
+**Load & Run** → **`e s`**. Full reference: [logic-builtins.md — `nth0/3` · `nth1/3`](logic-builtins.md#nth03-and-nth13).
+
+---
+
+### What matches Prolog / what differs
+
+| Prolog habit | LogTScript logic |
+|--------------|------------------|
+| **`[H\|T]`** recursion | Supported — same unification |
+| **`[_, X, _]`** fixed slot | Supported |
+| **`append/3`**, **`member/2`**, **`length/2`**, … | Built-ins (reserved names) |
+| User **`member/2`** rule | **Not allowed** — use another name (`userMember/2`, …) |
+| **`true` / `fail`** goals | **Not built-in** — use facts, **`\+`**, or empty body failure |
+| DCG **`NonTerminal --> …`** | **Not supported** |
+| Open / partial lists in **`reverse/2`**, **`sort/2`**, **`length/2`** count | **Fail** until the spine is ground |
+| Cyclic **`X = [X\|_]`** | **Fails** (occurs-check) |
+| Bare **`[a,b]`** as a goal | **Parse error** — wrap in **`X = [a,b]`** or pass to a predicate |
+| List literal size | Max **1024** comma-separated elements |
+
+For wire-packed list I/O (`text list`, `number list`, …), see [logic-query-exec.md](logic-query-exec.md#list-codec-rules).
 
 ---
 

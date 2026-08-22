@@ -366,8 +366,11 @@ In `logic { }`, a bare identifier is always a **logic atom**. To read a **LogTSc
 |------|---------|
 | `box1`, `c1` | Atoms (even if a wire with the same name exists) |
 | `text destWire` | Wire → ASCII atom |
+| `text list routeVec` | Vector / packed wire → Prolog list of atoms |
 | `number scoreIn` | Wire → unsigned integer |
+| `number list levels` | Packed wire → list of integers |
 | `bool flag` | Wire → 0/1 |
+| `bool list flags` | Packed wire → list of 0/1 |
 
 ```logts-play
 inline [logic] .nums:
@@ -400,6 +403,38 @@ comp [logic] .numLogic:
 ```
 
 After **Load & Run**: **`ok = 1`**, **`failed = 0`**.
+
+List wire prefix in mutations:
+
+```logts-play
+inline [logic] .routes:
+
+    path(a, [x])
+
+    query hasB:
+        path(b, Nodes)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes { }
+:
+
+8wire[4] routeVec = 01101110011001010111001100000000
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.routeLogic:{
+    logic { + path(b, text list routeVec) }
+    hasB >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+**Load & Run**: adds `path(b,[n,e,s])` from the packed wire → **`ok = 1`**.
 
 Missing wire with prefix → transaction failure:
 

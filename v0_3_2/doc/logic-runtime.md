@@ -21,7 +21,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across `set` passes on the same component |
 | **`.world:query`** | Reads **static inline only** — not the component dynamic overlay |
-| **Wire in mutation** | `text w` / `number w` / `bool w` — bare id = atom |
+| **Wire in mutation** | `text w` / `text list w` / `number w` / `number list w` / `bool w` / `bool list w` — bare id = atom |
 | **Constraints** | `constraint P <= Body` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
@@ -442,7 +442,7 @@ After **Load & Run**: **`ok = 0`** — static fact hidden by tombstone, not dele
 
 ## Example — wire prefix in mutation
 
-Use **`text`**, **`number`**, or **`bool`** before a wire name. Bare identifiers are **atoms** (even when a homonymous wire exists).
+Use **`text`**, **`number`**, **`bool`**, or **`text list`**, **`number list`**, **`bool list`** before a wire name. Bare identifiers are **atoms** (even when a homonymous wire exists).
 
 ```logts-play
 inline [logic] .warehouse:

@@ -1715,7 +1715,131 @@ function executeLogicGoals(mergedDef, goals, inputEnv, options) {
   };
 }
 
-function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth, columnSelect) {
+function logicListPackedElementWidth(bindType) {
+  if (bindType === 'bool') return 1;
+  if (bindType === 'text') return 8;
+  if (bindType === 'number') return 16;
+  return 8;
+}
+
+function logicResolveListWireLayout(totalBits, bindType, vectorShape) {
+  if (vectorShape && vectorShape.kind === 'vector') {
+    return {
+      mode: 'vector',
+      slotCount: vectorShape.count,
+      elementWidth: vectorShape.ew,
+    };
+  }
+  if (vectorShape && vectorShape.kind === 'matrix') {
+    throw Error(`${bindType} list expects a vector wire`);
+  }
+  const ew = logicListPackedElementWidth(bindType);
+  if (bindType === 'text' && totalBits % 8 !== 0) {
+    throw Error('text list expects vector or width multiple of 8');
+  }
+  if (bindType === 'number' && totalBits % 16 !== 0) {
+    throw Error('number list expects vector or width multiple of 16');
+  }
+  return {
+    mode: 'scalar',
+    slotCount: totalBits / ew,
+    elementWidth: ew,
+  };
+}
+
+function logicIsListSlotFill(cellBits, bindType, fillBits) {
+  if (!cellBits || cellBits.length === 0) return true;
+  if (bindType === 'bool') return false;
+  if (bindType === 'text' || bindType === 'number') {
+    return cellBits === fillBits || /^0+$/.test(cellBits);
+  }
+  return false;
+}
+
+function logicPrologListToArray(term) {
+  const out = [];
+  let cur = term;
+  while (cur && cur.kind === 'list' && !cur.nil) {
+    out.push(cur.head);
+    cur = cur.tail;
+  }
+  return out;
+}
+
+function logicArrayToPrologList(elements) {
+  let tail = { kind: 'list', nil: true };
+  for (let i = elements.length - 1; i >= 0; i--) {
+    tail = { kind: 'list', head: elements[i], tail };
+  }
+  return tail;
+}
+
+function logicDecodeListSlot(cellBits, bindType) {
+  if (bindType === 'bool') {
+    return { kind: 'number', value: cellBits[cellBits.length - 1] === '1' ? 1 : 0 };
+  }
+  if (bindType === 'text') {
+    let s = '';
+    for (let i = 0; i + 8 <= cellBits.length; i += 8) {
+      const byte = parseInt(cellBits.substr(i, 8), 2);
+      if (byte === 0) break;
+      s += String.fromCharCode(byte);
+    }
+    if (!s) return null;
+    return { kind: 'atom', name: s, logicTraceAsString: true };
+  }
+  if (bindType === 'number') {
+    if (/^0+$/.test(cellBits)) return null;
+    let n = parseInt(cellBits, 2);
+    if (isNaN(n)) n = 0;
+    return { kind: 'number', value: n };
+  }
+  return null;
+}
+
+function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape) {
+  const layout = logicResolveListWireLayout(bits.length, bindType, vectorShape);
+  const elements = [];
+  for (let i = 0; i < layout.slotCount; i++) {
+    const cell = bits.substr(i * layout.elementWidth, layout.elementWidth);
+    if (logicIsListSlotFill(cell, bindType, fillBits)) continue;
+    const el = logicDecodeListSlot(cell, bindType);
+    if (el == null) continue;
+    elements.push(el);
+  }
+  if (elements.length === 0) {
+    throw Error(`${bindType} list cannot contain 0 elements`);
+  }
+  return logicArrayToPrologList(elements);
+}
+
+function logicEncodeListToVectorBits(term, bindType, elementCount, elementWidth, fillBits) {
+  const elements = term && term.kind === 'list' ? logicPrologListToArray(term) : [];
+  const truncated = elements.slice(0, elementCount);
+  const cells = [];
+  for (let i = 0; i < elementCount; i++) {
+    if (i < truncated.length) {
+      cells.push(logicEncodeSolutionTerm(truncated[i], elementWidth));
+    } else {
+      cells.push(fillBits);
+    }
+  }
+  return cells.join('');
+}
+
+function logicListBindTypeFromTerm(term) {
+  if (!term || term.kind !== 'list' || term.nil) return 'text';
+  let cur = term;
+  while (cur && cur.kind === 'list' && !cur.nil) {
+    const h = cur.head;
+    if (h && h.kind === 'number') return 'number';
+    if (h && h.kind === 'atom') return 'text';
+    cur = cur.tail;
+  }
+  return 'text';
+}
+
+function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth, columnSelect, outputHints) {
   if (!freeVars || freeVars.length === 0) {
     const val = solutions && solutions.length > 0 ? 1 : 0;
     const w = shape && shape.kind === 'scalar' ? (scalarWidth || shape.ew || 1) : 1;
@@ -1728,18 +1852,46 @@ function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scal
     throw Error(`logic query: matrix result requires ;sel(i,j) when ${freeVars.length} output variables`);
   }
   if (packVars.length === 1 && shape && shape.kind === 'vector') {
+    const hint = outputHints && outputHints[packVars[0]];
+    if (!hint) {
+      throw Error(`query output requires explicit type for '${packVars[0]}'`);
+    }
+    if (hint.listFlag && solutions && solutions.length > 0) {
+      return logicEncodeListToVectorBits(
+        solutions[0][packVars[0]], hint.bindType, shape.count, shape.ew, fillBits,
+      );
+    }
+    if (hint.listFlag) {
+      return fillBits.repeat(shape.count);
+    }
     return logicPackVectorSolutions(
       solutions, packVars, shape.count, shape.ew, fillBits,
     );
   }
   if (packVars.length === 2 && shape && shape.kind === 'matrix') {
+    if (outputHints) {
+      for (const v of packVars) {
+        if (!outputHints[v]) {
+          throw Error(`query output requires explicit type for '${v}'`);
+        }
+      }
+    }
     return logicPackMatrixSolutions(
       solutions, packVars, shape.rows, shape.cols, shape.ew, fillBits,
     );
   }
   if (packVars.length >= 1 && solutions && solutions.length > 0) {
+    const hint = outputHints && outputHints[packVars[0]];
+    if (!hint) {
+      throw Error(`query output requires explicit type for '${packVars[0]}'`);
+    }
     const w = scalarWidth || (shape && shape.ew) || 8;
-    return logicEncodeSolutionTerm(solutions[0][packVars[0]], w);
+    const term = solutions[0][packVars[0]];
+    if (hint.listFlag) {
+      const layout = logicResolveListWireLayout(w, hint.bindType, shape);
+      return logicEncodeListToVectorBits(term, hint.bindType, layout.slotCount, layout.elementWidth, fillBits);
+    }
+    return logicTermToWireValue(term, w, hint.bindType);
   }
   if (shape && shape.kind === 'vector') {
     return fillBits.repeat(shape.count);
@@ -1772,6 +1924,13 @@ function logicEncodeSolutionTerm(term, elementWidth) {
   if (!term) return '0'.repeat(elementWidth);
   if (term.kind === 'number') return logicNumberToBits(term.value, elementWidth);
   if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, elementWidth);
+  if (term.kind === 'list') {
+    const bt = logicListBindTypeFromTerm(term);
+    const ew = logicListPackedElementWidth(bt);
+    const arr = logicPrologListToArray(term);
+    if (arr.length > 0) return logicEncodeSolutionTerm(arr[0], elementWidth);
+    return '0'.repeat(elementWidth);
+  }
   return '0'.repeat(elementWidth);
 }
 
@@ -1891,7 +2050,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicPackVectorSolutions = logicPackVectorSolutions;
   globalThis.logicPackMatrixSolutions = logicPackMatrixSolutions;
   globalThis.logicPackMatrixRow = logicPackMatrixRow;
-  globalThis.logicPackMatrixCol = logicPackMatrixCol;
+  globalThis.logicWireBitsToListTerm = logicWireBitsToListTerm;
+  globalThis.logicEncodeListToVectorBits = logicEncodeListToVectorBits;
+  globalThis.logicListBindTypeFromTerm = logicListBindTypeFromTerm;
+  globalThis.logicResolveListWireLayout = logicResolveListWireLayout;
+  globalThis.logicPrologListToArray = logicPrologListToArray;
   globalThis.LOGIC_MAX_QUERY_VARS = LOGIC_MAX_QUERY_VARS;
   globalThis.logicValidateQueryVarCount = logicValidateQueryVarCount;
   globalThis.logicValidateColumnSelect = logicValidateColumnSelect;
@@ -1945,6 +2108,11 @@ if (typeof module !== 'undefined' && module.exports) {
     logicPackMatrixSolutions,
     logicPackMatrixRow,
     logicPackMatrixCol,
+    logicWireBitsToListTerm,
+    logicEncodeListToVectorBits,
+    logicListBindTypeFromTerm,
+    logicResolveListWireLayout,
+    logicPrologListToArray,
     logicApplyResultPolicy,
     logicPolicyVarsForRedirect,
     logicResolveMatrixPackVars,

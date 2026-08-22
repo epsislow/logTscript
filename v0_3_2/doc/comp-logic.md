@@ -2,7 +2,7 @@
 
 `comp [logic]` is the **runtime layer** for declarative queries. It binds logic variables to component pins, reads wired inputs, runs all queries defined in the linked `inline [logic]`, and redirects results to LogTScript wires.
 
-Definition of facts/rules/queries → [inline-logic.md](inline-logic.md).
+Definition of facts/rules/queries → [inline-logic.md](inline-logic.md). Typed wire bindings (`text`, `number`, `bool`, optional `list`) → [logic-query-exec.md](logic-query-exec.md).
 
 In the **documentation viewer**, `logts-play` blocks support **Load** and **Load & Run** (use `on: 1` so the first run executes when `set = 1`).
 
@@ -89,11 +89,14 @@ comp [logic] .characterLogic:
 
 | Form | Meaning |
 |------|---------|
-| `X is number myX` | Variabilă **X** ← unsigned binary; lățime pin de la wire la assign, **default/max 64** biți |
-| `Name is text myName` | ASCII text — **lățimea pinului = lățimea wire-ului** la assign (`myName = wire`), multiplu de 8, max **256** biți; decode oprește la `\0` |
+| `X is number myX` | Logic var **X** ← unsigned binary; pin width from assign wire (default/max **64** bits) |
+| `Name is text myName` | ASCII text — pin width = assign wire width (multiple of 8, max **256** bits) |
 | `Alive is bool myAlive` | 1-bit boolean |
+| `Nodes is text list routePin` | List of atoms — pin width follows assign wire; decode skips fill cells |
+| `Vals is number list scorePin` | List of integers — 16 bits per element on vector wires |
+| `Flags is bool list bitPin` | List of booleans — 1 bit per element |
 
-Only **`number`**, **`text`**, and **`bool`** are supported at the pin boundary.
+Only **`number`**, **`text`**, and **`bool`** scalars, plus **`list`** on those types, are supported at the pin boundary.
 
 ### Pin `text` — lățime variabilă (nu fixă)
 
@@ -120,6 +123,48 @@ Exemplu: `160wire nameSlot` + `myX = nameSlot` → pin **160** biți → `"myWic
 | **Decode** | Unsigned binary → integer Prolog |
 
 Exemplu: `8wire scoreIn` + `myX = scoreIn` → pin **8** biți; `128wire big` → pin **64** biți.
+
+### List pins — `text list`, `number list`, `bool list`
+
+List pins use the same codec as [logic-query-exec.md](logic-query-exec.md#list-codec-rules). Pin width follows the assign wire in the exec block (vector recommended for text routes).
+
+| Form | Role |
+|------|------|
+| `Nodes is text list routePin` | Decode packed atoms from `routePin = routeIn`; encode list solutions on `route >= routeOut` |
+| `Vals is number list scorePin` | 16-bit cells on vector wires |
+| `Flags is bool list bitPin` | 1 bit per element |
+
+Fill cells are skipped on decode; encode truncates extra list elements silently.
+
+```logts-play
+inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes {
+        Nodes is text list routePin
+    }
+:
+
+8wire[4] routeIn = 01101110011001010111001100000000
+8wire[4] routeOut = 00000000000000000000000000000000
+1wire trigger = 1
+
+.routeLogic:{
+    routePin = routeIn
+    route >= routeOut
+    set = trigger
+}
+```
+
+**Load & Run**: `routeOut` holds `n`, `e`, `s` in the first three 8-bit cells.
 
 ---
 
@@ -975,7 +1020,7 @@ Invoke on **`comp [logic]`** only (not on inline instances):
 | **`0`** | Constraints would **fail** (same rollback rules as mutation) |
 | **Error** | Empty block **`check({ })`**, **non-ground** fact (Prolog variable), or **`data: static`** |
 
-**Wire refs** (`text w`, `number w`, `bool w`, bare atom id) resolve at eval time — identical to **`logic { }`**.
+**Wire refs** (`text w`, `text list w`, `number w`, `number list w`, `bool w`, `bool list w`, bare atom id) resolve at eval time — identical to **`logic { }`**.
 
 ```logts-play
 inline [logic] .warehouse:

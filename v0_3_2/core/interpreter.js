@@ -1718,23 +1718,45 @@ class Interpreter {
     const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
     const execFn = typeof executeLogicGoals === 'function' ? executeLogicGoals : null;
     const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
-    const inferFn = typeof logicInferBindType === 'function' ? logicInferBindType : null;
     const outVarsFn = typeof logicOutputFreeVars === 'function' ? logicOutputFreeVars : null;
     const prepFn = typeof logicPrepareGoalsForInvoke === 'function' ? logicPrepareGoalsForInvoke : null;
     const encFn = typeof logicEncodeInlineQueryResult === 'function' ? logicEncodeInlineQueryResult : null;
     const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;
     const fillFn = typeof logicGetElementFill === 'function' ? logicGetElementFill : null;
-    if (!parseGoalsFn || !resolveFn || !execFn || !pinFn || !inferFn || !outVarsFn || !prepFn || !encFn || !shapeFn) {
+    const listFn = typeof logicWireBitsToListTerm === 'function' ? logicWireBitsToListTerm : null;
+    if (!parseGoalsFn || !resolveFn || !execFn || !pinFn || !outVarsFn || !prepFn || !encFn || !shapeFn || !listFn) {
       throw new Error('Logic engine is not loaded');
     }
 
     const goals = parseGoalsFn(blockArg.raw);
     const merged = resolveFn(inlineInst, this.inlineInstances);
     const inputEnv = {};
+    const outputHints = {};
     for (const bind of invoke.bindings || []) {
+      if (bind.outputHintOnly) {
+        outputHints[bind.name] = { bindType: bind.bindType, listFlag: !!bind.listFlag };
+        continue;
+      }
       const bits = this._evalCallArgValue(bind.expr);
-      const bindType = inferFn(bits.length);
-      inputEnv[bind.name] = pinFn(bits, bindType);
+      let wireShape = null;
+      let fillBits = '0'.repeat(8);
+      if (bind.expr && bind.expr.var && this.wires.has(bind.expr.var)) {
+        const wire = this.wires.get(bind.expr.var);
+        wireShape = shapeFn(wire, this);
+        fillBits = fillFn ? fillFn(wire, this) : '0'.repeat(wireShape.ew || 8);
+      } else {
+        fillBits = '0'.repeat(bind.listFlag
+          ? (bind.bindType === 'bool' ? 1 : bind.bindType === 'number' ? 16 : 8)
+          : 8);
+      }
+      if (bind.listFlag) {
+        inputEnv[bind.name] = listFn(bits, bind.bindType, fillBits, wireShape);
+      } else {
+        inputEnv[bind.name] = pinFn(bits, bind.bindType);
+        if (bind.bindType === 'text' && inputEnv[bind.name] && inputEnv[bind.name].kind === 'atom') {
+          inputEnv[bind.name].logicTraceAsString = true;
+        }
+      }
     }
     const preparedGoals = prepFn(goals);
     const execOpts = {};
@@ -1798,7 +1820,17 @@ class Interpreter {
       encodeFreeVars = [];
     }
 
-    const bits = encFn(solutions, encodeFreeVars, shape, fillBits, scalarWidth, invoke.columnSelect || null);
+    for (const v of encodeFreeVars) {
+      if (outputHints[v] || inputEnv[v]) continue;
+      if (/^__collect\d+$/.test(v)) {
+        outputHints[v] = { bindType: 'text', listFlag: false };
+      }
+    }
+
+    const bits = encFn(
+      solutions, encodeFreeVars, shape, fillBits, scalarWidth,
+      invoke.columnSelect || null, outputHints,
+    );
     return {
       value: bits,
       ref: null,

@@ -11329,7 +11329,7 @@ peek(touchOut)
 
 \`comp [logic]\` is the **runtime layer** for declarative queries. It binds logic variables to component pins, reads wired inputs, runs all queries defined in the linked \`inline [logic]\`, and redirects results to LogTScript wires.
 
-Definition of facts/rules/queries → [inline-logic.md](inline-logic.md).
+Definition of facts/rules/queries → [inline-logic.md](inline-logic.md). Typed wire bindings (\`text\`, \`number\`, \`bool\`, optional \`list\`) → [logic-query-exec.md](logic-query-exec.md).
 
 In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (use \`on: 1\` so the first run executes when \`set = 1\`).
 
@@ -11416,11 +11416,14 @@ comp [logic] .characterLogic:
 
 | Form | Meaning |
 |------|---------|
-| \`X is number myX\` | Variabilă **X** ← unsigned binary; lățime pin de la wire la assign, **default/max 64** biți |
-| \`Name is text myName\` | ASCII text — **lățimea pinului = lățimea wire-ului** la assign (\`myName = wire\`), multiplu de 8, max **256** biți; decode oprește la \`\\0\` |
+| \`X is number myX\` | Logic var **X** ← unsigned binary; pin width from assign wire (default/max **64** bits) |
+| \`Name is text myName\` | ASCII text — pin width = assign wire width (multiple of 8, max **256** bits) |
 | \`Alive is bool myAlive\` | 1-bit boolean |
+| \`Nodes is text list routePin\` | List of atoms — pin width follows assign wire; decode skips fill cells |
+| \`Vals is number list scorePin\` | List of integers — 16 bits per element on vector wires |
+| \`Flags is bool list bitPin\` | List of booleans — 1 bit per element |
 
-Only **\`number\`**, **\`text\`**, and **\`bool\`** are supported at the pin boundary.
+Only **\`number\`**, **\`text\`**, and **\`bool\`** scalars, plus **\`list\`** on those types, are supported at the pin boundary.
 
 ### Pin \`text\` — lățime variabilă (nu fixă)
 
@@ -11447,6 +11450,48 @@ Exemplu: \`160wire nameSlot\` + \`myX = nameSlot\` → pin **160** biți → \`"
 | **Decode** | Unsigned binary → integer Prolog |
 
 Exemplu: \`8wire scoreIn\` + \`myX = scoreIn\` → pin **8** biți; \`128wire big\` → pin **64** biți.
+
+### List pins — \`text list\`, \`number list\`, \`bool list\`
+
+List pins use the same codec as [logic-query-exec.md](logic-query-exec.md#list-codec-rules). Pin width follows the assign wire in the exec block (vector recommended for text routes).
+
+| Form | Role |
+|------|------|
+| \`Nodes is text list routePin\` | Decode packed atoms from \`routePin = routeIn\`; encode list solutions on \`route >= routeOut\` |
+| \`Vals is number list scorePin\` | 16-bit cells on vector wires |
+| \`Flags is bool list bitPin\` | 1 bit per element |
+
+Fill cells are skipped on decode; encode truncates extra list elements silently.
+
+\`\`\`logts-play
+inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes {
+        Nodes is text list routePin
+    }
+:
+
+8wire[4] routeIn = 01101110011001010111001100000000
+8wire[4] routeOut = 00000000000000000000000000000000
+1wire trigger = 1
+
+.routeLogic:{
+    routePin = routeIn
+    route >= routeOut
+    set = trigger
+}
+\`\`\`
+
+**Load & Run**: \`routeOut\` holds \`n\`, \`e\`, \`s\` in the first three 8-bit cells.
 
 ---
 
@@ -12302,7 +12347,7 @@ Invoke on **\`comp [logic]\`** only (not on inline instances):
 | **\`0\`** | Constraints would **fail** (same rollback rules as mutation) |
 | **Error** | Empty block **\`check({ })\`**, **non-ground** fact (Prolog variable), or **\`data: static\`** |
 
-**Wire refs** (\`text w\`, \`number w\`, \`bool w\`, bare atom id) resolve at eval time — identical to **\`logic { }\`**.
+**Wire refs** (\`text w\`, \`text list w\`, \`number w\`, \`number list w\`, \`bool w\`, \`bool list w\`, bare atom id) resolve at eval time — identical to **\`logic { }\`**.
 
 \`\`\`logts-play
 inline [logic] .warehouse:
@@ -20137,7 +20182,7 @@ See [protocol-assemble.md — static vs dynamic width](protocol-assemble.md#stat
 
 \`inline [logic]\` defines a **declarative knowledge base**: ground facts, rules with bodies, and named queries. It is **not executed** by itself — like \`inline [asm]\` (definition only), not like \`inline [protocol]\` (invoke recipe).
 
-Runtime wiring lives in [\`comp [logic]\`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [\`logic-query-exec.md\`](logic-query-exec.md) — **\`.world:query({ goals }, Var=wire)\`**.
+Runtime wiring lives in [\`comp [logic]\`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [\`logic-query-exec.md\`](logic-query-exec.md) — **\`.world:query({ goals }, Var=<type> wire)\`** with explicit **\`text\` / \`number\` / \`bool\`** and optional **\`list\`**.
 
 In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run**.
 
@@ -20152,6 +20197,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
 | **Composition** | \`use .otherModule\` merges facts, rules, and constraints (not queries); \`use once\` skips revisits; **\`use .mod as alias\`** prefixes imported predicates |
 | **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
+| **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | \`doc(inline.logic)\` — syntax template; \`doc(.myModule)\` — **summary** (counts, query/constraint names, predicate histogram) |
@@ -20328,6 +20374,422 @@ comp [logic] .monoLogic:
 \`\`\`text
 mediterranean
 \`\`\`
+
+### Pattern matching — quick map
+
+| Pattern | Matches | Typical use |
+|---------|---------|-------------|
+| \`[]\` | Empty list only | Base case in recursion |
+| \`[X]\` | Exactly one element | Singleton |
+| \`[A, B, C]\` | Exactly three elements | Fixed-width unpack |
+| \`[H \\| T]\` | Non-empty list | Head **\`H\`**, tail **\`T\`** (may be \`[]\`) |
+| \`[A, B \\| Rest]\` | At least two elements | First two + remainder |
+| \`[_, X, _]\` | Exactly three; bind middle | Anonymous slots ignore positions |
+| \`[First, _ \\| _]\` | At least one element | First only (ignore rest with \`_\`) |
+| \`[_, _, Last]\` | Exactly three; bind last | Last of three without \`\\|\` |
+| \`[_ \\| T]\` | Any non-empty list | Skip head, keep tail |
+| \`[pair(N, Ls) \\| _]\` | Non-empty list of compounds | First element + ignore rest |
+
+Use **\`=\`** / unification goals to match patterns against ground facts or variables. **\`_\`** is an anonymous variable — each \`_\` is independent. Repeated named variables (e.g. **\`X\`**) must unify to the **same** term.
+
+**Occurs-check:** cyclic terms such as **\`X = [X | _]\`** fail (no infinite lists).
+
+---
+
+### Head and tail — \`[H | T]\`
+
+Decompose a list in a query or rule head. **\`H\`** binds to the first element; **\`T\`** binds to the rest (often another list, or \`[]\` at the end).
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    route([n, e, s, w])
+
+    query split:
+        route([Head | Tail]),
+        show(Head, Tail)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = split
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints one line such as **\`n [e, s, w]\`** — atom head, tail printed as a list.
+
+Fixed prefix plus tail — **\`[A, B | Rest]\`** requires at least two elements:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query firstTwo:
+        route([A, B | Rest]),
+        show(A, B, Rest)
+
+:
+
+1wire ok = .world:query({ route([A, B | Rest]), show(A, B, Rest) })
+\`\`\`
+
+**Load & Run** → **\`n e [s]\`**.
+
+---
+
+### Anonymous \`_\` — pick one slot
+
+Ignore positions you do not care about. Each **\`_\`** is fresh; only named variables are shared.
+
+**Middle of three:**
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    items([alpha, beta, gamma])
+
+    query middle:
+        items([_, X, _]),
+        show(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = middle
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** → **\`beta\`**.
+
+**First and last without walking the tail manually:**
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query ends:
+        route([First, _, Last]),
+        show(First, Last)
+
+:
+
+1wire ok = .world:query({ route([First, _, Last]), show(First, Last) })
+\`\`\`
+
+**Load & Run** → **\`n s\`**.
+
+For longer lists, combine **\`[_ | T]\`** (drop head) with recursion or use **\`append/3\`** / **\`nth0/3\`** (below).
+
+---
+
+### Recursive traversal — walk every element
+
+Classic Prolog style: one clause for the empty list, one for **\`[H|T]\`**. This is the same idea as built-in **\`member/2\`**, but with your own predicate name (**\`member/2\`** is reserved).
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+
+    walk([]) <- show("done")
+    walk([H | T]) <- show(H), walk(T)
+
+    query demo:
+        colors(L),
+        walk(L)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = demo
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`**, **\`green\`**, **\`blue\`**, then **\`done\`**.
+
+**Membership** (equivalent spirit to **\`member/2\`**):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    userMember(X, [X | _])
+    userMember(X, [_ | T]) <- userMember(X, T)
+
+    query findGreen:
+        userMember(C, [red, green, blue]),
+        C = green,
+        show(C)
+
+:
+
+1wire ok = .world:query({ userMember(C, [red, green, blue]), show(C) })
+\`\`\`
+
+Backtracking finds **\`red\`**, then **\`green\`**, then **\`blue\`**. The extra **\`C = green\`** keeps only the middle solution.
+
+---
+
+### Accumulator — sum a numeric list
+
+Use a second argument to carry the running total; base case **\`[]\`**, recursive case uses **\`is/2\`** for arithmetic (see [Arithmetic \`is/2\`](#arithmetic-is2)).
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    sumList([], 0)
+    sumList([H | T], Total) <- sumList(T, Rest), Total is H + Rest
+
+    data([1, 2, 3, 4])
+
+    query total:
+        data(L),
+        sumList(L, S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = total
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** → **\`10\`**.
+
+**Count elements** (same recursion shape; or use built-in **\`length/2\`**):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    count([], 0)
+    count([_ | T], N) <- count(T, M), N is M + 1
+
+    query len:
+        count([a, b, c, d], N),
+        show(N)
+
+:
+
+1wire ok = .world:query({ count([a, b, c, d], N), show(N) })
+\`\`\`
+
+→ **\`4\`**.
+
+---
+
+### Last element — recursion and \`append/3\`
+
+**Recursive last/2** (standard Prolog textbook pattern):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    last([X], X)
+    last([_ | T], X) <- last(T, X)
+
+    route([n, e, s])
+
+    query lastStep:
+        route(L),
+        last(L, X),
+        show(X)
+
+:
+
+1wire ok = .world:query({ route(L), last(L, X), show(X) })
+\`\`\`
+
+**Load & Run** → **\`s\`**.
+
+**Via \`append/3\`** — “prefix + singleton suffix” (many solutions on backtracking; for a **ground** list, take the split where suffix is one element, or use **\`;last\`** on an inline query):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query splits:
+        route(L),
+        append(Prefix, [Last], L),
+        show(Prefix, Last)
+
+:
+
+1wire ok = .world:query({ route(L), append(Prefix, [Last], L), show(Prefix, Last) })
+\`\`\`
+
+**Load & Run** prints three lines: **\`[] n\`**, **\`[n] e\`**, **\`[n, e] s\`**. The final line is the usual “last element” split. Full **\`append/3\`** modes: [logic-builtins.md — \`append/3\`](logic-builtins.md#append3).
+
+---
+
+### Split and join — \`append/3\` decompose
+
+Given a ground list, **\`append(L1, L2, L3)\`** with **\`L3\`** ground backtracks over all **\`L1\` / \`L2\`** pairs.
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    word([c, a, t])
+
+    query parts:
+        word(W),
+        append(L1, L2, W),
+        show(L1, L2)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = parts
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints four decompositions, ending with **\`[c, a, t] []\`**.
+
+Generative mode — build a list of known length (see also [logic-builtins.md — \`length/2\`](logic-builtins.md#length2)):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query gen:
+        length(L, 3),
+        append(L, [z], Long),
+        show(Long)
+
+:
+
+1wire ok = .world:query({ length(L, 3), append(L, [z], Long), show(Long) })
+\`\`\`
+
+**Load & Run** prints a four-element list **\`[..., z]\`** with three anonymous cells.
+
+---
+
+### Nested lists and compounds inside lists
+
+Lists may contain other lists or compound terms. Patterns apply at each level.
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    pairs([pair(a, [1, 2]), pair(b, [3])])
+
+    query firstPair:
+        pairs([pair(N, Ls) | _]),
+        show(N, Ls)
+
+:
+
+1wire ok = .world:query({ pairs([pair(N, Ls) | _]), show(N, Ls) })
+\`\`\`
+
+**Load & Run** → **\`a [1, 2]\`**.
+
+Deeper nesting — extract inner list by position:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    grid([row([1, 2]), row([3, 4])])
+
+    query topRow:
+        grid([row(Nums) | _]),
+        show(Nums)
+
+:
+
+1wire ok = .world:query({ grid([row(Nums) | _]), show(Nums) })
+\`\`\`
+
+→ **\`[1, 2]\`**.
+
+---
+
+### Index by position — \`nth0/3\` and \`nth1/3\`
+
+When you know the index, builtins avoid writing recursion:
+
+| Builtin | Index base | Example |
+|---------|------------|---------|
+| **\`nth0(I, List, Elem)\`** | 0 | \`nth0(1, [a,b,c], X)\` → **\`X = b\`** |
+| **\`nth1(I, List, Elem)\`** | 1 (SWI-style) | \`nth1(2, [a,b,c], X)\` → **\`X = b\`** |
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    route([n, e, s])
+
+    query byIndex:
+        route(L),
+        nth0(1, L, Step),
+        nth1(3, L, Last),
+        show(Step, Last)
+
+:
+
+1wire ok = .world:query({ route(L), nth0(1, L, Step), nth1(3, L, Last), show(Step, Last) })
+\`\`\`
+
+**Load & Run** → **\`e s\`**. Full reference: [logic-builtins.md — \`nth0/3\` · \`nth1/3\`](logic-builtins.md#nth03-and-nth13).
+
+---
+
+### What matches Prolog / what differs
+
+| Prolog habit | LogTScript logic |
+|--------------|------------------|
+| **\`[H\\|T]\`** recursion | Supported — same unification |
+| **\`[_, X, _]\`** fixed slot | Supported |
+| **\`append/3\`**, **\`member/2\`**, **\`length/2\`**, … | Built-ins (reserved names) |
+| User **\`member/2\`** rule | **Not allowed** — use another name (\`userMember/2\`, …) |
+| **\`true\` / \`fail\`** goals | **Not built-in** — use facts, **\`\\+\`**, or empty body failure |
+| DCG **\`NonTerminal --> …\`** | **Not supported** |
+| Open / partial lists in **\`reverse/2\`**, **\`sort/2\`**, **\`length/2\`** count | **Fail** until the spine is ground |
+| Cyclic **\`X = [X\\|_]\`** | **Fails** (occurs-check) |
+| Bare **\`[a,b]\`** as a goal | **Parse error** — wrap in **\`X = [a,b]\`** or pass to a predicate |
+| List literal size | Max **1024** comma-separated elements |
+
+For wire-packed list I/O (\`text list\`, \`number list\`, …), see [logic-query-exec.md](logic-query-exec.md#list-codec-rules).
 
 ---
 
@@ -23854,8 +24316,11 @@ In \`logic { }\`, a bare identifier is always a **logic atom**. To read a **LogT
 |------|---------|
 | \`box1\`, \`c1\` | Atoms (even if a wire with the same name exists) |
 | \`text destWire\` | Wire → ASCII atom |
+| \`text list routeVec\` | Vector / packed wire → Prolog list of atoms |
 | \`number scoreIn\` | Wire → unsigned integer |
+| \`number list levels\` | Packed wire → list of integers |
 | \`bool flag\` | Wire → 0/1 |
+| \`bool list flags\` | Packed wire → list of 0/1 |
 
 \`\`\`logts-play
 inline [logic] .nums:
@@ -23888,6 +24353,38 @@ comp [logic] .numLogic:
 \`\`\`
 
 After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`**.
+
+List wire prefix in mutations:
+
+\`\`\`logts-play
+inline [logic] .routes:
+
+    path(a, [x])
+
+    query hasB:
+        path(b, Nodes)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes { }
+:
+
+8wire[4] routeVec = 01101110011001010111001100000000
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.routeLogic:{
+    logic { + path(b, text list routeVec) }
+    hasB >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+**Load & Run**: adds \`path(b,[n,e,s])\` from the packed wire → **\`ok = 1\`**.
 
 Missing wire with prefix → transaction failure:
 
@@ -24272,23 +24769,23 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 |-------|---------|
 | **Syntax** | \`.module:query({ goals }, Var=wire, maxDepth=\\\\N, maxSolutions=\\\\N;policy)\` |
 | **Goals** | Prolog body in \`{ }\` — comma = AND, \`\\+\`, \`=:=\`, etc. |
-| **Inputs** | Optional \`, X=wire\` after the block |
+| **Inputs** | Optional \`, Var=text wire\`, \`Var=number wire\`, \`Var=bool wire\`, or \`Var=<type> list wire\` |
 | **Limits** | Optional \`, maxDepth=\\\\N\`, \`, maxSolutions=\\\\N\` (decimal literals; default **256** / **64**) |
 | **Column select** | Optional \`;sel(i,j)\` before policy — 0-based column indices into free variables |
 | **Result policy** | Optional trailing \`;unique\`, \`;first\`, or \`;last\` (after bindings/options) |
 | **\`_\`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | \`1wire\` LHS + all vars bound → \`1\` / \`0\` |
 | **Scalar (1st sol.)** | \`8wire\` / \`40wire\` / \`80wire\` LHS + one free var → **first solution** on that width (ASCII atom + \`\\0\` pad) |
-| **Bulk** | \`8wire[N]\` / \`40wire[N]\` / \`32wire[R,C]\` LHS + free vars → vector / matrix |
+| **List I/O** | \`Var=text list\` (output hint) or \`Var=text list wireIn\` (input) — packed on vector wires |
 
 ---
 
 ## Syntax
 
 \`\`\`logts
-result = .world:query({ owns(john, X) }, X=car)
+result = .world:query({ owns(john, X) }, X=text car)
 
-1wire ok = .world:query({ owns(john, X) }, X=car, maxDepth=\\10, maxSolutions=\\3)
+1wire ok = .world:query({ owns(john, X) }, X=text car, maxDepth=\\10, maxSolutions=\\3)
 
 8wire[10] cars = .world:query({ owns(john, _) })
 \`\`\`
@@ -24297,7 +24794,7 @@ result = .world:query({ owns(john, X) }, X=car)
 |------|---------|
 | **\`.world:query(...)\`** | Single method **\`query\`** on \`inline [logic]\` \`.world\` |
 | **\`{ goals }\`** | Prolog goals (same grammar as inline query body) |
-| **\`, Var=expr\`** | Bind logic variables before solve (wire → atom/number/bool) |
+| **\`, Var=<type> expr\`** | Bind logic variables before solve — **type is required** (\`text\`, \`number\`, \`bool\`, optional \`list\`) |
 | **\`, maxDepth=\\\\N\`** | Optional — max goal steps (default **256**) |
 | **\`, maxSolutions=\\\\N\`** | Optional — max solutions collected (default **64**) |
 | **\`;sel(i,j)\`** | Optional — project to two columns before policy/pack (required for \`32wire[R,C]\` when more than two free vars) |
@@ -24322,7 +24819,7 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 \`\`\`logts
 8wire[4] cars = .world:query({ owns(john, _) };unique)
 40wire last = .world:query({ owns(john, X) };last)
-1wire ok = .world:query({ owns(john, X) }, X=car;unique)
+1wire ok = .world:query({ owns(john, X) }, X=text car;unique)
 \`\`\`
 
 **Not supported:** \`.world:available(...)\` per query name, or redirect selectors like \`{ johnOwns:0 }\` inside the block — only **goals**.
@@ -24344,15 +24841,43 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 
 Encoding matches comp redirects: **atoms → ASCII + padding**, **numbers → unsigned binary** on cell width (see [comp-logic.md](comp-logic.md) D12b).
 
-### Input binding (\`Var=wire\`)
+### Input binding — explicit type (\`Var=<type> wire\`)
 
-Wire width selects decode mode:
+Every query binding after the goal block **must** name a decode type. Width alone does **not** select the mode.
 
-| Width | Decode |
-|-------|--------|
-| **1 bit** | Boolean / 0–1 |
-| **≥ 8, multiple of 8** | Text → atom (stop at \`\\0\`) |
-| **Other** | Unsigned number |
+| Form | Meaning |
+|------|---------|
+| \`X=text carWire\` | Wire → ASCII atom (stop at \`\\0\`; empty / all-zero → error on text) |
+| \`N=number scoreIn\` | Wire → unsigned integer |
+| \`F=bool flag\` | 1-bit wire → 0/1 |
+| \`Nodes=text list routeIn\` | Vector or packed scalar → Prolog list of atoms |
+| \`Vals=number list packedIn\` | Packed list of integers (16 bits per element on vector wires) |
+| \`Flags=bool list bitsIn\` | Packed list of booleans (1 bit per element) |
+
+**Output hint (no wire on the right):** when the LHS is a vector wire and the goal has one free list variable, give the type without a source wire:
+
+\`\`\`logts
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)
+\`\`\`
+
+The engine flattens the first solution list into consecutive cells (ASCII per atom on text lists). Unused slots use the wire fill pattern (\`\\0\` for text).
+
+### List codec rules
+
+| Type | Vector wire | Scalar packed wire |
+|------|-------------|-------------------|
+| **\`text list\`** | One atom per cell (\`8wire[N]\` → N atoms) | Total bits ÷ 8 slots |
+| **\`number list\`** | One integer per cell (cell width = element width) | Total bits ÷ 16 slots |
+| **\`bool list\`** | One bit per cell | Total bits = element count |
+
+| Rule | Behaviour |
+|------|-----------|
+| **Fill slots** | All-zero cells (or wire fill pattern) are **skipped** on decode |
+| **Zero elements** | Decode with no non-fill cells → error (\`text list cannot contain 0 elements\`, etc.) |
+| **Input truncate** | If the Prolog list has more elements than wire slots, extra elements are dropped silently on encode |
+| **Invalid text** | \`\\0\` or empty atom in a non-fill cell → skipped (not a valid list element) |
+
+**Legacy vs wave:** success paths produce identical wire values. Runtime errors are reported the same way as other inline queries (legacy stores \`lastReportedError\`; wave may throw on assignment — same message text).
 
 ---
 
@@ -24371,7 +24896,7 @@ inline [logic] .world:
 
 40wire car = 01100011'01101000'01100101'01110110'01111001
 
-1wire ok = .world:query({ owns(john, X) }, X=car)
+1wire ok = .world:query({ owns(john, X) }, X=text car)
 
 show(ok)
 \`\`\`
@@ -24551,6 +25076,122 @@ show(table; ascii)
 
 **Load & Run** packs two columns (brand + year) after dedupe — two matrix rows, not three.
 
+### List output — flatten route to vector
+
+\`\`\`logts-play
+inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+8wire[4] routeOut = 00000000000000000000000000000000
+
+8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)
+
+show(routeFlat; ascii)
+\`\`\`
+
+After **Load & Run**, \`routeFlat\` holds three ASCII cells \`n\`, \`e\`, \`s\`; slot 4 is fill (\`\\0\`).
+
+### List input — verify path against packed wire
+
+\`\`\`logts-play
+inline [logic] .routes:
+
+    path(a, [n, e, s])
+
+    query route:
+        path(a, Nodes)
+
+:
+
+8wire[4] routeIn = 01101110011001010111001100000000
+
+1wire ok = .routes:query({ path(a, Nodes) }, Nodes=text list routeIn)
+
+show(ok)
+\`\`\`
+
+\`routeIn\` encodes \`[n,e,s]\` plus a fill cell → **\`ok = 1\`**.
+
+### Scalar number input
+
+\`\`\`logts-play
+inline [logic] .scores:
+
+    level(box1, 42)
+
+    query q:
+        level(box1, N)
+
+:
+
+16wire scoreIn = 0000000000101010
+
+1wire ok = .scores:query({ level(box1, N) }, N=number scoreIn)
+
+show(ok)
+\`\`\`
+
+### Bool list — packed 4-bit input
+
+\`\`\`logts-play
+inline [logic] .flags:
+
+    flags(box1, [1, 0, 1, 1])
+
+    query q:
+        flags(box1, F)
+
+:
+
+4wire flagIn = 1011
+
+1wire ok = .flags:query({ flags(box1, F) }, F=bool list flagIn)
+
+show(ok)
+\`\`\`
+
+**Load & Run** → **\`ok = 1\`**.
+
+### Mutation — add path from text list wire
+
+\`\`\`logts-play
+inline [logic] .routes:
+
+    path(a, [x])
+
+    path(b, [n, e, s])
+
+:
+
+8wire[4] routeVec = 01101110011001010111001100000000
+
+comp [logic] .routeLogic:
+    on: 1
+    .routes { }
+:
+
+1wire trigger = 1
+
+.routeLogic:{
+    logic {
+        + path(b, text list routeVec)
+    }
+    set = trigger
+}
+
+1wire ok = .routes:query({ path(b, Nodes) }, Nodes=text list)
+
+show(ok)
+\`\`\`
+
+After **Load & Run**: mutation adds \`path(b,[n,e,s])\` → query succeeds → **\`ok = 1\`**.
+
 ---
 
 ## vs \`comp [logic]\`
@@ -24559,7 +25200,7 @@ show(table; ascii)
 |---|-------------------------|-------------------|
 | **Use** | One-off expression / assign | Circuit trigger + redirects |
 | **Trigger** | Runs when expression evaluates | \`set\` pin + \`on:\` |
-| **Inputs** | \`, Var=wire\` on call | Program block + exec \`pin = wire\` |
+| **Inputs** | \`, Var=<type> wire\` on call | Program block + exec \`pin = wire\` (supports \`text list\`, \`number list\`, \`bool list\`) |
 | **Outputs** | Expression return / LHS wire | \`query >= wire\` redirects |
 | **Limits** | Per-call \`maxDepth\` / \`maxSolutions\` (defaults 256 / 64); no \`truncated\`/\`depthExceeded\` pout | \`maxDepth\` / \`maxSolutions\` on comp + pout redirects |
 
@@ -24595,7 +25236,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across \`set\` passes on the same component |
 | **\`.world:query\`** | Reads **static inline only** — not the component dynamic overlay |
-| **Wire in mutation** | \`text w\` / \`number w\` / \`bool w\` — bare id = atom |
+| **Wire in mutation** | \`text w\` / \`text list w\` / \`number w\` / \`number list w\` / \`bool w\` / \`bool list w\` — bare id = atom |
 | **Constraints** | \`constraint P <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
@@ -25016,7 +25657,7 @@ After **Load & Run**: **\`ok = 0\`** — static fact hidden by tombstone, not de
 
 ## Example — wire prefix in mutation
 
-Use **\`text\`**, **\`number\`**, or **\`bool\`** before a wire name. Bare identifiers are **atoms** (even when a homonymous wire exists).
+Use **\`text\`**, **\`number\`**, **\`bool\`**, or **\`text list\`**, **\`number list\`**, **\`bool list\`** before a wire name. Bare identifiers are **atoms** (even when a homonymous wire exists).
 
 \`\`\`logts-play
 inline [logic] .warehouse:
