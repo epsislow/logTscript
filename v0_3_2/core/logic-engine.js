@@ -409,6 +409,7 @@ class LogicEngine {
 
       const newGoals = (renamed.body || []).concat(rest);
       const savedCut = env.cutDepth;
+      const savedCutCommitted = env.cutCommitted;
       env.cutDepth = cutParent;
       env.cutCommitted = false;
 
@@ -416,7 +417,7 @@ class LogicEngine {
 
       const cutCommitted = env.cutCommitted;
       env.cutDepth = savedCut;
-      env.cutCommitted = false;
+      env.cutCommitted = savedCutCommitted || cutCommitted;
       env.undo(trail);
       if (env.choiceDepth() > cutParent) env.popChoice();
 

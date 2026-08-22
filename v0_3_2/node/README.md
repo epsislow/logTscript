@@ -19,6 +19,13 @@ După modificări în `huffFsmScript` din `tests/test_suite.js`: `node node/_gen
 
 ## Debug (opțional)
 
+- `node node/_verify_doc_examples.js PAGE` — verifică exemplele `logts-play` din `doc/PAGE.md` (+ extra checks dacă există `node/doc_verify/PAGE.js`)
+- `node node/_verify_doc_examples.js --list` — listează paginile doc cu exemple `logts-play`
+- `node node/_verify_doc_examples.js --all` — rulează toate paginile (poate dura)
+- `node node/_verify_doc_examples.js inline-logic comp-logic` — mai multe pagini odată
+
+Poți rula din rădăcina repo: `node v0_3_2/node/_verify_doc_examples.js comp-logic`
+
 - `node node/_debug_show_peek.js`
 - `node node/_debug_test_group.js`
 

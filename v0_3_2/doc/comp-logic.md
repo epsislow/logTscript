@@ -19,6 +19,10 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Outputs** | Query redirect (`modifier:0 >= result`) |
 | **Query selection** | **Omit** = all queries; **`query = a, b`** = subset; **`query none`** = no queries |
 | **Mutations** | `logic { + fact / - fact }` — see [logic-runtime.md](logic-runtime.md) |
+| **List pins** | `Nodes is text list routePin` — vector wires recommended; see [list pins](#list-pins--text-list-number-list-bool-list) |
+| **Compound redirect** | `zoneId:0 >= zoneOut`, `zoneId:0:1 >= nameOut` — nested args by column index |
+| **Constraints** | `constraint P <= Body` in inline; mutations validated — [logic-constraints.md](logic-constraints.md) |
+| **Namespace alias** | `use .otherInline as alias` → `alias.predicate(...)` in queries |
 | **Doc** | `doc(comp.logic)`, `doc(.characterLogic)` |
 
 ---
@@ -1060,6 +1064,343 @@ comp [logic] .whLogic:
 After **Load & Run**: **`wouldPass = 1`**; **`hasBox2 = 0`** — the KB is unchanged until a real **`logic { }`** mutation runs.
 
 Constraint validation details → [logic-constraints.md — check](logic-constraints.md#constraint-check-simulation).
+
+---
+
+## Worked examples — mixed wires, lists, compound, constraints, namespaces
+
+These examples combine **typed pins** (`bool` / `text` / `number` and **`list`** variants), **compound** query results, **constraints**, and **`use … as`** namespace aliases. All use **`on: 1`** so **Load & Run** executes immediately.
+
+### Mixed scalar pins — `number`, `text`, and `bool`
+
+Three input wires feed three pin types; three boolean redirects report query success:
+
+```logts-play
+inline [logic] .plant:
+
+    level(tank1, 75)
+    mode(tank1, auto)
+    sensor(alarm, 0)
+
+    query levelOk:
+        level(tank1, N), N =< 80
+
+    query modeMatch:
+        mode(tank1, M)
+
+    query alarmOff:
+        sensor(alarm, F), F = 0
+
+:
+
+comp [logic] .plantLogic:
+    on: 1
+
+    .plant {
+        N is number levelPin
+        M is text modePin
+        F is bool sensePin
+    }
+
+:
+
+8wire levelWire = 01001011
+32wire modeWire = 01100001011101010111010001101111
+1wire senseWire = 0
+1wire okLevel = 0
+1wire okMode = 0
+1wire okAlarm = 0
+1wire trigger = 1
+
+.plantLogic:{
+    levelPin = levelWire
+    modePin = modeWire
+    sensePin = senseWire
+    levelOk >= okLevel
+    modeMatch >= okMode
+    alarmOff >= okAlarm
+    set = trigger
+}
+```
+
+After **Load & Run**: **`okLevel = 1`** (75 ≤ 80), **`okMode = 1`**, **`okAlarm = 1`** (alarm off).
+
+### Chained components — `text` wire → pin → `number` output
+
+Two **`comp [logic]`** blocks share a **`32wire nameSlot`**: the first writes an atom from a matrix cell; the second loads it into a **`text` pin** and resolves **`lookupAge`**:
+
+```logts-play
+inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+
+    query allAges:
+        age(X, Y)
+
+    query lookupAge:
+        age(X, Y)
+
+:
+
+comp [logic] .worldFetch:
+    on: 1
+    .world { }
+
+:
+
+comp [logic] .worldLookup:
+    on: 1
+    .world {
+        X is text myX
+    }
+
+:
+
+32wire nameSlot = 00000000000000000000000000000000
+8wire ageOut = 00000000
+1wire trigger = 1
+
+.worldFetch:{
+    allAges:0:0 >= nameSlot
+    set = trigger
+}
+
+.worldLookup:{
+    myX = nameSlot
+    lookupAge:0 >= ageOut
+    set = trigger
+}
+```
+
+After **Load & Run**: **`ageOut = 25`** (`00011001` on 8 bits).
+
+### `number list` pin — vector round-trip
+
+Use **`16wire[N]`** vector wires (16 bits per integer cell):
+
+```logts-play
+inline [logic] .scores:
+
+    batch(a, [10, 20, 30])
+
+    query batchQ:
+        batch(a, Scores)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+
+    .scores {
+        Scores is number list scorePin
+    }
+
+:
+
+16wire[3] scoreIn = 000000000000101000000000000101000000000000011110
+16wire[3] scoreOut = 000000000000000000000000000000000000000000000000
+1wire trigger = 1
+
+.scoreLogic:{
+    scorePin = scoreIn
+    batchQ >= scoreOut
+    set = trigger
+}
+```
+
+After **Load & Run**: first cell of **`scoreOut`** encodes **10** (`0000000000001010`).
+
+### `bool list` pin — input verify and vector output
+
+**Input:** packed **`4wire flagWire = 1011`** decodes to `[1, 0, 1, 1]` on pin **`flagPin`**.
+
+**Boolean redirect** on **`1wire`** reports satisfiability (same as inline **`:query`** on a 1-bit wire):
+
+```logts-play
+inline [logic] .flags:
+
+    flags(unit1, [1, 0, 1, 1])
+
+    query match:
+        flags(unit1, F)
+
+:
+
+comp [logic] .flagLogic:
+    on: 1
+
+    .flags {
+        F is bool list flagPin
+    }
+
+:
+
+4wire flagWire = 1011
+1wire ok = 0
+1wire trigger = 1
+
+.flagLogic:{
+    flagPin = flagWire
+    match >= ok
+    set = trigger
+}
+```
+
+**Vector bulk** writes the unified list back to wires — use **`1wire[N]`** (one bit per element):
+
+```logts-play
+inline [logic] .flags:
+
+    flags(unit1, [1, 0, 1, 1])
+
+    query match:
+        flags(unit1, F)
+
+:
+
+comp [logic] .flagLogic:
+    on: 1
+
+    .flags {
+        F is bool list flagPin
+    }
+
+:
+
+4wire flagWire = 1011
+1wire[4] flagOut = 0000
+1wire trigger = 1
+
+.flagLogic:{
+    flagPin = flagWire
+    match >= flagOut
+    set = trigger
+}
+```
+
+After **Load & Run**: **`flagOut = 1011`**.
+
+### Compound terms — nested argument redirect
+
+Query **`located(crate1, zone(Z, Name))`** exposes **`Z`** (column 0) and **`Name`** (column 1) from compound **`zone(3, east)`**:
+
+```logts-play
+inline [logic] .yard:
+
+    located(crate1, zone(3, east))
+
+    query zoneId:
+        located(crate1, zone(Z, Name))
+
+:
+
+comp [logic] .yardLogic:
+    on: 1
+
+    .yard { }
+
+:
+
+8wire zoneOut = 00000000
+32wire nameOut = 00000000000000000000000000000000
+1wire trigger = 1
+
+.yardLogic:{
+    zoneId:0 >= zoneOut
+    zoneId:0:1 >= nameOut
+    set = trigger
+}
+```
+
+After **Load & Run**: **`zoneOut = 3`**; **`nameOut`** holds **`east`** in ASCII.
+
+### Constraints + mutation + query
+
+**`constraint inside(Object, Container) <= object(Object), container(Container)`** validates the **`logic { + inside(box2, c1) }`** mutation before **`hasBox2`** runs:
+
+```logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+
+    .warehouse { }
+
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    hasBox2 >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`ok = 1`**, **`failed = 0`**.
+
+### Namespace alias — `use .inline as alias`
+
+Import predicates from another inline under a prefix:
+
+```logts-play
+inline [logic] .vehicles:
+
+    wheeled(car)
+
+:
+
+inline [logic] .fleet:
+
+    use .vehicles as veh
+
+    query hasCar:
+        veh.wheeled(car)
+
+    query hasBike:
+        veh.wheeled(bike)
+
+:
+
+comp [logic] .fleetLogic:
+    on: 1
+
+    .fleet { }
+
+:
+
+1wire carOk = 0
+1wire bikeOk = 0
+1wire trigger = 1
+
+.fleetLogic:{
+    hasCar >= carOk
+    hasBike >= bikeOk
+    set = trigger
+}
+```
+
+After **Load & Run**: **`carOk = 1`**, **`bikeOk = 0`**.
 
 ---
 

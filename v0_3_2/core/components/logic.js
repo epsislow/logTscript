@@ -843,7 +843,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           const meta = comp.queryMeta && comp.queryMeta[qName];
           const freeVars = meta && meta.freeVars ? meta.freeVars : [];
           const columnSelect = rd.columnSelect || null;
-          if (freeVars.length === 0) {
+          const boolScalarRedirect = shape.kind === 'scalar' && width === 1
+            && rd.resultPolicy == null && columnSelect == null;
+          if (freeVars.length === 0 || boolScalarRedirect) {
             const val = solutions.length > 0 ? 1 : 0;
             bits = encFn ? encFn({ kind: 'number', value: val }, width, 'bool') : (val ? '1' : '0');
           } else if (freeVars.length === 1 && shape.kind === 'vector' && packVecFn) {

@@ -41967,5 +41967,135 @@ comp [logic] .routeLogic:
     }, '0 elements');
   }, { propagation: 'wave' });
 
+  function runF25BoolListCompScalarRedirect(h, session) {
+    const src = `inline [logic] .flags:
+
+    flags(unit1, [1, 0, 1, 1])
+
+    query match:
+        flags(unit1, F)
+
+:
+
+comp [logic] .flagLogic:
+    on: 1
+
+    .flags {
+        F is bool list flagPin
+    }
+
+:
+
+4wire flagWire = 1011
+1wire ok = 0
+1wire trigger = 1
+
+.flagLogic:{
+    flagPin = flagWire
+    match >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3833, 'logic', 'F25 bool list comp scalar redirect (legacy)', runF25BoolListCompScalarRedirect);
+  reg(3834, 'logic', 'F25 bool list comp scalar redirect (wave)', runF25BoolListCompScalarRedirect, { propagation: 'wave' });
+
+  function runF25BoolListCompScalarRedirectFail(h, session) {
+    const src = `inline [logic] .flags:
+
+    flags(unit1, [1, 0, 1, 1])
+
+    query match:
+        flags(unit1, F)
+
+:
+
+comp [logic] .flagLogic:
+    on: 1
+
+    .flags {
+        F is bool list flagPin
+    }
+
+:
+
+4wire flagWire = 1100
+1wire ok = 1
+1wire trigger = 1
+
+.flagLogic:{
+    flagPin = flagWire
+    match >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  function runF25TextListCompScalarRedirect(h, session) {
+    const src = INLINE_LOGIC_F25_PATH + `
+comp [logic] .routeLogic:
+    on: 1
+
+    .routes {
+        Nodes is text list routePin
+    }
+
+:
+
+8wire[4] routeIn = 01101110011001010111001100000000
+1wire ok = 0
+1wire trigger = 1
+
+.routeLogic:{
+    routePin = routeIn
+    route >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  function runF25NumberListCompScalarRedirect(h, session) {
+    const src = `inline [logic] .scores:
+
+    batch(a, [10, 20, 30])
+
+    query batchQ:
+        batch(a, Scores)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+
+    .scores {
+        Scores is number list scorePin
+    }
+
+:
+
+16wire[3] scoreIn = 000000000000101000000000000101000000000000011110
+1wire ok = 0
+1wire trigger = 1
+
+.scoreLogic:{
+    scorePin = scoreIn
+    batchQ >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(3835, 'logic', 'F25 bool list comp scalar redirect fail (legacy)', runF25BoolListCompScalarRedirectFail);
+  reg(3836, 'logic', 'F25 bool list comp scalar redirect fail (wave)', runF25BoolListCompScalarRedirectFail, { propagation: 'wave' });
+  reg(3837, 'logic', 'F25 text list comp scalar redirect (legacy)', runF25TextListCompScalarRedirect);
+  reg(3838, 'logic', 'F25 text list comp scalar redirect (wave)', runF25TextListCompScalarRedirect, { propagation: 'wave' });
+  reg(3839, 'logic', 'F25 number list comp scalar redirect (legacy)', runF25NumberListCompScalarRedirect);
+  reg(3840, 'logic', 'F25 number list comp scalar redirect (wave)', runF25NumberListCompScalarRedirect, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
