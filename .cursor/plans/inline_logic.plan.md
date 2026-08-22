@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–25, F26–F27, F29 complete; **Faza 26** (`is/2`) — următoarea.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–29, F25 complete; **Faza 30** (doc mini-monopoly) — următoarea (doc-only).
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -89,6 +89,12 @@ todos:
   - id: logic-list-wire
     content: "Faza 25: liste tipate pe wire (2+c) — text|number|bool [list], D182+ — completed"
     status: completed
+  - id: logic-doc-monopoly
+    content: "Faza 30: doc mini-monopoly-logic.md — tutorial end-to-end (doc-only, fără engine nou)"
+    status: pending
+  - id: logic-random-2h
+    content: "2+h (draft F31): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
+    status: pending
 isProject: false
 ---
 
@@ -104,7 +110,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate                                |
 | **(completed)**          | Decizie luată / implementată                                                          |
 | **1+a … 1+v**            | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan)       |
-| **2+a … 2+g**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2g) |
+| **2+a … 2+h**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2h) |
 | ✅                        | Backlog **promovat / livrat** (fază completed)                                        |
 | ❌                        | Backlog **respins** definitiv                                                         |
 | 🟠✗                      | Backlog **închis** — alternativa nu se face; livrat altfel                            |
@@ -1303,7 +1309,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-> **Backlog post-MVP (**`1+a` **…** `1+v`**):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (**`2+a` **…** `2+g`**):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2g).
+> **Backlog post-MVP (**`1+a` **…** `1+v`**):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (**`2+a` **…** `2+h`**):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2h).
 
 ---
 
@@ -1342,7 +1348,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 26** `is/2` evaluare aritmetică                  | D152–D159                                                                                            | **(completed)**                                   |
 | **Faza 27** Builtins listă + doc `logic-builtins.md`    | D160–D169                                                                                            | **(completed)**                                   |
 | **Faza 29** Query N vars + `;sel(i,j)` redirect         | D170–D181                                                                                            | **(completed)**                                   |
-| **Faza 25** Liste tipate pe wire (**2+c**)                | D182–D199 (extinde D59, D32, D140)                                                                   | **(următoarea — draft confirmed parțial)**        |
+| **Faza 25** Liste tipate pe wire (**2+c**)                | D182–D199 (extinde D59, D32, D140)                                                                   | **(completed)**                                   |
+| **Faza 30** Doc tutorial mini-monopoly                    | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(următoarea — doc-only)**                       |
 
 
 ---
@@ -6488,12 +6495,14 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 26** `is/2` arithmetic          | D152–D159                                                 |
 | **Faza 27** builtins listă + doc       | D160–D169                                                 |
 | **Faza 29** query N vars + `;sel`      | D170–D181                                                 | **(completed)** |
-| **Faza 25** liste tipate pe wire       | **2+c** D182–D199                                         | **(următoarea)** |
+| **Faza 25** liste tipate pe wire       | **2+c** D182–D199                                         | **(completed)** |
+| **Faza 30** doc mini-monopoly tutorial | D200–D210 — `doc/mini-monopoly-logic.md`                  | **(următoarea — doc-only)** |
 | **F20b** scope blocks                  | **2+a** **(deferred)**                                    |
 | **F20c** reguli import relative        | **2+b** **(deferred)**                                    |
 | ~~**Builtins listă** member/append~~   | ~~**2+d**~~                                               |
 | **Liste avansate** dif/lazy/char       | **2+e** **(deferred)** — D136                             |
 | **Builtins listă suplimentare**        | **2+g** **(deferred)** — post-F27; catalog Prolog complet |
+| **Builtins random (integer)**          | **2+h** **(deferred)** — `random_between/3`; SWI-style; **fără float** |
 | `use` **/** `use once`                 | **Faza 15** **(completed)**                               |
 | Constraint `#K (line L)` trace         | **1+v** **(pause)**                                       |
 | POUT declarate comp                    | **1+k**                                                   |
@@ -6506,10 +6515,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 29~~ **(completed)**
-2. **Faza 25** — liste tipate pe wire + binding explicit (**2+c**, D182–D199) — **următoarea**
+1. ~~Faza 0~~ → ~~Faza 29~~ **(completed)** · ~~F25~~ **(completed)**
+2. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — **următoarea (doc-only)**
 3. Apoi backlog **1+p**, **1+s**, **1+o**, …
-4. Apoi faze amânate **2+a … 2+g** (fără **2+d** — livrat F27; **2+c** → F25 activ)
+4. Apoi faze amânate **2+a … 2+h**
 
 ---
 
@@ -6547,9 +6556,9 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 
 ---
 
-## Backlog faze amânate (2+a … 2+g)
+## Backlog faze amânate (2+a … 2+h)
 
-Tabel master **2+a … 2+g** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+Tabel master **2+a … 2+h** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 
 | Stare | ID          | Subiect                     | Detaliu                                                                                                        | Fază draft | Legat de                  |
@@ -6561,9 +6570,10 @@ Tabel master **2+a … 2+g** — faze **amânate** discutate/planificate, distin
 | ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                 |
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                 |
 | ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23 |
+| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)      | **F31?**   | F30 D203, Monopoly doc    |
 
 
-**Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24.
+**Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24; **2+h** independent (util pentru Monopoly doc v2).
 
 ### Note backlog 2+x — explicații
 
@@ -6719,6 +6729,75 @@ Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi 
 
 **Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
 
+#### **2+h** ⏳ — Builtins random (integer) **(draft F31)**
+
+> **Sursă:** confirmare user 2026-08-22 — D203 F30 (Monopoly doc) folosește **wire/counter** pentru zar; **2+h** = fază amânată pentru random în engine.  
+> **Legat de:** [Faza 30](#faza-30--doc-tutorial-mini-monopoly-logic-doc-only--următoarea) (D203-A), `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` (no floats).
+
+**Context SWI-Prolog (referință — nu ISO standard):**
+
+| Predicate SWI | Semnificație |
+|---------------|--------------|
+| **`random(-Float)`** | Float în `[0.0, 1.0)` — RNG global impur |
+| **`random_between(+Low, +High, -Int)`** | Integer uniform inclusiv `[Low, High]` — uzual pentru zar (`random_between(1, 6, D)`) |
+| **`set_random(+Seed)`** | Reseed explicit — reproducibilitate test |
+| **`getrand(+State)`** / **`setrand(+State)`** | Salvare/restaurare stare RNG |
+
+Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP** — API similar, dar **nu** portabil ISO.
+
+**Semantica Prolog:** random-ul e **impur** (side effect pe generator global) — tratat ca **built-in de sistem**, nu relație logică pură. Backtracking **nu** „dă alt număr” pentru același apel deja satisfăcut (comportament SWI: re-satisfy același rezultat sau fail — de documentat la implementare).
+
+**LogTScript azi — ce NU avem:**
+
+| Topic | Stare |
+|-------|--------|
+| **`random/*` în `logic-engine.js`** | **Lipsă** — zero builtins random |
+| **Float în logic** | **Nu** — doar **integers** (atoms, liste, compounds) — vezi `inline-logic.md`: *Floats — Not supported* |
+| **Float pe wire la comp pin** | **`number`** = unsigned integer binary, **nu** IEEE float |
+| **ISO Prolog standard random** | N/A — nu există în standard |
+
+**Implicație pentru MVP 2+h:** **nu** portăm `random/1` float din SWI; MVP propus = **doar integer**:
+
+| Predicate (draft) | Arity | Rol |
+|-------------------|-------|-----|
+| **`random_between(Low, High, Int)`** | 3 | `Low`/`High` ground integers; `Int` variabilă output — uniform inclusiv |
+| **`set_random(Seed)`** | 1 | Opțional — seed pentru teste legacy+wave deterministe |
+
+**Out of scope 2+h (explicit):**
+
+- **`random(Float)`** cu float — **respins** (fără tip float în logic)
+- **`random/1` pe wire** — nu la MVP
+- Distribuții non-uniforme, `random_member/2`, crypto RNG
+
+**Exemplu țintă (post-2+h) — zar Monopoly:**
+
+```prolog
+roll(D) <- random_between(1, 6, D)
+```
+
+**Fișiere țintă (când se promovează → F31):**
+
+| Fișier | Rol |
+|--------|-----|
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `_solveRandomBetween`, RNG state (seed) |
+| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiune `random_between/3`, impuritate, vs SWI |
+| `inline-logic.md` | Notă cross-link; floats rămân interzise |
+| `tests/test_suite.js` | **38xx+** legacy+wave; seed fix pentru determinism |
+| `mini-monopoly-logic.md` | Actualizare Phase C — zar în logic (doc v2) |
+
+**Decizii draft (de confirmat la promovare — D211+):**
+
+| ID | Propunere |
+|----|-----------|
+| **D211** | MVP = **`random_between/3`** integer only |
+| **D212** | **`set_random/1`** pentru teste — seed integer |
+| **D213** | Head **`random_between/3`** rezervat (builtin call only) |
+| **D214** | **Fără** `random/1` float — aliniat la „no floats in logic” |
+| **D215** | Documentare impuritate + interacțiune cu backtracking (SWI-style) |
+| **D216** | Opțional comp: seed wire la elaborare — **post-MVP** |
+
+**Estimare:** mică–medie (~1 fază) — un builtin + seed + teste; **fără** float infrastructure.
+
 ### Note backlog — explicații (1+x)
 
 #### **1+a** ❌ — respins (inline-native)
@@ -6778,3 +6857,151 @@ Filter toolbar **Logic** dedicat — `logic-mut` **exclusiv** (D82–D85): scoas
 #### **1+v** ⏸ — pause
 
 Ideea D72-B (`#K (line L)` în rollback) rămâne în backlog; **nu** se promovează fază — ordinal `#K` (F14) e suficient deocamdata.
+
+---
+
+## Faza 30 — Doc tutorial **mini-monopoly-logic** **(doc-only — următoarea)**
+
+> **Scop:** pagină EN de documentație (model **[huffman-v2.md](../v0_3_2/doc/huffman-v2.md)**, **[mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)**, **[plc.md](../v0_3_2/doc/plc.md)**) — cum ai construi un **Monopoly minimal** cu **`inline [logic]`** + **`comp [logic]`** + wire-uri + butoane UI.  
+> **Nu** implementare engine / feature nou în cod — doar doc + eventual `_verify_doc_examples.js` pe scriptul final.  
+> **User (2026-08-22):** planificare înainte de implementare; script complet la finalul paginii; problemă deschisă: **alegeri jucător** (buy / pass / pay rent / next player).
+
+### Fișiere țintă (doar doc)
+
+| Fișier | Rol |
+|--------|-----|
+| `[doc/mini-monopoly-logic.md](../v0_3_2/doc/mini-monopoly-logic.md)` | Pagină principală — arhitectură, faze, gaps, script complet |
+| `[doc/doc-index.json](../v0_3_2/doc/doc-index.json)` | Secțiune **Tutorials** sau **Logic** — link + search keywords |
+| `node/_gen_doc_data.js` | Regenerare viewer |
+| `node/doc_verify/mini-monopoly-logic.js` | Opțional — assert-uri wire pe scriptul final |
+| `[doc/comp-logic.md](../v0_3_2/doc/comp-logic.md)` | Cross-link „see also” |
+
+### Scope MVP doc (joc minimal)
+
+| Element | Propunere doc |
+|---------|----------------|
+| **Placă** | 8–12 pătrate (`square(n, name, price, rent)`) — loop cu `mod` pe poziție |
+| **Jucători** | 2 jucători, cash + poziție (`player(p1, cash, pos)`) |
+| **Zar** | **Nu** random în logic — `comp [counter]` / dip 1–6 sau wire `diceIn` |
+| **Tura** | Fact `turn(p1)` / `turn(p2)`; buton **Next player** → mutație sau swap |
+| **Aterizare** | Query `resolveLanding(P)` — go / tax / rent / offer buy |
+| **Proprietăți** | `owns(P, Square)` + `constraint` / mutație `+ owns(...)` |
+| **Câștig** | Query boolean `gameOver(Winner)` |
+
+### Arhitectură doc (faze — ca huffman-v2)
+
+```mermaid
+flowchart LR
+  subgraph KB [inline logic KB]
+    Board[squares + rules]
+    Dyn[dynamic owns / turn / cash]
+  end
+  subgraph RT [comp logic runtime]
+    Turn[turnStep comp]
+    Land[land comp]
+    Choice[choice comp]
+  end
+  subgraph UI [LogTScript UI]
+    BtnNext[Next player]
+    BtnDice[Dice / step]
+    DipChoice[choice code wire]
+    Wires[cash / pos display]
+  end
+  KB --> RT
+  BtnNext --> Turn
+  BtnDice --> Land
+  DipChoice --> Choice
+  RT --> Wires
+```
+
+| Fază doc | Conținut | Building blocks existente |
+|----------|----------|---------------------------|
+| **A — Board** | Facts + constraints init | `inline [logic]`, `constraint … <=` |
+| **B — Turn** | `turn(P)`, next player | `logic { ± }`, `query =`, `on: 1` |
+| **C — Move** | poziție + dice wire | pin `number`, `is/2`, `mod` sau aritmetică wire |
+| **D — Land** | rent / tax / buy-offer | query + redirect boolean / scalar |
+| **E — Choice** | buy vs pass | **problema deschisă** — vezi D204–D208 |
+| **F — Script complet** | un bloc `logts-play` la final | Load & Run |
+
+### Problema centrală: **alegeri jucător**
+
+Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). Doc-ul trebuie să explice **podul**.
+
+#### Pattern-uri posibile (de comparat în doc)
+
+| ID | Pattern | Cum arată | Pro | Contra |
+|----|---------|-----------|-----|--------|
+| **P1** | **Choice code pe wire** | `8wire choiceIn`; pin `C is number choicePin`; query `applyChoice(P, C)` | Un singur comp; extensibil | User trebuie să știe codurile (1=buy, 2=pass) |
+| **P2** | **Comp-uri separate per acțiune** | `.gameBuy:{ logic { + owns } … }` / `.gamePass:{ … }` | Butoane clare în UI | Multe blocuri exec; stare trebuie sincronizată |
+| **P3** | **`query =` subset** | Un comp, butoane setează `query = buy` vs `query = pass` | Folosește F18 | Necesită re-trigger `set` per buton |
+| **P4** | **Liste legale → vector** | `legalChoice(P, Code)` → `legalChoices >= choiceVec` | Apropie „meniu dinamic” | UI tot mapează index → acțiune; fără `call/N` |
+| **P5** | **PLC orchestrator + logic validate** | `inline [plc]` scan cu `CASE choice OF` + `.rules:check({…})` | Familiar industrial | Două limbaje; doc mai lung |
+| **P6** | **State machine extern** | `comp [counter]` / LUT pentru `phase` (move/choose/pay) | Clar pentru începători | Logic devine per-phase KB fragment |
+
+**Recomandare doc (draft D204):** **P1 + P4** — wire `choiceIn` + query `legalChoice(P, C)` (boolean redirect dacă illegal) + secțiune scurtă **P2** ca alternativă „editor-friendly”.
+
+### Ce avem deja (fără cod nou)
+
+- KB static + **mutații** runtime (`logic { + owns(p1, sq3) }`) — F11  
+- **Constraints** la buy (`object`/`container`-style sau custom) — F12  
+- **Pin bindings** `text`/`number`/`bool` + liste — F25  
+- **Query selection** `query = stillAtC1` — F18  
+- **Check** simulare mutație — F19  
+- **Cut** pentru „commit choice, no backtrack” — F24  
+- **`show/N`**, **`is/2`**, **`nth0`**, **`member`**, liste — F21–F27  
+- **Next-step trigger** — `comp [logic] on: 1` + `set = trigger` (ca toate exemplele doc)
+
+### Lipsuri / limitări (secțiune obligatorie în doc)
+
+| Lipsă | Impact Monopoly | Workaround doc |
+|-------|-----------------|----------------|
+| **Fără `call/N` / goal din wire** | Nu poți „apelează predicatul X din atom” | Cod numeric/text pe wire + reguli `choice(P, 1)` … |
+| **Fără `findall`/`bagof`** | Meniu dinamic mai greu | Query cu vector bulk + soluții multiple pe `legalChoice` |
+| **Fără random în logic** | Zar | Wire/counter (F30 doc); **→ [2+h](#2h--builtins-random-integer)** `random_between/3` |
+| **Fără persistență KB (1+o)** | Save game | Re-RUN = reset; menționăm explicit |
+| **Fără UI list binding automată** | Butoane ≠ soluții Prolog | Mapare manuală dip/switch → cod |
+| **Un singur `set` = un pass** | Turn multi-step | Faze: `phase(move)`, `phase(choose)` ca facts |
+| **2+ jucători async** | Hot-seat pe telefon | Doc: **hot-seat** — un singur device, Next player |
+
+### Decizii draft (D200–D210)
+
+| ID | Decizie | Propunere |
+|----|---------|-----------|
+| **D200** | **Doc-only** | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)** |
+| **D201** | **Nume fișier** | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)** |
+| **D202** | **2 jucători, 8 casute** | MVP suficient pentru tutorial — **(confirmed)** |
+| **D203** | **Zar la F30** | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F31**) |
+| **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2) |
+| **D205** | **Turn advance** | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1` |
+| **D206** | **Script final** | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2) |
+| **D207** | **Blocuri intermediare** | `logts-play` per fază A–E (runnable incremental) |
+| **D208** | **Verificare** | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next) |
+| **D209** | **Out of scope doc** | AI, negociere, carduri Chance, auction, 4+ jucători online |
+| **D210** | **Promovare viitoare** | **2+h** random integer; **1+p** validate; **2+g** `findall`; doc Monopoly v2 după F31 |
+
+### Structură pagină (outline)
+
+1. Title + one-liner + link la inline/comp logic  
+2. **Principle** (tabel reguli)  
+3. **Architecture** (mermaid + tabel faze)  
+4. **State model** — facts, dynamic, constraints  
+5. **Phase A** — board inline (snippet)  
+6. **Phase B** — turn + next player button  
+7. **Phase C** — dice + move (`number` pin)  
+8. **Phase D** — landing (rent / tax / buy offer)  
+9. **Phase E — Player choices** (compară P1–P6; recomandă P1+P4)  
+10. **Gaps & workarounds**  
+11. **Full game script** (`logts-play`)  
+12. **Test / verify** + **See also**
+
+### Livrabile F30
+
+- [ ] `doc/mini-monopoly-logic.md` (EN) — outline complet + snippet-uri + script final  
+- [ ] `doc-index.json` + regen doc-data  
+- [ ] Opțional: `node/doc_verify/mini-monopoly-logic.js`  
+- [ ] Cross-links din `inline-logic.md` / `comp-logic.md`  
+- [ ] **Fără** teste suite 38xx (doc-only) — unless script e extras ca test manual
+
+### Estimare
+
+Medie — ~1 pagină doc densă (similar huffman-v2 ca lungime), mostly prose + 8–12 blocuri `logts-play`, 0 schimbări engine.
