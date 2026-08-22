@@ -2122,6 +2122,11 @@ body.doc-mode #docView {
   max-height: min(320px, 55vh);
   overflow-y: auto;
   z-index: 20;
+  box-sizing: border-box;
+}
+.doc-contents-panel.doc-contents-panel--fixed {
+  position: fixed;
+  z-index: 5020;
 }
 .doc-contents-list {
   margin: 0;
@@ -2644,9 +2649,19 @@ body.doc-mode #docView {
     order: 10;
   }
   .doc-search {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
     min-width: 0;
     order: 5;
+  }
+  .doc-contents-wrap {
+    order: 4;
+    flex: 0 0 auto;
+  }
+  .doc-contents-panel:not(.doc-contents-panel--fixed) {
+    left: auto;
+    right: 0;
+    min-width: min(260px, calc(100vw - 24px));
+    max-width: min(260px, calc(100vw - 24px));
   }
   .doc-search-input {
     flex: 1;

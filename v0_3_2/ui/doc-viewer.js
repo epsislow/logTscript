@@ -1629,10 +1629,56 @@ function scrollToDocAnchor(anchor, options) {
   return true;
 }
 
+function resetDocContentsPanelPosition() {
+  const panel = document.getElementById('docContentsPanel');
+  if (!panel) return;
+  panel.classList.remove('doc-contents-panel--fixed');
+  panel.style.top = '';
+  panel.style.left = '';
+  panel.style.right = '';
+  panel.style.width = '';
+  panel.style.maxWidth = '';
+  panel.style.maxHeight = '';
+}
+
+function positionDocContentsPanel() {
+  const panel = document.getElementById('docContentsPanel');
+  const btn = document.getElementById('btnDocContents');
+  if (!panel || !btn || panel.hidden) return;
+
+  if (window.innerWidth > 768) {
+    resetDocContentsPanelPosition();
+    return;
+  }
+
+  const margin = 12;
+  const gap = 4;
+  const rect = btn.getBoundingClientRect();
+  const panelWidth = Math.min(260, window.innerWidth - margin * 2);
+  const maxHeight = Math.min(320, window.innerHeight - rect.bottom - gap - margin);
+
+  let left = rect.left;
+  if (left + panelWidth > window.innerWidth - margin) {
+    left = window.innerWidth - margin - panelWidth;
+  }
+  if (left < margin) left = margin;
+
+  panel.classList.add('doc-contents-panel--fixed');
+  panel.style.top = Math.round(rect.bottom + gap) + 'px';
+  panel.style.left = Math.round(left) + 'px';
+  panel.style.right = 'auto';
+  panel.style.width = panelWidth + 'px';
+  panel.style.maxWidth = panelWidth + 'px';
+  panel.style.maxHeight = Math.max(120, maxHeight) + 'px';
+}
+
 function closeDocContentsPanel() {
   const panel = document.getElementById('docContentsPanel');
   const btn = document.getElementById('btnDocContents');
-  if (panel) panel.hidden = true;
+  if (panel) {
+    panel.hidden = true;
+    resetDocContentsPanelPosition();
+  }
   if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
@@ -1668,6 +1714,7 @@ function toggleDocContentsPanel() {
     renderDocContentsPanel();
     panel.hidden = false;
     btn.setAttribute('aria-expanded', 'true');
+    positionDocContentsPanel();
   } else {
     closeDocContentsPanel();
   }
@@ -1703,6 +1750,10 @@ function initDocContents() {
     if (e.key === 'Escape' && panel && !panel.hidden) {
       closeDocContentsPanel();
     }
+  });
+
+  window.addEventListener('resize', function () {
+    if (panel && !panel.hidden) positionDocContentsPanel();
   });
 }
 
