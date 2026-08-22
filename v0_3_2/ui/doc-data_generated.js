@@ -20198,6 +20198,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Composition** | \`use .otherModule\` merges facts, rules, and constraints (not queries); \`use once\` skips revisits; **\`use .mod as alias\`** prefixes imported predicates |
 | **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
+| **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
 | **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | \`doc(inline.logic)\` — syntax template; \`doc(.myModule)\` — **summary** (counts, query/constraint names, predicate histogram) |
@@ -20225,6 +20226,7 @@ LogTScript logic follows common Prolog conventions:
 | **Number** | \`15\`, \`-4\` | Integer literal |
 | **String literal** | \`"hello "\`, \`"line\\n"\` | Double-quoted text (for **\`show/N\`** labels); escapes \`\\"\`, \`\\\\\` |
 | **List** | \`[]\`, \`[a, b, c]\`, \`[H \\| T]\` | Prolog-style lists — empty, comma literals, or head \\| tail |
+| **Compound** | \`point(1, 2)\`, \`edge(from(A), to(B))\` | Functor name + fixed arity; args may be atoms, numbers, lists, or nested compounds |
 | **Fact** | \`owns(john, chevy)\` | Ground clause (no body) |
 | **Rule** | \`modifier2(X, 0) <- X >= 9, X =< 12\` | Head \`<-\` body goals (comma = AND) |
 | **Negation** | \`\\+ age(peter, _)\` | Negation as failure — goal cannot be proven |
@@ -20793,6 +20795,413 @@ For wire-packed list I/O (\`text list\`, \`number list\`, …), see [logic-query
 
 ---
 
+## Compound terms
+
+A **compound** is a structured term **\`Name(Arg1, Arg2, …)\`** with a fixed **arity** (argument count). Arguments can be atoms, numbers, lists, variables, or **nested compounds**. Predicates in facts and rules use the same syntax: **\`owns(john, chevy)\`** is a compound of arity 2.
+
+In the **documentation viewer**, blocks marked **\`logts-play\`** support **Load** and **Load & Run**.
+
+### Pattern matching — quick map
+
+| Pattern | Matches | Typical use |
+|---------|---------|-------------|
+| \`carInfo(Make, Color, Year, Type)\` | Any \`carInfo/4\` fact | Bind all four arguments |
+| \`carInfo(toyota, _, Y, _)\` | Toyota rows only | Ignore color and body style |
+| \`located(Id, zone(Z, Name))\` | Second arg is nested \`zone/2\` | Unpack inner fields |
+| \`prop(N, rents(R1, R2, _, _, _, _), _, _)\` | Monopoly-style property row | Reach into nested \`rents/6\` |
+| \`branch(left(L), right(R))\` | Binary tree node | Recursive descent on **\`L\`** / **\`R\`** |
+| \`edge(from(A), to(B))\` | Labelled edge | Shared variable **\`A\`** in both compounds |
+
+Use **\`=\`** or a predicate call to unify compounds. Functor name **and** arity must match. **\`_\`** ignores one argument slot.
+
+**Not the same as arithmetic:** **\`M = N + 1\`** builds a **structure** \`+(N, 1)\`; **\`M is N + 1\`** evaluates (see [Arithmetic \`is/2\`](#arithmetic-is2)).
+
+---
+
+### Flat compound — bind some arguments
+
+Query a multi-argument fact and leave unwanted slots anonymous:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+    query toyotaYears:
+        carInfo(toyota, _, Year, _),
+        show(Year)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = toyotaYears
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`2020\`** twice (one line per matching fact).
+
+Filter with two bound slots:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+
+    query redToyota:
+        carInfo(Make, red, Year, Body),
+        show(Make, Year, Body)
+
+:
+
+1wire ok = .world:query({ carInfo(Make, red, Year, Body), show(Make, Year, Body) })
+\`\`\`
+
+→ **\`toyota 2020 sedan\`**.
+
+---
+
+### Nested compound — unpack inner functors
+
+Store structured data inside an argument:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    located(box1, zone(2, east))
+    located(box2, zone(5, west))
+
+    query where:
+        located(Box, zone(Id, Name)),
+        show(Box, Id, Name)
+
+:
+
+1wire ok = .world:query({ located(Box, zone(Id, Name)), show(Box, Id, Name) })
+\`\`\`
+
+**Load & Run** prints two lines, e.g. **\`box1 2 east\`**, **\`box2 5 west\`**.
+
+Deeper nest — compound inside list inside compound (Monopoly-style sketch):
+
+\`\`\`logts-play
+inline [logic] .mono:
+
+    board([prop(mediterranean, rents(2, 10, 30, 90, 160, 250), 50, 50)])
+
+    query firstRent:
+        board([prop(Name, rents(R1, R2, _, _, _, _), _, _) | _]),
+        show(Name, R1, R2)
+
+:
+
+comp [logic] .monoLogic:
+    on: 1
+    .mono { }
+:
+
+1wire trigger = 1
+
+.monoLogic:{
+    query = firstRent
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** → **\`mediterranean 2 10\`**.
+
+---
+
+### Unify — build or decompose a compound
+
+Use **\`=\`** when the shape is known (structural unification):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query rect:
+        Shape = rect(w(10), h(20)),
+        show(Shape)
+
+:
+
+1wire ok = .world:query({ Shape = rect(w(10), h(20)), show(Shape) })
+\`\`\`
+
+**Load & Run** → **\`rect(w(10), h(20))\`**.
+
+Decompose into named parts:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    shape(rect(w(10), h(20)))
+
+    query size:
+        shape(rect(w(W), h(H))),
+        show(W, H)
+
+:
+
+1wire ok = .world:query({ shape(rect(w(W), h(H))), show(W, H) })
+\`\`\`
+
+→ **\`10 20\`**.
+
+---
+
+### Shared variables across compounds
+
+The **same variable name** in one clause must refer to the **same** binding — useful for graphs and paths:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    edge(from(a), to(b))
+    edge(from(b), to(c))
+    edge(from(a), to(d))
+
+    query stepFromA:
+        edge(from(a), to(Dest)),
+        show(Dest)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = stepFromA
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`b\`** and **\`d\`** (two solutions).
+
+Chain two edges with a shared middle node:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    edge(from(a), to(b))
+    edge(from(b), to(c))
+    edge(from(a), to(d))
+
+    query twoHop:
+        edge(from(a), to(M)),
+        edge(from(M), to(Goal)),
+        show(Goal)
+
+:
+
+1wire ok = .world:query({ edge(from(a), to(M)), edge(from(M), to(Goal)), show(Goal) })
+\`\`\`
+
+**Load & Run** → **\`c\`** (path **\`a → b → c\`**).
+
+---
+
+### Recursive rules on compound shape — binary tree
+
+Treat compounds as algebraic data types: one clause per functor shape.
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    node(leaf(3))
+    node(leaf(7))
+    node(branch(leaf(1), leaf(9)))
+
+    nodeVal(leaf(V), V)
+    nodeVal(branch(L, R), Sum) <-
+        nodeVal(L, A),
+        nodeVal(R, B),
+        Sum is A + B
+
+:
+
+1wire ok = .world:query({ node(T), nodeVal(T, S), show(S) })
+\`\`\`
+
+**Load & Run** prints **\`3\`**, **\`7\`**, and **\`10\`** ( **\`branch(leaf(1), leaf(9))\`** ).
+
+---
+
+### \`show/N\` with compound arguments
+
+**\`show/N\`** prints ground compounds textually (same as other ground terms):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    inside(john, johnsCar)
+
+    query display:
+        inside(Person, Place),
+        show(inside(Person, Place))
+
+:
+
+1wire ok = .world:query({ inside(Person, Place), show(inside(Person, Place)) })
+\`\`\`
+
+**Load & Run** → **\`inside(john, johnsCar)\`**.
+
+With a string label:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    status(box1, ok(active))
+
+    query label:
+        status(Id, ok(State)),
+        show("box", Id, "state", State)
+
+:
+
+1wire ok = .world:query({ status(Id, ok(State)), show("box", Id, "state", State) })
+\`\`\`
+
+→ **\`box box1 state active\`**.
+
+---
+
+### Rules with compound heads
+
+Rule heads may be compounds — typical for transformers or normalised facts:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    raw(sensor(t1, 42))
+    raw(sensor(t2, 17))
+
+    reading(S, V) <- raw(sensor(S, V))
+
+    query all:
+        reading(S, V),
+        show(S, V)
+
+:
+
+1wire ok = .world:query({ reading(S, V), show(S, V) })
+\`\`\`
+
+**Load & Run** → **\`t1 42\`**, **\`t2 17\`**.
+
+Filter in the rule body with a nested pattern:
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    packet(header(type(data)), payload([1, 2, 3]))
+    packet(header(type(ack)), payload([]))
+
+    dataPacket(P) <- packet(header(type(data)), P)
+
+    query payloads:
+        dataPacket(Body),
+        show(Body)
+
+:
+
+1wire ok = .world:query({ dataPacket(Body), show(Body) })
+\`\`\`
+
+→ **\`[1, 2, 3]\`**.
+
+---
+
+### \`=\` vs \`is/2\` on compounds
+
+| Goal | When \`N\` is still free | Result |
+|------|------------------------|--------|
+| **\`M = N + 1\`** | yes | **\`M\`** becomes structure **\`+(N, 1)\`** (not evaluated) |
+| **\`M is N + 1\`** | yes | **Fail** — RHS must be ground enough to evaluate |
+| **\`M is 3 + 4\`** | — | **\`M = 7\`** |
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query numeric:
+        M is 3 + 4,
+        show(M)
+
+:
+
+1wire ok = .world:query({ M is 3 + 4, show(M) })
+\`\`\`
+
+**Load & Run** → **\`7\`**. Structural **\`M = N + 1\`** leaves a **\`+(N, 1)\`** term when **\`N\`** is free — see [Arithmetic \`is/2\`](#arithmetic-is2).
+
+---
+
+### Compounds and constraints
+
+Constraint heads are compounds too — **\`constraint inside(O, C) <= …\`** validates mutation facts. See [logic-constraints.md](logic-constraints.md). Example fact + constraint pattern:
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    container(c1)
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query hasInside:
+        inside(box1, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire flag = 0
+1wire trigger = 1
+
+.whLogic:{
+    hasInside >= flag
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**, **\`flag = 1\`** — the ground compound fact satisfies the constraint.
+
+---
+
+### Limits (compounds)
+
+| Topic | Behaviour |
+|-------|-----------|
+| **Arity** | Fixed per functor — \`foo(a)\` does not unify with \`foo(a, b)\` |
+| **Functor names** | Lowercase atoms (same as predicates) |
+| **Nesting depth** | Practical limit from **\`maxDepth\`** on solve (default **256** goal steps) |
+| **Reserved functors** | Built-in names (\`member\`, \`append\`, \`is\`, …) cannot be **user-defined clause heads** at that arity |
+| **Floats inside compounds** | **Not supported** — use integers |
+| **Cyclic structures** | **\`X = f(X)\`** fails (occurs-check), same as lists |
+
+---
+
 ## Built-in \`nth0/3\` and \`nth1/3\` (list indexing)
 
 **\`nth0/3\`** (0-based) and **\`nth1/3\`** (1-based) are reserved list indexing builtins. Full syntax, behaviour, and examples: [logic-builtins.md — \`nth0/3\` · \`nth1/3\`](logic-builtins.md#nth03-and-nth13).
@@ -21120,10 +21529,10 @@ inline [logic] .world:
 
 :
 
-show(doc(.world))
+doc(.world)
 \`\`\`
 
-Use **Load** to inspect the module summary via \`doc(.world)\`; **Load & Run** runs \`show(doc(.world))\` in the editor.
+Use **Load** to inspect the module summary; **Load & Run** executes \`doc(.world)\` in the editor.
 
 \`doc(.name)\` prints counts and names — not the full inline source. Example:
 
@@ -21411,7 +21820,7 @@ inline [logic] .character:
 
 :
 
-show(doc(.character))
+doc(.character)
 \`\`\`
 
 ---
