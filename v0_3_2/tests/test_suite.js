@@ -42696,5 +42696,202 @@ comp [logic] .pairLogic:
   reg(3881, 'logic', 'F33 each three expanded facts query (legacy)', runF33EachThreeFacts);
   reg(3882, 'logic', 'F33 each three expanded facts query (wave)', runF33EachThreeFacts, { propagation: 'wave' });
 
+  reg(3883, 'logic', 'random_between/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved random_between',
+      function() { parseLogicBody('random_between(L, H, I) <- L = H'); },
+      "'random_between/3' is reserved",
+    );
+  });
+
+  reg(3884, 'logic', 'set_random + random_between deterministic (legacy)', function(h) {
+    const prog = parseLogicBody([
+      'roll(D) <- random_between(1, 6, D)',
+      'query q: set_random(42), roll(D)',
+    ].join('\n'));
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('dice 4', String(sols[0].D.value), '4');
+  });
+  reg(3885, 'logic', 'set_random + random_between deterministic (wave)', function(h) {
+    const prog = parseLogicBody([
+      'roll(D) <- random_between(1, 6, D)',
+      'query q: set_random(42), roll(D)',
+    ].join('\n'));
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('dice 4', String(sols[0].D.value), '4');
+  }, { propagation: 'wave' });
+
+  reg(3886, 'logic', 'random_between Low > High fails', function(h) {
+    const prog = parseLogicBody('query bad: random_between(6, 1, D)');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(3887, 'logic', 'random_between non-ground Low fails', function(h) {
+    const prog = parseLogicBody('query bad: random_between(L, 6, D)');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runLogicRandomSeedRepeat(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+:
+
+16wire a = .dice:query({ set_random(7), roll(D) }, D=number)
+16wire b = .dice:query({ set_random(7), roll(D) }, D=number)`;
+    session.run(src);
+    h.assert('same seq', session.getWire(null, 'a'), session.getWire(null, 'b'));
+  }
+
+  reg(3888, 'logic', 'set_random same seed same draw (legacy)', runLogicRandomSeedRepeat);
+  reg(3889, 'logic', 'set_random same seed same draw (wave)', runLogicRandomSeedRepeat, { propagation: 'wave' });
+
+  function runLogicWalkerAdvance(h, session) {
+    const src = `inline [logic] .walker:
+
+    roll(D) <- random_between(1, 6, D)
+
+    step(P, S0, S1) <-
+        roll(D),
+        S1 is S0 + D
+
+    query advance:
+        step(p1, 10, NewSquare)
+
+:
+
+comp [logic] .walkerLogic:
+    on: 1
+    randomSeed: 42
+    .walker { }
+:
+
+16wire newPos = 0000000000000000
+1wire trigger = 1
+
+.walkerLogic:{
+    advance >= newPos
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('newPos 14', session.getWire(interp, 'newPos'), '0000000000001110');
+  }
+
+  reg(3890, 'logic', 'comp randomSeed walker advance (legacy)', runLogicWalkerAdvance);
+  reg(3891, 'logic', 'comp randomSeed walker advance (wave)', runLogicWalkerAdvance, { propagation: 'wave' });
+
+  function runLogicCompRandomSeedLiteral(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+comp [logic] .diceLogic:
+    on: 1
+    randomSeed: 42
+    .dice { }
+:
+
+16wire die = 0000000000000000
+1wire trigger = 1
+
+.diceLogic:{
+    oneRoll >= die
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('die 4', session.getWire(interp, 'die'), '0000000000000100');
+  }
+
+  reg(3892, 'logic', 'comp randomSeed literal die (legacy)', runLogicCompRandomSeedLiteral);
+  reg(3893, 'logic', 'comp randomSeed literal die (wave)', runLogicCompRandomSeedLiteral, { propagation: 'wave' });
+
+  function runLogicCompRandomSeedWire(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+32wire seedWire = 00000000000000000000000000101010
+
+comp [logic] .diceLogic:
+    on: 1
+    randomSeed: seedWire
+    .dice { }
+:
+
+16wire die = 0000000000000000
+1wire trigger = 1
+
+.diceLogic:{
+    oneRoll >= die
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('die 4', session.getWire(interp, 'die'), '0000000000000100');
+  }
+
+  reg(3894, 'logic', 'comp randomSeed wire die (legacy)', runLogicCompRandomSeedWire);
+  reg(3895, 'logic', 'comp randomSeed wire die (wave)', runLogicCompRandomSeedWire, { propagation: 'wave' });
+
+  reg(3896, 'logic', 'set_random out of range fails', function(h) {
+    const prog = parseLogicBody('query bad: set_random(4294967296)');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(3897, 'logic', 'random_between out of range High fails', function(h) {
+    const prog = parseLogicBody('query bad: random_between(1, 2147483648, D)');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runLogicMemberRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    colors([red, green, blue])
+
+    query allColors:
+        colors(L),
+        member(C, L),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = allColors
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+    h.assert('blue', String(session.outIncludes(interp, 'blue')), 'true');
+  }
+
+  reg(3898, 'logic', 'member/2 regression post-random (legacy)', runLogicMemberRegression);
+  reg(3899, 'logic', 'member/2 regression post-random (wave)', runLogicMemberRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

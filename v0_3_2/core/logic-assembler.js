@@ -15,6 +15,8 @@ const LOGIC_BUILTIN_ATOM_PRED = 'atom';
 const LOGIC_BUILTIN_NUMBER_PRED = 'number';
 const LOGIC_BUILTIN_LIST_PRED = 'list';
 const LOGIC_BUILTIN_COMPOUND_PRED = 'compound';
+const LOGIC_BUILTIN_RANDOM_BETWEEN_PRED = 'random_between';
+const LOGIC_BUILTIN_SET_RANDOM_PRED = 'set_random';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -36,6 +38,8 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_NUMBER_PRED]: [1],
   [LOGIC_BUILTIN_LIST_PRED]: [1],
   [LOGIC_BUILTIN_COMPOUND_PRED]: [1],
+  [LOGIC_BUILTIN_RANDOM_BETWEEN_PRED]: [3],
+  [LOGIC_BUILTIN_SET_RANDOM_PRED]: [1],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -521,6 +525,12 @@ function logicReservedHeadError(predicate, arity) {
   if (LOGIC_BUILTIN_TYPE_PREDS.has(predicate) && arity === 1) {
     return `'${predicate}/1' is reserved — cannot define ${predicate} as fact or rule head`;
   }
+  if (predicate === LOGIC_BUILTIN_RANDOM_BETWEEN_PRED && arity === 3) {
+    return "'random_between/3' is reserved — cannot define random_between as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SET_RANDOM_PRED && arity === 1) {
+    return "'set_random/1' is reserved — cannot define set_random as fact or rule head";
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -595,6 +605,10 @@ function logicValidateProgram(prog) {
         logicError("'sort/2' is reserved — cannot define sort as constraint head", c.line);
       } else if (LOGIC_BUILTIN_TYPE_PREDS.has(pred) && arity === 1) {
         logicError(`'${pred}/1' is reserved — cannot define ${pred} as constraint head`, c.line);
+      } else if (pred === LOGIC_BUILTIN_RANDOM_BETWEEN_PRED && arity === 3) {
+        logicError("'random_between/3' is reserved — cannot define random_between as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SET_RANDOM_PRED && arity === 1) {
+        logicError("'set_random/1' is reserved — cannot define set_random as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

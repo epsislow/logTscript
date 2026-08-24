@@ -26,6 +26,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
 | **`compound/1`** | 1 | yes | no | Type test — argument is a compound (not a list) |
+| **`random_between/3`** | 3 | yes | yes (RNG) | Uniform random integer in `[Low, High]` inclusive |
+| **`set_random/1`** | 1 | yes | yes (RNG) | Reseed the global integer RNG |
 
 Type predicates filter bound terms — see [logic-value-types.md](logic-value-types.md).
 
@@ -536,3 +538,87 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints **`red`** then **`green`**. Switch to **`viaBuiltin`** for the same behaviour using the built-in **`member/2`**.
+
+---
+
+## `random_between/3` and `set_random/1`
+
+Integer random numbers for dice, board steps, and other game logic. **No floats** — only ground integers in the ranges below.
+
+| Builtin | Arguments | Range |
+|---------|-----------|-------|
+| **`set_random(+Seed)`** | **`Seed`** ground integer | **0 … 4294967295** (32-bit unsigned) |
+| **`random_between(+Low, +High, -Int)`** | **`Low`**, **`High`**, **`Int`** | **-2147483648 … 2147483647** (signed 32-bit) |
+
+**Rules:**
+
+- **`Low`**, **`High`**, and **`Seed`** must be **ground** integers in range — free variables or out-of-range values → **fail**.
+- **`Low` > `High`** → **fail** (not an engine error).
+- **`Int`** is bound to a uniform integer in **`[Low, High]`** inclusive.
+- **Backtracking:** re-satisfying the same **`random_between/3`** goal returns the **same** **`Int`** (SWI-style impure semantics).
+- **RNG scope:** one global generator per run. **`set_random/1`** in a query body resets it; a later **`set_random/1`** overrides an earlier seed in the same query.
+- **Reserved heads:** you cannot define **`random_between/3`** or **`set_random/1`** as fact, rule, or constraint heads.
+
+**Component seed:** optional **`randomSeed:`** on **`comp [logic]`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass, equivalent to **`set_random(Val)`** before mutations and queries. See [comp-logic.md — `randomSeed:`](comp-logic.md#component-attributes).
+
+### Example — dice with deterministic seed
+
+```logts-play
+inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        set_random(42),
+        roll(D),
+        show("die:", D)
+
+:
+
+comp [logic] .diceLogic:
+    on: 1
+    .dice { }
+:
+
+1wire trigger = 1
+
+.diceLogic:{
+    query = oneRoll
+    set = trigger
+}
+```
+
+**Load & Run** prints **`die: 4`** (fixed for seed **42** with the built-in generator).
+
+### Example — board step with `is/2` and comp redirect
+
+```logts-play
+inline [logic] .walker:
+
+    roll(D) <- random_between(1, 6, D)
+
+    step(P, S0, S1) <-
+        roll(D),
+        S1 is S0 + D
+
+    query advance:
+        step(p1, 10, NewSquare)
+
+:
+
+comp [logic] .walkerLogic:
+    on: 1
+    randomSeed: 42
+    .walker { }
+:
+
+16wire newPos = 0000000000000000
+1wire trigger = 1
+
+.walkerLogic:{
+    advance >= newPos
+    set = trigger
+}
+```
+
+**Load & Run** sets **`newPos`** to **14** (10 + die **4**). Random runs inside rule **`step/3`**; the script only triggers query **`advance`** via the comp redirect.

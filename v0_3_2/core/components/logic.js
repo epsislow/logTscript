@@ -271,6 +271,62 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return n;
   }
 
+  _parseRandomSeed(attributes, compName, ctx) {
+    const raw = attributes.randomSeed;
+    if (raw == null || raw === '') return null;
+    const s = String(raw).trim();
+    if (/^\d+$/.test(s)) {
+      const n = parseInt(s, 10);
+      const normFn = typeof logicNormalizeRandomSeed === 'function' ? logicNormalizeRandomSeed : null;
+      const seed = normFn ? normFn(n) : (n >>> 0);
+      if (seed == null) {
+        throw Error(`logic ${compName}: randomSeed literal out of range (0..4294967295)`);
+      }
+      return { kind: 'literal', value: seed };
+    }
+    if (!ctx.wires || !ctx.wires.has(s)) {
+      throw Error(`logic ${compName}: randomSeed wire '${s}' not found`);
+    }
+    const wire = ctx.wires.get(s);
+    const width = ctx.getBitWidth(wire.type);
+    if (width > 32) {
+      throw Error(`logic ${compName}: randomSeed wire '${s}' exceeds 32 bits (${width})`);
+    }
+    return { kind: 'wire', wireName: s, width };
+  }
+
+  _readRandomSeedFromWire(compName, spec, ctx) {
+    const bitsRaw = ctx.getWireEffectiveValue(spec.wireName) || '';
+    const width = spec.width || 32;
+    let bits = bitsRaw;
+    if (bits.length > width) bits = bits.slice(-width);
+    else if (bits.length < width) bits = bits.padStart(width, '0');
+    const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
+    if (!pinFn) throw Error('Logic engine is not loaded');
+    const term = pinFn(bits, 'number');
+    const normFn = typeof logicNormalizeRandomSeed === 'function' ? logicNormalizeRandomSeed : null;
+    const seed = normFn ? normFn(term.value) : (term.value >>> 0);
+    if (seed == null) {
+      throw Error(`logic ${compName}: randomSeed wire value out of range (0..4294967295)`);
+    }
+    return seed;
+  }
+
+  _applyCompRandomSeed(comp, compName, ctx) {
+    if (!comp || !comp.randomSeed) return;
+    const setFn = typeof logicSetRandomSeed === 'function' ? logicSetRandomSeed : null;
+    if (!setFn) throw Error('Logic engine is not loaded');
+    let seed;
+    if (comp.randomSeed.kind === 'literal') {
+      seed = comp.randomSeed.value;
+    } else {
+      seed = this._readRandomSeedFromWire(compName, comp.randomSeed, ctx);
+    }
+    if (!setFn(seed)) {
+      throw Error(`logic ${compName}: randomSeed value out of range`);
+    }
+  }
+
   _parseIndexFacts(attributes, compName) {
     if (attributes.indexFacts == null || attributes.indexFacts === '') return 1;
     const n = parseInt(String(attributes.indexFacts), 10);
@@ -330,6 +386,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         { name: 'indexFacts', value: '0 or 1 (default 1 — fact index on)' },
         { name: 'indexRebuild', value: 'full or delta (default full; ignored when indexFacts: 0)' },
         { name: 'data', value: 'overlay (default), static, or seed' },
+        { name: 'randomSeed', value: 'integer literal or number wire (≤32 bits) — reseed RNG at each exec pass' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -395,6 +452,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const indexFacts = this._parseIndexFacts(attributes, name);
     const indexRebuild = this._parseIndexRebuild(attributes, name, indexFacts);
     const dataMode = this._parseDataMode(attributes, name);
+    const randomSeed = this._parseRandomSeed(attributes, name, ctx);
 
     const validateStaticFn = typeof logicValidateStaticKnowledge === 'function'
       ? logicValidateStaticKnowledge : null;
@@ -480,6 +538,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       dataMode,
       indexFacts,
       indexRebuild,
+      randomSeed,
       factIndex: null,
       ruleClauses: ruleFn ? ruleFn(merged.clauses) : [],
       maxDepth,
@@ -819,6 +878,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
 
     const merged = resolveFn(inst, ctx.inlineInstances);
+    this._applyCompRandomSeed(comp, compName, ctx);
     this._applyMutations(comp, compName, mutationBlocks, ctx, merged);
     const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
     const buildOpts = this._buildDataOpts(comp);

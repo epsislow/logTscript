@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — F32 complete; **Faza 33** ready (mutation each expansion); F30 doc monopoly; F34 random 2+h.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — F33+F34 complete; F30 doc monopoly parallel.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -102,8 +102,8 @@ todos:
     content: "Faza 33: mutation each expansion — text|number|bool [list] each wire (postfix); zip rows; broadcast args fără each"
     status: completed
   - id: logic-random-2h
-    content: "2+h (draft F34): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
-    status: pending
+    content: "Faza 34 (2+h): random_between/3 + set_random/1 + randomSeed: comp — teste 3883–3899 legacy+wave"
+    status: completed
 isProject: false
 ---
 
@@ -1362,7 +1362,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 31** Query `;sel(i)` vector 1 coloană            | D217–D227 — extinde F29; `_` interzis la sel                                                         | **(completed)**                                   |
 | **Faza 32** Doc logic values + type predicates          | D228–D247 — doc + engine; `logic-value-types.md`                                                     | **(completed)**                                   |
 | **Faza 33** Mutation **each** expansion                 | D248–D260 — `text|number|bool [list] each wire` (postfix F25); zip rows; broadcast fără `each`       | **(completed)**                                   |
-| **Faza 34** Builtins random integer (**2+h**)           | draft — `random_between/3`; seed opțional                                                            | **(deferred)**                                    |
+| **Faza 34** Builtins random integer (**2+h**)           | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:` comp; fără float                              | **(completed)**        |
 
 
 ---
@@ -6542,13 +6542,13 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 30** doc mini-monopoly tutorial         | D200–D210 — `doc/mini-monopoly-logic.md`                    |
 | **Faza 31** `;sel(i)` vector 1 col             | D217–D227 — extinde F29                                     |
 | **Faza 32** doc logic values + type predicates | D228–D247 — `logic-value-types.md` + engine                          | **(completed)**          |
-| **Faza 33** mutation **each** expansion        | D248–D260 — `text each wire` / `text list each matrix`; zip în `logic { + / - }` + `.check` | **(ready-to-implement)** |
+| **Faza 33** mutation **each** expansion        | D248–D260 — zip rows în `logic { + / - }` + `.check`                 | **(completed)**          |
+| **Faza 34** builtins random (**2+h**)          | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:`            | **(ready-to-implement — următoarea fază)** |
 | **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
 | **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
 | ~~**Builtins listă** member/append~~           | ~~**2+d**~~                                                 |
 | **Liste avansate** dif/lazy/char               | **2+e** **(deferred)** — D136                               |
 | **Builtins listă suplimentare**                | **2+g** **(deferred)** — post-F27; catalog Prolog complet   |
-| **Faza 34** / **2+h** builtins random          | **(deferred)** — `random_between/3`; draft **F34**          |
 | `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
 | Constraint `#K (line L)` trace                 | **1+v** **(pause)**                                         |
 | POUT declarate comp                            | **1+k**                                                     |
@@ -6561,11 +6561,11 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 32~~ **(completed)** · ~~F25~~ **(completed)**
-2. **Faza 33** — mutation **each** expansion (D248–D260) — **ready-to-implement**
-3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel
+1. ~~Faza 0~~ → ~~Faza 33~~ **(completed)** · ~~F25~~ **(completed)**
+2. **Faza 34** — builtins random **2+h** (`random_between/3`, `set_random/1`) — **ready-to-implement — următoarea fază**
+3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel (F30 rămâne wire/counter până la F34 doc v2)
 4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a … 2+h** (random → draft **F34**)
+5. Apoi faze amânate **2+a … 2+g** (2+e, 2+f) — ~~**2+h**~~ **→ F34**
 
 ---
 
@@ -6617,10 +6617,10 @@ Tabel master **2+a … 2+h** — faze **amânate** discutate/planificate, distin
 | ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                       |
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                       |
 | ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23       |
-| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)     | **F34**    | F30 D203, Monopoly doc          |
+| ✅     | ~~**2+h**~~ | Builtins random (integer)   | **Promovat → Faza 34** — `random_between/3`, `set_random/1`; vezi [Faza 34](#faza-34--builtins-random-integer-2h--ready-to-implement) | **F34**    | F30 D203, Monopoly doc v2       |
 
 
-**Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24; **2+h** independent (util pentru Monopoly doc v2). **Faza 31** (`;sel(i)`) = fază normală, nu backlog.
+**Ordine recomandată (când se promovează):** ~~**2+h**~~ **→ F34 (următoarea)** · **F29** → **F25** done · **2+a** / **2+b** independent · ~~**2+d**~~ **→ F27** · **2+g** post-F27 · **2+e** / **2+f** independent.
 
 ### Note backlog 2+x — explicații
 
@@ -6776,84 +6776,9 @@ Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi 
 
 **Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
 
-#### **2+h** ⏳ — Builtins random (integer) **(draft F34)**
+#### ~~**2+h**~~ ✅ → **Faza 34** (builtins random integer)
 
-> **Sursă:** confirmare user 2026-08-22 — D203 F30 (Monopoly doc) folosește **wire/counter** pentru zar; **2+h** = fază amânată pentru random în engine.  
-> **Legat de:** [Faza 30](#faza-30--doc-tutorial-mini-monopoly-logic-doc-only--următoarea) (D203-A), `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` (no floats).
-
-**Context SWI-Prolog (referință — nu ISO standard):**
-
-
-| Predicate SWI                         | Semnificație                                                                          |
-| ------------------------------------- | ------------------------------------------------------------------------------------- |
-| `random(-Float)`                      | Float în `[0.0, 1.0)` — RNG global impur                                              |
-| `random_between(+Low, +High, -Int)`   | Integer uniform inclusiv `[Low, High]` — uzual pentru zar (`random_between(1, 6, D)`) |
-| `set_random(+Seed)`                   | Reseed explicit — reproducibilitate test                                              |
-| `getrand(+State)` / `setrand(+State)` | Salvare/restaurare stare RNG                                                          |
-
-
-Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP** — API similar, dar **nu** portabil ISO.
-
-**Semantica Prolog:** random-ul e **impur** (side effect pe generator global) — tratat ca **built-in de sistem**, nu relație logică pură. Backtracking **nu** „dă alt număr” pentru același apel deja satisfăcut (comportament SWI: re-satisfy același rezultat sau fail — de documentat la implementare).
-
-**LogTScript azi — ce NU avem:**
-
-
-| Topic                               | Stare                                                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `random/*` **în** `logic-engine.js` | **Lipsă** — zero builtins random                                                                        |
-| **Float în logic**                  | **Nu** — doar **integers** (atoms, liste, compounds) — vezi `inline-logic.md`: *Floats — Not supported* |
-| **Float pe wire la comp pin**       | `number` = unsigned integer binary, **nu** IEEE float                                                   |
-| **ISO Prolog standard random**      | N/A — nu există în standard                                                                             |
-
-
-**Implicație pentru MVP 2+h:** **nu** portăm `random/1` float din SWI; MVP propus = **doar integer**:
-
-
-| Predicate (draft)                | Arity | Rol                                                                     |
-| -------------------------------- | ----- | ----------------------------------------------------------------------- |
-| `random_between(Low, High, Int)` | 3     | `Low`/`High` ground integers; `Int` variabilă output — uniform inclusiv |
-| `set_random(Seed)`               | 1     | Opțional — seed pentru teste legacy+wave deterministe                   |
-
-
-**Out of scope 2+h (explicit):**
-
-- `random(Float)` cu float — **respins** (fără tip float în logic)
-- `random/1` **pe wire** — nu la MVP
-- Distribuții non-uniforme, `random_member/2`, crypto RNG
-
-**Exemplu țintă (post-2+h) — zar Monopoly:**
-
-```prolog
-roll(D) <- random_between(1, 6, D)
-```
-
-**Fișiere țintă (când se promovează → F34):**
-
-
-| Fișier                                                 | Rol                                                |
-| ------------------------------------------------------ | -------------------------------------------------- |
-| `[logic-engine.js](../v0_3_2/core/logic-engine.js)`    | `_solveRandomBetween`, RNG state (seed)            |
-| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiune `random_between/3`, impuritate, vs SWI    |
-| `inline-logic.md`                                      | Notă cross-link; floats rămân interzise            |
-| `tests/test_suite.js`                                  | **38xx+** legacy+wave; seed fix pentru determinism |
-| `mini-monopoly-logic.md`                               | Actualizare Phase C — zar în logic (doc v2)        |
-
-
-**Decizii draft (de confirmat la promovare — D211+):**
-
-
-| ID       | Propunere                                                         |
-| -------- | ----------------------------------------------------------------- |
-| **D211** | MVP = `random_between/3` integer only                             |
-| **D212** | `set_random/1` pentru teste — seed integer                        |
-| **D213** | Head `random_between/3` rezervat (builtin call only)              |
-| **D214** | **Fără** `random/1` float — aliniat la „no floats in logic”       |
-| **D215** | Documentare impuritate + interacțiune cu backtracking (SWI-style) |
-| **D216** | Opțional comp: seed wire la elaborare — **post-MVP**              |
-
-
-**Estimare:** mică–medie (~1 fază) — un builtin + seed + teste; **fără** float infrastructure.
+**Promovat 2026-08-24** — secțiune completă: [Faza 34 — builtins random](#faza-34--builtins-random-integer-2h--ready-to-implement). **Următoarea fază** de implementare engine.
 
 ### Note backlog — explicații (1+x)
 
@@ -7025,7 +6950,7 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
 | **Fără** `call/N` **/ goal din wire** | Nu poți „apelează predicatul X din atom” | Cod numeric/text pe wire + reguli `choice(P, 1)` …                                   |
 | **Fără** `findall`**/**`bagof`        | Meniu dinamic mai greu                   | Query cu vector bulk + soluții multiple pe `legalChoice`                             |
-| **Fără random în logic**              | Zar                                      | Wire/counter (F30 doc); **→ [2+h](#2h--builtins-random-integer)** / **F34** `random_between/3` |
+| **Fără random în logic**              | Zar                                      | Wire/counter (F30 doc v1); **→ F34** `random_between/3` |
 | **Fără persistență KB (1+o)**         | Save game                                | Re-RUN = reset; menționăm explicit                                                   |
 | **Fără UI list binding automată**     | Butoane ≠ soluții Prolog                 | Mapare manuală dip/switch → cod                                                      |
 | **Un singur** `set` **= un pass**     | Turn multi-step                          | Faze: `phase(move)`, `phase(choose)` ca facts                                        |
@@ -7040,14 +6965,14 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | **D200** | **Doc-only**               | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)**                                                                   |
 | **D201** | **Nume fișier**            | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)**                                                                  |
 | **D202** | **2 jucători, 8 casute**   | MVP suficient pentru tutorial — **(confirmed)**                                                                                                    |
-| **D203** | **Zar la F30**             | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F34**) |
+| **D203** | **Zar la F30**             | **A (confirmed)** — wire/counter extern în doc v1; **F34** aduce `random_between/3` în engine |
 | **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2)                                                                                      |
 | **D205** | **Turn advance**           | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1`                                                                                          |
 | **D206** | **Script final**           | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2)                                                                                      |
 | **D207** | **Blocuri intermediare**   | `logts-play` per fază A–E (runnable incremental)                                                                                                   |
 | **D208** | **Verificare**             | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next)                                                                    |
 | **D209** | **Out of scope doc**       | AI, negociere, carduri Chance, auction, 4+ jucători online                                                                                         |
-| **D210** | **Promovare viitoare**     | **2+h** random → **F34**; **F33** mutation each; **1+p** validate; doc Monopoly v2                                                |
+| **D210** | **Promovare viitoare**     | **F34** random **(următoarea)**; **F33** each done; **1+p** validate; doc Monopoly v2 cu zar logic post-F34       |
 
 
 ### Structură pagină (outline)
@@ -7821,3 +7746,195 @@ Medie — parser + expand + matrix row codec + teste (~2–3 zile). Nu atinge so
 ### Decizii F33 — status
 
 **Toate D248–D260 confirmed** — F33 **completed**.
+
+---
+
+## Faza 34 — Builtins random (integer) **2+h** **(completed)**
+
+> **Promovat:** 2026-08-24 — **2+h** → fază normală **F34** (nu mai e backlog amânat).  
+> **Sursă:** D203 F30 (Monopoly doc) — wire/counter pentru zar până acum; F34 aduce `random_between/3` în engine.  
+> **Extinde:** [Faza 27](#faza-27--builtins-listă--doc-logic-builtinsmd-completed) (`logic-builtins.md`), [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) (integers only). **Nu** float infrastructure.
+
+### Problemă (stare azi post-F33)
+
+
+| Topic | Comportament azi |
+| ----- | ---------------- |
+| Zar / dice în logic | ❌ — zero builtins `random/*` în `logic-engine.js` |
+| Float în logic | ❌ respins — doar integers ([inline-logic.md](../v0_3_2/doc/inline-logic.md)) |
+| F30 Monopoly doc | Wire/counter extern (D203-A) — workaround până la F34 |
+
+
+**Scop F34:** `random_between(Low, High, Int)` integer uniform inclusiv + `set_random(Seed)` pentru teste deterministe.
+
+### Referință SWI (nu ISO)
+
+
+| Predicate SWI | Semnificație |
+| ------------- | ------------ |
+| `random_between(+Low, +High, -Int)` | Integer uniform `[Low, High]` inclusiv |
+| `set_random(+Seed)` | Reseed — reproducibilitate |
+| `random(-Float)` | **Out of scope F34** — fără float în logic |
+
+
+**Impuritate:** side effect pe RNG global; backtracking **nu** generează alt număr la re-satisfy același apel (SWI-style — de implementat + documentat).
+
+### Decizii F34 **(confirmed user 2026-08-24)**
+
+
+| ID | Decizie | Alegere |
+| -- | ------- | ------- |
+| **D211** | **MVP predicate** | ✅ **A** — `random_between/3` **integer only** |
+| **D212** | **`set_random/1`** | ✅ **A** — seed integer; pentru teste legacy+wave deterministe |
+| **D213** | **Head rezervat** | ✅ **A** — `random_between/3`, `set_random/1` — builtin call only |
+| **D214** | **Fără float** | ✅ **A** — respins `random/1` float |
+| **D215** | **Backtracking** | ✅ **A** — re-satisfy același `Int`; altfel fail (SWI-style) |
+| **D216** | **Low > High** | ✅ **A** — **fail** goal (nu error engine) |
+| **D261** | **RNG scope** | ✅ **A** — global proces / sesiune test (un generator per run Node) |
+| **D262** | **Comp `randomSeed:`** | ✅ **In scope F34** — literal integer **sau** wire name pe header `comp [logic]` |
+| **D263** | **Când se aplică seed comp** | ✅ **A** — la **începutul fiecărui exec pass** al comp-ului (înainte de mutation / query / check), echivalent `set_random(Val)` |
+| **D264** | **Wire `randomSeed:`** | ✅ **A** — wire **number** cu **≤ 32 biți**; valoare citită **ground** la exec pass; decode **unsigned 32-bit** (`0 … 4294967295`) |
+| **D265** | **Interval `set_random(+Seed)`** | ✅ **A** — **Seed** ground integer **0 … 4294967295** (32-bit unsigned); în afara intervalului → **fail** goal |
+| **D266** | **Interval `random_between` Low/High/Int** | ✅ **A** — **Low**, **High**, **Int** ground integers **-2147483648 … 2147483647** (signed 32-bit); Low > High → fail (D216); out of range → **fail** goal |
+
+**D262 — Comp `randomSeed:` (F34):** atribut opțional pe header `comp [logic]` — **literal** sau **wire**:
+
+```logts
+comp [logic] .gameLogic:
+    on: 1
+    randomSeed: 42              /* literal — același interval ca set_random (D265) */
+    .game { }
+
+comp [logic] .gameLogic2:
+    on: 1
+    randomSeed: seedWire        /* wire number ≤ 32 biți — citit la exec pass (D263–D264) */
+    .game { }
+```
+
+**Ordine la exec pass:** (1) dacă `randomSeed:` prezent → `set_random(Val)`; (2) mutation block; (3) query redirects / check. **`set_random(N)` în goals** rămâne disponibil și **suprascrie** seed-ul comp dacă rulează după init pass (comportament SWI — ultimul `set_random` câștigă). Fără `randomSeed:` → RNG global neschimbat de comp (D261).
+
+**D265–D266 — de ce 32-bit:** aliniază seed wire (D264), PRNG seeding și range dice/board; **distinct** de limitele generale logic KB (vezi mai jos).
+
+### Exemple țintă
+
+**Exemplu simplu end-to-end — random în reguli + adunare (`is/2`) + comp** *(nu e Monopoly; arată pattern-ul complet: inline rules → query → comp redirect)*:
+
+```logts
+inline [logic] .walker:
+
+    roll(D) <- random_between(1, 6, D)
+
+    step(P, S0, S1) <-
+        roll(D),
+        S1 is S0 + D
+
+    query advance:
+        step(p1, 10, NewSquare)
+
+:
+
+comp [logic] .walkerLogic:
+    on: 1
+    .walker { }
+:
+
+16wire newPos = 0
+1wire trigger = 1
+
+.walkerLogic:{
+    advance >= newPos
+    set = trigger
+}
+```
+
+**Ce se întâmplă la `set = trigger`:** comp rulează query-ul **`advance`** → apelează regula **`step/3`** → **`roll(D)`** → builtin **`random_between(1, 6, D)`** → **`S1 is 10 + D`** → redirect scrie **`NewSquare`** pe **`newPos`**. Random **nu** e „doar în `.world:query`” — e în **body de regulă**; scriptul doar declanșează query-ul.
+
+**Doc F34:** acest bloc → **`logts-play`** în `logic-builtins.md` (Load & Run); test integrare comp **3889**.
+
+---
+
+**Regulă zar (fragment reutilizabil):**
+
+```prolog
+roll(D) <- random_between(1, 6, D)
+```
+
+**Query ad-hoc (fără comp):**
+
+```logts
+inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+1wire die = .dice:query({ roll(D) }, D=number)
+```
+
+**Test determinist:**
+
+```logts
+1wire ok = .dice:query({ set_random(42), roll(D), D = 4 })
+```
+
+(exemplu ilustrativ — valoarea exactă depinde de algoritm; testele fixează seed + așteptări)
+
+### Fișiere țintă
+
+
+| Fișier | Schimbare |
+| ------ | --------- |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `_solveRandomBetween`, `_solveSetRandom`, RNG module (seed); validare D265–D266 |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | Reserved heads `random_between`, `set_random` |
+| `[logic.js](../v0_3_2/core/components/logic.js)` | Parse `randomSeed:` (literal / wire); init seed la exec pass (D262–D264) |
+| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiuni EN + `logts-play` Load & Run |
+| `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | Cross-link; floats rămân interzise |
+| `tests/test_suite.js` | **3883+** legacy+wave |
+| `doc/mini-monopoly-logic.md` | **Opțional post-F34** — Phase C zar în logic (doc v2) |
+
+
+### Teste draft (checklist)
+
+
+| ID | Scenariu |
+| -- | -------- |
+| 3883 | parse / reserved head `random_between/3` |
+| 3884 | `random_between(1, 6, D)` — D în range, legacy+wave |
+| 3885 | `set_random(N)` — același seed → aceeași secvență |
+| 3886 | Low > High → fail |
+| 3887 | non-ground Low/High → fail |
+| 3888 | regresie — `member/2`, `is/2` neschimbate |
+| 3889 | comp **`advance >= newPos`** — exemplul `.walker` (roll + `is/2` + random_between) legacy+wave |
+| 3890 | `randomSeed: 42` pe comp — secvență deterministă fără `set_random` în query |
+| 3891 | `randomSeed: seedWire` (32-bit) — seed din wire la exec pass |
+| 3892 | `set_random` / `random_between` out of range → fail |
+
+
+### Livrabile F34
+
+- [x] Engine `random_between/3` + `set_random/1` + validare D265–D266
+- [x] Comp attribute **`randomSeed:`** (D262–D264) în `logic.js`
+- [x] Reserved heads + validare user clauses
+- [x] Teste **3883–3899** legacy+wave
+- [x] Doc EN `logic-builtins.md` + cross-links
+- [x] Regen doc-data + verify
+
+### Estimare
+
+Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
+
+### Decizii F34 — status
+
+**D211–D216, D261–D266 confirmed** — F34 **completed** (3061 tests, doc verify OK).
+
+#### Limite numere logic **azi** (pre-F34 random caps)
+
+| Zonă | Limită efectivă azi | Notă |
+| ---- | ------------------- | ---- |
+| **Literale integer în KB** (`42`, `-1`) | Fără cap documentat — `parseInt` în lexer; practic **±9007199254740991** (JS safe integer) | Fără validare explicită la parse |
+| **`is/2` aritmetică** | JS `+ - * /` pe numere logic | Overflow / float posibil la valori mari — nedeclarat |
+| **Wire number pe pin comp logic** | **8 … 64 biți** (default **64**), unsigned la decode (`logicPinToInputValue`) | `NUMBER_PIN_MAX_BITS = 64` |
+| **Random F34** | **D265–D266** — caps **32-bit** doar pentru `set_random` / `random_between` / `randomSeed:` | Nu schimbă cap global KB |

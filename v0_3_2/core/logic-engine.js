@@ -104,6 +104,54 @@ function logicPredicateKey(predicate, arity) {
   return `${predicate}/${arity}`;
 }
 
+const LOGIC_RANDOM_SEED_MIN = 0;
+const LOGIC_RANDOM_SEED_MAX = 4294967295;
+const LOGIC_RANDOM_INT_MIN = -2147483648;
+const LOGIC_RANDOM_INT_MAX = 2147483647;
+
+let logicRngNext = null;
+
+function logicMulberry32(seed) {
+  let a = seed >>> 0;
+  return function logicRngStep() {
+    a |= 0;
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function logicEnsureRng() {
+  if (!logicRngNext) logicRngNext = logicMulberry32(0);
+}
+
+function logicNormalizeRandomSeed(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n) || Math.trunc(n) !== n) return null;
+  if (n < LOGIC_RANDOM_SEED_MIN || n > LOGIC_RANDOM_SEED_MAX) return null;
+  return n >>> 0;
+}
+
+function logicNormalizeRandomInt(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n) || Math.trunc(n) !== n) return null;
+  if (n < LOGIC_RANDOM_INT_MIN || n > LOGIC_RANDOM_INT_MAX) return null;
+  return n;
+}
+
+function logicSetRandomSeed(seed) {
+  const n = logicNormalizeRandomSeed(seed);
+  if (n == null) return false;
+  logicRngNext = logicMulberry32(n);
+  return true;
+}
+
+function logicRandomIntBetween(low, high) {
+  logicEnsureRng();
+  const range = high - low + 1;
+  if (range <= 0) return null;
+  return low + Math.floor(logicRngNext() * range);
+}
+
 class LogicEngine {
   constructor(clauses, options) {
     const opts = options || {};
@@ -244,6 +292,12 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'compound' && g0.arity === 1) {
       return this._solveTypePred(g0.args[0], 'compound', rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'random_between' && g0.arity === 3) {
+      return this._solveRandomBetween(g0.args[0], g0.args[1], g0.args[2], g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'set_random' && g0.arity === 1) {
+      return this._solveSetRandom(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -317,6 +371,50 @@ class LogicEngine {
     }
     if (ld.kind === 'number') {
       if (ld.value !== val) return false;
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _solveSetRandom(seedTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const sd = logicDeref(seedTerm, env);
+    if (sd.kind !== 'number') return false;
+    if (!logicSetRandomSeed(sd.value)) return false;
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveRandomBetween(lowTerm, highTerm, intTerm, goalRef, rest, env, depth, onSuccess, onDepthExceeded) {
+    const lowD = logicDeref(lowTerm, env);
+    const highD = logicDeref(highTerm, env);
+    if (lowD.kind !== 'number' || highD.kind !== 'number') return false;
+    const lowVal = logicNormalizeRandomInt(lowD.value);
+    const highVal = logicNormalizeRandomInt(highD.value);
+    if (lowVal == null || highVal == null || lowVal > highVal) return false;
+
+    if (!env.impureRandom) env.impureRandom = new Map();
+    const cp = env.choiceDepth();
+    let slot = env.impureRandom.get(goalRef);
+    if (!slot || cp < slot.cp) {
+      slot = { cp, value: null };
+      env.impureRandom.set(goalRef, slot);
+    }
+
+    const intD = logicDeref(intTerm, env);
+    if (intD.kind === 'var') {
+      if (slot.value == null) {
+        slot.value = logicRandomIntBetween(lowVal, highVal);
+        if (slot.value == null) return false;
+      }
+      if (intD.name !== '_') env.bind(intD.name, { kind: 'number', value: slot.value });
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (intD.kind === 'number') {
+      if (slot.value == null) {
+        if (intD.value < lowVal || intD.value > highVal) return false;
+        slot.value = intD.value;
+      } else if (intD.value !== slot.value) {
+        return false;
+      }
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     return false;
@@ -2313,6 +2411,12 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicTermIsGround = logicTermIsGround;
   globalThis.logicTermsEqualGround = logicTermsEqualGround;
   globalThis.logicBindConstraintHead = logicBindConstraintHead;
+  globalThis.logicSetRandomSeed = logicSetRandomSeed;
+  globalThis.logicNormalizeRandomSeed = logicNormalizeRandomSeed;
+  globalThis.logicNormalizeRandomInt = logicNormalizeRandomInt;
+  globalThis.LOGIC_RANDOM_SEED_MAX = LOGIC_RANDOM_SEED_MAX;
+  globalThis.LOGIC_RANDOM_INT_MIN = LOGIC_RANDOM_INT_MIN;
+  globalThis.LOGIC_RANDOM_INT_MAX = LOGIC_RANDOM_INT_MAX;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -2369,5 +2473,11 @@ if (typeof module !== 'undefined' && module.exports) {
     logicCollectStaticGroundFacts,
     logicFactClauseKey,
     logicTermIsGround,
+    logicSetRandomSeed,
+    logicNormalizeRandomSeed,
+    logicNormalizeRandomInt,
+    LOGIC_RANDOM_SEED_MAX,
+    LOGIC_RANDOM_INT_MIN,
+    LOGIC_RANDOM_INT_MAX,
   };
 }

@@ -75,6 +75,7 @@ trebuie sa existe si teste pe wave nu doar legacy, am observat diferente la rula
 
 sa te asiguri ca toate testele trec cu success, si ca blocurile din paginiile de documentatie care au blocuri logic  ruleza cu success.
 
++fiind vorba de functii noi builtin ar trebuii sa stea in pagina logic-builtins
+
 
 nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
-

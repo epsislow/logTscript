@@ -80,6 +80,7 @@ comp [logic] .characterLogic:
 | **`indexFacts:`** | **`0`** or **`1`** (default **1**) — persistent fact index; **`0`** disables index |
 | **`indexRebuild:`** | **`full`** (default) or **`delta`** — index update after commit; ignored when **`indexFacts: 0`** |
 | **`data:`** | **`overlay`** (default), **`static`**, or **`seed`** — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
+| **`randomSeed:`** | Optional — integer literal **0 … 4294967295** or **number wire ≤ 32 bits**; reseeds RNG at each exec pass (before mutations/queries). See [logic-builtins.md — random](logic-builtins.md#random_between3-and-set_random1) |
 
 ### Program block bindings
 
