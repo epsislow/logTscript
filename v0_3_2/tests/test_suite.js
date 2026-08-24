@@ -43250,5 +43250,341 @@ comp [logic] .worldLogic:
   reg(3932, 'logic', 'F35b sort/2 regression (legacy)', runF35bSortRegression);
   reg(3933, 'logic', 'F35b sort/2 regression (wave)', runF35bSortRegression, { propagation: 'wave' });
 
+  reg(3934, 'logic', 'list_to_set/2 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved list_to_set',
+      function() { parseLogicBody('list_to_set(X, Y) <- X = Y'); },
+      "'list_to_set/2' is reserved",
+    );
+  });
+
+  reg(3935, 'logic', 'list_to_set/2 removes duplicates', function(h) {
+    const prog = parseLogicBody('query q: list_to_set([a, b, a, c, b], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first a', sols[0].S.head.name, 'a');
+    h.assert('second b', sols[0].S.tail.head.name, 'b');
+    h.assert('third c', sols[0].S.tail.tail.head.name, 'c');
+    h.assert('nil', sols[0].S.tail.tail.tail.nil, true);
+  });
+  reg(3936, 'logic', 'list_to_set/2 removes duplicates (wave)', function(h) {
+    const prog = parseLogicBody('query q: list_to_set([a, b, a, c, b], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first a', sols[0].S.head.name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(3937, 'logic', 'union/3 ordered without duplicates', function(h) {
+    const prog = parseLogicBody('query q: union([a, b], [b, c], U)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('a', sols[0].U.head.name, 'a');
+    h.assert('b', sols[0].U.tail.head.name, 'b');
+    h.assert('c', sols[0].U.tail.tail.head.name, 'c');
+  });
+  reg(3938, 'logic', 'union/3 ordered without duplicates (wave)', function(h) {
+    const prog = parseLogicBody('query q: union([a, b], [b, c], U)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('c', sols[0].U.tail.tail.head.name, 'c');
+  }, { propagation: 'wave' });
+
+  reg(3939, 'logic', 'intersection/3 common elements', function(h) {
+    const prog = parseLogicBody('query q: intersection([a, b, a], [a, c], I)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('only a', sols[0].I.head.name, 'a');
+    h.assert('nil', sols[0].I.tail.nil, true);
+  });
+  reg(3940, 'logic', 'intersection/3 common elements (wave)', function(h) {
+    const prog = parseLogicBody('query q: intersection([a, b, a], [a, c], I)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('only a', sols[0].I.head.name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(3941, 'logic', 'subtract/3 removes all matches', function(h) {
+    const prog = parseLogicBody('query q: subtract([a, b, c, b], [b], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('a', sols[0].R.head.name, 'a');
+    h.assert('c', sols[0].R.tail.head.name, 'c');
+    h.assert('nil', sols[0].R.tail.tail.nil, true);
+  });
+  reg(3942, 'logic', 'subtract/3 removes all matches (wave)', function(h) {
+    const prog = parseLogicBody('query q: subtract([a, b, c, b], [b], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('c', sols[0].R.tail.head.name, 'c');
+  }, { propagation: 'wave' });
+
+  reg(3943, 'logic', 'union/3 non-list fails', function(h) {
+    const prog = parseLogicBody('query bad: union([a], notList, U)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35cUnionComp(h, session) {
+    const src = `inline [logic] .tags:
+
+    query allTags:
+        union([red, green], [blue, green], All),
+        member(C, All),
+        show(C)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = allTags
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+    h.assert('blue', String(session.outIncludes(interp, 'blue')), 'true');
+  }
+
+  reg(3944, 'logic', 'F35c union comp query show (legacy)', runF35cUnionComp);
+  reg(3945, 'logic', 'F35c union comp query show (wave)', runF35cUnionComp, { propagation: 'wave' });
+
+  function runF35cListToSetComp(h, session) {
+    const src = `inline [logic] .palette:
+
+    query unique:
+        list_to_set([red, blue, red, green], U),
+        is_set(U),
+        show(U)
+
+:
+
+comp [logic] .paletteLogic:
+    on: 1
+    .palette { }
+:
+
+1wire trigger = 1
+
+.paletteLogic:{
+    query = unique
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('blue', String(session.outIncludes(interp, 'blue')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+  }
+
+  reg(3946, 'logic', 'F35c list_to_set is_set comp (legacy)', runF35cListToSetComp);
+  reg(3947, 'logic', 'F35c list_to_set is_set comp (wave)', runF35cListToSetComp, { propagation: 'wave' });
+
+  function runF35cIsSetRegression(h, session) {
+    const src = `inline [logic] .tags:
+
+    query check:
+        is_set([red, green, blue]),
+        show("unique tags")
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = check
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('unique', String(session.outIncludes(interp, 'unique tags')), 'true');
+  }
+
+  reg(3948, 'logic', 'F35c is_set regression (legacy)', runF35cIsSetRegression);
+  reg(3949, 'logic', 'F35c is_set regression (wave)', runF35cIsSetRegression, { propagation: 'wave' });
+
+  reg(3950, 'logic', 'numlist/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved numlist',
+      function() { parseLogicBody('numlist(A, B, C) <- A = B'); },
+      "'numlist/3' is reserved",
+    );
+  });
+
+  reg(3951, 'logic', 'numlist/3 consecutive integers', function(h) {
+    const prog = parseLogicBody('query q: numlist(1, 3, L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first', String(sols[0].L.head.value), '1');
+    h.assert('second', String(sols[0].L.tail.head.value), '2');
+    h.assert('third', String(sols[0].L.tail.tail.head.value), '3');
+  });
+  reg(3952, 'logic', 'numlist/3 consecutive integers (wave)', function(h) {
+    const prog = parseLogicBody('query q: numlist(1, 3, L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('third', String(sols[0].L.tail.tail.head.value), '3');
+  }, { propagation: 'wave' });
+
+  reg(3953, 'logic', 'numlist/3 from greater than to is empty', function(h) {
+    const prog = parseLogicBody('query q: numlist(3, 1, L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('empty', sols[0].L.nil, true);
+  });
+
+  reg(3954, 'logic', 'sum_list/2 adds numbers', function(h) {
+    const prog = parseLogicBody('query q: sum_list([1, 2, 3], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('sum 6', String(sols[0].S.value), '6');
+  });
+  reg(3955, 'logic', 'sum_list/2 adds numbers (wave)', function(h) {
+    const prog = parseLogicBody('query q: sum_list([1, 2, 3], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('sum 6', String(sols[0].S.value), '6');
+  }, { propagation: 'wave' });
+
+  reg(3956, 'logic', 'sum_list/2 empty list is zero', function(h) {
+    const prog = parseLogicBody('query q: sum_list([], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('zero', String(sols[0].S.value), '0');
+  });
+
+  reg(3957, 'logic', 'max_list/2 finds maximum', function(h) {
+    const prog = parseLogicBody('query q: max_list([2, 5, 1], M)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('max 5', String(sols[0].M.value), '5');
+  });
+  reg(3958, 'logic', 'max_list/2 finds maximum (wave)', function(h) {
+    const prog = parseLogicBody('query q: max_list([2, 5, 1], M)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('max 5', String(sols[0].M.value), '5');
+  }, { propagation: 'wave' });
+
+  reg(3959, 'logic', 'min_list/2 finds minimum', function(h) {
+    const prog = parseLogicBody('query q: min_list([2, 5, 1], M)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('min 1', String(sols[0].M.value), '1');
+  });
+  reg(3960, 'logic', 'min_list/2 finds minimum (wave)', function(h) {
+    const prog = parseLogicBody('query q: min_list([2, 5, 1], M)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('min 1', String(sols[0].M.value), '1');
+  }, { propagation: 'wave' });
+
+  reg(3961, 'logic', 'max_list/2 empty list fails', function(h) {
+    const prog = parseLogicBody('query bad: max_list([], M)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(3962, 'logic', 'sum_list/2 non-number element fails', function(h) {
+    const prog = parseLogicBody('query bad: sum_list([1, a], S)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35dNumlistSum(h, session) {
+    const src = `inline [logic] .stats:
+
+    query total:
+        numlist(1, 5, L),
+        sum_list(L, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sum 15', String(session.outIncludes(interp, '15')), 'true');
+  }
+
+  reg(3963, 'logic', 'F35d numlist sum_list comp (legacy)', runF35dNumlistSum);
+  reg(3964, 'logic', 'F35d numlist sum_list comp (wave)', runF35dNumlistSum, { propagation: 'wave' });
+
+  function runF35dMinMax(h, session) {
+    const src = `inline [logic] .stats:
+
+    query range:
+        numlist(2, 6, L),
+        max_list(L, Hi),
+        min_list(L, Lo),
+        show(Hi, Lo)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = range
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('max 6', String(session.outIncludes(interp, '6')), 'true');
+    h.assert('min 2', String(session.outIncludes(interp, '2')), 'true');
+  }
+
+  reg(3965, 'logic', 'F35d min max comp (legacy)', runF35dMinMax);
+  reg(3966, 'logic', 'F35d min max comp (wave)', runF35dMinMax, { propagation: 'wave' });
+
+  function runF35dIsRegression(h, session) {
+    const src = `inline [logic] .world:
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ X is 10 + 5, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('15', String(session.outIncludes(interp, '15')), 'true');
+  }
+
+  reg(3967, 'logic', 'F35d is/2 regression (legacy)', runF35dIsRegression);
+  reg(3968, 'logic', 'F35d is/2 regression (wave)', runF35dIsRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

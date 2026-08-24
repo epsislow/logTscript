@@ -328,6 +328,30 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'is_set' && g0.arity === 1) {
       return this._solveIsSet(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'list_to_set' && g0.arity === 2) {
+      return this._solveListToSet(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'union' && g0.arity === 3) {
+      return this._solveUnion(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'intersection' && g0.arity === 3) {
+      return this._solveIntersection(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'subtract' && g0.arity === 3) {
+      return this._solveSubtract(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'numlist' && g0.arity === 3) {
+      return this._solveNumlist(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'sum_list' && g0.arity === 2) {
+      return this._solveSumList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'max_list' && g0.arity === 2) {
+      return this._solveMaxList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'min_list' && g0.arity === 2) {
+      return this._solveMinList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -948,6 +972,126 @@ class LogicEngine {
     if (!logicListIsGroundSet(ld, env, this.table)) return false;
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
+
+  _solveListToSet(list, set, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const setList = logicListToSetGround(ld, env, this.table);
+    if (setList == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(set, setList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveUnion(list1, list2, union, rest, env, depth, onSuccess, onDepthExceeded) {
+    const d1 = logicDeref(list1, env);
+    const d2 = logicDeref(list2, env);
+    if (d1.kind !== 'list' || !logicListIsGroundClosed(d1, env)) return false;
+    if (d2.kind !== 'list' || !logicListIsGroundClosed(d2, env)) return false;
+    const unionList = logicUnionGround(d1, d2, env, this.table);
+    if (unionList == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(union, unionList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveIntersection(list1, list2, inter, rest, env, depth, onSuccess, onDepthExceeded) {
+    const d1 = logicDeref(list1, env);
+    const d2 = logicDeref(list2, env);
+    if (d1.kind !== 'list' || !logicListIsGroundClosed(d1, env)) return false;
+    if (d2.kind !== 'list' || !logicListIsGroundClosed(d2, env)) return false;
+    const interList = logicIntersectionGround(d1, d2, env, this.table);
+    if (interList == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(inter, interList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveSubtract(list1, list2, remain, rest, env, depth, onSuccess, onDepthExceeded) {
+    const d1 = logicDeref(list1, env);
+    const d2 = logicDeref(list2, env);
+    if (d1.kind !== 'list' || !logicListIsGroundClosed(d1, env)) return false;
+    if (d2.kind !== 'list' || !logicListIsGroundClosed(d2, env)) return false;
+    const remainList = logicSubtractGround(d1, d2, env, this.table);
+    if (remainList == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(remain, remainList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveNumlist(fromTerm, toTerm, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const fromD = logicDeref(fromTerm, env);
+    const toD = logicDeref(toTerm, env);
+    if (fromD.kind !== 'number' || toD.kind !== 'number') return false;
+    if (!Number.isInteger(fromD.value) || !Number.isInteger(toD.value)) return false;
+    const built = logicBuildNumlist(fromD.value, toD.value);
+    if (built == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(list, built, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveSumList(list, sum, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const total = logicSumGroundNumberList(ld, env);
+    if (total == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(sum, { kind: 'number', value: total }, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveMaxList(list, max, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const nums = logicGroundNumberList(ld, env);
+    if (nums == null || nums.length === 0) return false;
+    let m = nums[0];
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] > m) m = nums[i];
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(max, { kind: 'number', value: m }, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveMinList(list, min, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const nums = logicGroundNumberList(ld, env);
+    if (nums == null || nums.length === 0) return false;
+    let m = nums[0];
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] < m) m = nums[i];
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(min, { kind: 'number', value: m }, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
 }
 
 function logicRenameApartClause(clause, idRef) {
@@ -1357,6 +1501,90 @@ function logicListIsGroundSet(listD, env, table) {
     }
   }
   return true;
+}
+
+function logicTermInGroundList(term, list, env, table) {
+  for (const e of list) {
+    if (logicCompareTerms(term, e, env, table) === 0) return true;
+  }
+  return false;
+}
+
+function logicListToSetGround(listD, env, table) {
+  const elems = logicGroundListToArray(listD, env);
+  if (elems == null) return null;
+  const out = [];
+  for (const e of elems) {
+    if (!logicTermInGroundList(e, out, env, table)) out.push(e);
+  }
+  return logicArrayToList(out);
+}
+
+function logicUnionGround(list1D, list2D, env, table) {
+  const e1 = logicGroundListToArray(list1D, env);
+  const e2 = logicGroundListToArray(list2D, env);
+  if (e1 == null || e2 == null) return null;
+  const out = [];
+  for (const e of e1) {
+    if (!logicTermInGroundList(e, out, env, table)) out.push(e);
+  }
+  for (const e of e2) {
+    if (!logicTermInGroundList(e, out, env, table)) out.push(e);
+  }
+  return logicArrayToList(out);
+}
+
+function logicIntersectionGround(list1D, list2D, env, table) {
+  const e1 = logicGroundListToArray(list1D, env);
+  const e2 = logicGroundListToArray(list2D, env);
+  if (e1 == null || e2 == null) return null;
+  const out = [];
+  for (const e of e1) {
+    if (logicTermInGroundList(e, e2, env, table) && !logicTermInGroundList(e, out, env, table)) {
+      out.push(e);
+    }
+  }
+  return logicArrayToList(out);
+}
+
+function logicGroundNumberList(listD, env) {
+  const elems = logicGroundListToArray(listD, env);
+  if (elems == null) return null;
+  const nums = [];
+  for (const e of elems) {
+    if (e.kind !== 'number' || !Number.isInteger(e.value)) return null;
+    nums.push(e.value);
+  }
+  return nums;
+}
+
+function logicBuildNumlist(from, to) {
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  if (from > to) return { kind: 'list', nil: true };
+  const count = to - from + 1;
+  if (count > 1024) return null;
+  const elems = [];
+  for (let n = from; n <= to; n++) elems.push({ kind: 'number', value: n });
+  return logicArrayToList(elems);
+}
+
+function logicSumGroundNumberList(listD, env) {
+  const nums = logicGroundNumberList(listD, env);
+  if (nums == null) return null;
+  let total = 0;
+  for (const n of nums) total += n;
+  return total;
+}
+
+function logicSubtractGround(list1D, list2D, env, table) {
+  const e1 = logicGroundListToArray(list1D, env);
+  const e2 = logicGroundListToArray(list2D, env);
+  if (e1 == null || e2 == null) return null;
+  const out = [];
+  for (const e of e1) {
+    if (!logicTermInGroundList(e, e2, env, table)) out.push(e);
+  }
+  return logicArrayToList(out);
 }
 
 function logicEvalNumber(term, env, table) {

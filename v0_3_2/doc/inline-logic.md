@@ -19,7 +19,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Debug output** | Built-in **`show/N`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | `[H|T]`, `[_, X, _]`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | `functor(Arg, …)`, nested `prop(N, rents(…))` — see [Compound terms](#compound-terms) |
-| **List builtins** | **`member/2`**, **`append/3`**, **`length/2`**, **`last/2`**, **`select/3`**, **`selectchk/3`**, **`flatten/2`**, **`same_length/2`**, **`reverse/2`**, **`sort/2`**, **`keysort/2`**, **`msort/2`**, **`prefix/2`**, **`suffix/2`**, **`is_set/1`**, **`nth0/3`**, **`nth1/3`** — [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **`member/2`**, **`append/3`**, **`length/2`**, **`last/2`**, **`select/3`**, **`selectchk/3`**, **`flatten/2`**, **`same_length/2`**, **`reverse/2`**, **`sort/2`**, **`keysort/2`**, **`msort/2`**, **`prefix/2`**, **`suffix/2`**, **`is_set/1`**, **`list_to_set/2`**, **`union/3`**, **`intersection/3`**, **`subtract/3`**, **`numlist/3`**, **`sum_list/2`**, **`max_list/2`**, **`min_list/2`**, **`nth0/3`**, **`nth1/3`** — [logic-builtins.md](logic-builtins.md) |
 | **Random builtins** | **`random_between/3`**, **`set_random/1`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
 | **Value kinds** | **`atom`**, **`number`**, **`list`**, **`compound`**; type tests **`atom/1`** … **`compound/1`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
@@ -102,7 +102,7 @@ Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **`
 
 **Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as `X = [X | _]` fail ). A bare list term cannot stand alone as a goal — bind it with `=` or pass it to a predicate.
 
-List literals accept at most **1024** comma-separated elements. Built-in list predicates (**`member/2`**, **`append/3`**, **`length/2`**, **`last/2`**, **`select/3`**, **`selectchk/3`**, **`flatten/2`**, **`same_length/2`**, **`reverse/2`**, **`sort/2`**, **`keysort/2`**, **`msort/2`**, **`prefix/2`**, **`suffix/2`**, **`is_set/1`**, **`nth0/3`**, **`nth1/3`**) are documented in [logic-builtins.md](logic-builtins.md).
+List literals accept at most **1024** comma-separated elements. Built-in list predicates (**`member/2`**, **`append/3`**, **`length/2`**, **`last/2`**, **`select/3`**, **`selectchk/3`**, **`flatten/2`**, **`same_length/2`**, **`reverse/2`**, **`sort/2`**, **`keysort/2`**, **`msort/2`**, **`prefix/2`**, **`suffix/2`**, **`is_set/1`**, **`list_to_set/2`**, **`union/3`**, **`intersection/3`**, **`subtract/3`**, **`numlist/3`**, **`sum_list/2`**, **`max_list/2`**, **`min_list/2`**, **`nth0/3`**, **`nth1/3`**) are documented in [logic-builtins.md](logic-builtins.md).
 
 **`show/N`** prints ground lists as `[a, b, c]` and partial lists as `[a, b|Rest]` when the tail is still a variable.
 

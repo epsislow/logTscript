@@ -27,6 +27,14 @@ const LOGIC_BUILTIN_MSORT_PRED = 'msort';
 const LOGIC_BUILTIN_PREFIX_PRED = 'prefix';
 const LOGIC_BUILTIN_SUFFIX_PRED = 'suffix';
 const LOGIC_BUILTIN_IS_SET_PRED = 'is_set';
+const LOGIC_BUILTIN_LIST_TO_SET_PRED = 'list_to_set';
+const LOGIC_BUILTIN_UNION_PRED = 'union';
+const LOGIC_BUILTIN_INTERSECTION_PRED = 'intersection';
+const LOGIC_BUILTIN_SUBTRACT_PRED = 'subtract';
+const LOGIC_BUILTIN_NUMLIST_PRED = 'numlist';
+const LOGIC_BUILTIN_SUM_LIST_PRED = 'sum_list';
+const LOGIC_BUILTIN_MAX_LIST_PRED = 'max_list';
+const LOGIC_BUILTIN_MIN_LIST_PRED = 'min_list';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -60,6 +68,14 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_PREFIX_PRED]: [2],
   [LOGIC_BUILTIN_SUFFIX_PRED]: [2],
   [LOGIC_BUILTIN_IS_SET_PRED]: [1],
+  [LOGIC_BUILTIN_LIST_TO_SET_PRED]: [2],
+  [LOGIC_BUILTIN_UNION_PRED]: [3],
+  [LOGIC_BUILTIN_INTERSECTION_PRED]: [3],
+  [LOGIC_BUILTIN_SUBTRACT_PRED]: [3],
+  [LOGIC_BUILTIN_NUMLIST_PRED]: [3],
+  [LOGIC_BUILTIN_SUM_LIST_PRED]: [2],
+  [LOGIC_BUILTIN_MAX_LIST_PRED]: [2],
+  [LOGIC_BUILTIN_MIN_LIST_PRED]: [2],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -581,6 +597,30 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_IS_SET_PRED && arity === 1) {
     return "'is_set/1' is reserved — cannot define is_set as fact or rule head";
   }
+  if (predicate === LOGIC_BUILTIN_LIST_TO_SET_PRED && arity === 2) {
+    return "'list_to_set/2' is reserved — cannot define list_to_set as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_UNION_PRED && arity === 3) {
+    return "'union/3' is reserved — cannot define union as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_INTERSECTION_PRED && arity === 3) {
+    return "'intersection/3' is reserved — cannot define intersection as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SUBTRACT_PRED && arity === 3) {
+    return "'subtract/3' is reserved — cannot define subtract as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_NUMLIST_PRED && arity === 3) {
+    return "'numlist/3' is reserved — cannot define numlist as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SUM_LIST_PRED && arity === 2) {
+    return "'sum_list/2' is reserved — cannot define sum_list as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_MAX_LIST_PRED && arity === 2) {
+    return "'max_list/2' is reserved — cannot define max_list as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_MIN_LIST_PRED && arity === 2) {
+    return "'min_list/2' is reserved — cannot define min_list as fact or rule head";
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -679,6 +719,22 @@ function logicValidateProgram(prog) {
         logicError("'suffix/2' is reserved — cannot define suffix as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_IS_SET_PRED && arity === 1) {
         logicError("'is_set/1' is reserved — cannot define is_set as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_LIST_TO_SET_PRED && arity === 2) {
+        logicError("'list_to_set/2' is reserved — cannot define list_to_set as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_UNION_PRED && arity === 3) {
+        logicError("'union/3' is reserved — cannot define union as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_INTERSECTION_PRED && arity === 3) {
+        logicError("'intersection/3' is reserved — cannot define intersection as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SUBTRACT_PRED && arity === 3) {
+        logicError("'subtract/3' is reserved — cannot define subtract as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_NUMLIST_PRED && arity === 3) {
+        logicError("'numlist/3' is reserved — cannot define numlist as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SUM_LIST_PRED && arity === 2) {
+        logicError("'sum_list/2' is reserved — cannot define sum_list as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_MAX_LIST_PRED && arity === 2) {
+        logicError("'max_list/2' is reserved — cannot define max_list as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_MIN_LIST_PRED && arity === 2) {
+        logicError("'min_list/2' is reserved — cannot define min_list as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

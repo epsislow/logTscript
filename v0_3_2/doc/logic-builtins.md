@@ -32,6 +32,14 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`prefix/2`** | 2 | yes | no | List prefix with backtracking |
 | **`suffix/2`** | 2 | yes | no | List suffix with backtracking |
 | **`is_set/1`** | 1 | yes | no | True when list has no duplicate elements |
+| **`list_to_set/2`** | 2 | yes | no | Remove duplicates; keep first occurrence order |
+| **`union/3`** | 3 | yes | no | Ordered union without duplicates |
+| **`intersection/3`** | 3 | yes | no | Common elements; order from first list |
+| **`subtract/3`** | 3 | yes | no | First list minus elements in second list |
+| **`numlist/3`** | 3 | yes | no | Consecutive integers from **From** through **To** inclusive |
+| **`sum_list/2`** | 2 | yes | no | Sum of ground integer list (**`[]` → 0**) |
+| **`max_list/2`** | 2 | yes | no | Maximum in non-empty ground integer list |
+| **`min_list/2`** | 2 | yes | no | Minimum in non-empty ground integer list |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -918,6 +926,292 @@ comp [logic] .tagLogic:
 ```
 
 **Load & Run** prints **`unique tags`**.
+
+---
+
+## `list_to_set/2`
+
+**`list_to_set(List, Set)`** — **`Set`** is **`List`** with duplicate elements removed. **First occurrence order** is preserved.
+
+| Call | Behaviour |
+|------|-----------|
+| `list_to_set([a, b, a, c], S)` | `S = [a, b, c]` |
+| Non-list or partial list | **Fail** |
+
+**Reserved head:** you cannot define **`list_to_set/2`** as fact, rule, or constraint head.
+
+### Example — unique palette
+
+```logts-play
+inline [logic] .palette:
+
+    query unique:
+        list_to_set([red, blue, red, green], U),
+        is_set(U),
+        show(U)
+
+:
+
+comp [logic] .paletteLogic:
+    on: 1
+    .palette { }
+:
+
+1wire trigger = 1
+
+.paletteLogic:{
+    query = unique
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[red, blue, green]`**.
+
+---
+
+## `union/3`
+
+**`union(List1, List2, Union)`** — **`Union`** contains every element from **`List1`** and **`List2`**, **without duplicates**. Order: all from **`List1`** (first occurrence), then new elements from **`List2`**.
+
+| Call | Behaviour |
+|------|-----------|
+| `union([a, b], [b, c], U)` | `U = [a, b, c]` |
+| Non-list argument | **Fail** |
+
+**Reserved head:** you cannot define **`union/3`** as fact, rule, or constraint head.
+
+### Example — merge tag lists
+
+```logts-play
+inline [logic] .tags:
+
+    query allTags:
+        union([red, green], [blue, green], All),
+        member(C, All),
+        show(C)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = allTags
+    set = trigger
+}
+```
+
+**Load & Run** prints **`red`**, **`green`**, **`blue`** (one line each).
+
+---
+
+## `intersection/3`
+
+**`intersection(List1, List2, Intersection)`** — **`Intersection`** is the ordered list of elements in **both** lists. Order follows **`List1`**; each common element appears **once**.
+
+| Call | Behaviour |
+|------|-----------|
+| `intersection([a, b, a], [a, c], I)` | `I = [a]` |
+| No common elements | `I = []` |
+| Non-list argument | **Fail** |
+
+**Reserved head:** you cannot define **`intersection/3`** as fact, rule, or constraint head.
+
+### Example — shared permissions
+
+```logts-play
+inline [logic] .access:
+
+    query shared:
+        intersection([read, write, admin], [read, execute, admin], Shared),
+        show(Shared)
+
+:
+
+comp [logic] .accessLogic:
+    on: 1
+    .access { }
+:
+
+1wire trigger = 1
+
+.accessLogic:{
+    query = shared
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[read, admin]`**.
+
+---
+
+## `subtract/3`
+
+**`subtract(List1, List2, Remainder)`** — **`Remainder`** is **`List1`** with every element that occurs in **`List2`** removed. Order of **`List1`** is preserved.
+
+| Call | Behaviour |
+|------|-----------|
+| `subtract([a, b, c, b], [b], R)` | `R = [a, c]` |
+| Non-list argument | **Fail** |
+
+**Reserved head:** you cannot define **`subtract/3`** as fact, rule, or constraint head.
+
+### Example — remove blocked items
+
+```logts-play
+inline [logic] .filter:
+
+    query allowed:
+        subtract([apple, pear, apple, plum], [pear], Allowed),
+        show(Allowed)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = allowed
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[apple, apple, plum]`**.
+
+---
+
+## `numlist/3`
+
+**`numlist(From, To, List)`** — **`List`** is the consecutive integers from **`From`** through **`To`** inclusive. **`From`** and **`To`** must be **ground** integers.
+
+| Call | Behaviour |
+|------|-----------|
+| `numlist(1, 3, L)` | `L = [1, 2, 3]` |
+| `numlist(3, 1, L)` | `L = []` |
+| Range longer than **1024** elements | **Fail** |
+| Non-integer bound | **Fail** |
+
+**Reserved head:** you cannot define **`numlist/3`** as fact, rule, or constraint head.
+
+### Example — build a range
+
+```logts-play
+inline [logic] .stats:
+
+    query range:
+        numlist(2, 6, L),
+        show(L)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = range
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[2, 3, 4, 5, 6]`**.
+
+---
+
+## `sum_list/2`
+
+**`sum_list(List, Sum)`** — **`Sum`** is the arithmetic sum of all elements in **`List`**. Every element must be a **ground** integer.
+
+| Call | Behaviour |
+|------|-----------|
+| `sum_list([1, 2, 3], S)` | `S = 6` |
+| `sum_list([], S)` | `S = 0` |
+| Non-number element | **Fail** |
+
+**Reserved head:** you cannot define **`sum_list/2`** as fact, rule, or constraint head.
+
+### Example — total of 1..5
+
+```logts-play
+inline [logic] .stats:
+
+    query total:
+        numlist(1, 5, L),
+        sum_list(L, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}
+```
+
+**Load & Run** prints **`15`**.
+
+---
+
+## `max_list/2` and `min_list/2`
+
+**`max_list(List, Max)`** — **`Max`** is the largest integer in non-empty **`List`**.
+
+**`min_list(List, Min)`** — **`Min`** is the smallest integer in non-empty **`List`**.
+
+| Call | Behaviour |
+|------|-----------|
+| `max_list([2, 5, 1], M)` | `M = 5` |
+| `min_list([2, 5, 1], M)` | `M = 1` |
+| `max_list([], M)` or `min_list([], M)` | **Fail** |
+| Non-number element | **Fail** |
+
+**Reserved heads:** you cannot define **`max_list/2`** or **`min_list/2`** as fact, rule, or constraint heads.
+
+### Example — range bounds
+
+```logts-play
+inline [logic] .stats:
+
+    query bounds:
+        numlist(2, 6, L),
+        max_list(L, Hi),
+        min_list(L, Lo),
+        show(Hi, Lo)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = bounds
+    set = trigger
+}
+```
+
+**Load & Run** prints **`6 2`**.
 
 ---
 
