@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — F33+F34 complete; F30 doc monopoly parallel.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — F33+F34 complete; **F35a…F35j** (2+g catalog); F30 doc parallel.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -104,6 +104,39 @@ todos:
   - id: logic-random-2h
     content: "Faza 34 (2+h): random_between/3 + set_random/1 + randomSeed: comp — teste 3883–3899 legacy+wave"
     status: completed
+  - id: logic-list-extra-2g
+    content: "Faza 35 (2+g): builtins listă — catalog complet în subfaze F35a…F35j"
+    status: pending
+  - id: logic-list-35a
+    content: "F35a: last/2, select/3, selectchk/3, flatten/2, same_length/2 — teste 3900+"
+    status: pending
+  - id: logic-list-35b
+    content: "F35b: keysort/2, msort/2, prefix/2, suffix/2, is_set/1 — teste 3910+"
+    status: pending
+  - id: logic-list-35c
+    content: "F35c: list_to_set/2, union/3, intersection/3, subtract/3 — teste 3920+"
+    status: pending
+  - id: logic-list-35d
+    content: "F35d: numlist/3, sum_list/2, max_list/2, min_list/2 — teste 3930+"
+    status: pending
+  - id: logic-list-35e
+    content: "F35e: sublist/3, permutation/2, combinations/3 — teste 3940+"
+    status: pending
+  - id: logic-list-35f
+    content: "F35f: call/1 infra + include/3, exclude/3, partition/4, convlist/3 — teste 3950+"
+    status: pending
+  - id: logic-list-35g
+    content: "F35g: maplist/2, maplist/3 — teste 3960+"
+    status: pending
+  - id: logic-list-35h
+    content: "F35h: foldl/4, foldl/5 — teste 3970+"
+    status: pending
+  - id: logic-list-35i
+    content: "F35i: findall/3, bagof/3, setof/3 — teste 3980+"
+    status: pending
+  - id: logic-list-35j
+    content: "F35j: length/2 generativ + nth1/4 — teste 3990+"
+    status: pending
 isProject: false
 ---
 
@@ -1363,6 +1396,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 32** Doc logic values + type predicates          | D228–D247 — doc + engine; `logic-value-types.md`                                                     | **(completed)**                                   |
 | **Faza 33** Mutation **each** expansion                 | D248–D260 — `text|number|bool [list] each wire` (postfix F25); zip rows; broadcast fără `each`       | **(completed)**                                   |
 | **Faza 34** Builtins random integer (**2+h**)           | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:` comp; fără float                              | **(completed)**        |
+| **Faza 35** Builtins listă suplimentare (**2+g**)       | **F35a…F35j** — catalog complet 2+g în 10 subfaze echilibrate (~2–4 zile/subfază)                                     | **(ready — F35a următoarea)** |
 
 
 ---
@@ -6543,12 +6577,13 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 31** `;sel(i)` vector 1 col             | D217–D227 — extinde F29                                     |
 | **Faza 32** doc logic values + type predicates | D228–D247 — `logic-value-types.md` + engine                          | **(completed)**          |
 | **Faza 33** mutation **each** expansion        | D248–D260 — zip rows în `logic { + / - }` + `.check`                 | **(completed)**          |
-| **Faza 34** builtins random (**2+h**)          | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:`            | **(ready-to-implement — următoarea fază)** |
+| **Faza 34** builtins random (**2+h**)          | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:`            | **(completed)** |
+| **Faza 35** builtins listă supl. (**2+g**)     | **F35a…F35j** — catalog complet; vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g) | **(ready — F35a următoarea)** |
 | **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
 | **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
-| ~~**Builtins listă** member/append~~           | ~~**2+d**~~                                                 |
+| ~~**Builtins listă** member/append~~           | ~~**2+d**~~ → **F27**                                       |
 | **Liste avansate** dif/lazy/char               | **2+e** **(deferred)** — D136                               |
-| **Builtins listă suplimentare**                | **2+g** **(deferred)** — post-F27; catalog Prolog complet   |
+| ~~**Builtins listă supl.**~~                   | ~~**2+g**~~ → **F35a…F35j** (catalog complet)               |
 | `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
 | Constraint `#K (line L)` trace                 | **1+v** **(pause)**                                         |
 | POUT declarate comp                            | **1+k**                                                     |
@@ -6561,11 +6596,11 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 33~~ **(completed)** · ~~F25~~ **(completed)**
-2. **Faza 34** — builtins random **2+h** (`random_between/3`, `set_random/1`) — **ready-to-implement — următoarea fază**
-3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel (F30 rămâne wire/counter până la F34 doc v2)
+1. ~~Faza 0~~ → ~~Faza 34~~ **(completed)**
+2. **Faza 35** — builtins listă **2+g** — **F35a** first, apoi **F35b…F35j** secvențial (catalog complet)
+3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel
 4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a … 2+g** (2+e, 2+f) — ~~**2+h**~~ **→ F34**
+5. Apoi faze amânate **2+a … 2+f** · ~~**2+g**~~ → **F35a…F35j**
 
 ---
 
@@ -6616,11 +6651,11 @@ Tabel master **2+a … 2+h** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+d**~~ | Builtins listă (core)       | `member/2` ****`append/3` ****`length/2` ****`reverse/2` ****`sort/2`                                          | **F27**    | D137, D160–D168, F22            |
 | ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                       |
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                       |
-| ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23       |
-| ✅     | ~~**2+h**~~ | Builtins random (integer)   | **Promovat → Faza 34** — `random_between/3`, `set_random/1`; vezi [Faza 34](#faza-34--builtins-random-integer-2h--ready-to-implement) | **F34**    | F30 D203, Monopoly doc v2       |
+| ✅     | ~~**2+g**~~ | Builtins listă suplimentare | **Promovat → Faza 35** — catalog complet **F35a…F35j** (10 subfaze); vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g) | **F35**    | **2+d**, **F27**, F22–F23       |
+| ✅     | ~~**2+h**~~ | Builtins random (integer)   | **Promovat → Faza 34** — `random_between/3`, `set_random/1`, `randomSeed:`; vezi [Faza 34](#faza-34--builtins-random-integer-2h--completed) | **F34**    | F30 D203, Monopoly doc v2       |
 
 
-**Ordine recomandată (când se promovează):** ~~**2+h**~~ **→ F34 (următoarea)** · **F29** → **F25** done · **2+a** / **2+b** independent · ~~**2+d**~~ **→ F27** · **2+g** post-F27 · **2+e** / **2+f** independent.
+**Ordine recomandată:** ~~**2+h**~~ **→ F34 done** · **2+g** **→ F35a…F35j** · **F35a** first · **F35f** după **F35a–e** (infra `call/1`) · **2+a** / **2+b** · **2+e** / **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -6654,10 +6689,12 @@ Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Pro
 
 **Amânat post-F24 MVP.** F24 livrează `!` în query/reguli + **interzice** `!` în `\+ (…)` (D149-A). Cazul `\+ (p(X), !)` — cut **inner contorizat** în subdovada negată (spec ISO/SWI: taie doar choice point-urile din paranteză, nu pe cele din query/regulă exterioară) — **elaborare + implementare** când promovăm **2+f**. Până atunci: parse/validate → **elaboration error** clar (ex. `cut is not allowed inside \\+ (...)`).
 
-#### **2+g** ⏳ — Builtins listă suplimentare (post-**F27**)
+#### **2+g** ✅ → **Faza 35** (builtins listă suplimentare)
+
+**Promovat 2026-08-24** — vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g). Implementare secvențială **F35a → F35j**.
 
 **Legat de:** **2+d** (promovat → **F27**), **F22** (liste), **F23** (`nth0`/`nth1`).  
-**Scop:** la promovare, adăugare incrementală de predicate Prolog pentru liste **peste** pachetul core **F27** (`member`, `append`, `length`, `reverse`, `sort`). Fiecare subset devine fază proprie (draft **F28+**) cu decizii D169+ — același pattern: head rezervat, engine builtin, teste legacy+wave, doc EN.
+**Scop:** predicate Prolog pentru liste **peste** pachetul core **F27** — același pattern: head rezervat, engine builtin, teste legacy+wave, doc EN.
 
 **Deja livrat / planificat (nu e 2+g):**
 
@@ -6757,28 +6794,20 @@ Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Pro
 
 ---
 
-##### Ce merită după **F27** (prioritate la promovare **2+g**)
+##### Ce merită după **F27** — **→ acoperit de F35a…F35j**
 
-Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi mici**, câte o fază:
-
-
-| Prioritate | Predicate                         | Motiv                                                     |
-| ---------- | --------------------------------- | --------------------------------------------------------- |
-| **1**      | `keysort/2`                       | Sortare pe perechi `(Key, Val)` — foarte uzual            |
-| **2**      | `last/2`, `select/3`              | Acces / eliminare simplă, implementare mică               |
-| **3**      | `list_to_set/2`, `union/3`        | Mulțimi pe liste ground                                   |
-| **4**      | `numlist/3`, `sum_list/2`         | Aritmetică / generare range                               |
-| **5**      | `flatten/2`                       | Liste imbricate în facts                                  |
-| **6**      | `include/3`, `maplist/2`          | Necesită **call/N** sau eval goal — complexitate mai mare |
-| **7**      | `findall/3`, `bagof/3`, `setof/3` | Model execution + scope vars — fază separată mare         |
-| **8**      | `permutation/2`, `msort/2`        | Nice-to-have, rar critic                                  |
+Ordinea veche de priorități este mapată în [harta subfaze F35](#hartă-subfaze--efort-echilibrat). Implementare secvențială **F35a → … → F35j**.
 
 
-**Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
+**Notă:** la promovare — head rezervat, teste **39xx+** legacy+wave, doc EN per subfază. **2+g** → **[Faza 35](#faza-35--builtins-listă-suplimentare-2g)** (**F35a…F35j**).
+
+#### ~~**2+g**~~ ✅ → **Faza 35** (builtins listă suplimentare)
+
+**Promovat 2026-08-24** — catalog complet împărțit în **F35a…F35j** — vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g). **Următoarea:** **F35a**.
 
 #### ~~**2+h**~~ ✅ → **Faza 34** (builtins random integer)
 
-**Promovat 2026-08-24** — secțiune completă: [Faza 34 — builtins random](#faza-34--builtins-random-integer-2h--ready-to-implement). **Următoarea fază** de implementare engine.
+**Promovat 2026-08-24** — secțiune completă: [Faza 34 — builtins random](#faza-34--builtins-random-integer-2h--completed). **Completed.**
 
 ### Note backlog — explicații (1+x)
 
@@ -6972,7 +7001,7 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | **D207** | **Blocuri intermediare**   | `logts-play` per fază A–E (runnable incremental)                                                                                                   |
 | **D208** | **Verificare**             | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next)                                                                    |
 | **D209** | **Out of scope doc**       | AI, negociere, carduri Chance, auction, 4+ jucători online                                                                                         |
-| **D210** | **Promovare viitoare**     | **F34** random **(următoarea)**; **F33** each done; **1+p** validate; doc Monopoly v2 cu zar logic post-F34       |
+| **D210** | **Promovare viitoare**     | **F35a** list builtins **(următoarea)**; **F34** done; catalog 2+g în **F35a…F35j**       |
 
 
 ### Structură pagină (outline)
@@ -7247,7 +7276,7 @@ compound person(j,25)
 | **D246** | Fără builtin `bool/1` | ✅ |
 | **D247** | `number` = kind logic **și** bindType wire (roluri separate) | ✅ |
 
-> **Notă:** **F33** = **mutation each expansion** (zip rows în `logic { + / - }`). **F34** = random **2+h**. Type predicates `atom/1`…`compound/1` → **F32** **(completed)**.
+> **Notă:** **F33** each **(completed)** · **F34** random **(completed)** · **F35** = **2+g** catalog complet în **F35a…F35j** **(F35a următoarea)** · **F32** type preds **(completed)**.
 
 ---
 
@@ -7938,3 +7967,287 @@ Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
 | **`is/2` aritmetică** | JS `+ - * /` pe numere logic | Overflow / float posibil la valori mari — nedeclarat |
 | **Wire number pe pin comp logic** | **8 … 64 biți** (default **64**), unsigned la decode (`logicPinToInputValue`) | `NUMBER_PIN_MAX_BITS = 64` |
 | **Random F34** | **D265–D266** — caps **32-bit** doar pentru `set_random` / `random_between` / `randomSeed:` | Nu schimbă cap global KB |
+
+---
+
+## Faza 35 — Builtins listă suplimentare **2+g** **(ready — F35a următoarea)**
+
+> **Promovat:** 2026-08-24 — **2+g** → **F35** cu **catalog complet** împărțit în **10 subfaze** (**F35a…F35j**), efort echilibrat (~**2–4 zile** / subfază).  
+> **Extinde:** [Faza 27](#faza-27--builtins-listă--doc-logic-builtinsmd-completed), [Faza 22](#faza-22--liste-prolog--completed).  
+> **Pattern per subfază:** head rezervat · engine builtin · teste **39xx+** legacy+wave · doc EN `logic-builtins.md` · regen verify.
+
+### Problemă (stare azi post-F34)
+
+| Topic | Comportament azi |
+| ----- | ---------------- |
+| Catalog 2+g (~34 predicate / arități) | ❌ — lipsesc din engine |
+| List builtins core (F27) | ✅ `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2` |
+| Higher-order (`include`, `maplist`, `findall`) | ❌ — necesită infra **`call/1`** (F35f+) |
+
+### Hartă subfaze — efort echilibrat
+
+| Subfază | Predicate (count) | Efort est. | Teste ID | Notă |
+| ------- | ----------------- | ---------- | -------- | ---- |
+| **[F35a](#f35a--acces--eliminare)** | 5 | ~2 zile | 3900–3909 | Mic–mediu; backtracking `select/3` |
+| **[F35b](#f35b--sortare--structură)** | 5 | ~2 zile | 3910–3919 | Mediu; extinde `sort/2` |
+| **[F35c](#f35c--mulțimi-pe-liste)** | 4 | ~2 zile | 3920–3929 | Mediu; ops pe mulțimi ground |
+| **[F35d](#f35d--range--agregare-numerică)** | 4 | ~1.5 zile | 3930–3939 | Mic–mediu; `is/2` + liste numere |
+| **[F35e](#f35e--sublistă--combinatorică)** | 3 | ~2.5 zile | 3940–3949 | Mediu; backtracking combinatorial |
+| **[F35f](#f35f--call1--filtrare)** | 4 + infra | ~3 zile | 3950–3959 | **Mare** — introduce **`call/1`** |
+| **[F35g](#f35g--maplist)** | 2 arități | ~2 zile | 3960–3969 | Mediu; depinde F35f |
+| **[F35h](#f35h--foldl)** | 2 arități | ~2 zile | 3970–3979 | Mediu; depinde F35f |
+| **[F35i](#f35i--findall--bagof--setof)** | 3 | ~4 zile | 3980–3994 | **Mare** — scope vars + impuritate |
+| **[F35j](#f35j--avansate-swi)** | 2 | ~2 zile | 3995–4004 | Mediu; extinde `length/2`, `nth1/3` |
+
+**Total:** ~**23 zile** engine (secvențial) · **~38 predicate-arități** · acoperă **tot catalogul 2+g** exceptând itemi respinși (vezi mai jos).
+
+**Ordine obligatorie:** **F35a → b → c → d → e** (independente de `call/1`) · apoi **F35f** (infra) · **F35g → h** · **F35i** · **F35j** (poate paralel cu i dacă echipă separată).
+
+### Catalog — acoperire completă vs exclus
+
+| Grup catalog [2+g](#catalog-complet-prolog-swi--iso-style--referință-2g) | Subfază | Status plan |
+| ------------------------------------------------------------------------ | ------- | ----------- |
+| `last/2`, `select/3`, `selectchk/3`, `flatten/2`, `same_length/2` | **F35a** | ✅ inclus |
+| `keysort/2`, `msort/2`, `prefix/2`, `suffix/2`, `is_set/1` | **F35b** | ✅ inclus |
+| `list_to_set/2`, `union/3`, `intersection/3`, `subtract/3` | **F35c** | ✅ inclus |
+| `numlist/3`, `sum_list/2`, `max_list/2`, `min_list/2` | **F35d** | ✅ inclus |
+| `sublist/3`, `permutation/2`, `combinations/3` | **F35e** | ✅ inclus |
+| `include/3`, `exclude/3`, `partition/4`, `convlist/3` | **F35f** | ✅ inclus |
+| `maplist/2`, `maplist/3` | **F35g** | ✅ inclus |
+| `foldl/4`, `foldl/5` | **F35h** | ✅ inclus |
+| `findall/3`, `bagof/3`, `setof/3` | **F35i** | ✅ inclus |
+| `length/2` generativ, `nth1/4` | **F35j** | ✅ inclus |
+| `append/2` dif-list | — | ❌ **→ 2+e** (dif-list, nu builtin library) |
+
+---
+
+### F35a — Acces & eliminare **(ready-to-implement — următoarea)**
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`last/2`** | Ultimul element; listă vidă → fail |
+| **`select/3`** | `Rest` = listă fără o apariție a lui `X`; backtracking SWI |
+| **`selectchk/3`** | Ca `select/3`, prima apariție, determinist |
+| **`flatten/2`** | Aplatizare recursivă; atom/number rămân în Flat |
+| **`same_length/2`** | Aceeași lungime (ground sau bind `N`) |
+
+**Teste draft:** 3900 reserved `select/3` · 3901 `select(b,[a,b,c],R)` · 3902 backtracking · 3903 `selectchk/3` · 3904 `flatten/2` · 3905 `last/2` · 3906 `same_length/2` · 3907 non-list fail · 3908 regresie F27
+
+**Doc:** exemple `select` + `flatten` (deck / zones) — vezi secțiunea exemple veche F35.
+
+---
+
+### F35b — Sortare & structură
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`keysort/2`** | Sortează după Key al perechii `Key-Value` (compound) |
+| **`msort/2`** | Sort stabil — păstrează ordinea egalelor |
+| **`prefix/2`** | `Prefix` este prefix al listei (backtracking) |
+| **`suffix/2`** | `Suffix` este suffix al listei (backtracking) |
+| **`is_set/1`** | Adevărat dacă lista nu are duplicate |
+
+**Teste draft:** 3910–3918 · regresie `sort/2` 3919
+
+---
+
+### F35c — Mulțimi pe liste
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`list_to_set/2`** | Elimină duplicate, păstrează prima apariție |
+| **`union/3`** | Reuniune fără duplicate |
+| **`intersection/3`** | Intersecție |
+| **`subtract/3`** | Scade din L1 elementele din L2 |
+
+**Teste draft:** 3920–3928 · regresie 3929
+
+---
+
+### F35d — Range & agregare numerică
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`numlist/3`** | `numlist(From, To, L)` — integers consecutivi inclusiv |
+| **`sum_list/2`** | Suma elementelor numerice ground |
+| **`max_list/2`** | Maxim într-o listă de numere ground |
+| **`min_list/2`** | Minim într-o listă de numere ground |
+
+**Teste draft:** 3930–3938 · regresie `is/2` 3939
+
+---
+
+### F35e — Sublistă & combinatorică
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`sublist/3`** | `Sub` apare consecutiv în `List` (backtracking) |
+| **`permutation/2`** | Toate permutările (backtracking) |
+| **`combinations/3`** | Submulțimi de lungime fixă `K` (backtracking) |
+
+**Teste draft:** 3940–3948 · regresie 3949
+
+---
+
+### F35f — `call/1` infra + filtrare
+
+**Prerequisite pentru F35g, F35h.**
+
+| Livrabil | Detaliu |
+| -------- | ------- |
+| **`call/1`** (infra) | Evaluează goal ca meta-call (predicate ground sau partial ground) |
+| **`include/3`** | `include(Goal, List, Included)` — păstrează elem. unde Goal reușește |
+| **`exclude/3`** | Inversul lui `include/3` |
+| **`partition/4`** | `partition(Goal, List, Included, Excluded)` |
+| **`convlist/3`** | Map + elimină eșecurile (ca maplist + filter) |
+
+**Decizie draft D275:** `call/1` — Goal trebuie să fie **callable** (compound ground head sau template cu elem ca `X`); **nu** cut prin `call` la MVP F35f.
+
+**Teste draft:** 3950 infra `call/1` · 3951–3957 include/exclude/partition/convlist · 3958–3959 regresie
+
+---
+
+### F35g — maplist
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`maplist/2`** | `maplist(Goal, List)` — Goal cu 1 arg liber |
+| **`maplist/3`** | `maplist(Goal, List1, List2)` — Goal cu 2 args liberi |
+
+**Depinde:** F35f (`call/1`).
+
+**Teste draft:** 3960–3968 · regresie 3969
+
+---
+
+### F35h — foldl
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`foldl/4`** | `foldl(Goal, List, V0, V)` — fold stânga cu acumulator |
+| **`foldl/5`** | Variantă cu 2 liste paralele (SWI) |
+
+**Depinde:** F35f.
+
+**Teste draft:** 3970–3978 · regresie 3979
+
+---
+
+### F35i — findall / bagof / setof
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`findall/3`** | `findall(Template, Goal, List)` — toate soluțiile |
+| **`bagof/3`** | Ca findall + respectă existențial vars din Goal |
+| **`setof/3`** | Soluții unice, sortate (ca bagof + set) |
+
+**Cea mai mare subfază** — impuritate, scope vars, șabloane.
+
+**Decizii draft D276–D278:** Template cu vars libere · bagof/setof fail dacă zero soluții (SWI) · findall returnează `[]`.
+
+**Teste draft:** 3980–3993 · regresie 3994
+
+---
+
+### F35j — Avansate SWI
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`length/2` generativ** | Extinde F27: `length(L, N)` cu `N` ground → generează listă de N variabile anonime |
+| **`nth1/4`** | `nth1(I, List, Elem, Rest)` — elem + rest listă după index 1-based |
+
+**Notă:** `append/2` dif-list rămâne **2+e**, nu F35j.
+
+**Teste draft:** 3995–4003 · regresie `length/2`/`nth1/3` 4004
+
+---
+
+### Decizii umbrella F35 **(draft — confirmare la F35a)**
+
+| ID | Decizie | Propunere |
+| -- | ------- | --------- |
+| **D267** | **Scope total** | ✅ **A** — catalog complet 2+g în **F35a…F35j** (except `append/2` dif-list → 2+e) |
+| **D268** | **Head rezervat** | ✅ **A** — toate predicatele noi — builtin call only |
+| **D269** | **`select/3` backtracking** | ✅ **A** — SWI (F35a) |
+| **D270** | **`selectchk/3`** | ✅ **A** — determinist, prima apariție (F35a) |
+| **D271** | **`flatten/2`** | ✅ **A** — recursiv complet (F35a) |
+| **D272** | **`last/2`** | ✅ **A** — listă nevidă; generativ out of scope MVP (F35a) |
+| **D273** | **`keysort/2`** | ✅ **A** — sort după Key compound (F35b) |
+| **D274** | **Non-list arg** | ✅ **A** — list arg non-list → fail (toate subfazele) |
+| **D275** | **`call/1` infra** | ✅ **A** — F35f; meta-call controlat, fără cut cross-call MVP |
+| **D276** | **`findall/3` template** | ✅ **A** — vars libere din Template capturate per soluție (F35i) |
+| **D277** | **`bagof/3` / `setof/3` zero sol** | ✅ **A** — **fail** (SWI) |
+| **D278** | **`length/2` generativ** | ✅ **A** — doar `N` ground, listă de `_` vars (F35j) |
+
+### Fișiere țintă (toate subfazele)
+
+| Fișier | Schimbare |
+| ------ | --------- |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `_solve*` per builtin + `call/1` (F35f) |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | Reserved heads + constraint/fact/rule |
+| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiuni EN + `logts-play` per subfază |
+| `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | Cross-link list builtins extinse |
+| `tests/test_suite.js` | **3900–4004+** legacy+wave |
+
+### Exemple țintă F35a (doc + teste)
+
+**`select/3` — extrage din pachet:**
+
+```logts-play
+inline [logic] .deck:
+
+    query draw:
+        select(Card, [go, jail, chance, go], Rest),
+        show("drew:", Card),
+        show("rest:", Rest)
+
+:
+
+1wire ok = .deck:query({ draw })
+```
+
+**`flatten/2` — zone imbricate:**
+
+```logts-play
+inline [logic] .map:
+
+    zones([floor1, [roomA, roomB], floor2])
+
+    query rooms:
+        zones(Z),
+        flatten(Z, Flat),
+        member(R, Flat),
+        show(R)
+
+:
+
+comp [logic] .mapLogic:
+    on: 1
+    .map { }
+:
+
+1wire trigger = 1
+
+.mapLogic:{
+    query = rooms
+    set = trigger
+}
+```
+
+### Livrabile F35 (umbrella)
+
+- [ ] **F35a** — 5 builtins acces/eliminare
+- [ ] **F35b** — 5 builtins sort/structură
+- [ ] **F35c** — 4 builtins mulțimi
+- [ ] **F35d** — 4 builtins range/agregare
+- [ ] **F35e** — 3 builtins combinatorică
+- [ ] **F35f** — `call/1` + 4 builtins filtrare
+- [ ] **F35g** — maplist/2, maplist/3
+- [ ] **F35h** — foldl/4, foldl/5
+- [ ] **F35i** — findall, bagof, setof
+- [ ] **F35j** — length generativ + nth1/4
+- [ ] Doc EN complet + verify după fiecare subfază
+
+### Decizii F35 — status
+
+**D267–D278 draft** — **F35a ready-to-implement** (confirmare user la start).
