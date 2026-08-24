@@ -43586,5 +43586,175 @@ comp [logic] .statsLogic:
   reg(3967, 'logic', 'F35d is/2 regression (legacy)', runF35dIsRegression);
   reg(3968, 'logic', 'F35d is/2 regression (wave)', runF35dIsRegression, { propagation: 'wave' });
 
+  reg(3969, 'logic', 'sublist/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved sublist',
+      function() { parseLogicBody('sublist(A, B, C) <- A = B'); },
+      "'sublist/3' is reserved",
+    );
+  });
+
+  reg(3970, 'logic', 'sublist/3 match with rest tail', function(h) {
+    const prog = parseLogicBody('query q: sublist([b], [a, b, c], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('rest c', sols[0].R.head.name, 'c');
+    h.assert('rest nil', sols[0].R.tail.nil, true);
+  });
+  reg(3971, 'logic', 'sublist/3 match with rest tail (wave)', function(h) {
+    const prog = parseLogicBody('query q: sublist([b], [a, b, c], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('rest c', sols[0].R.head.name, 'c');
+  }, { propagation: 'wave' });
+
+  reg(3972, 'logic', 'sublist/3 backtracking two matches', function(h) {
+    const prog = parseLogicBody('query q: sublist([a], [x, a, y, a], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('two sols', String(sols.length), '2');
+  });
+
+  reg(3973, 'logic', 'permutation/2 three elements six solutions', function(h) {
+    const prog = parseLogicBody('query q: permutation(P, [a, b, c])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('six sols', String(sols.length), '6');
+  });
+  reg(3974, 'logic', 'permutation/2 three elements (wave)', function(h) {
+    const prog = parseLogicBody('query q: permutation(P, [a, b, c])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('six sols', String(sols.length), '6');
+  }, { propagation: 'wave' });
+
+  reg(3975, 'logic', 'permutation/2 ground check succeeds', function(h) {
+    const ok = parseLogicBody('query ok: permutation([b, a], [a, b])');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+    const bad = parseLogicBody('query bad: permutation([a, a], [a, b])');
+    h.assert('bad', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+
+  reg(3976, 'logic', 'combinations/3 choose two of three', function(h) {
+    const prog = parseLogicBody('query q: combinations(2, [a, b, c], C)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('three sols', String(sols.length), '3');
+  });
+  reg(3977, 'logic', 'combinations/3 choose two of three (wave)', function(h) {
+    const prog = parseLogicBody('query q: combinations(2, [a, b, c], C)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('three sols', String(sols.length), '3');
+  }, { propagation: 'wave' });
+
+  reg(3978, 'logic', 'combinations/3 zero picks empty list', function(h) {
+    const prog = parseLogicBody('query q: combinations(0, [a, b], C)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('empty', sols[0].C.nil, true);
+  });
+
+  reg(3979, 'logic', 'combinations/3 k greater than length fails', function(h) {
+    const prog = parseLogicBody('query bad: combinations(3, [a, b], C)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(3980, 'logic', 'sublist/3 non-list fails', function(h) {
+    const prog = parseLogicBody('query bad: sublist(X, notList, R)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35eComboComp(h, session) {
+    const src = `inline [logic] .pick:
+
+    query pairs:
+        combinations(2, [red, green, blue], Pair),
+        show(Pair)
+
+:
+
+comp [logic] .pickLogic:
+    on: 1
+    .pick { }
+:
+
+1wire trigger = 1
+
+.pickLogic:{
+    query = pairs
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red green', String(session.outIncludes(interp, '[red, green]')), 'true');
+    h.assert('red blue', String(session.outIncludes(interp, '[red, blue]')), 'true');
+    h.assert('green blue', String(session.outIncludes(interp, '[green, blue]')), 'true');
+  }
+
+  reg(3981, 'logic', 'F35e combinations comp show (legacy)', runF35eComboComp);
+  reg(3982, 'logic', 'F35e combinations comp show (wave)', runF35eComboComp, { propagation: 'wave' });
+
+  function runF35ePermComp(h, session) {
+    const src = `inline [logic] .deck:
+
+    query orders:
+        permutation(Order, [a, b]),
+        show(Order)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = orders
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('a b', String(session.outIncludes(interp, '[a, b]')), 'true');
+    h.assert('b a', String(session.outIncludes(interp, '[b, a]')), 'true');
+  }
+
+  reg(3983, 'logic', 'F35e permutation comp show (legacy)', runF35ePermComp);
+  reg(3984, 'logic', 'F35e permutation comp show (wave)', runF35ePermComp, { propagation: 'wave' });
+
+  function runF35eNumlistRegression(h, session) {
+    const src = `inline [logic] .stats:
+
+    query total:
+        numlist(1, 5, L),
+        sum_list(L, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sum 15', String(session.outIncludes(interp, '15')), 'true');
+  }
+
+  reg(3985, 'logic', 'F35e numlist regression (legacy)', runF35eNumlistRegression);
+  reg(3986, 'logic', 'F35e numlist regression (wave)', runF35eNumlistRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

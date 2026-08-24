@@ -40,6 +40,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`sum_list/2`** | 2 | yes | no | Sum of ground integer list (**`[]` → 0**) |
 | **`max_list/2`** | 2 | yes | no | Maximum in non-empty ground integer list |
 | **`min_list/2`** | 2 | yes | no | Minimum in non-empty ground integer list |
+| **`sublist/3`** | 3 | yes | no | Contiguous subsequence; **Rest** is tail after match |
+| **`permutation/2`** | 2 | yes | no | All permutations with backtracking |
+| **`combinations/3`** | 3 | yes | no | **K**-element subsets; order from source list |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -1212,6 +1215,128 @@ comp [logic] .statsLogic:
 ```
 
 **Load & Run** prints **`6 2`**.
+
+---
+
+## `sublist/3`
+
+**`sublist(Sub, List, Rest)`** — **`Sub`** is a **contiguous** subsequence of **`List`**. **`Rest`** is the remainder of **`List`** after the matched **`Sub`** ends. Backtracks over all match positions (including empty **`Sub`**).
+
+| Call | Behaviour |
+|------|-----------|
+| `sublist([b], [a, b, c], R)` | `R = [c]` |
+| `sublist([a], [x, a, y, a], R)` | Two solutions |
+| Non-list **`List`** | **Fail** |
+
+**Reserved head:** you cannot define **`sublist/3`** as fact, rule, or constraint head.
+
+### Example — find a segment
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        sublist([go, stop], [wait, go, stop, go], R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[go]`** (the tail after **`[go, stop]`**).
+
+---
+
+## `permutation/2`
+
+**`permutation(Perm, List)`** — **`Perm`** is a permutation of **`List`**. With a **ground** **`List`**, backtracks over all orderings. With both arguments **ground**, succeeds when they are permutations of each other.
+
+| Call | Behaviour |
+|------|-----------|
+| `permutation(P, [a, b, c])` | Six solutions |
+| `permutation([b, a], [a, b])` | Succeeds |
+| `permutation([a, a], [a, b])` | **Fail** |
+| Open or partial list | **Fail** when generating |
+
+**Reserved head:** you cannot define **`permutation/2`** as fact, rule, or constraint head.
+
+### Example — reorder two cards
+
+```logts-play
+inline [logic] .deck:
+
+    query orders:
+        permutation(Order, [a, b]),
+        show(Order)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = orders
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[a, b]`** and **`[b, a]`**.
+
+---
+
+## `combinations/3`
+
+**`combinations(K, List, Comb)`** — **`Comb`** is a **K**-element sublist of **`List`** with elements in the **same order** as **`List`**. **`K`** must be a **ground** non-negative integer.
+
+| Call | Behaviour |
+|------|-----------|
+| `combinations(2, [a, b, c], C)` | Three solutions: `[a, b]`, `[a, c]`, `[b, c]` |
+| `combinations(0, L, C)` | `C = []` |
+| `combinations(3, [a, b], C)` | **Fail** |
+| Non-list **`List`** | **Fail** |
+
+**Reserved head:** you cannot define **`combinations/3`** as fact, rule, or constraint head.
+
+### Example — pick pairs of colors
+
+```logts-play
+inline [logic] .pick:
+
+    query pairs:
+        combinations(2, [red, green, blue], Pair),
+        show(Pair)
+
+:
+
+comp [logic] .pickLogic:
+    on: 1
+    .pick { }
+:
+
+1wire trigger = 1
+
+.pickLogic:{
+    query = pairs
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[red, green]`**, **`[red, blue]`**, and **`[green, blue]`**.
 
 ---
 

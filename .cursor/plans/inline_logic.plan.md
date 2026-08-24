@@ -120,8 +120,8 @@ todos:
     content: "F35d: numlist/3, sum_list/2, max_list/2, min_list/2 — teste 3950+"
     status: completed
   - id: logic-list-35e
-    content: "F35e: sublist/3, permutation/2, combinations/3 — teste 3940+"
-    status: pending
+    content: "F35e: sublist/3, permutation/2, combinations/3 — teste 3969+"
+    status: completed
   - id: logic-list-35f
     content: "F35f: call/1 infra + include/3, exclude/3, partition/4, convlist/3 — teste 3950+"
     status: pending
@@ -8077,7 +8077,7 @@ Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
 
 ---
 
-### F35e — Sublistă & combinatorică
+### F35e — Sublistă & combinatorică **(completed)**
 
 | Predicate | Semnificație |
 | --------- | ------------ |
@@ -8240,7 +8240,7 @@ comp [logic] .mapLogic:
 - [x] **F35b** — 5 builtins sort/structură
 - [x] **F35c** — 4 builtins mulțimi
 - [x] **F35d** — 4 builtins range/agregare
-- [ ] **F35e** — 3 builtins combinatorică
+- [x] **F35e** — 3 builtins combinatorică
 - [ ] **F35f** — `call/1` + 4 builtins filtrare
 - [ ] **F35g** — maplist/2, maplist/3
 - [ ] **F35h** — foldl/4, foldl/5

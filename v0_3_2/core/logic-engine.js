@@ -352,6 +352,15 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'min_list' && g0.arity === 2) {
       return this._solveMinList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'sublist' && g0.arity === 3) {
+      return this._solveSublist(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'permutation' && g0.arity === 2) {
+      return this._solvePermutation(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'combinations' && g0.arity === 3) {
+      return this._solveCombinations(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -1092,6 +1101,154 @@ class LogicEngine {
     }
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
+
+  _solveSublist(sub, list, rest, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._sublistWalk(sub, list, rest, cont, env);
+  }
+
+  _listMatchPrefixAndRest(prefix, list, env) {
+    let p = logicDeref(prefix, env);
+    let l = logicDeref(list, env);
+    if (p.kind !== 'list') return false;
+    if (logicListIsNil(p)) return l;
+    while (!logicListIsNil(p)) {
+      if (l.kind !== 'list' || logicListIsNil(l)) return false;
+      if (!logicUnify(p.head, l.head, env, this.table)) return false;
+      p = logicDeref(p.tail, env);
+      l = logicDeref(l.tail, env);
+    }
+    return l;
+  }
+
+  _sublistWalk(sub, list, rest, cont, env) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list') return false;
+    let any = false;
+    const trail = env.trailLength();
+    const matchRest = this._listMatchPrefixAndRest(sub, list, env);
+    if (matchRest !== false) {
+      const trail2 = env.trailLength();
+      if (logicUnify(rest, matchRest, env, this.table)) {
+        if (cont()) any = true;
+        if (this._solutionCapReached || env.cutCommitted) {
+          env.undo(trail);
+          return any;
+        }
+      }
+      env.undo(trail2);
+    }
+    env.undo(trail);
+    if (!logicListIsNil(ld)) {
+      const restVar = { kind: 'var', name: `__sub${this._renameSerial++}` };
+      const rebuilt = { kind: 'list', head: ld.head, tail: restVar };
+      const trail3 = env.trailLength();
+      if (logicUnify(list, rebuilt, env, this.table)) {
+        if (this._sublistWalk(sub, restVar, rest, cont, env)) any = true;
+      }
+      env.undo(trail3);
+    }
+    return any;
+  }
+
+  _solvePermutation(perm, list, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    const pd = logicDeref(perm, env);
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    if (ld.kind === 'list' && logicListIsGroundClosed(ld, env)) {
+      return this._permuteWalk(ld, perm, cont, env);
+    }
+    if (pd.kind === 'list' && logicListIsGroundClosed(pd, env)
+        && ld.kind === 'list' && logicListIsGroundClosed(ld, env)) {
+      if (!logicSameMultiset(pd, ld, env, this.table)) return false;
+      const trail = env.trailLength();
+      if (!logicUnify(perm, list, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return cont();
+    }
+    return false;
+  }
+
+  _permuteWalk(listD, perm, cont, env) {
+    const elems = logicGroundListToArray(listD, env);
+    if (elems == null) return false;
+    return this._permBuildWalk(elems, [], perm, cont, env);
+  }
+
+  _permBuildWalk(remaining, built, perm, cont, env) {
+    if (remaining.length === 0) {
+      const builtList = logicArrayToList(built);
+      const trail = env.trailLength();
+      let ok = false;
+      if (logicUnify(perm, builtList, env, this.table)) ok = cont();
+      env.undo(trail);
+      return ok;
+    }
+    let any = false;
+    for (let i = 0; i < remaining.length; i++) {
+      const head = remaining[i];
+      const nextRem = remaining.slice(0, i).concat(remaining.slice(i + 1));
+      if (this._permBuildWalk(nextRem, built.concat([head]), perm, cont, env)) any = true;
+      if (this._solutionCapReached || env.cutCommitted) break;
+    }
+    return any;
+  }
+
+  _solveCombinations(kTerm, list, comb, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const kd = logicDeref(kTerm, env);
+    if (kd.kind !== 'number' || !Number.isInteger(kd.value) || kd.value < 0) return false;
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list') return false;
+    const pd = logicDeref(comb, env);
+    if (pd.kind === 'list' && logicListIsGroundClosed(pd, env)
+        && logicListIsGroundClosed(ld, env)) {
+      let matchCount = 0;
+      const trail = env.trailLength();
+      const checkCont = () => {
+        matchCount++;
+        return matchCount < 2;
+      };
+      this._combWalk(kd.value, list, comb, checkCont, env);
+      env.undo(trail);
+      if (matchCount !== 1) return false;
+      return this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._combWalk(kd.value, list, comb, cont, env);
+  }
+
+  _combWalk(k, list, comb, cont, env) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list') return false;
+    if (k === 0) {
+      const trail = env.trailLength();
+      let ok = false;
+      if (logicUnify(comb, { kind: 'list', nil: true }, env, this.table)) ok = cont();
+      env.undo(trail);
+      return ok;
+    }
+    if (logicListIsNil(ld)) return false;
+    let any = false;
+    const restVar = { kind: 'var', name: `__cmb${this._renameSerial++}` };
+    const rebuilt = { kind: 'list', head: ld.head, tail: restVar };
+    const trail = env.trailLength();
+    if (logicUnify(list, rebuilt, env, this.table)) {
+      if (this._combWalk(k, restVar, comb, cont, env)) any = true;
+      if (!this._solutionCapReached && !env.cutCommitted) {
+        const tailCombVar = { kind: 'var', name: `__cmb${this._renameSerial++}` };
+        const extComb = { kind: 'list', head: ld.head, tail: tailCombVar };
+        const trail2 = env.trailLength();
+        if (logicUnify(comb, extComb, env, this.table)) {
+          if (this._combWalk(k - 1, restVar, tailCombVar, cont, env)) any = true;
+        }
+        env.undo(trail2);
+      }
+    }
+    env.undo(trail);
+    return any;
+  }
 }
 
 function logicRenameApartClause(clause, idRef) {
@@ -1585,6 +1742,25 @@ function logicSubtractGround(list1D, list2D, env, table) {
     if (!logicTermInGroundList(e, e2, env, table)) out.push(e);
   }
   return logicArrayToList(out);
+}
+
+function logicSameMultiset(listA, listB, env, table) {
+  const a = logicGroundListToArray(listA, env);
+  const b = logicGroundListToArray(listB, env);
+  if (a == null || b == null || a.length !== b.length) return false;
+  const used = new Array(b.length).fill(false);
+  for (const ea of a) {
+    let found = false;
+    for (let j = 0; j < b.length; j++) {
+      if (!used[j] && logicCompareTerms(ea, b[j], env, table) === 0) {
+        used[j] = true;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+  }
+  return true;
 }
 
 function logicEvalNumber(term, env, table) {

@@ -35,6 +35,9 @@ const LOGIC_BUILTIN_NUMLIST_PRED = 'numlist';
 const LOGIC_BUILTIN_SUM_LIST_PRED = 'sum_list';
 const LOGIC_BUILTIN_MAX_LIST_PRED = 'max_list';
 const LOGIC_BUILTIN_MIN_LIST_PRED = 'min_list';
+const LOGIC_BUILTIN_SUBLIST_PRED = 'sublist';
+const LOGIC_BUILTIN_PERMUTATION_PRED = 'permutation';
+const LOGIC_BUILTIN_COMBINATIONS_PRED = 'combinations';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -76,6 +79,9 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_SUM_LIST_PRED]: [2],
   [LOGIC_BUILTIN_MAX_LIST_PRED]: [2],
   [LOGIC_BUILTIN_MIN_LIST_PRED]: [2],
+  [LOGIC_BUILTIN_SUBLIST_PRED]: [3],
+  [LOGIC_BUILTIN_PERMUTATION_PRED]: [2],
+  [LOGIC_BUILTIN_COMBINATIONS_PRED]: [3],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -621,6 +627,15 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_MIN_LIST_PRED && arity === 2) {
     return "'min_list/2' is reserved — cannot define min_list as fact or rule head";
   }
+  if (predicate === LOGIC_BUILTIN_SUBLIST_PRED && arity === 3) {
+    return "'sublist/3' is reserved — cannot define sublist as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_PERMUTATION_PRED && arity === 2) {
+    return "'permutation/2' is reserved — cannot define permutation as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_COMBINATIONS_PRED && arity === 3) {
+    return "'combinations/3' is reserved — cannot define combinations as fact or rule head";
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -735,6 +750,12 @@ function logicValidateProgram(prog) {
         logicError("'max_list/2' is reserved — cannot define max_list as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_MIN_LIST_PRED && arity === 2) {
         logicError("'min_list/2' is reserved — cannot define min_list as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SUBLIST_PRED && arity === 3) {
+        logicError("'sublist/3' is reserved — cannot define sublist as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_PERMUTATION_PRED && arity === 2) {
+        logicError("'permutation/2' is reserved — cannot define permutation as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_COMBINATIONS_PRED && arity === 3) {
+        logicError("'combinations/3' is reserved — cannot define combinations as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }
