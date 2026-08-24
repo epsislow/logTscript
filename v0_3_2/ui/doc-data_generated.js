@@ -20594,7 +20594,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
-| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
 | **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
 | **Value kinds** | **\`atom\`**, **\`number\`**, **\`list\`**, **\`compound\`**; type tests **\`atom/1\`** … **\`compound/1\`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
@@ -20677,7 +20677,7 @@ Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **\
 
 **Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as \`X = [X | _]\` fail ). A bare list term cannot stand alone as a goal — bind it with \`=\` or pass it to a predicate.
 
-List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`**) are documented in [logic-builtins.md](logic-builtins.md).
+List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**) are documented in [logic-builtins.md](logic-builtins.md).
 
 **\`show/N\`** prints ground lists as \`[a, b, c]\` and partial lists as \`[a, b|Rest]\` when the tail is still a variable.
 
@@ -24257,6 +24257,34 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`flatten/2\`** | 2 | yes | no | Recursively flatten nested ground lists |
 | **\`same_length/2\`** | 2 | yes | no | Equal list lengths; bind anonymous list |
 | **\`sort/2\`** | 2 | yes | no | Sort ground list by standard term order |
+| **\`keysort/2\`** | 2 | yes | no | Sort compound pairs by first argument (key) |
+| **\`msort/2\`** | 2 | yes | no | Stable sort by standard term order |
+| **\`prefix/2\`** | 2 | yes | no | List prefix with backtracking |
+| **\`suffix/2\`** | 2 | yes | no | List suffix with backtracking |
+| **\`is_set/1\`** | 1 | yes | no | True when list has no duplicate elements |
+| **\`list_to_set/2\`** | 2 | yes | no | Remove duplicates; keep first occurrence order |
+| **\`union/3\`** | 3 | yes | no | Ordered union without duplicates |
+| **\`intersection/3\`** | 3 | yes | no | Common elements; order from first list |
+| **\`subtract/3\`** | 3 | yes | no | First list minus elements in second list |
+| **\`numlist/3\`** | 3 | yes | no | Consecutive integers from **From** through **To** inclusive |
+| **\`sum_list/2\`** | 2 | yes | no | Sum of ground integer list (**\`[]\` → 0**) |
+| **\`max_list/2\`** | 2 | yes | no | Maximum in non-empty ground integer list |
+| **\`min_list/2\`** | 2 | yes | no | Minimum in non-empty ground integer list |
+| **\`sublist/3\`** | 3 | yes | no | Contiguous subsequence; **Rest** is tail after match |
+| **\`permutation/2\`** | 2 | yes | no | All permutations with backtracking |
+| **\`combinations/3\`** | 3 | yes | no | **K**-element subsets; order from source list |
+| **\`call/1\`** | 1 | yes | no | Meta-call — prove a compound goal term |
+| **\`include/3\`** | 3 | yes | no | Keep list elements where template goal succeeds |
+| **\`exclude/3\`** | 3 | yes | no | Keep list elements where template goal fails |
+| **\`partition/4\`** | 4 | yes | no | Split list into pass / fail partitions |
+| **\`convlist/3\`** | 3 | yes | no | Map template goal; collect outputs (drop failures) |
+| **\`maplist/2\`** | 2 | yes | no | Prove template goal for every list element |
+| **\`maplist/3\`** | 3 | yes | no | Map template goal across parallel lists |
+| **\`foldl/4\`** | 4 | yes | no | Left fold with accumulator over one list |
+| **\`foldl/5\`** | 5 | yes | no | Left fold with accumulator over two parallel lists |
+| **\`findall/3\`** | 3 | yes | no | Collect all template instances for a goal (**\`[]\`** if none) |
+| **\`bagof/3\`** | 3 | yes | no | Like findall, groups by existential goal vars; **fail** if none |
+| **\`setof/3\`** | 3 | yes | no | Like bagof, then unique + sorted list |
 | **\`atom/1\`** | 1 | yes | no | Type test — argument is an atom |
 | **\`number/1\`** | 1 | yes | no | Type test — argument is an integer |
 | **\`list/1\`** | 1 | yes | no | Type test — argument is a list |
@@ -24944,6 +24972,1123 @@ comp [logic] .worldLogic:
 \`\`\`
 
 **Load & Run** prints **\`[a, b, c]\`**.
+
+---
+
+## \`keysort/2\`
+
+**\`keysort(Pairs, Sorted)\`** — sort a ground list of **compound pairs** by the **first argument** (the key). Use **\`pair(Key, Value)\`** (or any compound with at least one argument). **Duplicates are kept.**
+
+| Call | Behaviour |
+|------|-----------|
+| \`keysort([pair(b, 2), pair(a, 1)], S)\` | \`S = [pair(a, 1), pair(b, 2)]\` |
+| Non-compound element | **Fail** |
+| Non-list or partial list | **Fail** |
+
+**Reserved head:** you cannot define **\`keysort/2\`** as fact, rule, or constraint head.
+
+### Example — rank by name
+
+\`\`\`logts-play
+inline [logic] .scores:
+
+    query ranked:
+        keysort([pair(bob, 80), pair(ann, 95), pair(cal, 70)], Sorted),
+        member(pair(Name, Score), Sorted),
+        show(Name, Score)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+:
+
+1wire trigger = 1
+
+.scoreLogic:{
+    query = ranked
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`ann 95\`**, then **\`bob 80\`**, then **\`cal 70\`** (sorted by name).
+
+---
+
+## \`msort/2\`
+
+**\`msort(List, Sorted)\`** — like **\`sort/2\`**, but **stable**: equal elements keep their original relative order. **\`List\`** must be a **ground** closed list.
+
+| Call | Behaviour |
+|------|-----------|
+| \`msort([2, 1, 2, 1], S)\` | \`S = [1, 1, 2, 2]\` (first \`1\` stays before second \`1\`) |
+| Same constraints as **\`sort/2\`** | Ground closed list required |
+
+**Reserved head:** you cannot define **\`msort/2\`** as fact, rule, or constraint head.
+
+### Example — stable reorder
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        msort([2, 1, 2, 1], S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[1, 1, 2, 2]\`**.
+
+---
+
+## \`prefix/2\`
+
+**\`prefix(Prefix, List)\`** — **\`Prefix\`** is a leading sublist of **\`List\`**. Backtracks over all prefixes (including **\`[]\`**).
+
+| Call | Behaviour |
+|------|-----------|
+| \`prefix(P, [a, b, c])\` | Four solutions: \`[]\`, \`[a]\`, \`[a, b]\`, \`[a, b, c]\` |
+| \`prefix([a, b], L)\` | Binds **\`L\`** to a list starting with **\`[a, b]\`** |
+| Non-list second arg | **Fail** |
+
+**Reserved head:** you cannot define **\`prefix/2\`** as fact, rule, or constraint head.
+
+### Example — enumerate prefixes
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        prefix(P, [go, stop, wait]),
+        show(P)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[]\`**, **\`[go]\`**, **\`[go, stop]\`**, **\`[go, stop, wait]\`** (one line each).
+
+---
+
+## \`suffix/2\`
+
+**\`suffix(Suffix, List)\`** — **\`Suffix\`** is a trailing sublist of **\`List\`**. Backtracks over all suffixes (including **\`[]\`**).
+
+| Call | Behaviour |
+|------|-----------|
+| \`suffix(S, [a, b, c])\` | Four solutions: \`[a, b, c]\`, \`[b, c]\`, \`[c]\`, \`[]\` |
+| Non-list second arg | **Fail** |
+
+**Reserved head:** you cannot define **\`suffix/2\`** as fact, rule, or constraint head.
+
+### Example — tail segments
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        suffix(S, [red, green, blue]),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints the full list, then **\`[green, blue]\`**, **\`[blue]\`**, and **\`[]\`**.
+
+---
+
+## \`is_set/1\`
+
+**\`is_set(List)\`** — succeeds when **\`List\`** is a **ground** closed list with **no duplicate** elements (standard term equality).
+
+| Call | Behaviour |
+|------|-----------|
+| \`is_set([a, b, c])\` | Succeeds |
+| \`is_set([a, b, a])\` | **Fail** |
+| Open list or free variable | **Fail** |
+
+**Reserved head:** you cannot define **\`is_set/1\`** as fact, rule, or constraint head.
+
+### Example — validate unique tags
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query check:
+        is_set([red, green, blue]),
+        show("unique tags")
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = check
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`unique tags\`**.
+
+---
+
+## \`list_to_set/2\`
+
+**\`list_to_set(List, Set)\`** — **\`Set\`** is **\`List\`** with duplicate elements removed. **First occurrence order** is preserved.
+
+| Call | Behaviour |
+|------|-----------|
+| \`list_to_set([a, b, a, c], S)\` | \`S = [a, b, c]\` |
+| Non-list or partial list | **Fail** |
+
+**Reserved head:** you cannot define **\`list_to_set/2\`** as fact, rule, or constraint head.
+
+### Example — unique palette
+
+\`\`\`logts-play
+inline [logic] .palette:
+
+    query unique:
+        list_to_set([red, blue, red, green], U),
+        is_set(U),
+        show(U)
+
+:
+
+comp [logic] .paletteLogic:
+    on: 1
+    .palette { }
+:
+
+1wire trigger = 1
+
+.paletteLogic:{
+    query = unique
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[red, blue, green]\`**.
+
+---
+
+## \`union/3\`
+
+**\`union(List1, List2, Union)\`** — **\`Union\`** contains every element from **\`List1\`** and **\`List2\`**, **without duplicates**. Order: all from **\`List1\`** (first occurrence), then new elements from **\`List2\`**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`union([a, b], [b, c], U)\` | \`U = [a, b, c]\` |
+| Non-list argument | **Fail** |
+
+**Reserved head:** you cannot define **\`union/3\`** as fact, rule, or constraint head.
+
+### Example — merge tag lists
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query allTags:
+        union([red, green], [blue, green], All),
+        member(C, All),
+        show(C)
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = allTags
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`**, **\`green\`**, **\`blue\`** (one line each).
+
+---
+
+## \`intersection/3\`
+
+**\`intersection(List1, List2, Intersection)\`** — **\`Intersection\`** is the ordered list of elements in **both** lists. Order follows **\`List1\`**; each common element appears **once**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`intersection([a, b, a], [a, c], I)\` | \`I = [a]\` |
+| No common elements | \`I = []\` |
+| Non-list argument | **Fail** |
+
+**Reserved head:** you cannot define **\`intersection/3\`** as fact, rule, or constraint head.
+
+### Example — shared permissions
+
+\`\`\`logts-play
+inline [logic] .access:
+
+    query shared:
+        intersection([read, write, admin], [read, execute, admin], Shared),
+        show(Shared)
+
+:
+
+comp [logic] .accessLogic:
+    on: 1
+    .access { }
+:
+
+1wire trigger = 1
+
+.accessLogic:{
+    query = shared
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[read, admin]\`**.
+
+---
+
+## \`subtract/3\`
+
+**\`subtract(List1, List2, Remainder)\`** — **\`Remainder\`** is **\`List1\`** with every element that occurs in **\`List2\`** removed. Order of **\`List1\`** is preserved.
+
+| Call | Behaviour |
+|------|-----------|
+| \`subtract([a, b, c, b], [b], R)\` | \`R = [a, c]\` |
+| Non-list argument | **Fail** |
+
+**Reserved head:** you cannot define **\`subtract/3\`** as fact, rule, or constraint head.
+
+### Example — remove blocked items
+
+\`\`\`logts-play
+inline [logic] .filter:
+
+    query allowed:
+        subtract([apple, pear, apple, plum], [pear], Allowed),
+        show(Allowed)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = allowed
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[apple, apple, plum]\`**.
+
+---
+
+## \`numlist/3\`
+
+**\`numlist(From, To, List)\`** — **\`List\`** is the consecutive integers from **\`From\`** through **\`To\`** inclusive. **\`From\`** and **\`To\`** must be **ground** integers.
+
+| Call | Behaviour |
+|------|-----------|
+| \`numlist(1, 3, L)\` | \`L = [1, 2, 3]\` |
+| \`numlist(3, 1, L)\` | \`L = []\` |
+| Range longer than **1024** elements | **Fail** |
+| Non-integer bound | **Fail** |
+
+**Reserved head:** you cannot define **\`numlist/3\`** as fact, rule, or constraint head.
+
+### Example — build a range
+
+\`\`\`logts-play
+inline [logic] .stats:
+
+    query range:
+        numlist(2, 6, L),
+        show(L)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = range
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[2, 3, 4, 5, 6]\`**.
+
+---
+
+## \`sum_list/2\`
+
+**\`sum_list(List, Sum)\`** — **\`Sum\`** is the arithmetic sum of all elements in **\`List\`**. Every element must be a **ground** integer.
+
+| Call | Behaviour |
+|------|-----------|
+| \`sum_list([1, 2, 3], S)\` | \`S = 6\` |
+| \`sum_list([], S)\` | \`S = 0\` |
+| Non-number element | **Fail** |
+
+**Reserved head:** you cannot define **\`sum_list/2\`** as fact, rule, or constraint head.
+
+### Example — total of 1..5
+
+\`\`\`logts-play
+inline [logic] .stats:
+
+    query total:
+        numlist(1, 5, L),
+        sum_list(L, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`15\`**.
+
+---
+
+## \`max_list/2\` and \`min_list/2\`
+
+**\`max_list(List, Max)\`** — **\`Max\`** is the largest integer in non-empty **\`List\`**.
+
+**\`min_list(List, Min)\`** — **\`Min\`** is the smallest integer in non-empty **\`List\`**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`max_list([2, 5, 1], M)\` | \`M = 5\` |
+| \`min_list([2, 5, 1], M)\` | \`M = 1\` |
+| \`max_list([], M)\` or \`min_list([], M)\` | **Fail** |
+| Non-number element | **Fail** |
+
+**Reserved heads:** you cannot define **\`max_list/2\`** or **\`min_list/2\`** as fact, rule, or constraint heads.
+
+### Example — range bounds
+
+\`\`\`logts-play
+inline [logic] .stats:
+
+    query bounds:
+        numlist(2, 6, L),
+        max_list(L, Hi),
+        min_list(L, Lo),
+        show(Hi, Lo)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = bounds
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`6 2\`**.
+
+---
+
+## \`sublist/3\`
+
+**\`sublist(Sub, List, Rest)\`** — **\`Sub\`** is a **contiguous** subsequence of **\`List\`**. **\`Rest\`** is the remainder of **\`List\`** after the matched **\`Sub\`** ends. Backtracks over all match positions (including empty **\`Sub\`**).
+
+| Call | Behaviour |
+|------|-----------|
+| \`sublist([b], [a, b, c], R)\` | \`R = [c]\` |
+| \`sublist([a], [x, a, y, a], R)\` | Two solutions |
+| Non-list **\`List\`** | **Fail** |
+
+**Reserved head:** you cannot define **\`sublist/3\`** as fact, rule, or constraint head.
+
+### Example — find a segment
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        sublist([go, stop], [wait, go, stop, go], R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[go]\`** (the tail after **\`[go, stop]\`**).
+
+---
+
+## \`permutation/2\`
+
+**\`permutation(Perm, List)\`** — **\`Perm\`** is a permutation of **\`List\`**. With a **ground** **\`List\`**, backtracks over all orderings. With both arguments **ground**, succeeds when they are permutations of each other.
+
+| Call | Behaviour |
+|------|-----------|
+| \`permutation(P, [a, b, c])\` | Six solutions |
+| \`permutation([b, a], [a, b])\` | Succeeds |
+| \`permutation([a, a], [a, b])\` | **Fail** |
+| Open or partial list | **Fail** when generating |
+
+**Reserved head:** you cannot define **\`permutation/2\`** as fact, rule, or constraint head.
+
+### Example — reorder two cards
+
+\`\`\`logts-play
+inline [logic] .deck:
+
+    query orders:
+        permutation(Order, [a, b]),
+        show(Order)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = orders
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[a, b]\`** and **\`[b, a]\`**.
+
+---
+
+## \`combinations/3\`
+
+**\`combinations(K, List, Comb)\`** — **\`Comb\`** is a **K**-element sublist of **\`List\`** with elements in the **same order** as **\`List\`**. **\`K\`** must be a **ground** non-negative integer.
+
+| Call | Behaviour |
+|------|-----------|
+| \`combinations(2, [a, b, c], C)\` | Three solutions: \`[a, b]\`, \`[a, c]\`, \`[b, c]\` |
+| \`combinations(0, L, C)\` | \`C = []\` |
+| \`combinations(3, [a, b], C)\` | **Fail** |
+| Non-list **\`List\`** | **Fail** |
+
+**Reserved head:** you cannot define **\`combinations/3\`** as fact, rule, or constraint head.
+
+### Example — pick pairs of colors
+
+\`\`\`logts-play
+inline [logic] .pick:
+
+    query pairs:
+        combinations(2, [red, green, blue], Pair),
+        show(Pair)
+
+:
+
+comp [logic] .pickLogic:
+    on: 1
+    .pick { }
+:
+
+1wire trigger = 1
+
+.pickLogic:{
+    query = pairs
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[red, green]\`**, **\`[red, blue]\`**, and **\`[green, blue]\`**.
+
+---
+
+## \`call/1\`
+
+**\`call(Goal)\`** — prove **\`Goal\`**, where **\`Goal\`** is a **callable compound** (e.g. **\`member(X, L)\`**, **\`number(3)\`**). Enables meta-calling and underpins **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, and **\`convlist/3\`**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`call(number(3))\` | Succeeds |
+| \`call(member(X, [a, b]))\` | Backtracking over **\`X\`** |
+| Non-compound goal | **Fail** |
+| Cut inside **\`call\`** | Does **not** commit choices made **before** the **\`call\`** |
+
+**Reserved head:** you cannot define **\`call/1\`** as fact, rule, or constraint head.
+
+### Example — meta-call with backtracking
+
+\`\`\`logts-play
+inline [logic] .world:
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ call(member(X, [red, green])), show(X) })
+\`\`\`
+
+**Load & Run** prints **\`red\`** and **\`green\`**.
+
+---
+
+## \`include/3\`, \`exclude/3\`, and \`partition/4\`
+
+Higher-order list filters. **\`Goal\`** is a **template compound** with at least one variable (e.g. **\`number(X)\`**). For each list element, that variable is bound to the element and **\`Goal\`** is called.
+
+| Builtin | Result |
+|---------|--------|
+| **\`include(Goal, List, Included)\`** | Elements where **\`Goal\`** succeeds |
+| **\`exclude(Goal, List, Excluded)\`** | Elements where **\`Goal\`** fails |
+| **\`partition(Goal, List, Included, Excluded)\`** | Both partitions |
+
+**\`List\`** must be a **ground** closed list.
+
+### Example — keep numbers only
+
+\`\`\`logts-play
+inline [logic] .filter:
+
+    query nums:
+        include(number(X), [1, a, 2, 3, b], Ns),
+        show(Ns)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = nums
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[1, 2, 3]\`**.
+
+### Example — partition numbers and atoms
+
+\`\`\`logts-play
+inline [logic] .filter:
+
+    query split:
+        partition(number(X), [1, a, 2, b], Ns, As),
+        show(Ns, As)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = split
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[1, 2]\`** and **\`[a, b]\`**.
+
+---
+
+## \`convlist/3\`
+
+**\`convlist(Goal, List, Result)\`** — apply **\`Goal\`** to each element of **\`List\`**. On success, append the **output** to **\`Result\`**.
+
+| Goal shape | Output collected |
+|------------|------------------|
+| Unary **\`p(X)\`** | The bound **\`X\`** (same as **\`include/3\`** spirit) |
+| N-ary **\`p(X, …, Y)\`** | The **last** argument after the call |
+
+### Example — double each number
+
+\`\`\`logts-play
+inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        convlist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[2, 4, 6]\`**.
+
+---
+
+## \`maplist/2\` and \`maplist/3\`
+
+Higher-order list iteration built on **\`call/1\`**. Unlike **\`include/3\`**, **\`maplist\`** requires **every** element to succeed — one failure fails the whole goal.
+
+| Builtin | Arguments | Behaviour |
+|---------|-----------|-----------|
+| **\`maplist(Goal, List)\`** | Unary template **\`Goal\`** | Prove **\`Goal\`** for **each** element of ground **\`List\`** |
+| **\`maplist(Goal, List1, List2)\`** | Binary template **\`Goal\`** | For each pair from **\`List1\`** and **\`List2\`**; generate **\`List2\`** or verify ground lists |
+
+**Template rules** (same as **\`convlist/3\`**):
+
+- **\`maplist/2\`**: first variable in **\`Goal\`** is bound to each list element in turn.
+- **\`maplist/3\`**: first variable gets the element from **\`List1\`**, second variable gets the matching element from **\`List2\`** (or is collected when **\`List2\`** is unbound).
+
+**\`List1\`** must be a **ground** closed list. **\`List2\`** may be unbound (output) or ground (verification). Length mismatch → **fail**.
+
+### Example — double each number
+
+\`\`\`logts-play
+inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        maplist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[2, 4, 6]\`**.
+
+### Example — type-check every element
+
+\`\`\`logts-play
+inline [logic] .check:
+
+    query allNumbers:
+        maplist(number(X), [1, 2, 3])
+
+:
+
+comp [logic] .checkLogic:
+    on: 1
+    .check { }
+:
+
+1wire trigger = 1
+
+.checkLogic:{
+    query = allNumbers
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** succeeds silently (no **\`show\`**). **\`maplist(number(X), [1, a, 3])\`** would **fail**.
+
+---
+
+## \`foldl/4\` and \`foldl/5\`
+
+Left-fold over list(s) using a template goal and an initial accumulator value. Built on **\`call/1\`**.
+
+| Builtin | Arguments | Goal template shape |
+|---------|-----------|---------------------|
+| **\`foldl(Goal, List, V0, V)\`** | One ground list | **\`Goal(AccIn, Element, AccOut)\`** — 3 variables left-to-right |
+| **\`foldl(Goal, List1, List2, V0, V)\`** | Two ground lists, same length | **\`Goal(AccIn, Elem1, Elem2, AccOut)\`** — 4 variables left-to-right |
+
+**Behaviour:**
+
+- Start with **\`AccIn = V0\`** (dereferenced).
+- For each element (or pair), prove **\`Goal\`** once; the new accumulator is **\`AccOut\`** after the call.
+- Empty list(s) → **\`V = V0\`**.
+- One failed step → whole **\`foldl\`** fails.
+- **\`V\`** may be unbound (output) or ground (verification).
+
+### Example — sum a list
+
+\`\`\`logts-play
+inline [logic] .stats:
+
+    plus(A, B, C) <- C is A + B
+
+    query total:
+        foldl(plus(A, X, C), [1, 2, 3, 4], 0, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`10\`**.
+
+### Example — fold two parallel lists
+
+\`\`\`logts-play
+inline [logic] .pairs:
+
+    pairSum(A, X, Y, C) <- C is A + X + Y
+
+    query total:
+        foldl(pairSum(A, X, Y, C), [1, 2], [10, 20], 0, S),
+        show(S)
+
+:
+
+comp [logic] .pairsLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+
+.pairsLogic:{
+    query = total
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`33\`** (\`0+1+10\`, then \`11+2+20\`).
+
+---
+
+## \`findall/3\`, \`bagof/3\`, and \`setof/3\`
+
+Solution aggregators — collect answers from a template goal into a list. All three take:
+
+| Argument | Role |
+|----------|------|
+| **\`Template\`** | Term built for **each** successful goal solution (free variables captured per solution) |
+| **\`Goal\`** | Callable compound goal (same shape as **\`call/1\`**) |
+| **\`List\`** | Output list (or ground list to verify) |
+
+### Comparison at a glance
+
+| Builtin | Zero solutions | Existential vars in **\`Goal\`** | Duplicates | Order |
+|---------|----------------|--------------------------------|------------|-------|
+| **\`findall/3\`** | **\`[]\`** (succeeds) | Ignored — all solutions in one list | Kept | Goal order |
+| **\`bagof/3\`** | **Fail** | Grouped — **backtracks** per binding | Kept per group | Goal order per group |
+| **\`setof/3\`** | **Fail** | Same grouping as **\`bagof/3\`** | Removed | Sorted (standard term order) |
+
+**Existential variables** = variables appearing in **\`Goal\`** but **not** in **\`Template\`**, and still **free** when the aggregator runs. Each distinct binding produces a separate **\`bagof/3\`** or **\`setof/3\`** solution.
+
+**Cut** inside **\`Goal\`** does not escape the aggregator (same barrier as **\`call/1\`**).
+
+### Example — \`findall/3\` collects every solution
+
+\`\`\`logts-play
+inline [logic] .deck:
+
+    query allCards:
+        findall(Card, member(Card, [ace, king, queen]), Hand),
+        show(Hand)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = allCards
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[ace, king, queen]\`**.
+
+### Example — \`findall/3\` with no solutions
+
+\`\`\`logts-play
+inline [logic] .deck:
+
+    query empty:
+        findall(Card, member(Card, []), Hand),
+        show(Hand)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = empty
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[]\`** — **\`findall/3\`** always succeeds.
+
+### Example — compound template
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query labelled:
+        findall(tag(Color), member(Color, [red, blue]), Tags),
+        show(Tags)
+
+:
+
+comp [logic] .tagsLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagsLogic:{
+    query = labelled
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[tag(red), tag(blue)]\`**.
+
+### Example — \`findall/3\` vs \`bagof/3\` (existential grouping)
+
+Same facts, different aggregation:
+
+\`\`\`logts-play
+inline [logic] .party:
+
+    likes(mary, food)
+    likes(mary, wine)
+    likes(john, beer)
+
+    query allItems:
+        findall(Item, likes(Person, Item), Items),
+        show("findall:", Items)
+
+    query perPerson:
+        bagof(Item, likes(Person, Item), Items),
+        show("bagof person:", Person),
+        show("bagof items:", Items)
+
+:
+
+comp [logic] .partyLogic:
+    on: 1
+    .party { }
+:
+
+1wire trigger = 1
+
+.partyLogic:{
+    query = allItems
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** with **\`allItems\`** prints **\`findall: [food, wine, beer]\`** — every item, one list.
+
+Switch **\`query = perPerson\`** to see **\`bagof\`** backtrack: first **\`mary\`** with **\`[food, wine]\`**, then **\`john\`** with **\`[beer]\`**.
+
+### Example — \`bagof/3\` with a pre-bound variable
+
+When **\`Person\`** is already bound, grouping collapses to a single bag:
+
+\`\`\`logts-play
+inline [logic] .party:
+
+    likes(mary, food)
+    likes(mary, wine)
+    likes(john, beer)
+
+    query maryOnly:
+        Person = mary,
+        bagof(Item, likes(Person, Item), Items),
+        show(Items)
+
+:
+
+comp [logic] .partyLogic:
+    on: 1
+    .party { }
+:
+
+1wire trigger = 1
+
+.partyLogic:{
+    query = maryOnly
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[food, wine]\`**.
+
+### Example — \`setof/3\` removes duplicates and sorts
+
+\`\`\`logts-play
+inline [logic] .votes:
+
+    query ranked:
+        setof(Color, member(Color, [green, red, blue, red, green]), Unique),
+        show(Unique)
+
+:
+
+comp [logic] .votesLogic:
+    on: 1
+    .votes { }
+:
+
+1wire trigger = 1
+
+.votesLogic:{
+    query = ranked
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[blue, green, red]\`** — duplicates dropped, standard term order.
+
+### Example — collect unique players from facts
+
+\`\`\`logts-play
+inline [logic] .scores:
+
+    scored(alice, 10)
+    scored(bob, 5)
+    scored(alice, 3)
+    scored(carol, 7)
+
+    query leaders:
+        setof(Player, scored(Player, _), Players),
+        show(Players)
+
+:
+
+comp [logic] .scoresLogic:
+    on: 1
+    .scores { }
+:
+
+1wire trigger = 1
+
+.scoresLogic:{
+    query = leaders
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[alice, bob, carol]\`**.
 
 ---
 
