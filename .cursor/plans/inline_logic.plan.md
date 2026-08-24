@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — F33+F34 complete; **F35a…F35j** (2+g catalog); F30 doc parallel.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — F33+F34 complete; **F35a…F35j** (2+g catalog) **completed**; **F36a** true/fail.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -106,7 +106,7 @@ todos:
     status: completed
   - id: logic-list-extra-2g
     content: "Faza 35 (2+g): builtins listă — catalog complet în subfaze F35a…F35j"
-    status: pending
+    status: completed
   - id: logic-list-35a
     content: "F35a: last/2, select/3, selectchk/3, flatten/2, same_length/2 — teste 3900+"
     status: completed
@@ -1399,7 +1399,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 32** Doc logic values + type predicates          | D228–D247 — doc + engine; `logic-value-types.md`                                                     | **(completed)**                                   |
 | **Faza 33** Mutation **each** expansion                 | D248–D260 — `text|number|bool [list] each wire` (postfix F25); zip rows; broadcast fără `each`       | **(completed)**                                   |
 | **Faza 34** Builtins random integer (**2+h**)           | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:` comp; fără float                              | **(completed)**        |
-| **Faza 35** Builtins listă suplimentare (**2+g**)       | **F35a…F35j** — catalog complet 2+g în 10 subfaze echilibrate (~2–4 zile/subfază)                                     | **(ready — F35a următoarea)** |
+| **Faza 35** Builtins listă suplimentare (**2+g**)       | **F35a…F35j** — catalog complet 2+g în 10 subfaze echilibrate (~2–4 zile/subfază)                                     | **(completed)** |
 
 
 ---
@@ -4728,6 +4728,8 @@ comp [logic] .peopleLogic:
 
 ### D136 — Out of scope (explicație)
 
+> **Scope clar backlog:** vezi [**2+e — scope clar**](#2e--d136--scope-clar) în tabelul master **2+x**.
+
 
 | Concept                | Ce e                        | De ce nu în F22                                                         |
 | ---------------------- | --------------------------- | ----------------------------------------------------------------------- |
@@ -6581,7 +6583,7 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 32** doc logic values + type predicates | D228–D247 — `logic-value-types.md` + engine                          | **(completed)**          |
 | **Faza 33** mutation **each** expansion        | D248–D260 — zip rows în `logic { + / - }` + `.check`                 | **(completed)**          |
 | **Faza 34** builtins random (**2+h**)          | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:`            | **(completed)** |
-| **Faza 35** builtins listă supl. (**2+g**)     | **F35a…F35j** — catalog complet; vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g) | **(ready — F35a următoarea)** |
+| **Faza 35** builtins listă supl. (**2+g**)     | **F35a…F35j** — catalog complet; vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g) | **(completed)** |
 | **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
 | **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
 | ~~**Builtins listă** member/append~~           | ~~**2+d**~~ → **F27**                                       |
@@ -6684,9 +6686,29 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2`. **F22** livrează termeni + reguli user (exemple doc); `nth0`**/**`nth1` → **F23** **(completed)**. User 2026-08-21: scope extins cu `length`, `reverse`, `sort`.
 
-#### **2+e** ⏳ (D136)
+#### **2+e** ⏳ (D136) — scope clar
 
-Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Prolog avansat; Monopoly nu le cere.
+**Ce este:** bucket backlog pentru **model de listă avansat** în engine — **nu** o fază de builtins library. Vezi și [D136 — explicație](#d136--out-of-scope-explicație).
+
+**Conține (3 piese, livrate împreună sau în subfaze viitoare):**
+
+| Piesă | Descriere | Exemplu / impact |
+| ----- | --------- | ---------------- |
+| **Dif-list** | Listă cu coadă deschisă (`List-Rest`); unificare pe „goluri” la capete | `append/2` **variantă dif-list** (SWI/DCG), distinct de `append/3` |
+| **Lazy list** | Elemente generate la demand, nu toate ground din start | Model de execuție diferit |
+| **String ↔ char list** | Conversie automată `"abc"` ≡ `[97,98,99]` | La noi `"..."` = string literal (F21); fără echivalență automată cu listă |
+
+**Nu este / deja livrat altundeva:**
+
+| Item | Unde |
+| ---- | ---- |
+| `append/3`, `member/2`, `length/2`, `reverse/2`, `sort/2` | ✅ **F27** (ex-**2+d**) |
+| Catalog builtins listă suplimentare (`maplist`, `foldl`, `findall`, `nth1/4`, …) | ✅ **F35** (ex-**2+g**) |
+| `length/2` generativ, `nth1/4` | ✅ **F35j** (builtin library, **nu** dif-list) |
+
+**De ce `append/2` apare la 2+e:** în plan = **`append/2` dif-list** (legat de DCG/dif-list), **nu** un al doilea `append` cu 2 argumente obișnuit. Necesită infrastructură dif-list; nu e un head rezervat simplu ca la F35.
+
+**Status:** ⏳ amânat — Prolog avansat; Monopoly nu le cere. **Fără fază proprie încă** (promovare viitoare după **2+a** / **2+b** sau împreună cu **2+f**, la decizie).
 
 #### **2+f** ⏳ — Cut în NAF (local cut)
 
@@ -7279,7 +7301,7 @@ compound person(j,25)
 | **D246** | Fără builtin `bool/1` | ✅ |
 | **D247** | `number` = kind logic **și** bindType wire (roluri separate) | ✅ |
 
-> **Notă:** **F33** each **(completed)** · **F34** random **(completed)** · **F35** = **2+g** catalog complet în **F35a…F35j** **(F35a următoarea)** · **F32** type preds **(completed)**.
+> **Notă:** **F33** each **(completed)** · **F34** random **(completed)** · **F35** = **2+g** catalog **F35a…F35j** **(completed)** · **F36a** true/fail **(completed)** · **F32** type preds **(completed)**.
 
 ---
 
@@ -7973,7 +7995,7 @@ Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
 
 ---
 
-## Faza 35 — Builtins listă suplimentare **2+g** **(ready — F35a următoarea)**
+## Faza 35 — Builtins listă suplimentare **2+g** **(completed)**
 
 > **Promovat:** 2026-08-24 — **2+g** → **F35** cu **catalog complet** împărțit în **10 subfaze** (**F35a…F35j**), efort echilibrat (~**2–4 zile** / subfază).  
 > **Extinde:** [Faza 27](#faza-27--builtins-listă--doc-logic-builtinsmd-completed), [Faza 22](#faza-22--liste-prolog--completed).  
@@ -8250,11 +8272,11 @@ comp [logic] .mapLogic:
 - [x] **F35i** — findall, bagof, setof
 - [x] **F35j** — length generativ + nth1/4
 - [x] **F36a** — true/0, fail/0
-- [ ] Doc EN complet + verify după fiecare subfază
+- [x] Doc EN complet + verify după fiecare subfază
 
 ### Decizii F35 — status
 
-**D267–D278 draft** — **F35a ready-to-implement** (confirmare user la start).
+**D267–D278** — **completed** (F35a…F35j livrate; doc EN + verify per subfază).
 
 ---
 
