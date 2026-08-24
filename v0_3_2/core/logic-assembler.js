@@ -44,6 +44,7 @@ const LOGIC_BUILTIN_EXCLUDE_PRED = 'exclude';
 const LOGIC_BUILTIN_PARTITION_PRED = 'partition';
 const LOGIC_BUILTIN_CONVLIST_PRED = 'convlist';
 const LOGIC_BUILTIN_MAPLIST_PRED = 'maplist';
+const LOGIC_BUILTIN_FOLDL_PRED = 'foldl';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -94,6 +95,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_PARTITION_PRED]: [4],
   [LOGIC_BUILTIN_CONVLIST_PRED]: [3],
   [LOGIC_BUILTIN_MAPLIST_PRED]: [2, 3],
+  [LOGIC_BUILTIN_FOLDL_PRED]: [4, 5],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -666,6 +668,9 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_MAPLIST_PRED && (arity === 2 || arity === 3)) {
     return `'maplist/${arity}' is reserved — cannot define maplist as fact or rule head`;
   }
+  if (predicate === LOGIC_BUILTIN_FOLDL_PRED && (arity === 4 || arity === 5)) {
+    return `'foldl/${arity}' is reserved — cannot define foldl as fact or rule head`;
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -798,6 +803,8 @@ function logicValidateProgram(prog) {
         logicError("'convlist/3' is reserved — cannot define convlist as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_MAPLIST_PRED && (arity === 2 || arity === 3)) {
         logicError(`'maplist/${arity}' is reserved — cannot define maplist as constraint head`, c.line);
+      } else if (pred === LOGIC_BUILTIN_FOLDL_PRED && (arity === 4 || arity === 5)) {
+        logicError(`'foldl/${arity}' is reserved — cannot define foldl as constraint head`, c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

@@ -50,6 +50,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`convlist/3`** | 3 | yes | no | Map template goal; collect outputs (drop failures) |
 | **`maplist/2`** | 2 | yes | no | Prove template goal for every list element |
 | **`maplist/3`** | 3 | yes | no | Map template goal across parallel lists |
+| **`foldl/4`** | 4 | yes | no | Left fold with accumulator over one list |
+| **`foldl/5`** | 5 | yes | no | Left fold with accumulator over two parallel lists |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -1548,6 +1550,81 @@ comp [logic] .checkLogic:
 ```
 
 **Load & Run** succeeds silently (no **`show`**). **`maplist(number(X), [1, a, 3])`** would **fail**.
+
+---
+
+## `foldl/4` and `foldl/5`
+
+Left-fold over list(s) using a template goal and an initial accumulator value. Built on **`call/1`**.
+
+| Builtin | Arguments | Goal template shape |
+|---------|-----------|---------------------|
+| **`foldl(Goal, List, V0, V)`** | One ground list | **`Goal(AccIn, Element, AccOut)`** — 3 variables left-to-right |
+| **`foldl(Goal, List1, List2, V0, V)`** | Two ground lists, same length | **`Goal(AccIn, Elem1, Elem2, AccOut)`** — 4 variables left-to-right |
+
+**Behaviour:**
+
+- Start with **`AccIn = V0`** (dereferenced).
+- For each element (or pair), prove **`Goal`** once; the new accumulator is **`AccOut`** after the call.
+- Empty list(s) → **`V = V0`**.
+- One failed step → whole **`foldl`** fails.
+- **`V`** may be unbound (output) or ground (verification).
+
+### Example — sum a list
+
+```logts-play
+inline [logic] .stats:
+
+    plus(A, B, C) <- C is A + B
+
+    query total:
+        foldl(plus(A, X, C), [1, 2, 3, 4], 0, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}
+```
+
+**Load & Run** prints **`10`**.
+
+### Example — fold two parallel lists
+
+```logts-play
+inline [logic] .pairs:
+
+    pairSum(A, X, Y, C) <- C is A + X + Y
+
+    query total:
+        foldl(pairSum(A, X, Y, C), [1, 2], [10, 20], 0, S),
+        show(S)
+
+:
+
+comp [logic] .pairsLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+
+.pairsLogic:{
+    query = total
+    set = trigger
+}
+```
+
+**Load & Run** prints **`33`** (`0+1+10`, then `11+2+20`).
 
 ---
 

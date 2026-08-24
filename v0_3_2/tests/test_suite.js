@@ -44064,5 +44064,127 @@ comp [logic] .filterLogic:
   reg(4017, 'logic', 'F35g include regression (legacy)', runF35gIncludeRegression);
   reg(4018, 'logic', 'F35g include regression (wave)', runF35gIncludeRegression, { propagation: 'wave' });
 
+  reg(4019, 'logic', 'foldl/4 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved foldl/4',
+      function() { parseLogicBody('foldl(A, B, C, D) <- A = B'); },
+      "'foldl/4' is reserved",
+    );
+  });
+
+  reg(4020, 'logic', 'foldl/5 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved foldl/5',
+      function() { parseLogicBody('foldl(A, B, C, D, E) <- A = B'); },
+      "'foldl/5' is reserved",
+    );
+  });
+
+  reg(4021, 'logic', 'foldl/4 sums list with rule', function(h) {
+    const prog = parseLogicBody('plus(A, B, C) <- C is A + B\nquery q: foldl(plus(A, X, C), [1, 2, 3], 0, S)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('sum 6', sols[0].S.value, 6);
+  });
+  reg(4022, 'logic', 'foldl/4 sums list with rule (wave)', function(h) {
+    const prog = parseLogicBody('plus(A, B, C) <- C is A + B\nquery q: foldl(plus(A, X, C), [1, 2, 3], 0, S)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('sum 6', sols[0].S.value, 6);
+  }, { propagation: 'wave' });
+
+  reg(4023, 'logic', 'foldl/4 empty list returns initial', function(h) {
+    const prog = parseLogicBody('plus(A, B, C) <- C is A + B\nquery q: foldl(plus(A, X, C), [], 7, S)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('initial 7', sols[0].S.value, 7);
+  });
+
+  reg(4024, 'logic', 'foldl/4 goal failure mid-fold fails', function(h) {
+    const prog = parseLogicBody('plus(A, B, C) <- C is A + B\nquery bad: foldl(plus(A, X, C), [1, a, 3], 0, S)');
+    const eng = new LogicEngine(prog.clauses);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4025, 'logic', 'foldl/5 folds parallel lists', function(h) {
+    const prog = parseLogicBody('pairSum(A, X, Y, C) <- C is A + X + Y\nquery q: foldl(pairSum(A, X, Y, C), [1, 2], [10, 20], 0, S)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('sum 33', sols[0].S.value, 33);
+  });
+  reg(4026, 'logic', 'foldl/5 folds parallel lists (wave)', function(h) {
+    const prog = parseLogicBody('pairSum(A, X, Y, C) <- C is A + X + Y\nquery q: foldl(pairSum(A, X, Y, C), [1, 2], [10, 20], 0, S)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('sum 33', sols[0].S.value, 33);
+  }, { propagation: 'wave' });
+
+  reg(4027, 'logic', 'foldl/5 length mismatch fails', function(h) {
+    const prog = parseLogicBody('pairSum(A, X, Y, C) <- C is A + X + Y\nquery bad: foldl(pairSum(A, X, Y, C), [1, 2, 3], [10, 20], 0, S)');
+    const eng = new LogicEngine(prog.clauses);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35hFoldlComp(h, session) {
+    const src = `inline [logic] .stats:
+
+    plus(A, B, C) <- C is A + B
+
+    query total:
+        foldl(plus(A, X, C), [1, 2, 3, 4], 0, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sum 10', String(session.outIncludes(interp, '10')), 'true');
+  }
+
+  reg(4028, 'logic', 'F35h foldl comp show (legacy)', runF35hFoldlComp);
+  reg(4029, 'logic', 'F35h foldl comp show (wave)', runF35hFoldlComp, { propagation: 'wave' });
+
+  function runF35hMaplistRegression(h, session) {
+    const src = `inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        maplist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('doubled list', String(session.outIncludes(interp, '[2, 4, 6]')), 'true');
+  }
+
+  reg(4030, 'logic', 'F35h maplist regression (legacy)', runF35hMaplistRegression);
+  reg(4031, 'logic', 'F35h maplist regression (wave)', runF35hMaplistRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
