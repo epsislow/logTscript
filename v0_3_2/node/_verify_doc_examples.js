@@ -22,7 +22,8 @@ const { ROOT, DOC } = require('./js/paths');
 const { TEST_RUNTIME_SCRIPTS } = require(path.join(ROOT, 'tests', 'test_runtime_bundle_generated.js'));
 const { createTestNodeSandbox } = require('./js/test_node_sandbox');
 
-const LOGTS_PLAY_RE = /```logts-play\n([\s\S]*?)```/g;
+// Opening fence may be LF or CRLF; closing ``` is matched literally.
+const LOGTS_PLAY_RE = /```logts-play\r?\n([\s\S]*?)```/g;
 const DOC_VERIFY_DIR = path.join(__dirname, 'doc_verify');
 
 function printHelp() {
@@ -81,7 +82,7 @@ function listDocPagesWithPlayBlocks() {
     if (!name.endsWith('.md')) continue;
     const full = path.join(DOC, name);
     const md = fs.readFileSync(full, 'utf8');
-    const count = (md.match(/```logts-play/g) || []).length;
+    const count = extractPlayBlocks(md).length;
     if (count > 0) {
       pages.push({ slug: name.slice(0, -3), file: full, blocks: count });
     }
@@ -90,12 +91,16 @@ function listDocPagesWithPlayBlocks() {
   return pages;
 }
 
+function normalizeBlockText(text) {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+}
+
 function extractPlayBlocks(md) {
   const blocks = [];
   let m;
   const re = new RegExp(LOGTS_PLAY_RE.source, 'g');
   while ((m = re.exec(md))) {
-    blocks.push(m[1].trim());
+    blocks.push(normalizeBlockText(m[1]));
   }
   return blocks;
 }
@@ -212,7 +217,10 @@ function verifyPage(sandbox, page, opts) {
     extra: extraCases.length,
     extraFails,
   };
-  console.log(`Summary: blocks ${runBlocks ? `${blocks.length - blockFails}/${blocks.length}` : 'skipped'}` +
+  const blockSummary = runBlocks
+    ? `${blocks.length - blockFails}/${blocks.length}`
+    : (blocks.length === 0 ? 'none found' : 'skipped');
+  console.log(`Summary: blocks ${blockSummary}` +
     (extraCases.length ? `, extra ${extraCases.length - extraFails}/${extraCases.length}` : ''));
   return summary;
 }
