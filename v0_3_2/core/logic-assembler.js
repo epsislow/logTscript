@@ -38,6 +38,12 @@ const LOGIC_BUILTIN_MIN_LIST_PRED = 'min_list';
 const LOGIC_BUILTIN_SUBLIST_PRED = 'sublist';
 const LOGIC_BUILTIN_PERMUTATION_PRED = 'permutation';
 const LOGIC_BUILTIN_COMBINATIONS_PRED = 'combinations';
+const LOGIC_BUILTIN_CALL_PRED = 'call';
+const LOGIC_BUILTIN_INCLUDE_PRED = 'include';
+const LOGIC_BUILTIN_EXCLUDE_PRED = 'exclude';
+const LOGIC_BUILTIN_PARTITION_PRED = 'partition';
+const LOGIC_BUILTIN_CONVLIST_PRED = 'convlist';
+const LOGIC_BUILTIN_MAPLIST_PRED = 'maplist';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -82,6 +88,12 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_SUBLIST_PRED]: [3],
   [LOGIC_BUILTIN_PERMUTATION_PRED]: [2],
   [LOGIC_BUILTIN_COMBINATIONS_PRED]: [3],
+  [LOGIC_BUILTIN_CALL_PRED]: [1],
+  [LOGIC_BUILTIN_INCLUDE_PRED]: [3],
+  [LOGIC_BUILTIN_EXCLUDE_PRED]: [3],
+  [LOGIC_BUILTIN_PARTITION_PRED]: [4],
+  [LOGIC_BUILTIN_CONVLIST_PRED]: [3],
+  [LOGIC_BUILTIN_MAPLIST_PRED]: [2, 3],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -636,6 +648,24 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_COMBINATIONS_PRED && arity === 3) {
     return "'combinations/3' is reserved — cannot define combinations as fact or rule head";
   }
+  if (predicate === LOGIC_BUILTIN_CALL_PRED && arity === 1) {
+    return "'call/1' is reserved — cannot define call as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_INCLUDE_PRED && arity === 3) {
+    return "'include/3' is reserved — cannot define include as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_EXCLUDE_PRED && arity === 3) {
+    return "'exclude/3' is reserved — cannot define exclude as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_PARTITION_PRED && arity === 4) {
+    return "'partition/4' is reserved — cannot define partition as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_CONVLIST_PRED && arity === 3) {
+    return "'convlist/3' is reserved — cannot define convlist as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_MAPLIST_PRED && (arity === 2 || arity === 3)) {
+    return `'maplist/${arity}' is reserved — cannot define maplist as fact or rule head`;
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -756,6 +786,18 @@ function logicValidateProgram(prog) {
         logicError("'permutation/2' is reserved — cannot define permutation as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_COMBINATIONS_PRED && arity === 3) {
         logicError("'combinations/3' is reserved — cannot define combinations as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_CALL_PRED && arity === 1) {
+        logicError("'call/1' is reserved — cannot define call as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_INCLUDE_PRED && arity === 3) {
+        logicError("'include/3' is reserved — cannot define include as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_EXCLUDE_PRED && arity === 3) {
+        logicError("'exclude/3' is reserved — cannot define exclude as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_PARTITION_PRED && arity === 4) {
+        logicError("'partition/4' is reserved — cannot define partition as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_CONVLIST_PRED && arity === 3) {
+        logicError("'convlist/3' is reserved — cannot define convlist as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_MAPLIST_PRED && (arity === 2 || arity === 3)) {
+        logicError(`'maplist/${arity}' is reserved — cannot define maplist as constraint head`, c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

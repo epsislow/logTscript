@@ -43756,5 +43756,313 @@ comp [logic] .statsLogic:
   reg(3985, 'logic', 'F35e numlist regression (legacy)', runF35eNumlistRegression);
   reg(3986, 'logic', 'F35e numlist regression (wave)', runF35eNumlistRegression, { propagation: 'wave' });
 
+  reg(3987, 'logic', 'call/1 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved call',
+      function() { parseLogicBody('call(X) <- X = Y'); },
+      "'call/1' is reserved",
+    );
+  });
+
+  reg(3988, 'logic', 'call/1 invokes callable goal', function(h) {
+    const ok = parseLogicBody('query ok: call(number(3))');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+    const bad = parseLogicBody('query bad: call(atom(3))');
+    h.assert('bad', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+
+  reg(3989, 'logic', 'call/1 member backtracking', function(h) {
+    const prog = parseLogicBody('query q: call(member(X, [a, b]))');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('two sols', String(sols.length), '2');
+    h.assert('a', sols[0].X.name, 'a');
+    h.assert('b', sols[1].X.name, 'b');
+  });
+  reg(3990, 'logic', 'call/1 member backtracking (wave)', function(h) {
+    const prog = parseLogicBody('query q: call(member(X, [a, b]))');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('two sols', String(sols.length), '2');
+  }, { propagation: 'wave' });
+
+  reg(3991, 'logic', 'include/3 keeps matching elements', function(h) {
+    const prog = parseLogicBody('query q: include(number(X), [1, a, 2], I)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first 1', sols[0].I.head.value, 1);
+    h.assert('second 2', sols[0].I.tail.head.value, 2);
+    h.assert('nil', sols[0].I.tail.tail.nil, true);
+  });
+  reg(3992, 'logic', 'include/3 keeps matching elements (wave)', function(h) {
+    const prog = parseLogicBody('query q: include(number(X), [1, a, 2], I)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('second 2', sols[0].I.tail.head.value, 2);
+  }, { propagation: 'wave' });
+
+  reg(3993, 'logic', 'exclude/3 drops matching elements', function(h) {
+    const prog = parseLogicBody('query q: exclude(number(X), [1, a, 2], E)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('only a', sols[0].E.head.name, 'a');
+    h.assert('nil', sols[0].E.tail.nil, true);
+  });
+  reg(3994, 'logic', 'exclude/3 drops matching elements (wave)', function(h) {
+    const prog = parseLogicBody('query q: exclude(number(X), [1, a, 2], E)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('only a', sols[0].E.head.name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(3995, 'logic', 'partition/4 splits list', function(h) {
+    const prog = parseLogicBody('query q: partition(number(X), [1, a, 2], I, E)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('inc 1', sols[0].I.head.value, 1);
+    h.assert('exc a', sols[0].E.head.name, 'a');
+  });
+  reg(3996, 'logic', 'partition/4 splits list (wave)', function(h) {
+    const prog = parseLogicBody('query q: partition(number(X), [1, a, 2], I, E)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('exc a', sols[0].E.head.name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(3997, 'logic', 'convlist/3 maps with rule', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery q: convlist(double(X, Y), [1, 2, 3], R)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first 2', sols[0].R.head.value, 2);
+    h.assert('second 4', sols[0].R.tail.head.value, 4);
+    h.assert('third 6', sols[0].R.tail.tail.head.value, 6);
+  });
+  reg(3998, 'logic', 'convlist/3 maps with rule (wave)', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery q: convlist(double(X, Y), [1, 2, 3], R)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('third 6', sols[0].R.tail.tail.head.value, 6);
+  }, { propagation: 'wave' });
+
+  reg(3999, 'logic', 'include/3 non-list fails', function(h) {
+    const prog = parseLogicBody('query bad: include(number(X), notList, I)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35fIncludeComp(h, session) {
+    const src = `inline [logic] .filter:
+
+    query nums:
+        include(number(X), [1, a, 2, 3, b], Ns),
+        show(Ns)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = nums
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('nums', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  }
+
+  reg(4000, 'logic', 'F35f include comp show (legacy)', runF35fIncludeComp);
+  reg(4001, 'logic', 'F35f include comp show (wave)', runF35fIncludeComp, { propagation: 'wave' });
+
+  function runF35fConvlistComp(h, session) {
+    const src = `inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        convlist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('doubled', String(session.outIncludes(interp, '[2, 4, 6]')), 'true');
+  }
+
+  reg(4002, 'logic', 'F35f convlist comp show (legacy)', runF35fConvlistComp);
+  reg(4003, 'logic', 'F35f convlist comp show (wave)', runF35fConvlistComp, { propagation: 'wave' });
+
+  function runF35fPermRegression(h, session) {
+    const src = `inline [logic] .deck:
+
+    query orders:
+        permutation(Order, [a, b]),
+        show(Order)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = orders
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('a b', String(session.outIncludes(interp, '[a, b]')), 'true');
+    h.assert('b a', String(session.outIncludes(interp, '[b, a]')), 'true');
+  }
+
+  reg(4004, 'logic', 'F35f permutation regression (legacy)', runF35fPermRegression);
+  reg(4005, 'logic', 'F35f permutation regression (wave)', runF35fPermRegression, { propagation: 'wave' });
+
+  reg(4006, 'logic', 'maplist/2 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved maplist/2',
+      function() { parseLogicBody('maplist(X, Y) <- X = Y'); },
+      "'maplist/2' is reserved",
+    );
+  });
+
+  reg(4007, 'logic', 'maplist/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved maplist/3',
+      function() { parseLogicBody('maplist(X, Y, Z) <- X = Y'); },
+      "'maplist/3' is reserved",
+    );
+  });
+
+  reg(4008, 'logic', 'maplist/2 all elements satisfy goal', function(h) {
+    const ok = parseLogicBody('query ok: maplist(number(X), [1, 2, 3])');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+    const bad = parseLogicBody('query bad: maplist(number(X), [1, a, 3])');
+    h.assert('bad', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+  reg(4009, 'logic', 'maplist/2 all elements satisfy goal (wave)', function(h) {
+    const ok = parseLogicBody('query ok: maplist(number(X), [1, 2, 3])');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+    const bad = parseLogicBody('query bad: maplist(number(X), [1, a, 3])');
+    h.assert('bad', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  }, { propagation: 'wave' });
+
+  reg(4010, 'logic', 'maplist/3 maps with rule', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery q: maplist(double(X, Y), [1, 2, 3], R)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first 2', sols[0].R.head.value, 2);
+    h.assert('second 4', sols[0].R.tail.head.value, 4);
+    h.assert('third 6', sols[0].R.tail.tail.head.value, 6);
+  });
+  reg(4011, 'logic', 'maplist/3 maps with rule (wave)', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery q: maplist(double(X, Y), [1, 2, 3], R)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('third 6', sols[0].R.tail.tail.head.value, 6);
+  }, { propagation: 'wave' });
+
+  reg(4012, 'logic', 'maplist/3 verifies ground pair list', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery ok: maplist(double(X, Y), [1, 2], [2, 4])');
+    const eng = new LogicEngine(prog.clauses);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+    const bad = parseLogicBody('double(X, Y) <- Y is X * 2\nquery bad: maplist(double(X, Y), [1, 2], [2, 5])');
+    h.assert('bad', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+  reg(4013, 'logic', 'maplist/3 verifies ground pair list (wave)', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery ok: maplist(double(X, Y), [1, 2], [2, 4])');
+    const eng = new LogicEngine(prog.clauses);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  }, { propagation: 'wave' });
+
+  reg(4014, 'logic', 'maplist/3 length mismatch fails', function(h) {
+    const prog = parseLogicBody('double(X, Y) <- Y is X * 2\nquery bad: maplist(double(X, Y), [1, 2, 3], [2, 4])');
+    const eng = new LogicEngine(prog.clauses);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35gMaplistComp(h, session) {
+    const src = `inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        maplist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('doubled list', String(session.outIncludes(interp, '[2, 4, 6]')), 'true');
+  }
+
+  reg(4015, 'logic', 'F35g maplist comp show (legacy)', runF35gMaplistComp);
+  reg(4016, 'logic', 'F35g maplist comp show (wave)', runF35gMaplistComp, { propagation: 'wave' });
+
+  function runF35gIncludeRegression(h, session) {
+    const src = `inline [logic] .filter:
+
+    query nums:
+        include(number(X), [1, a, 2, 3, b], Ns),
+        show(Ns)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = nums
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('filtered', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  }
+
+  reg(4017, 'logic', 'F35g include regression (legacy)', runF35gIncludeRegression);
+  reg(4018, 'logic', 'F35g include regression (wave)', runF35gIncludeRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

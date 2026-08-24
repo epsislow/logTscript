@@ -43,6 +43,13 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`sublist/3`** | 3 | yes | no | Contiguous subsequence; **Rest** is tail after match |
 | **`permutation/2`** | 2 | yes | no | All permutations with backtracking |
 | **`combinations/3`** | 3 | yes | no | **K**-element subsets; order from source list |
+| **`call/1`** | 1 | yes | no | Meta-call — prove a compound goal term |
+| **`include/3`** | 3 | yes | no | Keep list elements where template goal succeeds |
+| **`exclude/3`** | 3 | yes | no | Keep list elements where template goal fails |
+| **`partition/4`** | 4 | yes | no | Split list into pass / fail partitions |
+| **`convlist/3`** | 3 | yes | no | Map template goal; collect outputs (drop failures) |
+| **`maplist/2`** | 2 | yes | no | Prove template goal for every list element |
+| **`maplist/3`** | 3 | yes | no | Map template goal across parallel lists |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -1337,6 +1344,210 @@ comp [logic] .pickLogic:
 ```
 
 **Load & Run** prints **`[red, green]`**, **`[red, blue]`**, and **`[green, blue]`**.
+
+---
+
+## `call/1`
+
+**`call(Goal)`** — prove **`Goal`**, where **`Goal`** is a **callable compound** (e.g. **`member(X, L)`**, **`number(3)`**). Enables meta-calling and underpins **`include/3`**, **`exclude/3`**, **`partition/4`**, and **`convlist/3`**.
+
+| Call | Behaviour |
+|------|-----------|
+| `call(number(3))` | Succeeds |
+| `call(member(X, [a, b]))` | Backtracking over **`X`** |
+| Non-compound goal | **Fail** |
+| Cut inside **`call`** | Does **not** commit choices made **before** the **`call`** |
+
+**Reserved head:** you cannot define **`call/1`** as fact, rule, or constraint head.
+
+### Example — meta-call with backtracking
+
+```logts-play
+inline [logic] .world:
+
+:
+
+1wire run = 1
+1wire ok = .world:query({ call(member(X, [red, green])), show(X) })
+```
+
+**Load & Run** prints **`red`** and **`green`**.
+
+---
+
+## `include/3`, `exclude/3`, and `partition/4`
+
+Higher-order list filters. **`Goal`** is a **template compound** with at least one variable (e.g. **`number(X)`**). For each list element, that variable is bound to the element and **`Goal`** is called.
+
+| Builtin | Result |
+|---------|--------|
+| **`include(Goal, List, Included)`** | Elements where **`Goal`** succeeds |
+| **`exclude(Goal, List, Excluded)`** | Elements where **`Goal`** fails |
+| **`partition(Goal, List, Included, Excluded)`** | Both partitions |
+
+**`List`** must be a **ground** closed list.
+
+### Example — keep numbers only
+
+```logts-play
+inline [logic] .filter:
+
+    query nums:
+        include(number(X), [1, a, 2, 3, b], Ns),
+        show(Ns)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = nums
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[1, 2, 3]`**.
+
+### Example — partition numbers and atoms
+
+```logts-play
+inline [logic] .filter:
+
+    query split:
+        partition(number(X), [1, a, 2, b], Ns, As),
+        show(Ns, As)
+
+:
+
+comp [logic] .filterLogic:
+    on: 1
+    .filter { }
+:
+
+1wire trigger = 1
+
+.filterLogic:{
+    query = split
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[1, 2]`** and **`[a, b]`**.
+
+---
+
+## `convlist/3`
+
+**`convlist(Goal, List, Result)`** — apply **`Goal`** to each element of **`List`**. On success, append the **output** to **`Result`**.
+
+| Goal shape | Output collected |
+|------------|------------------|
+| Unary **`p(X)`** | The bound **`X`** (same as **`include/3`** spirit) |
+| N-ary **`p(X, …, Y)`** | The **last** argument after the call |
+
+### Example — double each number
+
+```logts-play
+inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        convlist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[2, 4, 6]`**.
+
+---
+
+## `maplist/2` and `maplist/3`
+
+Higher-order list iteration built on **`call/1`**. Unlike **`include/3`**, **`maplist`** requires **every** element to succeed — one failure fails the whole goal.
+
+| Builtin | Arguments | Behaviour |
+|---------|-----------|-----------|
+| **`maplist(Goal, List)`** | Unary template **`Goal`** | Prove **`Goal`** for **each** element of ground **`List`** |
+| **`maplist(Goal, List1, List2)`** | Binary template **`Goal`** | For each pair from **`List1`** and **`List2`**; generate **`List2`** or verify ground lists |
+
+**Template rules** (same as **`convlist/3`**):
+
+- **`maplist/2`**: first variable in **`Goal`** is bound to each list element in turn.
+- **`maplist/3`**: first variable gets the element from **`List1`**, second variable gets the matching element from **`List2`** (or is collected when **`List2`** is unbound).
+
+**`List1`** must be a **ground** closed list. **`List2`** may be unbound (output) or ground (verification). Length mismatch → **fail**.
+
+### Example — double each number
+
+```logts-play
+inline [logic] .math:
+
+    double(X, Y) <- Y is X * 2
+
+    query doubled:
+        maplist(double(X, Y), [1, 2, 3], R),
+        show(R)
+
+:
+
+comp [logic] .mathLogic:
+    on: 1
+    .math { }
+:
+
+1wire trigger = 1
+
+.mathLogic:{
+    query = doubled
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[2, 4, 6]`**.
+
+### Example — type-check every element
+
+```logts-play
+inline [logic] .check:
+
+    query allNumbers:
+        maplist(number(X), [1, 2, 3])
+
+:
+
+comp [logic] .checkLogic:
+    on: 1
+    .check { }
+:
+
+1wire trigger = 1
+
+.checkLogic:{
+    query = allNumbers
+    set = trigger
+}
+```
+
+**Load & Run** succeeds silently (no **`show`**). **`maplist(number(X), [1, a, 3])`** would **fail**.
 
 ---
 

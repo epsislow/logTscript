@@ -361,6 +361,27 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'combinations' && g0.arity === 3) {
       return this._solveCombinations(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'call' && g0.arity === 1) {
+      return this._solveCallBuiltin(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'include' && g0.arity === 3) {
+      return this._solveInclude(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'exclude' && g0.arity === 3) {
+      return this._solveExclude(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'partition' && g0.arity === 4) {
+      return this._solvePartition(g0.args[0], g0.args[1], g0.args[2], g0.args[3], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'convlist' && g0.arity === 3) {
+      return this._solveConvlist(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'maplist' && g0.arity === 2) {
+      return this._solveMaplist2(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'maplist' && g0.arity === 3) {
+      return this._solveMaplist3(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -1249,6 +1270,195 @@ class LogicEngine {
     env.undo(trail);
     return any;
   }
+
+  _solveCallBuiltin(goalTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const innerGoal = logicGoalFromCallableTerm(logicDeref(goalTerm, env));
+    if (!innerGoal) return false;
+    const savedCutDepth = env.cutDepth;
+    const savedCutCommitted = env.cutCommitted;
+    env.cutDepth = env.choiceDepth();
+    env.cutCommitted = false;
+    const cont = () => {
+      env.cutDepth = savedCutDepth;
+      env.cutCommitted = savedCutCommitted || env.cutCommitted;
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    };
+    const ok = this._solveGoals([innerGoal], env, depth + 1, cont, onDepthExceeded);
+    if (!ok) {
+      env.cutDepth = savedCutDepth;
+      env.cutCommitted = savedCutCommitted;
+    }
+    return ok;
+  }
+
+  _tryCallableTemplateOnce(templateTerm, elem, env, depth, onDepthExceeded) {
+    const prepared = logicPrepareCallableInstantiation(templateTerm, elem, env);
+    if (!prepared) return { ok: false, resultTerm: null };
+    const { goal, templateCopy } = prepared;
+    let ok = false;
+    let resultTerm = null;
+    const savedCutDepth = env.cutDepth;
+    const savedCutCommitted = env.cutCommitted;
+    env.cutDepth = env.choiceDepth();
+    env.cutCommitted = false;
+    const trail = env.trailLength();
+    this._solveGoals([goal], env, depth + 1, () => {
+      ok = true;
+      resultTerm = logicConvlistResultFromTemplate(templateCopy, env, this.table);
+      return false;
+    }, onDepthExceeded);
+    env.undo(trail);
+    env.cutDepth = savedCutDepth;
+    env.cutCommitted = savedCutCommitted;
+    return { ok, resultTerm };
+  }
+
+  _solveInclude(goalTemplate, list, included, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const elems = logicGroundListToArray(ld, env);
+    if (elems == null) return false;
+    const picked = [];
+    for (const elem of elems) {
+      const trial = this._tryCallableTemplateOnce(goalTemplate, elem, env, depth, onDepthExceeded);
+      if (trial.ok) picked.push(elem);
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(included, logicArrayToList(picked), env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveExclude(goalTemplate, list, excluded, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const elems = logicGroundListToArray(ld, env);
+    if (elems == null) return false;
+    const picked = [];
+    for (const elem of elems) {
+      const trial = this._tryCallableTemplateOnce(goalTemplate, elem, env, depth, onDepthExceeded);
+      if (!trial.ok) picked.push(elem);
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(excluded, logicArrayToList(picked), env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solvePartition(goalTemplate, list, included, excluded, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const elems = logicGroundListToArray(ld, env);
+    if (elems == null) return false;
+    const inc = [];
+    const exc = [];
+    for (const elem of elems) {
+      const trial = this._tryCallableTemplateOnce(goalTemplate, elem, env, depth, onDepthExceeded);
+      if (trial.ok) inc.push(elem);
+      else exc.push(elem);
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(included, logicArrayToList(inc), env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    if (!logicUnify(excluded, logicArrayToList(exc), env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveConvlist(goalTemplate, list, result, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const elems = logicGroundListToArray(ld, env);
+    if (elems == null) return false;
+    const out = [];
+    for (const elem of elems) {
+      const trial = this._tryCallableTemplateOnce(goalTemplate, elem, env, depth, onDepthExceeded);
+      if (trial.ok && trial.resultTerm != null) out.push(trial.resultTerm);
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(result, logicArrayToList(out), env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveMaplist2(goalTemplate, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const elems = logicGroundListToArray(ld, env);
+    if (elems == null) return false;
+    for (const elem of elems) {
+      const trial = this._tryCallableTemplateOnce(goalTemplate, elem, env, depth, onDepthExceeded);
+      if (!trial.ok) return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveMaplist3(goalTemplate, list1, list2, rest, env, depth, onSuccess, onDepthExceeded) {
+    const d1 = logicDeref(list1, env);
+    if (d1.kind !== 'list' || !logicListIsGroundClosed(d1, env)) return false;
+    const e1 = logicGroundListToArray(d1, env);
+    if (e1 == null) return false;
+    const d2 = logicDeref(list2, env);
+    if (d2.kind === 'list' && logicListIsGroundClosed(d2, env)) {
+      const e2 = logicGroundListToArray(d2, env);
+      if (e2 == null || e2.length !== e1.length) return false;
+      for (let i = 0; i < e1.length; i++) {
+        const trial = this._tryCallableTemplatePairOnce(goalTemplate, e1[i], e2[i], env, depth, onDepthExceeded);
+        if (!trial.ok) return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (d2.kind === 'var') {
+      const out = [];
+      for (const elem1 of e1) {
+        const trial = this._tryCallableTemplatePairOnce(goalTemplate, elem1, null, env, depth, onDepthExceeded);
+        if (!trial.ok || trial.resultTerm == null) return false;
+        out.push(trial.resultTerm);
+      }
+      const trail = env.trailLength();
+      if (!logicUnify(list2, logicArrayToList(out), env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _tryCallableTemplatePairOnce(templateTerm, elem1, elem2, env, depth, onDepthExceeded) {
+    const prepared = logicPrepareCallableInstantiationPair(templateTerm, elem1, elem2, env);
+    if (!prepared) return { ok: false, resultTerm: null };
+    const { goal, templateCopy, outVarName } = prepared;
+    let ok = false;
+    let resultTerm = null;
+    const savedCutDepth = env.cutDepth;
+    const savedCutCommitted = env.cutCommitted;
+    env.cutDepth = env.choiceDepth();
+    env.cutCommitted = false;
+    const trail = env.trailLength();
+    this._solveGoals([goal], env, depth + 1, () => {
+      ok = true;
+      if (outVarName) {
+        const outTerm = logicTermVarByName(templateCopy, outVarName);
+        resultTerm = outTerm ? logicResolveTerm(outTerm, env, this.table) : null;
+      }
+      return false;
+    }, onDepthExceeded);
+    env.undo(trail);
+    env.cutDepth = savedCutDepth;
+    env.cutCommitted = savedCutCommitted;
+    return { ok, resultTerm };
+  }
 }
 
 function logicRenameApartClause(clause, idRef) {
@@ -1761,6 +1971,202 @@ function logicSameMultiset(listA, listB, env, table) {
     if (!found) return false;
   }
   return true;
+}
+
+function logicGoalFromCallableTerm(term) {
+  if (!term) return null;
+  if (term.kind === 'compound') {
+    return {
+      kind: 'call',
+      predicate: term.predicate,
+      arity: term.arity != null ? term.arity : (term.args || []).length,
+      args: term.args || [],
+    };
+  }
+  if (term.kind === 'call') return term;
+  return null;
+}
+
+function logicCloneTerm(term) {
+  if (!term) return term;
+  if (term.kind === 'var') return { kind: 'var', name: term.name };
+  if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'atom') {
+    const r = { kind: 'atom', name: term.name };
+    if (term.id != null) r.id = term.id;
+    if (term.logicTraceAsString) r.logicTraceAsString = true;
+    return r;
+  }
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      arity: term.arity != null ? term.arity : (term.args || []).length,
+      args: (term.args || []).map(logicCloneTerm),
+    };
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicCloneTerm(term.head),
+      tail: logicCloneTerm(term.tail),
+    };
+  }
+  if (term.kind === 'arith') {
+    return {
+      kind: 'arith',
+      op: term.op,
+      left: logicCloneTerm(term.left),
+      right: logicCloneTerm(term.right),
+    };
+  }
+  return term;
+}
+
+function logicFirstVarNameInTerm(term) {
+  let found = null;
+  function walk(t) {
+    if (!t || found) return;
+    if (t.kind === 'var' && t.name !== '_') {
+      found = t.name;
+      return;
+    }
+    if (t.kind === 'compound') {
+      for (const a of t.args || []) walk(a);
+    } else if (t.kind === 'list' && !t.nil) {
+      walk(t.head);
+      walk(t.tail);
+    } else if (t.kind === 'arith') {
+      walk(t.left);
+      walk(t.right);
+    }
+  }
+  walk(term);
+  return found;
+}
+
+function logicSubstituteVarInTerm(term, varName, replacement) {
+  if (!term) return term;
+  if (term.kind === 'var') {
+    if (term.name === varName) return logicCloneTerm(replacement);
+    return term;
+  }
+  if (term.kind === 'number' || term.kind === 'atom') return term;
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      arity: term.arity != null ? term.arity : (term.args || []).length,
+      args: (term.args || []).map((a) => logicSubstituteVarInTerm(a, varName, replacement)),
+    };
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicSubstituteVarInTerm(term.head, varName, replacement),
+      tail: logicSubstituteVarInTerm(term.tail, varName, replacement),
+    };
+  }
+  if (term.kind === 'arith') {
+    return {
+      kind: 'arith',
+      op: term.op,
+      left: logicSubstituteVarInTerm(term.left, varName, replacement),
+      right: logicSubstituteVarInTerm(term.right, varName, replacement),
+    };
+  }
+  return term;
+}
+
+function logicVarNamesInTerm(term) {
+  const names = [];
+  const seen = new Set();
+  function walk(t) {
+    if (!t) return;
+    if (t.kind === 'var' && t.name !== '_') {
+      if (!seen.has(t.name)) {
+        seen.add(t.name);
+        names.push(t.name);
+      }
+      return;
+    }
+    if (t.kind === 'compound') {
+      for (const a of t.args || []) walk(a);
+    } else if (t.kind === 'list' && !t.nil) {
+      walk(t.head);
+      walk(t.tail);
+    } else if (t.kind === 'arith') {
+      walk(t.left);
+      walk(t.right);
+    }
+  }
+  walk(term);
+  return names;
+}
+
+function logicTermVarByName(term, varName) {
+  let found = null;
+  function walk(t) {
+    if (!t || found) return;
+    if (t.kind === 'var' && t.name === varName) {
+      found = t;
+      return;
+    }
+    if (t.kind === 'compound') {
+      for (const a of t.args || []) walk(a);
+    } else if (t.kind === 'list' && !t.nil) {
+      walk(t.head);
+      walk(t.tail);
+    } else if (t.kind === 'arith') {
+      walk(t.left);
+      walk(t.right);
+    }
+  }
+  walk(term);
+  return found;
+}
+
+function logicPrepareCallableInstantiation(templateTerm, elem, env) {
+  const td = logicDeref(templateTerm, env);
+  if (td.kind !== 'compound') return null;
+  const varName = logicFirstVarNameInTerm(td);
+  if (!varName) return null;
+  const elemD = logicDeref(elem, env);
+  const templateCopy = logicSubstituteVarInTerm(td, varName, elemD);
+  const goal = logicGoalFromCallableTerm(templateCopy);
+  if (!goal) return null;
+  return { goal, templateCopy };
+}
+
+function logicPrepareCallableInstantiationPair(templateTerm, elem1, elem2, env) {
+  const td = logicDeref(templateTerm, env);
+  if (td.kind !== 'compound') return null;
+  const varNames = logicVarNamesInTerm(td);
+  if (varNames.length < 2) return null;
+  const inVarName = varNames[0];
+  const outVarName = varNames[1];
+  const elem1D = logicDeref(elem1, env);
+  let templateCopy = logicSubstituteVarInTerm(td, inVarName, elem1D);
+  let outTerm = null;
+  if (elem2 != null) {
+    const elem2D = logicDeref(elem2, env);
+    templateCopy = logicSubstituteVarInTerm(templateCopy, outVarName, elem2D);
+  } else {
+    outTerm = logicTermVarByName(templateCopy, outVarName);
+  }
+  const goal = logicGoalFromCallableTerm(templateCopy);
+  if (!goal) return null;
+  return { goal, templateCopy, outVarName: elem2 == null ? outVarName : null, outTerm };
+}
+
+function logicConvlistResultFromTemplate(templateCopy, env, table) {
+  if (!templateCopy || templateCopy.kind !== 'compound') return null;
+  const args = templateCopy.args || [];
+  if (!args.length) return null;
+  const idx = args.length === 1 ? 0 : args.length - 1;
+  return logicResolveTerm(args[idx], env, table);
 }
 
 function logicEvalNumber(term, env, table) {
