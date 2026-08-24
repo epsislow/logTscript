@@ -1,0 +1,492 @@
+LogTScript Documentation v0.3.2
+Logic Values and Type Predicates
+LogTScript logic supports several kinds of values that can participate in facts, rules, queries, and compound structures.
+Type predicates allow rules and queries to test the type of the value currently bound to a variable.
+
+───
+
+Value types
+The core logic value categories are:
+
+Type
+Example
+Description
+
+atom
+john, boardwalk, red
+Symbolic constant
+
+number
+15, -4, 250
+Integer value
+
+bool
+0, 1
+Boolean value
+
+text
+"John Smith"
+Text value
+
+list
+[10, 20, 30]
+Ordered collection
+
+compound
+person(john, 25)
+Structured value with a functor and arguments
+
+
+Variables are not values themselves. A variable becomes bound to one of the above values during resolution.
+
+───
+
+Type predicates
+The following predicates test the type of the current value:
+logts
+atom(X)
+number(X)
+bool(X)
+text(X)
+list(X)
+compound(X)
+
+These predicates are type tests. They do not generate arbitrary values.
+For example:
+logts
+value(10)
+value("hello")
+value(red)
+
+query numbers:
+    value(X),
+    number(X)
+
+The query produces:
+text
+X = 10
+
+while:
+logts
+query textValues:
+    value(X),
+    text(X)
+
+produces:
+text
+X = "hello"
+
+and:
+logts
+query atoms:
+    value(X),
+    atom(X)
+
+produces:
+text
+X = red
+
+
+───
+
+Type checking with bound variables
+When the variable is already bound, the type predicate simply tests that value.
+logts
+value(42)
+
+query valid:
+    value(X),
+    number(X)
+
+X becomes 42, and:
+text
+number(42)
+
+succeeds.
+If the value is incompatible:
+logts
+value("42")
+
+query valid:
+    value(X),
+    number(X)
+
+the number(X) goal fails.
+
+───
+
+Unbound variables
+A variable does not have to be bound when a relation starts.
+For example:
+logts
+score(10)
+score(20)
+score(50)
+
+validScore(X) <-
+    score(X),
+    number(X),
+    X >= 0,
+    X =< 100
+
+query valid:
+    validScore(X)
+
+Resolution proceeds by binding X through score(X):
+text
+X = 10 → number(10) ✓
+X = 20 → number(20) ✓
+X = 50 → number(50) ✓
+
+The query therefore produces three solutions.
+A type predicate does not generate numbers:
+logts
+number(X)
+
+does not mean "generate a number for X".
+It means:
+The current binding of X must be a number.
+Therefore, goal order can matter:
+logts
+validScore(X) <-
+    score(X),
+    number(X),
+    X >= 0,
+    X =< 100
+
+can work because score(X) binds X before the type test.
+
+───
+
+A variable may have different types across solutions
+A logic variable does not have one permanent type across all backtracking solutions.
+For example:
+logts
+value(10)
+value("hello")
+value(25)
+value("world")
+
+query values:
+    value(X)
+
+produces:
+text
+X = 10
+X = "hello"
+X = 25
+X = "world"
+
+The same variable X therefore has different types in different solutions.
+A type predicate filters those solutions:
+logts
+query numericValues:
+    value(X),
+    number(X)
+
+produces:
+text
+X = 10
+X = 25
+
+while:
+logts
+query textValues:
+    value(X),
+    text(X)
+
+produces:
+text
+X = "hello"
+X = "world"
+
+
+───
+
+Lists
+A list is a distinct logic value representing an ordered collection.
+Examples:
+logts
+[]
+[1]
+[1, 2, 3]
+["John", "Mary", "Peter"]
+
+A list can contain values of different types:
+logts
+[10, "hello", red, person(john, 25)]
+
+The list itself is a list:
+logts
+list(X)
+
+but its elements have their own types.
+For example:
+logts
+value(["John", "Mary", "Peter"])
+
+query names:
+    value(X),
+    list(X)
+
+succeeds because X is a list.
+However:
+logts
+text(X)
+
+does not succeed.
+A list containing text values is not itself a text value.
+Conceptually:
+text
+X = ["John", "Mary", "Peter"]
+
+list(X)  ✓
+text(X)  ✗
+
+To test the elements, use a relation that accesses the elements:
+logts
+member(Item, X),
+text(Item)
+
+This can produce:
+text
+Item = "John"
+Item = "Mary"
+Item = "Peter"
+
+
+───
+
+Compound values
+A compound value is a structured value consisting of a functor and a fixed number of arguments.
+Example:
+logts
+person(john, 25)
+
+This is a compound value with:
+text
+functor = person
+arity   = 2
+
+Another example:
+logts
+rents(50, 200, 600, 1400, 1700)
+
+has:
+text
+functor = rents
+arity   = 5
+
+The entire value is a single compound value.
+logts
+value(person(john, 25))
+
+query structures:
+    value(X),
+    compound(X)
+
+produces:
+text
+X = person(john, 25)
+
+
+───
+
+Compound values vs lists
+Lists and compound values are distinct semantic types in LogTScript.
+A compound has a named functor and fixed arity:
+logts
+person(john, 25)
+
+A list is an ordered collection whose length can vary:
+logts
+[john, mary, peter]
+
+Therefore:
+text
+compound(person(john, 25))  ✓
+list(person(john, 25))      ✗
+
+list([john, mary, peter])   ✓
+compound([john, mary])      ✗
+
+This distinction is intentional even though some Prolog implementations internally represent lists using compound terms.
+LogTScript treats them as different logic value categories.
+
+───
+
+Destructuring compound values
+Compound values can be matched directly through unification.
+For example:
+logts
+property(
+    boardwalk,
+    400,
+    [50, 200, 600, 1400, 1700],
+    200
+)
+
+A query can destructure the compound:
+logts
+query propertyInfo:
+    property(Name, Price, Rents, HotelPrice)
+
+producing:
+text
+Name       = boardwalk
+Price      = 400
+Rents      = [50, 200, 600, 1400, 1700]
+HotelPrice = 200
+
+The list remains a single value bound to Rents.
+It can subsequently be processed by list relations.
+
+───
+
+Lists inside compound values
+Compound values and lists can be combined naturally.
+For example, a Monopoly property can be represented as:
+logts
+property(
+    boardwalk,
+    400,
+    [50, 200, 600, 1400, 1700],
+    200
+)
+
+This remains property/4 regardless of how many rent values are stored in the list.
+This avoids expanding the relation into something such as:
+text
+property/8
+property/9
+...
+
+for every additional list element.
+The number of rent values is instead represented by the list:
+logts
+[50, 200, 600, 1400, 1700]
+
+
+───
+
+Element type vs container type
+The type of a container is independent from the type of its contents.
+For:
+logts
+Names = ["John", "Mary", "Peter"]
+
+the value has type:
+text
+list
+
+while each element has type:
+text
+text
+
+Therefore:
+logts
+list(Names)
+
+succeeds, but:
+logts
+text(Names)
+
+fails.
+A relation operating on an element can test its type independently:
+logts
+member(Name, Names),
+text(Name)
+
+This distinction applies to all compound and collection values.
+
+───
+
+Type predicates are ordinary logic goals
+Type predicates can be used anywhere a normal goal can be used:
+logts
+validScore(X) <-
+    number(X),
+    X >= 0,
+    X =< 100
+
+logts
+validName(X) <-
+    text(X)
+
+logts
+validProperty(X) <-
+    compound(X)
+
+logts
+validRentTable(X) <-
+    list(X)
+
+They participate in normal conjunction and backtracking.
+They do not introduce a separate type-checking language.
+
+───
+
+Example — mixed values
+logts
+inline [logic] .world:
+
+    value(10)
+    value("hello")
+    value(red)
+    value([1, 2, 3])
+    value(person(john, 25))
+
+    query numbers:
+        value(X),
+        number(X)
+
+    query texts:
+        value(X),
+        text(X)
+
+    query atoms:
+        value(X),
+        atom(X)
+
+    query lists:
+        value(X),
+        list(X)
+
+    query structures:
+        value(X),
+        compound(X)
+
+:
+
+The queries classify the same knowledge base without modifying it.
+
+───
+
+Design principle
+Type predicates are filters, not generators.
+logts
+number(X)
+
+does not generate arbitrary integers.
+logts
+text(X)
+
+does not generate arbitrary strings.
+logts
+list(X)
+
+does not generate arbitrary lists.
+They test the current candidate binding produced by the rest of the logic program.
+This preserves the normal LogTScript logic model:
+text
+facts/rules
+    ↓
+unification
+    ↓
+candidate bindings
+    ↓
+type predicates / comparisons / other goals
+    ↓
+solutions
+
+And because the type is evaluated for each binding, the same variable can legitimately have different types across different backtracking solutions.
