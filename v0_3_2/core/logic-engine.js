@@ -298,6 +298,21 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'set_random' && g0.arity === 1) {
       return this._solveSetRandom(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'last' && g0.arity === 2) {
+      return this._solveLast(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'select' && g0.arity === 3) {
+      return this._solveSelect(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'selectchk' && g0.arity === 3) {
+      return this._solveSelectchk(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'flatten' && g0.arity === 2) {
+      return this._solveFlatten(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'same_length' && g0.arity === 2) {
+      return this._solveSameLength(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -704,6 +719,121 @@ class LogicEngine {
     }
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
+
+  _solveLast(list, elem, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || logicListIsNil(ld)) return false;
+    if (!logicListIsGroundClosed(ld, env)) return false;
+    let cur = ld;
+    let lastHead = null;
+    while (!logicListIsNil(cur)) {
+      if (cur.kind !== 'list' || cur.nil) return false;
+      lastHead = cur.head;
+      const tailD = logicDeref(cur.tail, env);
+      if (logicListIsNil(tailD)) break;
+      cur = tailD;
+      if (cur.kind === 'var') return false;
+    }
+    const trail = env.trailLength();
+    if (!logicUnify(elem, lastHead, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveSelect(elem, list, restList, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._selectWalk(elem, list, restList, cont, env, false);
+  }
+
+  _solveSelectchk(elem, list, restList, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._selectWalk(elem, list, restList, cont, env, true);
+  }
+
+  _selectWalk(elem, list, restList, cont, env, firstOnly) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || logicListIsNil(ld)) return false;
+    let any = false;
+    const trail = env.trailLength();
+    if (logicUnify(elem, ld.head, env, this.table)) {
+      const tInner = env.trailLength();
+      if (logicUnify(restList, ld.tail, env, this.table)) {
+        if (cont()) any = true;
+        if (firstOnly || this._solutionCapReached || env.cutCommitted) {
+          env.undo(trail);
+          return any;
+        }
+      }
+      env.undo(tInner);
+    }
+    env.undo(trail);
+    const restTailVar = { kind: 'var', name: `__sel${this._renameSerial++}` };
+    const trail2 = env.trailLength();
+    const rebuiltRest = { kind: 'list', head: ld.head, tail: restTailVar };
+    if (logicUnify(restList, rebuiltRest, env, this.table)) {
+      if (this._selectWalk(elem, ld.tail, restTailVar, cont, env, firstOnly)) any = true;
+    }
+    env.undo(trail2);
+    return any;
+  }
+
+  _solveFlatten(nested, flat, rest, env, depth, onSuccess, onDepthExceeded) {
+    const nd = logicDeref(nested, env);
+    if (nd.kind !== 'list' || !logicListIsGroundClosed(nd, env)) return false;
+    const elems = logicFlattenGroundList(nd, env);
+    if (elems == null) return false;
+    const flatList = logicArrayToList(elems);
+    const trail = env.trailLength();
+    if (!logicUnify(flat, flatList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveSameLength(list1, list2, rest, env, depth, onSuccess, onDepthExceeded) {
+    const d1 = logicDeref(list1, env);
+    const d2 = logicDeref(list2, env);
+    if (d1.kind !== 'list' && d1.kind !== 'var') return false;
+    if (d2.kind !== 'list' && d2.kind !== 'var') return false;
+    if (d1.kind === 'var' && d2.kind === 'var') return false;
+    if (d1.kind === 'list' && logicListIsGroundClosed(d1, env)) {
+      const len = logicGroundListLength(d1, env);
+      if (len == null) return false;
+      if (d2.kind === 'list') {
+        if (!logicListIsGroundClosed(d2, env)) return false;
+        const len2 = logicGroundListLength(d2, env);
+        if (len2 == null || len !== len2) return false;
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      if (d2.kind === 'var') {
+        const built = logicBuildAnonList(len);
+        const trail = env.trailLength();
+        if (!logicUnify(list2, built, env, this.table)) {
+          env.undo(trail);
+          return false;
+        }
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      return false;
+    }
+    if (d2.kind === 'list' && logicListIsGroundClosed(d2, env)) {
+      const len = logicGroundListLength(d2, env);
+      if (len == null) return false;
+      if (d1.kind === 'var') {
+        const built = logicBuildAnonList(len);
+        const trail = env.trailLength();
+        if (!logicUnify(list1, built, env, this.table)) {
+          env.undo(trail);
+          return false;
+        }
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+    }
+    return false;
+  }
 }
 
 function logicRenameApartClause(clause, idRef) {
@@ -1053,6 +1183,26 @@ function logicArrayToList(elems) {
     tail = { kind: 'list', head: elems[i], tail };
   }
   return tail;
+}
+
+function logicFlattenGroundList(listD, env) {
+  const out = [];
+  let cur = listD;
+  while (!logicListIsNil(cur)) {
+    if (cur.kind !== 'list' || cur.nil) return null;
+    const headD = logicDeref(cur.head, env);
+    if (headD.kind === 'var') return null;
+    if (headD.kind === 'list') {
+      const nested = logicFlattenGroundList(headD, env);
+      if (nested == null) return null;
+      for (const e of nested) out.push(e);
+    } else {
+      out.push(headD);
+    }
+    cur = logicDeref(cur.tail, env);
+    if (cur.kind === 'var') return null;
+  }
+  return out;
 }
 
 function logicReverseGroundList(listD, env) {

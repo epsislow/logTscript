@@ -42893,5 +42893,184 @@ comp [logic] .worldLogic:
   reg(3898, 'logic', 'member/2 regression post-random (legacy)', runLogicMemberRegression);
   reg(3899, 'logic', 'member/2 regression post-random (wave)', runLogicMemberRegression, { propagation: 'wave' });
 
+  reg(3900, 'logic', 'select/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved select',
+      function() { parseLogicBody('select(X, L, R) <- X = Y'); },
+      "'select/3' is reserved",
+    );
+  });
+
+  reg(3901, 'logic', 'select/3 remove element (legacy)', function(h) {
+    const prog = parseLogicBody('query q: select(b, [a, b, c], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('R head', sols[0].R.head.name, 'a');
+    h.assert('R tail head', sols[0].R.tail.head.name, 'c');
+  });
+  reg(3902, 'logic', 'select/3 remove element (wave)', function(h) {
+    const prog = parseLogicBody('query q: select(b, [a, b, c], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('R head', sols[0].R.head.name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(3903, 'logic', 'select/3 backtracking duplicate', function(h) {
+    const prog = parseLogicBody('query q: select(X, [a, b, a], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('three sols', String(sols.length), '3');
+  });
+
+  reg(3904, 'logic', 'selectchk/3 first occurrence only', function(h) {
+    const prog = parseLogicBody('query q: selectchk(b, [a, b, c, b], R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('R tail head', sols[0].R.tail.head.name, 'c');
+    h.assert('R tail tail head', sols[0].R.tail.tail.head.name, 'b');
+  });
+
+  reg(3905, 'logic', 'flatten/2 nested list', function(h) {
+    const prog = parseLogicBody('query q: flatten([a, [b, c], d], F)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('F len', String(logicGroundListToArray(sols[0].F, {}).length), '4');
+    h.assert('F third', sols[0].F.tail.tail.head.name, 'c');
+  });
+
+  reg(3906, 'logic', 'last/2 ground and empty fail', function(h) {
+    const ok = parseLogicBody('query ok: last([a, b, c], X)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(ok.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('last c', sols[0].X.name, 'c');
+    const bad = parseLogicBody('query bad: last([], X)');
+    h.assert('empty fail', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+
+  reg(3907, 'logic', 'same_length/2 ground and bind', function(h) {
+    const prog = parseLogicBody('query q: same_length([a, b], L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    let cur = sols[0].L;
+    let n = 0;
+    while (cur && cur.kind === 'list' && !cur.nil) {
+      n++;
+      cur = cur.tail;
+    }
+    h.assert('len 2', String(n), '2');
+    const eq = parseLogicBody('query eq: same_length([1, 2], [a, b])');
+    h.assert('equal', String(eng.solveQuery(logicQueryGoals(eq.queries[0]), {}).length), '1');
+  });
+
+  reg(3908, 'logic', 'list builtin non-list arg fails', function(h) {
+    const prog = parseLogicBody('query bad: select(X, notList, R)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35aDeckFlatten(h, session) {
+    const src = `inline [logic] .deck:
+
+    zones([floor1, [roomA, roomB], floor2])
+
+    query draw:
+        select(Card, [go, jail, chance], Rest),
+        show("drew:", Card),
+        show("rest:", Rest)
+
+    query rooms:
+        zones(Z),
+        flatten(Z, Flat),
+        member(R, Flat),
+        show(R)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = draw
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('drew', String(session.outIncludes(interp, 'drew:')), 'true');
+    h.assert('rest', String(session.outIncludes(interp, 'rest:')), 'true');
+  }
+
+  reg(3909, 'logic', 'F35a select comp query show (legacy)', runF35aDeckFlatten);
+  reg(3910, 'logic', 'F35a select comp query show (wave)', runF35aDeckFlatten, { propagation: 'wave' });
+
+  function runF35aFlattenMember(h, session) {
+    const src = `inline [logic] .map:
+
+    zones([floor1, [roomA, roomB], floor2])
+
+    query rooms:
+        zones(Z),
+        flatten(Z, Flat),
+        member(R, Flat),
+        show(R)
+
+:
+
+comp [logic] .mapLogic:
+    on: 1
+    .map { }
+:
+
+1wire trigger = 1
+
+.mapLogic:{
+    query = rooms
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('floor1', String(session.outIncludes(interp, 'floor1')), 'true');
+    h.assert('roomA', String(session.outIncludes(interp, 'roomA')), 'true');
+    h.assert('roomB', String(session.outIncludes(interp, 'roomB')), 'true');
+    h.assert('floor2', String(session.outIncludes(interp, 'floor2')), 'true');
+  }
+
+  reg(3911, 'logic', 'F35a flatten member comp (legacy)', runF35aFlattenMember);
+  reg(3912, 'logic', 'F35a flatten member comp (wave)', runF35aFlattenMember, { propagation: 'wave' });
+
+  function runF35aRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    query m:
+        member(C, [red, green, blue]),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = m
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+  }
+
+  reg(3913, 'logic', 'F35a member regression (legacy)', runF35aRegression);
+  reg(3914, 'logic', 'F35a member regression (wave)', runF35aRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

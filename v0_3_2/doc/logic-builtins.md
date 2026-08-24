@@ -21,6 +21,11 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`append/3`** | 3 | yes | no | Concatenate or decompose lists |
 | **`length/2`** | 2 | yes | no | List length; generative when **`N`** is ground |
 | **`reverse/2`** | 2 | yes | no | Reverse list order (bidirectional) |
+| **`last/2`** | 2 | yes | no | Last element of a non-empty ground list |
+| **`select/3`** | 3 | yes | no | Remove one occurrence; SWI backtracking |
+| **`selectchk/3`** | 3 | yes | no | Like **`select/3`**, first match only |
+| **`flatten/2`** | 2 | yes | no | Recursively flatten nested ground lists |
+| **`same_length/2`** | 2 | yes | no | Equal list lengths; bind anonymous list |
 | **`sort/2`** | 2 | yes | no | Sort ground list by standard term order |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
@@ -386,6 +391,214 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints a four-element list ending with **`tail`**.
+
+---
+
+## `last/2`
+
+**`last(List, Elem)`** — **`Elem`** is the last element of non-empty **`List`**.
+
+| Call | Behaviour |
+|------|-----------|
+| `last([a, b, c], X)` | `X = c` |
+| `last([], X)` | **Fail** |
+| Non-list | **Fail** |
+| Open or partial list | **Fail** |
+
+**Reserved head:** you cannot define **`last/2`** as fact, rule, or constraint head.
+
+### Example — last element
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        last([alpha, beta, gamma], X),
+        show(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`gamma`**.
+
+---
+
+## `select/3`
+
+**`select(Elem, List, Rest)`** — **`Rest`** is **`List`** with **one** occurrence of **`Elem`** removed. Standard SWI-style backtracking: duplicate elements yield multiple solutions.
+
+| Call | Behaviour |
+|------|-----------|
+| `select(b, [a, b, c], R)` | `R = [a, c]` |
+| `select(X, [a, b, a], R)` | Three solutions (`X` = each `a` in turn) |
+| Non-list second arg | **Fail** |
+
+**Reserved head:** you cannot define **`select/3`** as fact, rule, or constraint head.
+
+### Example — draw from a deck
+
+```logts-play
+inline [logic] .deck:
+
+    query draw:
+        select(Card, [go, jail, chance], Rest),
+        show("drew:", Card),
+        show("rest:", Rest)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = draw
+    set = trigger
+}
+```
+
+**Load & Run** prints one drawn card and the remaining list (order preserved except for the removed card).
+
+---
+
+## `selectchk/3`
+
+**`selectchk(Elem, List, Rest)`** — same as **`select/3`**, but **deterministic**: only the **first** matching occurrence is removed; no choice point for alternate positions.
+
+| Call | Behaviour |
+|------|-----------|
+| `selectchk(b, [a, b, c, b], R)` | `R = [a, c, b]` (second **`b`** kept) |
+| `selectchk(X, [a, b, a], R)` | One solution only |
+
+**Reserved head:** you cannot define **`selectchk/3`** as fact, rule, or constraint head.
+
+### Example — first match only
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        selectchk(b, [a, b, c, b], R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[a, c, b]`**.
+
+---
+
+## `flatten/2`
+
+**`flatten(Nested, Flat)`** — **`Flat`** is **`Nested`** with all nested list structure removed recursively. Only **ground** closed lists are accepted; variables inside or open tails → **fail**.
+
+| Call | Behaviour |
+|------|-----------|
+| `flatten([a, [b, c], d], F)` | `F = [a, b, c, d]` |
+| `flatten([], F)` | `F = []` |
+| Non-list or partial list | **Fail** |
+
+**Reserved head:** you cannot define **`flatten/2`** as fact, rule, or constraint head.
+
+### Example — nested zones
+
+```logts-play
+inline [logic] .map:
+
+    zones([floor1, [roomA, roomB], floor2])
+
+    query rooms:
+        zones(Z),
+        flatten(Z, Flat),
+        member(R, Flat),
+        show(R)
+
+:
+
+comp [logic] .mapLogic:
+    on: 1
+    .map { }
+:
+
+1wire trigger = 1
+
+.mapLogic:{
+    query = rooms
+    set = trigger
+}
+```
+
+**Load & Run** prints **`floor1`**, **`roomA`**, **`roomB`**, and **`floor2`** (one line each).
+
+---
+
+## `same_length/2`
+
+**`same_length(List1, List2)`** — both lists have the same number of elements.
+
+| Call | Behaviour |
+|------|-----------|
+| `same_length([a, b], [1, 2])` | Succeeds |
+| `same_length([a, b], L)` | `L = [_, _]` (anonymous variables) |
+| `same_length(L1, L2)` with both free | **Fail** |
+| Non-list argument | **Fail** |
+| Open or partial list | **Fail** when comparing lengths |
+
+**Reserved head:** you cannot define **`same_length/2`** as fact, rule, or constraint head.
+
+### Example — bind length
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        same_length([x, y, z], L),
+        length(L, N),
+        show(N)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`3`**.
 
 ---
 

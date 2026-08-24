@@ -17,6 +17,11 @@ const LOGIC_BUILTIN_LIST_PRED = 'list';
 const LOGIC_BUILTIN_COMPOUND_PRED = 'compound';
 const LOGIC_BUILTIN_RANDOM_BETWEEN_PRED = 'random_between';
 const LOGIC_BUILTIN_SET_RANDOM_PRED = 'set_random';
+const LOGIC_BUILTIN_LAST_PRED = 'last';
+const LOGIC_BUILTIN_SELECT_PRED = 'select';
+const LOGIC_BUILTIN_SELECTCHK_PRED = 'selectchk';
+const LOGIC_BUILTIN_FLATTEN_PRED = 'flatten';
+const LOGIC_BUILTIN_SAME_LENGTH_PRED = 'same_length';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -40,6 +45,11 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_COMPOUND_PRED]: [1],
   [LOGIC_BUILTIN_RANDOM_BETWEEN_PRED]: [3],
   [LOGIC_BUILTIN_SET_RANDOM_PRED]: [1],
+  [LOGIC_BUILTIN_LAST_PRED]: [2],
+  [LOGIC_BUILTIN_SELECT_PRED]: [3],
+  [LOGIC_BUILTIN_SELECTCHK_PRED]: [3],
+  [LOGIC_BUILTIN_FLATTEN_PRED]: [2],
+  [LOGIC_BUILTIN_SAME_LENGTH_PRED]: [2],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -531,6 +541,21 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_SET_RANDOM_PRED && arity === 1) {
     return "'set_random/1' is reserved — cannot define set_random as fact or rule head";
   }
+  if (predicate === LOGIC_BUILTIN_LAST_PRED && arity === 2) {
+    return "'last/2' is reserved — cannot define last as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SELECT_PRED && arity === 3) {
+    return "'select/3' is reserved — cannot define select as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SELECTCHK_PRED && arity === 3) {
+    return "'selectchk/3' is reserved — cannot define selectchk as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_FLATTEN_PRED && arity === 2) {
+    return "'flatten/2' is reserved — cannot define flatten as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SAME_LENGTH_PRED && arity === 2) {
+    return "'same_length/2' is reserved — cannot define same_length as fact or rule head";
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -609,6 +634,16 @@ function logicValidateProgram(prog) {
         logicError("'random_between/3' is reserved — cannot define random_between as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_SET_RANDOM_PRED && arity === 1) {
         logicError("'set_random/1' is reserved — cannot define set_random as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_LAST_PRED && arity === 2) {
+        logicError("'last/2' is reserved — cannot define last as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SELECT_PRED && arity === 3) {
+        logicError("'select/3' is reserved — cannot define select as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SELECTCHK_PRED && arity === 3) {
+        logicError("'selectchk/3' is reserved — cannot define selectchk as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_FLATTEN_PRED && arity === 2) {
+        logicError("'flatten/2' is reserved — cannot define flatten as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SAME_LENGTH_PRED && arity === 2) {
+        logicError("'same_length/2' is reserved — cannot define same_length as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }
