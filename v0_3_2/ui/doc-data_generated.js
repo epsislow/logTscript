@@ -11557,11 +11557,25 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 
 **Encoding:** atoms → **ASCII + \`\\0\` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or \`\\0\` per cell if undeclared).
 
-**Limits:** up to **16** free variables per query. **Matrix bulk** (\`query >= matrix\`) supports **two columns** on the wire — use **\`;sel(i,j)\`** when **N > 2**. At **N = 2**, columns **0** and **1** are implicit (same as **\`;sel(0,1)\`**).
+**Limits:** up to **16** free variables per query. **Matrix bulk** (\`query >= matrix\`) packs **two columns** — use **\`;sel(i,j)\`** when **N > 2**. **Vector bulk** on one column uses **\`;sel(i)\`** with a vector wire. At **N = 2**, matrix columns **0** and **1** are implicit (same as **\`;sel(0,1)\`**).
 
-### Column select (\`;sel(i,j)\`)
+### Column select (\`;sel(i)\` and \`;sel(i,j)\`)
 
-Select **two query columns** (0-based, left-to-right in the goal) before policies and packing:
+Indices are **0-based argument positions** in the query goal (left-to-right in the call).
+
+**One column → vector** (\`;sel(i)\`):
+
+\`\`\`logts
+allCarInfos;sel(2);unique >= years
+\`\`\`
+
+| Rule | Behaviour |
+|------|-----------|
+| **LHS** | **\`Wwire[N]\`** vector |
+| **\`_\` at \`i\`** | **Error** at elaboration — name that argument |
+| **Policy** | **\`;sel(2);unique\`** — dedupe on the selected column |
+
+**Two columns → matrix** (\`;sel(i,j)\`):
 
 \`\`\`logts
 allCarInfos;sel(0,2);unique >= table
@@ -12023,6 +12037,44 @@ comp [logic] .peopleLogic:
 \`\`\`
 
 After **Load & Run**: \`uniqCars\` holds **\`c\`**, **\`f\`** (not two \`c\` slots); **\`numUniq = 2\`**.
+
+---
+
+## Example — \`;sel(2);unique\` vector (one column)
+
+Extract **model year** only (**argument index 2** = **\`Z\`**) into a vector. The other arguments may stay **\`_\`**; only the **selected** index must be a **named** variable.
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+    query allCarInfos:
+        carInfo(X, Y, Z, K)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world { }
+
+:
+
+16wire[3] years = 000000000000000000000000000000000000000000000000
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(2);unique >= years
+    set = trigger
+}
+
+show(years; u16)
+\`\`\`
+
+After **Load & Run**: **\`years\`** = \`2020\`, \`2018\`, fill — two unique years from three facts.
 
 ---
 
@@ -21839,14 +21891,14 @@ query personWithoutAge:
 
 ## Queries and free variables
 
-Each \`query\` may expose up to **16** free variables. **Matrix bulk** on \`comp [logic]\` still writes **two columns** per row — use **\`;sel(i,j)\`** when **N > 2** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside \`\\+\`) are not output columns.
+Each \`query\` may expose up to **16** free variables. **Matrix bulk** on \`comp [logic]\` writes **two columns** per row — use **\`;sel(i,j)\`** when **N > 2**. **Vector bulk** on one column uses **\`;sel(i)\`** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside \`\\+\`) are not output columns.
 
 | Free vars | Redirect pattern (on comp) |
 |-----------|----------------------------|
 | **0** | \`queryName >= wire\` — \`1\` if any solution, else \`0\` |
 | **1** | \`queryName:0 >= wire\`, \`queryName:1 >= wire\`, … — solution index |
 | **2** | \`query >= matrix\`, \`query:r >= vector\`, … — implicit columns 0 and 1 |
-| **N > 2** | \`query;sel(i,j) >= matrix\`, \`query:0 >= rowAll\` (N cells), \`query;sel(i,j):0 >= pair\` — see comp-logic |
+| **N > 2** | \`query;sel(i,j) >= matrix\`, \`query;sel(i) >= vector\`, \`query:0 >= rowAll\` (N cells), \`query;sel(i,j):0 >= pair\` — see comp-logic |
 
 ---
 
@@ -25522,7 +25574,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Inputs** | Optional \`, Var=text wire\`, \`Var=number wire\`, \`Var=bool wire\`, or \`Var=<type> list wire\` |
 | **Output hints** | Scalar/matrix with free vars: \`, Var=text\` (no wire) — **required**; width alone does not infer type |
 | **Limits** | Optional \`, maxDepth=\\\\N\`, \`, maxSolutions=\\\\N\` (decimal literals; default **256** / **64**) |
-| **Column select** | Optional \`;sel(i,j)\` before policy — 0-based column indices into free variables |
+| **Column select** | **\`;sel(i)\`** → vector one column; **\`;sel(i,j)\`** → matrix two columns (0-based **argument** indices) |
 | **Result policy** | Optional trailing \`;unique\`, \`;first\`, or \`;last\` (after bindings/options) |
 | **\`_\`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | \`1wire\` LHS + all vars bound → \`1\` / \`0\` |
@@ -25548,7 +25600,8 @@ result = .world:query({ owns(john, X) }, X=text car)
 | **\`, Var=<type> expr\`** | Bind logic variables before solve — **type is required** (\`text\`, \`number\`, \`bool\`, optional \`list\`) |
 | **\`, maxDepth=\\\\N\`** | Optional — max goal steps (default **256**) |
 | **\`, maxSolutions=\\\\N\`** | Optional — max solutions collected (default **64**) |
-| **\`;sel(i,j)\`** | Optional — project to two columns before policy/pack (required for \`32wire[R,C]\` when more than two free vars) |
+| **\`;sel(i)\`** | Optional — project to **one** column → **\`Wwire[N]\`** vector bulk |
+| **\`;sel(i,j)\`** | Optional — project to **two** columns → **\`Wwire[R,C]\`** matrix (required when more than two goal args and no \`;sel(i)\`) |
 | **\`;unique\` / \`;first\` / \`;last\`** | Optional — post-process **projected** solutions before pack (see below) |
 
 **No pout flags:** inline \`query\` does **not** expose \`truncated\` / \`depthExceeded\` — caps apply silently (extra solutions dropped, depth failure = unprovable / boolean \`0\`).
@@ -25584,8 +25637,9 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 | All Prolog vars bound (in goal or via \`, Var=wire\`) | \`1wire\` | **\`1\`** if satisfiable, **\`0\`** otherwise |
 | One free var — **first solution only** | \`8wire\`, \`40wire\`, \`80wire\`, … (no \`[N]\`) | First binding for that var, encoded on **full wire width** (atom → ASCII + \`\\0\` pad) |
 | One collected var (\`_\` or free name) — **all solutions** | \`8wire[N]\`, \`40wire[N]\`, … | Vector — one solution per slot (discovery order, \`\\0\` fill on unused slots) |
-| Two free vars (or after \`;sel\`) | \`32wire[R,C]\` | Matrix — row = solution, two columns |
-| More than two free vars | \`32wire[R,C]\` with \`;sel(i,j)\` | Matrix on selected columns; error without \`;sel\` |
+| One column ( **\`;sel(i)\`** ) | \`16wire[N]\`, … | Vector — one value per solution at argument index **\`i\`** |
+| Two columns ( **\`;sel(i,j)\`** ) | \`32wire[R,C]\` | Matrix — row = solution, two selected columns |
+| More than two goal args | \`32wire[R,C]\` with **\`;sel(i,j)\`** or **\`16wire[N]\`** with **\`;sel(i)\`** | Pick columns explicitly; error if matrix bulk without **\`;sel\`** |
 | Existence with free vars | \`1wire\` | **\`1\`** / **\`0\`** (boolean — not first binding) |
 
 **Wire width = cell width:** an atom such as \`chevy\` (5 letters) needs **\`40wire\`** (5×8 bits) for the full name. **\`8wire\`** holds only **one ASCII character** (the first letter). Same rule as [comp-logic.md](comp-logic.md) redirects.
@@ -25808,6 +25862,33 @@ show(lastChar; ascii)
 \`\`\`
 
 Discovery order is \`chevy\` → \`ford\` → \`bike\`. **\`;first\`** → \`c\`, **\`;last\`** → \`b\`.
+
+### Column select — \`;sel(i)\` one column (vector)
+
+Use **\`;sel(i)\`** to pack **one goal argument** into a **vector** wire. Indices are **0-based argument positions** in the call (same as **\`;sel(i,j)\`**).
+
+| Rule | Behaviour |
+|------|-----------|
+| **LHS** | **\`Wwire[N]\`** vector (not matrix) |
+| **Output hint** | **\`Var=<type>\`** for the **named** variable at index **\`i\`** (e.g. \`Z=number\`) |
+| **\`_\` at \`i\`** | **Error** — name the variable you want to extract (\`carInfo(_, _, Z, _)\`, not \`sel(0)\`) |
+| **\`_\` elsewhere** | Allowed — only **selected** indices must be named |
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+:
+
+16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2);unique)
+
+show(years; u16)
+\`\`\`
+
+**Load & Run:** vector of model years (\`2020\`, \`2018\`) after **\`;unique\`** — slot 2 is fill. Use **\`show(...; u16)\`** for numbers, not **\`ascii\`**.
 
 ### Column select — \`;sel(0,2);unique\` on four variables
 

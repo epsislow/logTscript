@@ -42097,5 +42097,93 @@ comp [logic] .scoreLogic:
   reg(3839, 'logic', 'F25 number list comp scalar redirect (legacy)', runF25NumberListCompScalarRedirect);
   reg(3840, 'logic', 'F25 number list comp scalar redirect (wave)', runF25NumberListCompScalarRedirect, { propagation: 'wave' });
 
+  function runF31InlineSel2Years(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2);unique)`;
+    const { interp } = session.run(src);
+    const years = interp.getWireEffectiveValue('years');
+    h.assert('48 bits', String(years.length), '48');
+    h.assert('2020', years.slice(0, 16), '0000011111100100');
+    h.assert('2018', years.slice(16, 32), '0000011111100010');
+    h.assert('fill slot2', years.slice(32, 48), '0000000000000000');
+  }
+
+  function runF31SelAnonymousError(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+16wire[3] years = ${'0'.repeat(48)}
+
+16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(1))`;
+    let errMsg = '';
+    try {
+      session.run(src);
+      if (session.interp && session.interp.lastReportedError) {
+        errMsg = session.interp.lastReportedError.message || '';
+      }
+    } catch (e) {
+      errMsg = e.message || '';
+    }
+    h.assert('anonymous sel error', String(/anonymous \(_\)/.test(errMsg)), 'true');
+  }
+
+  function runF31Sel2MatrixLhsError(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+32wire[3, 2] table = ${'0'.repeat(192)}
+
+32wire[3, 2] table = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2))`;
+    let errMsg = '';
+    try {
+      session.run(src);
+      if (session.interp && session.interp.lastReportedError) {
+        errMsg = session.interp.lastReportedError.message || '';
+      }
+    } catch (e) {
+      errMsg = e.message || '';
+    }
+    h.assert('vector lhs required', String(/requires vector wire LHS/.test(errMsg)), 'true');
+  }
+
+  function runF31CompSel2Years(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+16wire[3] years = ${'0'.repeat(48)}
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(2);unique >= years
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const years = interp.getWireEffectiveValue('years');
+    h.assert('48 bits', String(years.length), '48');
+    h.assert('2020', years.slice(0, 16), '0000011111100100');
+    h.assert('2018', years.slice(16, 32), '0000011111100010');
+  }
+
+  function runF31MatrixSel02PartialAnon(h, session) {
+    const src = INLINE_LOGIC_CARS + `
+32wire[2, 2] table = .world:query({ carInfo(X, _, Z, _) }, X=text, Z=number; sel(0,2);unique)`;
+    const { interp } = session.run(src);
+    const table = interp.getWireEffectiveValue('table');
+    h.assert('128 bits', String(table.length), '128');
+    h.assert('row0 toyota', table.slice(0, 32), '01110100011011110111100101101111');
+    h.assert('row0 2020', table.slice(32, 64), '00000000000000000000011111100100');
+    h.assert('row1 ford', table.slice(64, 96), '01100110011011110111001001100100');
+  }
+
+  reg(3841, 'logic', 'F31 inline ;sel(2) vector years unique (legacy)', runF31InlineSel2Years);
+  reg(3842, 'logic', 'F31 inline ;sel(2) vector years unique (wave)', runF31InlineSel2Years, { propagation: 'wave' });
+  reg(3843, 'logic', 'F31 sel anonymous column error (legacy)', runF31SelAnonymousError);
+  reg(3844, 'logic', 'F31 sel anonymous column error (wave)', runF31SelAnonymousError, { propagation: 'wave' });
+  reg(3845, 'logic', 'F31 sel(i) matrix LHS error (legacy)', runF31Sel2MatrixLhsError);
+  reg(3846, 'logic', 'F31 sel(i) matrix LHS error (wave)', runF31Sel2MatrixLhsError, { propagation: 'wave' });
+  reg(3847, 'logic', 'F31 comp ;sel(2) vector redirect (legacy)', runF31CompSel2Years);
+  reg(3848, 'logic', 'F31 comp ;sel(2) vector redirect (wave)', runF31CompSel2Years, { propagation: 'wave' });
+  reg(3849, 'logic', 'F31 matrix ;sel(0,2) with named skip _ (legacy)', runF31MatrixSel02PartialAnon);
+  reg(3850, 'logic', 'F31 matrix ;sel(0,2) with named skip _ (wave)', runF31MatrixSel02PartialAnon, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

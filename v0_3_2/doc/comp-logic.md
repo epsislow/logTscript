@@ -230,11 +230,25 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 
 **Encoding:** atoms → **ASCII + `\0` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or `\0` per cell if undeclared).
 
-**Limits:** up to **16** free variables per query. **Matrix bulk** (`query >= matrix`) supports **two columns** on the wire — use **`;sel(i,j)`** when **N > 2**. At **N = 2**, columns **0** and **1** are implicit (same as **`;sel(0,1)`**).
+**Limits:** up to **16** free variables per query. **Matrix bulk** (`query >= matrix`) packs **two columns** — use **`;sel(i,j)`** when **N > 2**. **Vector bulk** on one column uses **`;sel(i)`** with a vector wire. At **N = 2**, matrix columns **0** and **1** are implicit (same as **`;sel(0,1)`**).
 
-### Column select (`;sel(i,j)`)
+### Column select (`;sel(i)` and `;sel(i,j)`)
 
-Select **two query columns** (0-based, left-to-right in the goal) before policies and packing:
+Indices are **0-based argument positions** in the query goal (left-to-right in the call).
+
+**One column → vector** (`;sel(i)`):
+
+```logts
+allCarInfos;sel(2);unique >= years
+```
+
+| Rule | Behaviour |
+|------|-----------|
+| **LHS** | **`Wwire[N]`** vector |
+| **`_` at `i`** | **Error** at elaboration — name that argument |
+| **Policy** | **`;sel(2);unique`** — dedupe on the selected column |
+
+**Two columns → matrix** (`;sel(i,j)`):
 
 ```logts
 allCarInfos;sel(0,2);unique >= table
@@ -696,6 +710,44 @@ comp [logic] .peopleLogic:
 ```
 
 After **Load & Run**: `uniqCars` holds **`c`**, **`f`** (not two `c` slots); **`numUniq = 2`**.
+
+---
+
+## Example — `;sel(2);unique` vector (one column)
+
+Extract **model year** only (**argument index 2** = **`Z`**) into a vector. The other arguments may stay **`_`**; only the **selected** index must be a **named** variable.
+
+```logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+    query allCarInfos:
+        carInfo(X, Y, Z, K)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world { }
+
+:
+
+16wire[3] years = 000000000000000000000000000000000000000000000000
+1wire trigger = 1
+
+.worldLogic:{
+    allCarInfos;sel(2);unique >= years
+    set = trigger
+}
+
+show(years; u16)
+```
+
+After **Load & Run**: **`years`** = `2020`, `2018`, fill — two unique years from three facts.
 
 ---
 

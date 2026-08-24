@@ -15,7 +15,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Inputs** | Optional `, Var=text wire`, `Var=number wire`, `Var=bool wire`, or `Var=<type> list wire` |
 | **Output hints** | Scalar/matrix with free vars: `, Var=text` (no wire) — **required**; width alone does not infer type |
 | **Limits** | Optional `, maxDepth=\\N`, `, maxSolutions=\\N` (decimal literals; default **256** / **64**) |
-| **Column select** | Optional `;sel(i,j)` before policy — 0-based column indices into free variables |
+| **Column select** | **`;sel(i)`** → vector one column; **`;sel(i,j)`** → matrix two columns (0-based **argument** indices) |
 | **Result policy** | Optional trailing `;unique`, `;first`, or `;last` (after bindings/options) |
 | **`_`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | `1wire` LHS + all vars bound → `1` / `0` |
@@ -41,7 +41,8 @@ result = .world:query({ owns(john, X) }, X=text car)
 | **`, Var=<type> expr`** | Bind logic variables before solve — **type is required** (`text`, `number`, `bool`, optional `list`) |
 | **`, maxDepth=\\N`** | Optional — max goal steps (default **256**) |
 | **`, maxSolutions=\\N`** | Optional — max solutions collected (default **64**) |
-| **`;sel(i,j)`** | Optional — project to two columns before policy/pack (required for `32wire[R,C]` when more than two free vars) |
+| **`;sel(i)`** | Optional — project to **one** column → **`Wwire[N]`** vector bulk |
+| **`;sel(i,j)`** | Optional — project to **two** columns → **`Wwire[R,C]`** matrix (required when more than two goal args and no `;sel(i)`) |
 | **`;unique` / `;first` / `;last`** | Optional — post-process **projected** solutions before pack (see below) |
 
 **No pout flags:** inline `query` does **not** expose `truncated` / `depthExceeded` — caps apply silently (extra solutions dropped, depth failure = unprovable / boolean `0`).
@@ -77,8 +78,9 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 | All Prolog vars bound (in goal or via `, Var=wire`) | `1wire` | **`1`** if satisfiable, **`0`** otherwise |
 | One free var — **first solution only** | `8wire`, `40wire`, `80wire`, … (no `[N]`) | First binding for that var, encoded on **full wire width** (atom → ASCII + `\0` pad) |
 | One collected var (`_` or free name) — **all solutions** | `8wire[N]`, `40wire[N]`, … | Vector — one solution per slot (discovery order, `\0` fill on unused slots) |
-| Two free vars (or after `;sel`) | `32wire[R,C]` | Matrix — row = solution, two columns |
-| More than two free vars | `32wire[R,C]` with `;sel(i,j)` | Matrix on selected columns; error without `;sel` |
+| One column ( **`;sel(i)`** ) | `16wire[N]`, … | Vector — one value per solution at argument index **`i`** |
+| Two columns ( **`;sel(i,j)`** ) | `32wire[R,C]` | Matrix — row = solution, two selected columns |
+| More than two goal args | `32wire[R,C]` with **`;sel(i,j)`** or **`16wire[N]`** with **`;sel(i)`** | Pick columns explicitly; error if matrix bulk without **`;sel`** |
 | Existence with free vars | `1wire` | **`1`** / **`0`** (boolean — not first binding) |
 
 **Wire width = cell width:** an atom such as `chevy` (5 letters) needs **`40wire`** (5×8 bits) for the full name. **`8wire`** holds only **one ASCII character** (the first letter). Same rule as [comp-logic.md](comp-logic.md) redirects.
@@ -301,6 +303,33 @@ show(lastChar; ascii)
 ```
 
 Discovery order is `chevy` → `ford` → `bike`. **`;first`** → `c`, **`;last`** → `b`.
+
+### Column select — `;sel(i)` one column (vector)
+
+Use **`;sel(i)`** to pack **one goal argument** into a **vector** wire. Indices are **0-based argument positions** in the call (same as **`;sel(i,j)`**).
+
+| Rule | Behaviour |
+|------|-----------|
+| **LHS** | **`Wwire[N]`** vector (not matrix) |
+| **Output hint** | **`Var=<type>`** for the **named** variable at index **`i`** (e.g. `Z=number`) |
+| **`_` at `i`** | **Error** — name the variable you want to extract (`carInfo(_, _, Z, _)`, not `sel(0)`) |
+| **`_` elsewhere** | Allowed — only **selected** indices must be named |
+
+```logts-play
+inline [logic] .world:
+
+    carInfo(toyota, red, 2020, sedan)
+    carInfo(ford, blue, 2018, truck)
+    carInfo(toyota, silver, 2020, coupe)
+
+:
+
+16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2);unique)
+
+show(years; u16)
+```
+
+**Load & Run:** vector of model years (`2020`, `2018`) after **`;unique`** — slot 2 is fill. Use **`show(...; u16)`** for numbers, not **`ascii`**.
 
 ### Column select — `;sel(0,2);unique` on four variables
 

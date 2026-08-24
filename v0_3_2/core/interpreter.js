@@ -1724,6 +1724,11 @@ class Interpreter {
     const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;
     const fillFn = typeof logicGetElementFill === 'function' ? logicGetElementFill : null;
     const listFn = typeof logicWireBitsToListTerm === 'function' ? logicWireBitsToListTerm : null;
+    const argSlotsFn = typeof logicCallArgVarSlots === 'function' ? logicCallArgVarSlots : null;
+    const selAnonFn = typeof logicValidateSelAnonymous === 'function' ? logicValidateSelAnonymous : null;
+    const selCountFn = typeof logicSelArgCount === 'function' ? logicSelArgCount : null;
+    const packColSelFn = typeof logicPackVarsFromColumnSelect === 'function'
+      ? logicPackVarsFromColumnSelect : null;
     if (!parseGoalsFn || !resolveFn || !execFn || !pinFn || !outVarsFn || !prepFn || !encFn || !shapeFn || !listFn) {
       throw new Error('Logic engine is not loaded');
     }
@@ -1759,6 +1764,7 @@ class Interpreter {
       }
     }
     const preparedGoals = prepFn(goals);
+    const argVarSlots = argSlotsFn ? argSlotsFn(goals, preparedGoals) : null;
     const execOpts = {};
     for (const opt of invoke.queryOptions || []) {
       const label = `${instName}:query ${opt.name}`;
@@ -1778,14 +1784,20 @@ class Interpreter {
     const policyVarsFn = typeof logicPolicyVarsForRedirect === 'function'
       ? logicPolicyVarsForRedirect : null;
     const ctxLabel = `${instName}:query`;
+    const selArgCount = selCountFn
+      ? selCountFn(argVarSlots, freeVars)
+      : freeVars.length;
     if (validateCountFn) validateCountFn(freeVars.length, ctxLabel);
     if (invoke.columnSelect && validateSelFn) {
-      validateSelFn(invoke.columnSelect, freeVars.length, ctxLabel);
+      validateSelFn(invoke.columnSelect, selArgCount, ctxLabel);
+    }
+    if (invoke.columnSelect && selAnonFn) {
+      selAnonFn(argVarSlots, invoke.columnSelect, ctxLabel);
     }
     const applyFn = typeof logicApplyResultPolicy === 'function' ? logicApplyResultPolicy : null;
     if (invoke.resultPolicy && applyFn) {
       const policyVars = policyVarsFn
-        ? policyVarsFn(freeVars, invoke.columnSelect || null)
+        ? policyVarsFn(freeVars, invoke.columnSelect || null, argVarSlots)
         : freeVars;
       solutions = applyFn(solutions, invoke.resultPolicy, policyVars);
     }
@@ -1829,7 +1841,7 @@ class Interpreter {
 
     const bits = encFn(
       solutions, encodeFreeVars, shape, fillBits, scalarWidth,
-      invoke.columnSelect || null, outputHints,
+      invoke.columnSelect || null, outputHints, argVarSlots,
     );
     return {
       value: bits,

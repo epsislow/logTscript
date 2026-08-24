@@ -25,3 +25,43 @@ sa te asiguri ca toate testele trec cu success.
 Poti adauga pagina de documentatie noua cu ce inseamna logic runtime explicatia executiei static / dinamic thumbstone, mutationFailed, mutations and queries, etc exemple, poti sa adaugi mai multe exemple in documentatie la fiecare sectiune pentru diverse comportamente, cu butoane load si load and run, 
 
 nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
+
+
+3000
+5
+4
+3
+2
+1
+
+
+incepe implementarea
+
+sa adaugi exemple cu butoane load si load and run
+sa scrii documentatie cu comportamentul/ functionalitatile noi si exemple care sa mearga conform
+trebuie sa existe si teste pe wave nu doar legacy, am observat diferente la rulari intre wave si legacy, au fost corectate dar posibil ca din nou sa apara rezultate diferite, si asta nu este ok, rezultatele trebuie sa fie aceleasi intre wave si legacy
+
+sa te asiguri ca toate testele trec cu success.
+
+nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
+
+
+====
+implementeaza te rog F31
+
+
+sa adaugi exemple cu butoane load si load and run
+sa scrii documentatie cu comportamentul/ functionalitatile noi si exemple care sa mearga conform
+trebuie sa existe si teste pe wave nu doar legacy, am observat diferente la rulari intre wave si legacy, au fost corectate dar posibil ca din nou sa apara rezultate diferite, si asta nu este ok, rezultatele trebuie sa fie aceleasi intre wave si legacy
+
+sa te asiguri ca toate testele trec cu success, si ca blocurile din paginiile de documentatie care au blocuri logic (vezi inline logic, logic query , comp logic, si astea
+  logic-builtins                12 blocks
+  logic-constraints              8 blocks
+  logic-indexing                 4 blocks
+  logic-query-exec              14 blocks
+  logic-runtime                 11 blocks
+) ruleza cu success.
+
+
+nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
+

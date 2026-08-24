@@ -1327,22 +1327,26 @@ parseLogicQueryModifiers() {
       const i = parseInt(this.c.value, 10);
       this.eat(this.c.type);
       this.t.skip();
-      if (this.c.type !== 'SYM' || this.c.value !== ',') {
-        throw Error(`Expected ',' in sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+        this.t.skip();
+        if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+          throw Error(`Expected second integer in sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        const j = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        this.t.skip();
+        if (this.c.type !== 'SYM' || this.c.value !== ')') {
+          throw Error(`Expected ')' after sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        this.eat('SYM', ')');
+        columnSelect = [i, j];
+      } else if (this.c.type === 'SYM' && this.c.value === ')') {
+        this.eat('SYM', ')');
+        columnSelect = [i];
+      } else {
+        throw Error(`Expected ',' or ')' in sel( at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
-      this.eat('SYM', ',');
-      this.t.skip();
-      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-        throw Error(`Expected second integer in sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-      const j = parseInt(this.c.value, 10);
-      this.eat(this.c.type);
-      this.t.skip();
-      if (this.c.type !== 'SYM' || this.c.value !== ')') {
-        throw Error(`Expected ')' after sel(i,j) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-      this.eat('SYM', ')');
-      columnSelect = [i, j];
       continue;
     }
     if (this.c.type === 'ID' && allowedPolicies.has(this.c.value)) {

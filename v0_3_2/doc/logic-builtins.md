@@ -111,7 +111,14 @@ inline [logic] .warehouse:
     inside(box1, c1)
     inside(box2, c1)
 
-    constraint atMostTwo <= count(inside(_, c1), 2)
+    capacity(c1, 2)
+
+    constraint inside(O, C) <=
+        object(O),
+        container(C),
+        capacity(C, Max),
+        count(inside(_, C), N),
+        N =< Max
 
     query ok:
         count(inside(_, c1), 2)

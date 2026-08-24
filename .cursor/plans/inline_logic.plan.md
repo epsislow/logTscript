@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–29, F25 complete; **Faza 30** (doc mini-monopoly) — următoarea (doc-only).
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–29, F25, **F31** complete; F30 doc mini-monopoly (doc-only); 2+h random draft F32.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -93,8 +93,11 @@ todos:
     content: "Faza 30: doc mini-monopoly-logic.md — tutorial end-to-end (doc-only, fără engine nou)"
     status: pending
   - id: logic-random-2h
-    content: "2+h (draft F31): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
+    content: "2+h (draft F32): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
     status: pending
+  - id: logic-sel-i
+    content: "Faza 31: ;sel(i) vector o coloană — extinde F29; _ interzis la sel; hints pe nume din goal"
+    status: completed
 isProject: false
 ---
 
@@ -1349,7 +1352,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 27** Builtins listă + doc `logic-builtins.md`    | D160–D169                                                                                            | **(completed)**                                   |
 | **Faza 29** Query N vars + `;sel(i,j)` redirect         | D170–D181                                                                                            | **(completed)**                                   |
 | **Faza 25** Liste tipate pe wire (**2+c**)                | D182–D199 (extinde D59, D32, D140)                                                                   | **(completed)**                                   |
-| **Faza 30** Doc tutorial mini-monopoly                    | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(următoarea — doc-only)**                       |
+| **Faza 30** Doc tutorial mini-monopoly                    | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(doc-only — pending)**                          |
+| **Faza 31** Query `;sel(i)` vector 1 coloană            | D217–D227 — extinde F29; `_` interzis la sel                                                         | **(următoarea — ready-to-implement)**             |
 
 
 ---
@@ -5890,7 +5894,7 @@ După `;first` → **1 rând**: `(toyota, red)`.
 | `;sel(0,2)` cu N=4 | OK                             |
 | `;sel(0,4)`        | **error** — index out of range |
 | `;sel(1,1)`        | **error** — duplicate index    |
-| `;sel(0,1,2)`      | **error** — arity ≠ 2          |
+| `;sel(0,1,2)`      | **error** — arity ≠ 2 (F29); **`;sel(i)` arity 1 → [Faza 31](#faza-31--query-seli-vector-o-coloană-următoarea) |
 | `;sel(a,b)`        | **error** — non-integer        |
 
 
@@ -6496,13 +6500,14 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 27** builtins listă + doc       | D160–D169                                                 |
 | **Faza 29** query N vars + `;sel`      | D170–D181                                                 | **(completed)** |
 | **Faza 25** liste tipate pe wire       | **2+c** D182–D199                                         | **(completed)** |
-| **Faza 30** doc mini-monopoly tutorial | D200–D210 — `doc/mini-monopoly-logic.md`                  | **(următoarea — doc-only)** |
+| **Faza 30** doc mini-monopoly tutorial | D200–D210 — `doc/mini-monopoly-logic.md`                  | **(doc-only — pending)** |
+| **Faza 31** `;sel(i)` vector 1 col     | D217–D227 — extinde F29                                   | **(următoarea)** |
 | **F20b** scope blocks                  | **2+a** **(deferred)**                                    |
 | **F20c** reguli import relative        | **2+b** **(deferred)**                                    |
 | ~~**Builtins listă** member/append~~   | ~~**2+d**~~                                               |
 | **Liste avansate** dif/lazy/char       | **2+e** **(deferred)** — D136                             |
 | **Builtins listă suplimentare**        | **2+g** **(deferred)** — post-F27; catalog Prolog complet |
-| **Builtins random (integer)**          | **2+h** **(deferred)** — `random_between/3`; SWI-style; **fără float** |
+| **Builtins random (integer)**          | **2+h** **(deferred)** — `random_between/3`; draft **F32?** |
 | `use` **/** `use once`                 | **Faza 15** **(completed)**                               |
 | Constraint `#K (line L)` trace         | **1+v** **(pause)**                                       |
 | POUT declarate comp                    | **1+k**                                                   |
@@ -6516,9 +6521,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 ## Ordine recomandată
 
 1. ~~Faza 0~~ → ~~Faza 29~~ **(completed)** · ~~F25~~ **(completed)**
-2. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — **următoarea (doc-only)**
-3. Apoi backlog **1+p**, **1+s**, **1+o**, …
-4. Apoi faze amânate **2+a … 2+h**
+2. **Faza 31** — **`;sel(i)`** vector o coloană (D217–D227) — **următoarea implementare**
+3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel
+4. Apoi backlog **1+p**, **1+s**, **1+o**, …
+5. Apoi faze amânate **2+a … 2+h**
 
 ---
 
@@ -6570,10 +6576,10 @@ Tabel master **2+a … 2+h** — faze **amânate** discutate/planificate, distin
 | ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                 |
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                 |
 | ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23 |
-| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)      | **F31?**   | F30 D203, Monopoly doc    |
+| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)      | **F32?**   | F30 D203, Monopoly doc    |
 
 
-**Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24; **2+h** independent (util pentru Monopoly doc v2).
+**Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24; **2+h** independent (util pentru Monopoly doc v2). **Faza 31** (`;sel(i)`) = fază normală, nu backlog.
 
 ### Note backlog 2+x — explicații
 
@@ -6729,7 +6735,7 @@ Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi 
 
 **Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
 
-#### **2+h** ⏳ — Builtins random (integer) **(draft F31)**
+#### **2+h** ⏳ — Builtins random (integer) **(draft F32)**
 
 > **Sursă:** confirmare user 2026-08-22 — D203 F30 (Monopoly doc) folosește **wire/counter** pentru zar; **2+h** = fază amânată pentru random în engine.  
 > **Legat de:** [Faza 30](#faza-30--doc-tutorial-mini-monopoly-logic-doc-only--următoarea) (D203-A), `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` (no floats).
@@ -6775,7 +6781,7 @@ Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP*
 roll(D) <- random_between(1, 6, D)
 ```
 
-**Fișiere țintă (când se promovează → F31):**
+**Fișiere țintă (când se promovează → F32):**
 
 | Fișier | Rol |
 |--------|-----|
@@ -6970,14 +6976,14 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | **D200** | **Doc-only** | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)** |
 | **D201** | **Nume fișier** | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)** |
 | **D202** | **2 jucători, 8 casute** | MVP suficient pentru tutorial — **(confirmed)** |
-| **D203** | **Zar la F30** | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F31**) |
+| **D203** | **Zar la F30** | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F32**) |
 | **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2) |
 | **D205** | **Turn advance** | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1` |
 | **D206** | **Script final** | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2) |
 | **D207** | **Blocuri intermediare** | `logts-play` per fază A–E (runnable incremental) |
 | **D208** | **Verificare** | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next) |
 | **D209** | **Out of scope doc** | AI, negociere, carduri Chance, auction, 4+ jucători online |
-| **D210** | **Promovare viitoare** | **2+h** random integer; **1+p** validate; **2+g** `findall`; doc Monopoly v2 după F31 |
+| **D210** | **Promovare viitoare** | **2+h** random; **F31** `;sel(i)` pentru extract coloană Z; **1+p** validate; doc Monopoly v2 |
 
 ### Structură pagină (outline)
 
@@ -7005,3 +7011,115 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 ### Estimare
 
 Medie — ~1 pagină doc densă (similar huffman-v2 ca lungime), mostly prose + 8–12 blocuri `logts-play`, 0 schimbări engine.
+
+---
+
+## Faza 31 — Query `;sel(i)` vector o coloană **(completed)**
+
+> **Sursă:** discuție design 2026-08-24 — extract coloană unică din query N vars (ex. doar anii `Z` din `carInfo/4`); fără regulă helper `year(Z)` obligatorie.  
+> **Extinde:** [Faza 29](#decizii-faza-29--query-n-variabile--selij-confirmed--d179d181-ready) (`;sel(i,j)` matrix). **Nu** e fază amânată backlog — implementare imediată după confirmare plan.
+
+### Problemă (stare azi post-F29)
+
+| Situație | Comportament azi |
+|----------|------------------|
+| `;sel(0,2)` + matrix LHS | ✅ 2 coloane (F29) |
+| `;sel(2)` arity 1 | ❌ parse/validare — arity ≠ 2 |
+| `{ carInfo(_, _, Z, _) }` + vector doar pe **Z** | ❌ prea multe `__collect` / hint-uri confuze |
+| Regulă `year(Z) <- carInfo(_, _, Z, _)` | ✅ workaround manual |
+
+**Scop F31:** `;sel(i)` cu **un** index → pack **vector** `Wwire[N]` (o coloană), aceeași indexare 0-based ca F29.
+
+### Decizii F31 **(confirmed — ready-to-implement)**
+
+| ID | Decizie | Alegere |
+|----|---------|---------|
+| **D217** | **Arity `;sel`** | **A** — `;sel(i)` = 1 col vector; `;sel(i,j)` = 2 col matrix (F29, neschimbat) |
+| **D218** | **Semantica index `i`** | **A** — **poziția argumentului** în goal (0-based), ca D171 F29 — nu „al N-lea nume liber” |
+| **D219** | **`_` la sel** | **A (confirmed)** — **interzis** selectarea unei poziții `_`; eroare elaborare clară |
+| **D220** | **Hint output** | **A** — binding `Var=type` folosește **numele din goal** (`Z=number`); **fără** alias arbitrar (`M`, `Q`) |
+| **D221** | **Hints necesare** | **A** — doar pentru variabilele **selectate** (`;sel(2)` → doar `Z=number`) |
+| **D222** | **`_` neselectat** | **A** — `_` în poziții **neincluse** în sel rămâne permis (`carInfo(X, _, Z, _), sel(0,2)`) |
+| **D223** | **LHS wire** | **A** — `;sel(i)` → **vector** `ewire[N]`; `;sel(i,j)` → **matrix** `ewire[R,C]` (F29) |
+| **D224** | **Paritate comp** | **A** — `allCarInfos;sel(2) >= years` pe redirect comp (vector bulk 1 col) |
+| **D225** | **Validare sel vs AST** | **A** — verificare `_` **înainte** de rename la `__collectN` (pe goal parse brut / term map pre-prep) |
+| **D226** | **Policy trailing** | **A** — `;sel(2);unique` / `;first` / `;last` — aceeași ordine ca F10/F29 |
+| **D227** | **Out of scope** | Tip pe index (`sel(0:text)`) respins; alias `M=text` respins; `sel(2,2)` rămâne invalid |
+
+### Erori elaborare (mesaje draft)
+
+| Condiție | Rezultat |
+|----------|----------|
+| `;sel(1)` pe `carInfo(_, _, Z, _)` | **error** — `sel(1): column 1 is anonymous (_); name the variable to select it` |
+| `;sel(2)` fără `Z=number` | **error** — `query output requires explicit type for 'Z'` |
+| `;sel(2)` + `32wire[3,2]` matrix LHS | **error** — `sel(i) requires vector wire LHS` |
+| `;sel(0,2)` pe poziție `_` | **error** — aceeași regulă D219 per index |
+| `;sel(5)` N=4 | **error** — index out of range |
+
+### Exemple țintă
+
+**Vector — doar anii (cazul `carInfo`):**
+
+```logts
+16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2);unique)
+show(years; u16)
+```
+
+**Matrix — brand + an (F29, neschimbat):**
+
+```logts
+32wire[3, 2] table = .world:query(
+  { carInfo(X, _, Z, _) },
+  X=text, Z=number; sel(0,2);unique)
+```
+
+**Comp redirect — paritate D224:**
+
+```logts
+.worldLogic:{
+    allCarInfos;sel(2);unique >= years
+    set = trigger
+}
+```
+
+### Pipeline (post-proiecție)
+
+```
+solve → N cols → ;sel(i) → 1 col → ;unique|first|last → logicPackVectorSolutions
+solve → N cols → ;sel(i,j) → 2 cols → policy → logicPackMatrixSolutions   (F29)
+```
+
+### Fișiere țintă
+
+| Fișier | Schimbare |
+|--------|-----------|
+| `[parser.js](../v0_3_2/core/parser.js)` | `parseLogicQueryModifiers` — `sel(i)` **sau** `sel(i,j)`; comp redirect idem |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `logicEncodeInlineQueryResult` — ramură `packVars.length === 1` + vector (există parțial); pack cu hint pe var selectată |
+| `[components/logic.js](../v0_3_2/core/components/logic.js)` | Elaborare sel arity 1; validare `_` pe argument index; redirect `;sel(i) >= vector` |
+| `[interpreter.js](../v0_3_2/core/interpreter.js)` | Inline query — transmite `columnSelect` scalar `[i]` vs pereche `[i,j]` |
+| `[logic-query-exec.md](../v0_3_2/doc/logic-query-exec.md)` | Secțiune `;sel(i)` + exemple `years` / `carInfo` |
+| `[comp-logic.md](../v0_3_2/doc/comp-logic.md)` | Redirect vector `;sel(i)` |
+| `tests/test_suite.js` | **3814+** legacy+wave |
+
+### Teste draft (D227 checklist)
+
+| ID | Scenariu |
+|----|----------|
+| 3814 | parse inline `;sel(2);unique` arity 1 |
+| 3815 | `carInfo(_,_,Z,_); sel(2)` + `Z=number` → vector years corect |
+| 3816 | `sel(1)` pe `_` → elaboration error |
+| 3817 | `sel(2)` + matrix LHS → error |
+| 3818 | comp `allCarInfos;sel(2) >= years` (legacy+wave) |
+| 3819 | regresie F29 `;sel(0,2)` neschimbat |
+| 3820 | `;sel(0,2)` cu `_` la index 1 OK (Y neinclus în sel) |
+
+### Livrabile F31
+
+- [x] Parser + elaborare + pack inline + comp redirect  
+- [x] Teste **3841–3850** legacy+wave  
+- [x] Doc EN `logic-query-exec.md`, `comp-logic.md`, `inline-logic.md`  
+- [x] Regen doc-data; verify logic pages  
+
+### Estimare
+
+Mică — extensie F29 (~1–2 zile): parser arity, validare `_`, ramură pack vector deja apropiată de F29.

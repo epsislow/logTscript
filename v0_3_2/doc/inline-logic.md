@@ -1318,14 +1318,14 @@ query personWithoutAge:
 
 ## Queries and free variables
 
-Each `query` may expose up to **16** free variables. **Matrix bulk** on `comp [logic]` still writes **two columns** per row — use **`;sel(i,j)`** when **N > 2** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside `\+`) are not output columns.
+Each `query` may expose up to **16** free variables. **Matrix bulk** on `comp [logic]` writes **two columns** per row — use **`;sel(i,j)`** when **N > 2**. **Vector bulk** on one column uses **`;sel(i)`** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside `\+`) are not output columns.
 
 | Free vars | Redirect pattern (on comp) |
 |-----------|----------------------------|
 | **0** | `queryName >= wire` — `1` if any solution, else `0` |
 | **1** | `queryName:0 >= wire`, `queryName:1 >= wire`, … — solution index |
 | **2** | `query >= matrix`, `query:r >= vector`, … — implicit columns 0 and 1 |
-| **N > 2** | `query;sel(i,j) >= matrix`, `query:0 >= rowAll` (N cells), `query;sel(i,j):0 >= pair` — see comp-logic |
+| **N > 2** | `query;sel(i,j) >= matrix`, `query;sel(i) >= vector`, `query:0 >= rowAll` (N cells), `query;sel(i,j):0 >= pair` — see comp-logic |
 
 ---
 

@@ -33,6 +33,7 @@ function logicSolutionsForRedirect(comp, qName, rd) {
   if (!raw || !raw.length) return raw || [];
   const meta = comp.queryMeta && comp.queryMeta[qName];
   const freeVars = meta && meta.freeVars ? meta.freeVars : [];
+  const argVarSlots = meta && meta.argVarSlots ? meta.argVarSlots : null;
   const policy = rd && rd.resultPolicy;
   const columnSelect = rd && rd.columnSelect;
   const applyFn = typeof logicApplyResultPolicy === 'function' ? logicApplyResultPolicy : null;
@@ -40,7 +41,7 @@ function logicSolutionsForRedirect(comp, qName, rd) {
     ? logicPolicyVarsForRedirect : null;
   if (!policy || !applyFn) return raw;
   const policyVars = policyVarsFn
-    ? policyVarsFn(freeVars, columnSelect)
+    ? policyVarsFn(freeVars, columnSelect, argVarSlots)
     : freeVars;
   return applyFn(raw, policy, policyVars);
 }
@@ -150,15 +151,23 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const meta = comp.queryMeta || {};
     const validateSelFn = typeof logicValidateColumnSelect === 'function'
       ? logicValidateColumnSelect : null;
+    const validateSelAnonFn = typeof logicValidateSelAnonymous === 'function'
+      ? logicValidateSelAnonymous : null;
+    const selCountFn = typeof logicSelArgCount === 'function' ? logicSelArgCount : null;
     for (const p of properties || []) {
       if (p.property !== 'pout>' && p.property !== 'logicQuery>') continue;
       const qName = p.queryName || p.poutName;
       if (LogicComponent.LOGIC_META_POUTS.has(qName)) continue;
-      const freeVars = (meta[qName] && meta[qName].freeVars) || [];
-      const n = freeVars.length;
+      const qMeta = meta[qName] || {};
+      const freeVars = qMeta.freeVars || [];
+      const argVarSlots = qMeta.argVarSlots || null;
+      const n = selCountFn ? selCountFn(argVarSlots, freeVars) : freeVars.length;
       const ctxLabel = `logic ${compName}: query '${qName}'`;
       if (p.columnSelect && validateSelFn) {
         validateSelFn(p.columnSelect, n, ctxLabel);
+      }
+      if (p.columnSelect && validateSelAnonFn) {
+        validateSelAnonFn(argVarSlots, p.columnSelect, ctxLabel);
       }
       if (p.property === 'pout>' && p.resultPolicy == null && p.columnSelect == null) {
         const wireName = p.target && p.target.var;
@@ -166,9 +175,21 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           const wire = ctx.wires.get(wireName);
           if (wire) {
             const shape = logicWireShape(wire, ctx);
-            if (shape.kind === 'matrix' && n > 2) {
-              throw Error(`${ctxLabel}: matrix bulk requires ;sel(i,j) when ${n} output variables`);
+            if (shape.kind === 'matrix' && freeVars.length > 2) {
+              throw Error(`${ctxLabel}: matrix bulk requires ;sel(i,j) when ${freeVars.length} output variables`);
             }
+          }
+        }
+      }
+      if (p.property === 'pout>' && p.columnSelect && p.target && p.target.var && ctx && ctx.wires) {
+        const wire = ctx.wires.get(p.target.var);
+        if (wire) {
+          const shape = logicWireShape(wire, ctx);
+          if (p.columnSelect.length === 1 && shape.kind === 'matrix') {
+            throw Error(`${ctxLabel}: sel(i) requires vector wire LHS`);
+          }
+          if (p.columnSelect.length === 2 && shape.kind === 'vector') {
+            throw Error(`${ctxLabel}: sel(i,j) requires matrix wire LHS`);
           }
         }
       }
@@ -404,6 +425,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const listGoalsFn = typeof logicListFreeVarsInGoals === 'function' ? logicListFreeVarsInGoals : null;
     const listGoalFn = typeof logicListFreeVarsInGoal === 'function' ? logicListFreeVarsInGoal : null;
     const queryGoalsFn = typeof logicQueryGoals === 'function' ? logicQueryGoals : null;
+    const prepGoalsFn = typeof logicPrepareGoalsForInvoke === 'function'
+      ? logicPrepareGoalsForInvoke : null;
+    const argSlotsFn = typeof logicCallArgVarSlots === 'function' ? logicCallArgVarSlots : null;
     const pinByLogicVar = {};
     for (const meta of Object.values(pinDefs)) {
       pinByLogicVar[meta.logicVar] = meta;
@@ -427,7 +451,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         if (free.length > maxVars) {
           throw Error(`logic ${name}: query '${q.name}' has ${free.length} output variables (maximum ${maxVars})`);
         }
-        queryMeta[q.name] = { freeVars: free };
+        const qGoals = queryGoalsFn ? queryGoalsFn(q) : (q.goals || (q.goal ? [q.goal] : []));
+        let argVarSlots = null;
+        if (prepGoalsFn && argSlotsFn && qGoals.length) {
+          argVarSlots = argSlotsFn(qGoals, prepGoalsFn(qGoals));
+        }
+        queryMeta[q.name] = { freeVars: free, argVarSlots };
       }
     }
 
@@ -842,21 +871,25 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           if (!solutions) continue;
           const meta = comp.queryMeta && comp.queryMeta[qName];
           const freeVars = meta && meta.freeVars ? meta.freeVars : [];
+          const argVarSlots = meta && meta.argVarSlots ? meta.argVarSlots : null;
           const columnSelect = rd.columnSelect || null;
+          const packVars = (columnSelect && packVarsFromSelFn)
+            ? packVarsFromSelFn(freeVars, columnSelect, argVarSlots)
+            : freeVars;
           const boolScalarRedirect = shape.kind === 'scalar' && width === 1
             && rd.resultPolicy == null && columnSelect == null;
           if (freeVars.length === 0 || boolScalarRedirect) {
             const val = solutions.length > 0 ? 1 : 0;
             bits = encFn ? encFn({ kind: 'number', value: val }, width, 'bool') : (val ? '1' : '0');
-          } else if (freeVars.length === 1 && shape.kind === 'vector' && packVecFn) {
-            const sol0 = solutions[0] && solutions[0][freeVars[0]];
+          } else if (packVars.length === 1 && shape.kind === 'vector' && packVecFn) {
+            const sol0 = solutions[0] && solutions[0][packVars[0]];
             const listEncFn = typeof logicEncodeListToVectorBits === 'function'
               ? logicEncodeListToVectorBits : null;
             const listBtFn = typeof logicListBindTypeFromTerm === 'function'
               ? logicListBindTypeFromTerm : null;
             let listBindType = null;
             for (const pin of Object.values(comp.pinStorage || {})) {
-              if (pin.logicVar === freeVars[0] && pin.listFlag) {
+              if (pin.logicVar === packVars[0] && pin.listFlag) {
                 listBindType = pin.bindType;
                 break;
               }
@@ -866,19 +899,19 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
                 sol0, listBindType || listBtFn(sol0), shape.count, shape.ew, fillBits,
               );
             } else {
-              bits = packVecFn(solutions, freeVars, shape.count, shape.ew, fillBits);
+              bits = packVecFn(solutions, packVars, shape.count, shape.ew, fillBits);
             }
           } else if (shape.kind === 'matrix' && packMatFn) {
-            const packVars = matrixPackVarsFn
-              ? matrixPackVarsFn(freeVars, columnSelect)
+            const matPackVars = matrixPackVarsFn
+              ? matrixPackVarsFn(freeVars, columnSelect, argVarSlots)
               : (freeVars.length === 2 ? freeVars : null);
-            if (!packVars || packVars.length !== 2) {
+            if (!matPackVars || matPackVars.length !== 2) {
               throw Error(`logic ${compName}: query '${qName}' matrix bulk requires ;sel(i,j) when ${freeVars.length} output variables`);
             }
-            bits = packMatFn(solutions, packVars, shape.rows, shape.cols, shape.ew, fillBits);
-          } else if (freeVars.length >= 1 && solutions.length > 0) {
+            bits = packMatFn(solutions, matPackVars, shape.rows, shape.cols, shape.ew, fillBits);
+          } else if (packVars.length >= 1 && solutions.length > 0) {
             const sol = solutions[0];
-            const term = sol[freeVars[0]];
+            const term = sol[packVars[0]];
             bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
           } else {
             bits = fillBits.padStart(width, '0').slice(-width);
@@ -890,6 +923,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
         const meta = comp.queryMeta && comp.queryMeta[qName];
         const freeVars = meta && meta.freeVars ? meta.freeVars : [];
+        const argVarSlots = meta && meta.argVarSlots ? meta.argVarSlots : null;
         const columnSelect = rd.columnSelect || null;
         const mode = rd.redirectMode || (rd.solutionIndex != null ? 'indexOrRow' : null);
 
@@ -918,7 +952,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         } else if (mode === 'indexOrRow') {
           const idx = rd.solutionIndex != null ? rd.solutionIndex : rd.rowIndex;
           const rowPackVars = packVarsFromSelFn && columnSelect
-            ? packVarsFromSelFn(freeVars, columnSelect)
+            ? packVarsFromSelFn(freeVars, columnSelect, argVarSlots)
             : freeVars;
           const rowCols = rowPackVars.length;
           if (rowPackVars.length === 1 && shape.kind === 'scalar') {

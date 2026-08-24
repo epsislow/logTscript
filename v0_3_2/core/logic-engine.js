@@ -1134,37 +1134,104 @@ function logicValidateQueryVarCount(count, context) {
   }
 }
 
+function logicPrimaryCallGoal(goals) {
+  for (const g of goals || []) {
+    if (g && (g.kind === 'call' || g.kind === 'compound')) return g;
+    if (g && g.kind === 'not') {
+      const inner = logicPrimaryCallGoal([g.goal]);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+function logicCallArgVarSlots(rawGoals, preparedGoals) {
+  const rawG = logicPrimaryCallGoal(rawGoals);
+  const prepG = logicPrimaryCallGoal(preparedGoals);
+  if (!rawG || !prepG || !rawG.args || !prepG.args) return null;
+  const n = Math.max(rawG.args.length, prepG.args.length);
+  const slots = [];
+  for (let i = 0; i < n; i++) {
+    const rawA = rawG.args[i];
+    const prepA = prepG.args[i];
+    slots.push({
+      index: i,
+      anonymous: !!(rawA && rawA.kind === 'var' && rawA.name === '_'),
+      varName: prepA && prepA.kind === 'var' ? prepA.name : null,
+    });
+  }
+  return slots;
+}
+
+function logicSelArgCount(argVarSlots, freeVars) {
+  if (argVarSlots && argVarSlots.length) return argVarSlots.length;
+  return freeVars ? freeVars.length : 0;
+}
+
+function logicValidateSelAnonymous(argVarSlots, columnSelect, context) {
+  if (!columnSelect || !argVarSlots || !argVarSlots.length) return;
+  for (const i of columnSelect) {
+    const s = argVarSlots[i];
+    if (!s) {
+      throw Error(`${context}: sel(${i}) out of range`);
+    }
+    if (s.anonymous) {
+      throw Error(`${context}: sel(${i}): column ${i} is anonymous (_); name the variable to select it`);
+    }
+    if (!s.varName) {
+      throw Error(`${context}: sel(${i}): column ${i} is not a variable`);
+    }
+  }
+}
+
 function logicValidateColumnSelect(columnSelect, varCount, context) {
   if (!columnSelect) return;
-  if (!Array.isArray(columnSelect) || columnSelect.length !== 2) {
-    throw Error(`${context}: ;sel requires exactly two column indices`);
+  if (!Array.isArray(columnSelect) || (columnSelect.length !== 1 && columnSelect.length !== 2)) {
+    throw Error(`${context}: ;sel requires one or two column indices`);
   }
-  const [i, j] = columnSelect;
-  if (!Number.isInteger(i) || !Number.isInteger(j)) {
-    throw Error(`${context}: ;sel indices must be integers`);
+  for (const idx of columnSelect) {
+    if (!Number.isInteger(idx)) {
+      throw Error(`${context}: ;sel indices must be integers`);
+    }
+    if (idx < 0 || idx >= varCount) {
+      const label = columnSelect.length === 1
+        ? `sel(${idx})`
+        : `sel(${columnSelect[0]},${columnSelect[1]})`;
+      throw Error(`${context}: ;${label} out of range for ${varCount} query columns (0-based)`);
+    }
   }
-  if (i < 0 || j < 0 || i >= varCount || j >= varCount) {
-    throw Error(`${context}: ;sel(${i},${j}) out of range for ${varCount} query variables (0-based)`);
-  }
-  if (i === j) {
-    throw Error(`${context}: ;sel(${i},${j}) requires two distinct column indices`);
+  if (columnSelect.length === 2 && columnSelect[0] === columnSelect[1]) {
+    throw Error(`${context}: ;sel(${columnSelect[0]},${columnSelect[1]}) requires two distinct column indices`);
   }
 }
 
-function logicPackVarsFromSelect(freeVars, columnSelect) {
+function logicPackVarsFromColumnSelect(columnSelect, argVarSlots, freeVars) {
   if (!columnSelect) return freeVars;
-  const [i, j] = columnSelect;
-  return [freeVars[i], freeVars[j]];
+  if (argVarSlots && argVarSlots.length) {
+    return columnSelect.map((i) => {
+      const s = argVarSlots[i];
+      return s && s.varName ? s.varName : null;
+    }).filter(Boolean);
+  }
+  if (columnSelect.length === 1) return [freeVars[columnSelect[0]]];
+  return [freeVars[columnSelect[0]], freeVars[columnSelect[1]]];
 }
 
-function logicResolveMatrixPackVars(freeVars, columnSelect) {
-  if (columnSelect) return logicPackVarsFromSelect(freeVars, columnSelect);
+function logicPackVarsFromSelect(freeVars, columnSelect, argVarSlots) {
+  return logicPackVarsFromColumnSelect(columnSelect, argVarSlots, freeVars);
+}
+
+function logicResolveMatrixPackVars(freeVars, columnSelect, argVarSlots) {
+  if (columnSelect) {
+    const pv = logicPackVarsFromColumnSelect(columnSelect, argVarSlots, freeVars);
+    return pv.length === 2 ? pv : null;
+  }
   if (freeVars.length === 2) return freeVars;
   return null;
 }
 
-function logicPolicyVarsForRedirect(freeVars, columnSelect) {
-  if (columnSelect) return logicPackVarsFromSelect(freeVars, columnSelect);
+function logicPolicyVarsForRedirect(freeVars, columnSelect, argVarSlots) {
+  if (columnSelect) return logicPackVarsFromColumnSelect(columnSelect, argVarSlots, freeVars);
   return freeVars;
 }
 
@@ -1840,7 +1907,7 @@ function logicListBindTypeFromTerm(term) {
   return 'text';
 }
 
-function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth, columnSelect, outputHints) {
+function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth, columnSelect, outputHints, argVarSlots) {
   if (!freeVars || freeVars.length === 0) {
     const val = solutions && solutions.length > 0 ? 1 : 0;
     const w = shape && shape.kind === 'scalar' ? (scalarWidth || shape.ew || 1) : 1;
@@ -1848,7 +1915,13 @@ function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scal
   }
   let packVars = freeVars;
   if (columnSelect) {
-    packVars = logicPackVarsFromSelect(freeVars, columnSelect);
+    packVars = logicPackVarsFromColumnSelect(columnSelect, argVarSlots, freeVars);
+    if (columnSelect.length === 1 && shape && shape.kind === 'matrix') {
+      throw Error('logic query: sel(i) requires vector wire LHS');
+    }
+    if (columnSelect.length === 2 && shape && shape.kind === 'vector') {
+      throw Error('logic query: sel(i,j) requires matrix wire LHS');
+    }
   } else if (shape && shape.kind === 'matrix' && freeVars.length > 2) {
     throw Error(`logic query: matrix result requires ;sel(i,j) when ${freeVars.length} output variables`);
   }
@@ -2059,6 +2132,10 @@ if (typeof globalThis !== 'undefined') {
   globalThis.LOGIC_MAX_QUERY_VARS = LOGIC_MAX_QUERY_VARS;
   globalThis.logicValidateQueryVarCount = logicValidateQueryVarCount;
   globalThis.logicValidateColumnSelect = logicValidateColumnSelect;
+  globalThis.logicValidateSelAnonymous = logicValidateSelAnonymous;
+  globalThis.logicCallArgVarSlots = logicCallArgVarSlots;
+  globalThis.logicSelArgCount = logicSelArgCount;
+  globalThis.logicPackVarsFromColumnSelect = logicPackVarsFromColumnSelect;
   globalThis.logicPackVarsFromSelect = logicPackVarsFromSelect;
   globalThis.logicResolveMatrixPackVars = logicResolveMatrixPackVars;
   globalThis.logicPolicyVarsForRedirect = logicPolicyVarsForRedirect;
