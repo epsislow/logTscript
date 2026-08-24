@@ -608,7 +608,27 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       const wireShape = wire && shapeFn ? shapeFn(wire, ctx) : null;
       const fillBits = wire && fillFn ? fillFn(wire, ctx) : '0'.repeat(8);
       let resolved;
-      if (term.listFlag && listFn) {
+      if (term.eachIndex != null) {
+        const idx = term.eachIndex;
+        if (term.listFlag) {
+          if (!wireShape || wireShape.kind !== 'matrix') {
+            throw Error(`logic ${compName}: each list requires matrix wire '${wireName}'`);
+          }
+          const rowFn = typeof logicWireRowToListTerm === 'function' ? logicWireRowToListTerm : null;
+          if (!rowFn) throw Error('Logic engine is not loaded');
+          resolved = rowFn(bits, wireShape, idx, term.bindType, fillBits);
+        } else {
+          if (!wireShape || wireShape.kind !== 'vector') {
+            throw Error(`logic ${compName}: each scalar requires vector wire '${wireName}'`);
+          }
+          const ew = wireShape.ew;
+          const cellBits = bits.substr(idx * ew, ew);
+          if (cellBits.length < ew) {
+            throw Error(`logic ${compName}: each index ${idx} out of range on wire '${wireName}'`);
+          }
+          resolved = pinFn(cellBits, term.bindType);
+        }
+      } else if (term.listFlag && listFn) {
         resolved = listFn(bits, term.bindType, fillBits, wireShape);
       } else {
         resolved = pinFn(bits, term.bindType);
@@ -641,9 +661,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const parseFn = typeof parseLogicMutationBlock === 'function' ? parseLogicMutationBlock : null;
     if (!parseFn || !mutationBlocks || !mutationBlocks.length) return [];
     const ops = [];
+    const expandFn = typeof logicExpandMutationEachOps === 'function'
+      ? logicExpandMutationEachOps : null;
     for (const block of mutationBlocks) {
       const parsed = parseFn(block.raw);
-      for (const item of parsed) {
+      const expanded = expandFn ? expandFn(parsed, ctx) : parsed;
+      for (const item of expanded) {
         ops.push({
           op: item.op,
           head: this._resolveMutationTerm(item.head, ctx, compName),
@@ -1032,8 +1055,18 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       throw Error(`logic ${compName}: check({ }) requires at least one op`);
     }
 
+    let expanded;
+    try {
+      const expandFn = typeof logicExpandMutationEachOps === 'function'
+        ? logicExpandMutationEachOps : null;
+      expanded = expandFn ? expandFn(parsed, ctx) : parsed;
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      throw Error(msg);
+    }
+
     const ops = [];
-    for (const item of parsed) {
+    for (const item of expanded) {
       ops.push({
         op: item.op,
         head: this._resolveMutationTerm(item.head, ctx, compName),

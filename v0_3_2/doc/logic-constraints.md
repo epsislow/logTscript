@@ -367,6 +367,8 @@ In `logic { }`, a bare identifier is always a **logic atom**. To read a **LogTSc
 | `box1`, `c1` | Atoms (even if a wire with the same name exists) |
 | `text destWire` | Wire → ASCII atom |
 | `text list routeVec` | Vector / packed wire → Prolog list of atoms |
+| `text each ownersVec` | Vector → one atom per row (expanded mutation) |
+| `text list each carsMatrix` | Matrix → one Prolog list per row (expanded mutation) |
 | `number scoreIn` | Wire → unsigned integer |
 | `number list levels` | Packed wire → list of integers |
 | `bool flag` | Wire → 0/1 |

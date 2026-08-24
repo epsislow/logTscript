@@ -12343,6 +12343,7 @@ Change the effective knowledge base on each solve pass without editing \`inline 
 |-----------|------|
 | **\`+ groundFact\`** | Assert fact into component dynamic store |
 | **\`- groundFact\`** | Tombstone — hide matching static or dynamic fact |
+| **\`text each vec\`** / **\`text list each mat\`** | Expand to **N** separate ground facts (zip rows) before commit — [logic-runtime.md — each](logic-runtime.md#mutation-each--zip-rows-into-n-facts) |
 | **\`mutationFailed >= wire\`** | **\`1\`** if transaction failed (store unchanged) |
 
 Mutations run **before** query redirects in the same pass. The dynamic store **persists** across \`set\` triggers on the same component.
@@ -22223,7 +22224,7 @@ doc(.character)
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
 - **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
-- Static vs dynamic KB, \`logic { + / - }\`, tombstones → [logic-runtime.md](logic-runtime.md)
+- Static vs dynamic KB, \`logic { + / - }\`, tombstones, **\`each\`** row expansion → [logic-runtime.md](logic-runtime.md)
 - Constraints \`<=\` vs rules \`<-\` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)
@@ -25133,6 +25134,8 @@ In \`logic { }\`, a bare identifier is always a **logic atom**. To read a **LogT
 | \`box1\`, \`c1\` | Atoms (even if a wire with the same name exists) |
 | \`text destWire\` | Wire → ASCII atom |
 | \`text list routeVec\` | Vector / packed wire → Prolog list of atoms |
+| \`text each ownersVec\` | Vector → one atom per row (expanded mutation) |
+| \`text list each carsMatrix\` | Matrix → one Prolog list per row (expanded mutation) |
 | \`number scoreIn\` | Wire → unsigned integer |
 | \`number list levels\` | Packed wire → list of integers |
 | \`bool flag\` | Wire → 0/1 |
@@ -26082,7 +26085,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across \`set\` passes on the same component |
 | **\`.world:query\`** | Reads **static inline only** — not the component dynamic overlay |
-| **Wire in mutation** | \`text w\` / \`text list w\` / \`number w\` / \`number list w\` / \`bool w\` / \`bool list w\` — bare id = atom |
+| **Wire in mutation** | \`text w\` / \`text list w\` / … — bare id = atom; **\`text each w\`** / **\`text list each matrix\`** expand to N ops |
 | **Constraints** | \`constraint P <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
@@ -26537,6 +26540,138 @@ After **Load & Run**: **\`ok = 1\`**, **\`failed = 0\`** — \`destWire\` encode
 logic { + inside(box1, container2) }    /* atom container2 */
 logic { + inside(box1, text container2) } /* wire container2 → atom from bits */
 \`\`\`
+
+---
+
+## Mutation **\`each\`** — zip rows into N facts
+
+Postfix modifier on wire refs (extends F25 bind syntax):
+
+\`\`\`text
+<text | number | bool> [list] each <wireName>
+\`\`\`
+
+| Form | Wire shape | One expanded call at row \`i\` |
+|------|------------|------------------------------|
+| \`text each V\` | vector \`Wwire[N]\` | atom from cell \`i\` |
+| \`number each V\` | vector | number from cell \`i\` |
+| \`bool each V\` | vector | bool from cell \`i\` |
+| \`text list each M\` | matrix \`Wwire[R,C]\` | Prolog list from **row** \`i\` (fill cells skipped, same as \`text list\`) |
+| \`text list W\` **without** \`each\` | vector | **unchanged** — one list argument for the whole wire |
+| \`text list M\` **without** \`each\` on matrix | — | **error** (same as before) |
+
+**Rules:**
+
+- All \`each\` args in one fact must share the same row count (\`N\` = vector length or matrix rows). Mismatch → **\`mutationFailed = 1\`**.
+- Args **without** \`each\` (literals, atoms, \`text w\`, \`text list w\`, …) are **broadcast** — same value on every expanded call.
+- \`-\` uses the same expansion as \`+\`.
+- Before resolve/commit, the engine expands to separate \`+\`/\`-\` ops; constraints and indexing see each ground fact individually.
+
+### Example — zip two vectors
+
+\`\`\`logts-play
+inline [logic] .pairs:
+
+    query qa:
+        pair(a, X)
+    query qb:
+        pair(b, X)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire okA = 0
+1wire okB = 0
+1wire failed = 0
+1wire trigger = 1
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, text each cars)
+    }
+    qa >= okA
+    qb >= okB
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: three facts \`pair(a,t)\`, \`pair(b,u)\`, \`pair(c,v)\` (one ASCII cell per vector slot) → **\`okA = 1\`**, **\`okB = 1\`**, **\`failed = 0\`**.
+
+### Example — vector owner + matrix row lists
+
+\`\`\`logts-play
+inline [logic] .fleet:
+
+    query carA:
+        car(a, L)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3,3] carsMatrix = 01101000 + 01100010 + 01100001 + 01100010 + 01110000 + 00000000 + 01101101 + 00000000 + 00000000
+
+comp [logic] .fleetLogic:
+    on: 1
+    .fleet { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.fleetLogic:{
+    logic {
+        + car(text each owners, text list each carsMatrix)
+    }
+    carA >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: owner **\`a\`** gets list **\`[t,b,a]\`** from row 0 (NUL/fill cells dropped) → **\`ok = 1\`**.
+
+### Example — broadcast without \`each\`
+
+\`\`\`logts-play
+inline [logic] .tags:
+
+    query qa:
+        tag(a, active, L)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] sharedTags = 01101000 + 01100010 + 01100011
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tagLogic:{
+    logic {
+        + tag(text each owners, active, text list sharedTags)
+    }
+    qa >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+The literal **\`active\`** and the **\`text list sharedTags\`** value are identical on every expanded \`tag/3\` fact.
 
 ---
 

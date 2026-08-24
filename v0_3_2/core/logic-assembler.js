@@ -420,11 +420,19 @@ class LogicParser {
         this.advance();
         listFlag = true;
       }
+      let eachFlag = false;
+      if (this.at('ID') && this.peek().value === 'each') {
+        this.advance();
+        eachFlag = true;
+      }
       if (!this.at('ID')) {
-        logicError(`expected wire name after ${bindType}${listFlag ? ' list' : ''}`, this.peek().line);
+        logicError(
+          `expected wire name after ${bindType}${listFlag ? ' list' : ''}${eachFlag ? ' each' : ''}`,
+          this.peek().line,
+        );
       }
       const wireName = this.advance().value;
-      return { kind: 'wireRef', bindType, listFlag, wireName };
+      return { kind: 'wireRef', bindType, listFlag, eachFlag, wireName };
     }
     return this.parseTerm();
   }

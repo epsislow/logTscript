@@ -1888,6 +1888,124 @@ function logicDecodeListSlot(cellBits, bindType) {
   return null;
 }
 
+function logicCloneMutationTerm(term) {
+  if (!term) return term;
+  if (term.kind === 'wireRef') {
+    return {
+      kind: 'wireRef',
+      bindType: term.bindType,
+      listFlag: !!term.listFlag,
+      eachFlag: !!term.eachFlag,
+      eachIndex: term.eachIndex,
+      wireName: term.wireName,
+    };
+  }
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      arity: term.arity != null ? term.arity : (term.args || []).length,
+      args: (term.args || []).map(logicCloneMutationTerm),
+    };
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicCloneMutationTerm(term.head),
+      tail: logicCloneMutationTerm(term.tail),
+    };
+  }
+  if (term.kind === 'atom') {
+    const out = { kind: 'atom', name: term.name };
+    if (term.logicTraceAsString) out.logicTraceAsString = true;
+    return out;
+  }
+  if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'var') return { kind: 'var', name: term.name };
+  return term;
+}
+
+function logicEachRowCountForWireRef(term, wire, ctx) {
+  const shapeFn = typeof globalThis.logicWireShape === 'function' ? globalThis.logicWireShape : null;
+  if (!shapeFn) throw Error('logicWireShape is not loaded');
+  const shape = shapeFn(wire, ctx);
+  if (term.listFlag) {
+    if (shape.kind !== 'matrix') throw Error('each list requires matrix wire');
+    return shape.rows;
+  }
+  if (shape.kind === 'vector') return shape.count;
+  if (shape.kind === 'matrix') throw Error('each scalar requires vector wire');
+  throw Error('each requires vector or matrix wire');
+}
+
+function logicWireRowToListTerm(bits, matrixShape, rowIndex, bindType, fillBits) {
+  const cols = matrixShape.cols;
+  const ew = matrixShape.ew;
+  const rowBits = bits.substr(rowIndex * cols * ew, cols * ew);
+  const virtualShape = { kind: 'vector', count: cols, ew };
+  return logicWireBitsToListTerm(rowBits, bindType, fillBits, virtualShape);
+}
+
+function logicExpandOneMutationEachItem(item, ctx) {
+  const head = item && item.head;
+  if (!head || head.kind !== 'compound') return [item];
+  const args = head.args || [];
+  const eachRefs = args.filter((a) => a && a.kind === 'wireRef' && a.eachFlag);
+  if (!eachRefs.length) return [item];
+
+  const counts = [];
+  for (const ref of eachRefs) {
+    if (!ctx.wires || !ctx.wires.has(ref.wireName)) {
+      throw Error(`logic mutation: wire '${ref.wireName}' not found`);
+    }
+    const wire = ctx.wires.get(ref.wireName);
+    counts.push(logicEachRowCountForWireRef(ref, wire, ctx));
+  }
+  const n = counts[0];
+  for (let i = 1; i < counts.length; i++) {
+    if (counts[i] !== n) {
+      throw Error(`each: row count mismatch (${counts.join(' vs ')})`);
+    }
+  }
+  if (n <= 0) throw Error('each: row count must be at least 1');
+
+  const out = [];
+  for (let row = 0; row < n; row++) {
+    const newArgs = args.map((a) => {
+      if (a && a.kind === 'wireRef' && a.eachFlag) {
+        return {
+          kind: 'wireRef',
+          bindType: a.bindType,
+          listFlag: a.listFlag,
+          eachFlag: false,
+          eachIndex: row,
+          wireName: a.wireName,
+        };
+      }
+      return logicCloneMutationTerm(a);
+    });
+    out.push({
+      op: item.op,
+      head: {
+        kind: 'compound',
+        predicate: head.predicate,
+        arity: newArgs.length,
+        args: newArgs,
+      },
+    });
+  }
+  return out;
+}
+
+function logicExpandMutationEachOps(items, ctx) {
+  const out = [];
+  for (const item of items || []) {
+    out.push(...logicExpandOneMutationEachItem(item, ctx));
+  }
+  return out;
+}
+
 function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape) {
   const layout = logicResolveListWireLayout(bits.length, bindType, vectorShape);
   const elements = [];
@@ -2148,6 +2266,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicPackMatrixSolutions = logicPackMatrixSolutions;
   globalThis.logicPackMatrixRow = logicPackMatrixRow;
   globalThis.logicWireBitsToListTerm = logicWireBitsToListTerm;
+  globalThis.logicWireRowToListTerm = logicWireRowToListTerm;
+  globalThis.logicCloneMutationTerm = logicCloneMutationTerm;
+  globalThis.logicEachRowCountForWireRef = logicEachRowCountForWireRef;
+  globalThis.logicExpandMutationEachOps = logicExpandMutationEachOps;
+  globalThis.logicExpandOneMutationEachItem = logicExpandOneMutationEachItem;
   globalThis.logicEncodeListToVectorBits = logicEncodeListToVectorBits;
   globalThis.logicListBindTypeFromTerm = logicListBindTypeFromTerm;
   globalThis.logicResolveListWireLayout = logicResolveListWireLayout;

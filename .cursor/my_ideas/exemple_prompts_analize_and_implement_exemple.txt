@@ -65,3 +65,16 @@ sa te asiguri ca toate testele trec cu success, si ca blocurile din paginiile de
 
 nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
 
+=====
+implementeaza te rog F33 
+
+
+sa adaugi exemple cu butoane load si load and run
+sa scrii documentatie cu comportamentul/ functionalitatile noi si exemple care sa mearga conform
+trebuie sa existe si teste pe wave nu doar legacy, am observat diferente la rulari intre wave si legacy, au fost corectate dar posibil ca din nou sa apara rezultate diferite, si asta nu este ok, rezultatele trebuie sa fie aceleasi intre wave si legacy
+
+sa te asiguri ca toate testele trec cu success, si ca blocurile din paginiile de documentatie care au blocuri logic  ruleza cu success.
+
+
+nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
+

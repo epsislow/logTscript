@@ -1016,6 +1016,7 @@ Change the effective knowledge base on each solve pass without editing `inline [
 |-----------|------|
 | **`+ groundFact`** | Assert fact into component dynamic store |
 | **`- groundFact`** | Tombstone — hide matching static or dynamic fact |
+| **`text each vec`** / **`text list each mat`** | Expand to **N** separate ground facts (zip rows) before commit — [logic-runtime.md — each](logic-runtime.md#mutation-each--zip-rows-into-n-facts) |
 | **`mutationFailed >= wire`** | **`1`** if transaction failed (store unchanged) |
 
 Mutations run **before** query redirects in the same pass. The dynamic store **persists** across `set` triggers on the same component.

@@ -42345,5 +42345,356 @@ comp [logic] .worldLogic:
     h.assert('list shown', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
   }, { propagation: 'wave' });
 
+  reg(3864, 'logic', 'F33 parse mutation text each postfix', function(h) {
+    const ops = parseLogicMutationBlock('+ car(text each owners, text list each carsMatrix).');
+    h.assert('one op', String(ops.length), '1');
+    h.assert('add', ops[0].op, 'add');
+    const args = ops[0].head.args;
+    h.assert('arg0 each', String(args[0].eachFlag), 'true');
+    h.assert('arg0 no list', String(args[0].listFlag), 'false');
+    h.assert('arg1 each list', String(args[1].eachFlag && args[1].listFlag), 'true');
+  });
+
+  function runF33EachZipVectors(h, session) {
+    const src = `inline [logic] .pairs:
+
+    query qa:
+        pair(a, X)
+    query qb:
+        pair(b, X)
+    query qc:
+        pair(c, X)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+1wire okC = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, text each cars)
+    }
+    qa >= okA
+    qb >= okB
+    qc >= okC
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('okC', interp.getWireEffectiveValue('okC'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  function runF33EachMatrixList(h, session) {
+    const src = `inline [logic] .fleet:
+
+    query qa:
+        car(a, L)
+    query qb:
+        car(b, L)
+    query qc:
+        car(c, L)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3,3] carsMatrix = 01101000 + 01100010 + 01100001 + 01100010 + 01110000 + 00000000 + 01101101 + 00000000 + 00000000
+
+comp [logic] .fleetLogic:
+    on: 1
+    .fleet { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+1wire okC = 0
+
+.fleetLogic:{
+    logic {
+        + car(text each owners, text list each carsMatrix)
+    }
+    qa >= okA
+    qb >= okB
+    qc >= okC
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('okC', interp.getWireEffectiveValue('okC'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  function runF33EachRowMismatch(h, session) {
+    const src = `inline [logic] .pairs:
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, text each cars)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '1');
+  }
+
+  function runF33EachBroadcast(h, session) {
+    const src = `inline [logic] .tags:
+
+    query qa:
+        tag(a, active, L)
+    query qb:
+        tag(b, active, L)
+    query qc:
+        tag(c, active, L)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] sharedTags = 01101000 + 01100010 + 01100011
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+1wire okC = 0
+
+.tagLogic:{
+    logic {
+        + tag(text each owners, active, text list sharedTags)
+    }
+    qa >= okA
+    qb >= okB
+    qc >= okC
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('okC', interp.getWireEffectiveValue('okC'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  function runF33EachRemove(h, session) {
+    const src = `inline [logic] .pairs:
+
+    query qa:
+        pair(a, X)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okAfter = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, text each cars)
+        - pair(text each owners, text each cars)
+    }
+    qa >= okAfter
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('removed', interp.getWireEffectiveValue('okAfter'), '0');
+  }
+
+  function runF33EachCheck(h, session) {
+    const src = `inline [logic] .pairs:
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire pass = .pairLogic:check({ + pair(text each owners, text each cars) })`;
+    const { interp } = session.run(src);
+    h.assert('check pass', interp.getWireEffectiveValue('pass'), '1');
+  }
+
+  function runF33BatchNoEach(h, session) {
+    const src = `inline [logic] .batch:
+
+    query hasBatch:
+        batch(Os, Cs)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .batchLogic:
+    on: 1
+    .batch { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire ok = 0
+
+.batchLogic:{
+    logic {
+        + batch(text list owners, text list cars)
+    }
+    hasBatch >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  function runF33EachConstraintRollback(h, session) {
+    const src = `inline [logic] .pairs:
+
+    allowed(a, t)
+    allowed(c, v)
+
+    constraint pair(O, C) <= allowed(O, C)
+
+    query qa:
+        pair(a, X)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, text each cars)
+    }
+    qa >= okA
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('no partial commit', interp.getWireEffectiveValue('okA'), '0');
+  }
+
+  function runF33EachThreeFacts(h, session) {
+    const src = `inline [logic] .pairs:
+
+    query qa:
+        pair(a, X)
+    query qb:
+        pair(b, X)
+    query qc:
+        pair(c, X)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[3] cars = 01101000 + 01101001 + 01101010
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+1wire okC = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, text each cars)
+    }
+    qa >= okA
+    qb >= okB
+    qc >= okC
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('okC', interp.getWireEffectiveValue('okC'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(3865, 'logic', 'F33 each zip two vectors (legacy)', runF33EachZipVectors);
+  reg(3866, 'logic', 'F33 each zip two vectors (wave)', runF33EachZipVectors, { propagation: 'wave' });
+  reg(3867, 'logic', 'F33 each matrix list per row (legacy)', runF33EachMatrixList);
+  reg(3868, 'logic', 'F33 each matrix list per row (wave)', runF33EachMatrixList, { propagation: 'wave' });
+  reg(3869, 'logic', 'F33 each row count mismatch (legacy)', runF33EachRowMismatch);
+  reg(3870, 'logic', 'F33 each row count mismatch (wave)', runF33EachRowMismatch, { propagation: 'wave' });
+  reg(3871, 'logic', 'F33 each broadcast literal and list (legacy)', runF33EachBroadcast);
+  reg(3872, 'logic', 'F33 each broadcast literal and list (wave)', runF33EachBroadcast, { propagation: 'wave' });
+  reg(3873, 'logic', 'F33 each remove expanded facts (legacy)', runF33EachRemove);
+  reg(3874, 'logic', 'F33 each remove expanded facts (wave)', runF33EachRemove, { propagation: 'wave' });
+  reg(3875, 'logic', 'F33 check each expansion (legacy)', runF33EachCheck);
+  reg(3876, 'logic', 'F33 check each expansion (wave)', runF33EachCheck, { propagation: 'wave' });
+  reg(3877, 'logic', 'F33 batch text list without each (legacy)', runF33BatchNoEach);
+  reg(3878, 'logic', 'F33 batch text list without each (wave)', runF33BatchNoEach, { propagation: 'wave' });
+  reg(3879, 'logic', 'F33 each constraint rollback (legacy)', runF33EachConstraintRollback);
+  reg(3880, 'logic', 'F33 each constraint rollback (wave)', runF33EachConstraintRollback, { propagation: 'wave' });
+  reg(3881, 'logic', 'F33 each three expanded facts query (legacy)', runF33EachThreeFacts);
+  reg(3882, 'logic', 'F33 each three expanded facts query (wave)', runF33EachThreeFacts, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

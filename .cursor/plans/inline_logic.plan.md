@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — F31 complete; **Faza 32** ready (logic-value-types + atom/1…compound/1); F30 doc monopoly; F33 random 2+h.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — F32 complete; **Faza 33** ready (mutation each expansion); F30 doc monopoly; F34 random 2+h.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -98,8 +98,11 @@ todos:
   - id: logic-value-types-doc
     content: "Faza 32: logic-value-types.md + atom/1…compound/1 — completed"
     status: completed
+  - id: logic-mutation-each
+    content: "Faza 33: mutation each expansion — text|number|bool [list] each wire (postfix); zip rows; broadcast args fără each"
+    status: completed
   - id: logic-random-2h
-    content: "2+h (draft F33): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
+    content: "2+h (draft F34): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
     status: pending
 isProject: false
 ---
@@ -1358,6 +1361,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 30** Doc tutorial mini-monopoly                  | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(doc-only — pending)**                          |
 | **Faza 31** Query `;sel(i)` vector 1 coloană            | D217–D227 — extinde F29; `_` interzis la sel                                                         | **(completed)**                                   |
 | **Faza 32** Doc logic values + type predicates          | D228–D247 — doc + engine; `logic-value-types.md`                                                     | **(completed)**                                   |
+| **Faza 33** Mutation **each** expansion                 | D248–D260 — `text|number|bool [list] each wire` (postfix F25); zip rows; broadcast fără `each`       | **(completed)**                                   |
+| **Faza 34** Builtins random integer (**2+h**)           | draft — `random_between/3`; seed opțional                                                            | **(deferred)**                                    |
 
 
 ---
@@ -6536,13 +6541,14 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **Faza 25** liste tipate pe wire               | **2+c** D182–D199                                           |
 | **Faza 30** doc mini-monopoly tutorial         | D200–D210 — `doc/mini-monopoly-logic.md`                    |
 | **Faza 31** `;sel(i)` vector 1 col             | D217–D227 — extinde F29                                     |
-| **Faza 32** doc logic values + type predicates | D228–D247 — `logic-value-types.md` + engine                          | **(ready-to-implement)** |
+| **Faza 32** doc logic values + type predicates | D228–D247 — `logic-value-types.md` + engine                          | **(completed)**          |
+| **Faza 33** mutation **each** expansion        | D248–D260 — `text each wire` / `text list each matrix`; zip în `logic { + / - }` + `.check` | **(ready-to-implement)** |
 | **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
 | **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
 | ~~**Builtins listă** member/append~~           | ~~**2+d**~~                                                 |
 | **Liste avansate** dif/lazy/char               | **2+e** **(deferred)** — D136                               |
 | **Builtins listă suplimentare**                | **2+g** **(deferred)** — post-F27; catalog Prolog complet   |
-| **Builtins random (integer)**                  | **2+h** **(deferred)** — `random_between/3`; draft **F33?** |
+| **Faza 34** / **2+h** builtins random          | **(deferred)** — `random_between/3`; draft **F34**          |
 | `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
 | Constraint `#K (line L)` trace                 | **1+v** **(pause)**                                         |
 | POUT declarate comp                            | **1+k**                                                     |
@@ -6555,11 +6561,11 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 31~~ **(completed)** · ~~F25~~ **(completed)**
-2. **Faza 32** — **logic-value-types.md** + builtins `atom/1`…`compound/1` (D228=B) — **ready-to-implement**
+1. ~~Faza 0~~ → ~~Faza 32~~ **(completed)** · ~~F25~~ **(completed)**
+2. **Faza 33** — mutation **each** expansion (D248–D260) — **ready-to-implement**
 3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel
 4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a … 2+h** (random → draft **F33**)
+5. Apoi faze amânate **2+a … 2+h** (random → draft **F34**)
 
 ---
 
@@ -6611,7 +6617,7 @@ Tabel master **2+a … 2+h** — faze **amânate** discutate/planificate, distin
 | ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                       |
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                       |
 | ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23       |
-| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)     | **F33?**   | F30 D203, Monopoly doc          |
+| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)     | **F34**    | F30 D203, Monopoly doc          |
 
 
 **Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24; **2+h** independent (util pentru Monopoly doc v2). **Faza 31** (`;sel(i)`) = fază normală, nu backlog.
@@ -6770,7 +6776,7 @@ Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi 
 
 **Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
 
-#### **2+h** ⏳ — Builtins random (integer) **(draft F33)**
+#### **2+h** ⏳ — Builtins random (integer) **(draft F34)**
 
 > **Sursă:** confirmare user 2026-08-22 — D203 F30 (Monopoly doc) folosește **wire/counter** pentru zar; **2+h** = fază amânată pentru random în engine.  
 > **Legat de:** [Faza 30](#faza-30--doc-tutorial-mini-monopoly-logic-doc-only--următoarea) (D203-A), `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` (no floats).
@@ -6822,7 +6828,7 @@ Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP*
 roll(D) <- random_between(1, 6, D)
 ```
 
-**Fișiere țintă (când se promovează → F33):**
+**Fișiere țintă (când se promovează → F34):**
 
 
 | Fișier                                                 | Rol                                                |
@@ -7019,7 +7025,7 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
 | **Fără** `call/N` **/ goal din wire** | Nu poți „apelează predicatul X din atom” | Cod numeric/text pe wire + reguli `choice(P, 1)` …                                   |
 | **Fără** `findall`**/**`bagof`        | Meniu dinamic mai greu                   | Query cu vector bulk + soluții multiple pe `legalChoice`                             |
-| **Fără random în logic**              | Zar                                      | Wire/counter (F30 doc); **→ [2+h](#2h--builtins-random-integer)** `random_between/3` |
+| **Fără random în logic**              | Zar                                      | Wire/counter (F30 doc); **→ [2+h](#2h--builtins-random-integer)** / **F34** `random_between/3` |
 | **Fără persistență KB (1+o)**         | Save game                                | Re-RUN = reset; menționăm explicit                                                   |
 | **Fără UI list binding automată**     | Butoane ≠ soluții Prolog                 | Mapare manuală dip/switch → cod                                                      |
 | **Un singur** `set` **= un pass**     | Turn multi-step                          | Faze: `phase(move)`, `phase(choose)` ca facts                                        |
@@ -7034,14 +7040,14 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | **D200** | **Doc-only**               | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)**                                                                   |
 | **D201** | **Nume fișier**            | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)**                                                                  |
 | **D202** | **2 jucători, 8 casute**   | MVP suficient pentru tutorial — **(confirmed)**                                                                                                    |
-| **D203** | **Zar la F30**             | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F33**) |
+| **D203** | **Zar la F30**             | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F34**) |
 | **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2)                                                                                      |
 | **D205** | **Turn advance**           | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1`                                                                                          |
 | **D206** | **Script final**           | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2)                                                                                      |
 | **D207** | **Blocuri intermediare**   | `logts-play` per fază A–E (runnable incremental)                                                                                                   |
 | **D208** | **Verificare**             | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next)                                                                    |
 | **D209** | **Out of scope doc**       | AI, negociere, carduri Chance, auction, 4+ jucători online                                                                                         |
-| **D210** | **Promovare viitoare**     | **2+h** random; **F32** logic values doc; **F33** type builtins?; **1+p** validate; doc Monopoly v2                                                |
+| **D210** | **Promovare viitoare**     | **2+h** random → **F34**; **F33** mutation each; **1+p** validate; doc Monopoly v2                                                |
 
 
 ### Structură pagină (outline)
@@ -7316,7 +7322,7 @@ compound person(j,25)
 | **D246** | Fără builtin `bool/1` | ✅ |
 | **D247** | `number` = kind logic **și** bindType wire (roluri separate) | ✅ |
 
-> **Notă:** **F33** în plan = alt subiect (**random 2+h**), **nu** type predicates. Referința „F33 pentru atom/1” a fost **greșită** — predicate tip aparțin **F32** dacă alegi D228=B.
+> **Notă:** **F33** = **mutation each expansion** (zip rows în `logic { + / - }`). **F34** = random **2+h**. Type predicates `atom/1`…`compound/1` → **F32** **(completed)**.
 
 ---
 
@@ -7622,3 +7628,196 @@ Medie — doc + 4 builtins + teste (~2–3 zile).
 ### Decizii F32 — status
 
 **Toate D228–D247 confirmed** — F32 **completed**.
+
+---
+
+## Faza 33 — Mutation **each** expansion **(completed — D248–D260)**
+
+> **Sursă:** discuție design 2026-08-24 — zip paralel la mutație fără a schimba semantica `text list wire` (F25).  
+> **Extinde:** [Faza 11](#faza-11--runtime-mutation-done) (mutations), [Faza 12](#faza-12--constraints-done) (validate per fact), [Faza 19](#faza-19--constraint-as-query-helper-1u-completed) (`.check`), [Faza 25](#faza-25--liste-tipate-pe-wire-2c-completed) (wire bind types + list codec). **Nu** schimbă pipeline-ul post-expand — fiecare fact expandat = o linie `+`/`-` ca azi.
+
+### Problemă (stare azi post-F25)
+
+
+| Situație | Comportament azi |
+| -------- | ---------------- |
+| `+ car(text list Os, text list Cs)` | **1 fact** — două liste Prolog întregi |
+| Zip scalar–scalar pe vectori egali | ❌ N linii manuale sau batch + reguli |
+| `+ car(text each …, text list each Matrix)` | ❌ sintaxă inexistentă |
+| `text list` pe **matrix** wire | ❌ eroare (`text list expects a vector wire`) |
+
+
+**Scop F33:** keyword **`each`** în args mutation/check — parcurge **rândul** `i` (index 0-based) și **expandă** într-o listă de ops `+`/`-` ground **înainte** de resolve/commit; procesarea fiecărui fact rămâne identică cu F11/F12.
+
+### Sintaxă **(confirmed — postfix F25)**
+
+
+```
+<text|number|bool> list? each? <wireName>
+```
+
+Extinde gramatica F25 (`text list w`): `each` este **modifier postfix** imediat înainte de numele wire — **nu** prefix.
+
+| Formă | Wire | La index `i` |
+| ----- | ---- | ------------ |
+| `text each V` | vector `Wwire[N]` | atom din celula `i` |
+| `number each V` | vector | număr din celula `i` |
+| `bool each V` | vector | bool din celula `i` |
+| `text list each M` | matrix `Wwire[R,C]` | rând `i` → listă Prolog (skip fill `\0` / zero — ca F25) |
+| `number list each M` | matrix | rând `i` → listă numere |
+| `bool list each M` | matrix | rând `i` → listă bool |
+| `text list W` **fără** `each` | vector | **neschimbat F25** — o listă întreagă |
+| `text w` **fără** `each` | scalar / packed | **neschimbat F25** — un termen |
+
+
+**Fără `each`:** comportament existent **100% intact** (D253).
+
+### Decizii F33 **(confirmed user 2026-08-24)**
+
+
+| ID | Decizie | Alegere |
+| -- | ------- | ------- |
+| **D248** | **Marker `each`** | **A** — keyword explicit postfix; **nu** auto-expand pe `text list` fără `each` |
+| **D249** | **Lungime rânduri** | **A** — toate args cu `each` trebuie **aceeași** `N`; `N` = `vector.count` sau `matrix.rows`; **≠ → eroare** (`mutationFailed=1` / elaboration la parse wire) |
+| **D250** | **Args fără `each`** | **C** — **broadcast**: literali / atomi / termeni ground; **și** wire refs (`text w`, `text list w`, …) — **aceeași valoare** rezolvată o dată, repetată la fiecare apel expandat |
+| **D251** | **`-` remove** | **A** — aceeași expandare ca `+`; N remove-uri ground în aceeași tranzacție |
+| **D252** | **Pipeline** | **A** — **destructure înainte** de procesare: `expandMutationEachOps(parsedOps) → [op₁…opₙ]`; apoi **același** path `_resolveMutationTerm` → validate → commit ca N linii separate |
+| **D253** | **Backward compat** | **A** — fără `each` = F25/F11 neschimbat |
+| **D254** | **`.check({ + / - })`** | **A** — aceeași expandare + validare ca mutation commit (F19) |
+| **D255** | **`text list each` pe vector** | **A (recommended)** — **eroare** elaborare (listă dintr-o celulă = ambiguu); zip scalar–scalar = `text each` pe ambele |
+| **D256** | **Rând gol după strip fill** | **A (recommended)** — dacă rând matrix devine listă **0 elemente** după skip fill → **eroare** (aliniat F25: `cannot contain 0 elements`) |
+| **D257** | **Zero rânduri** (`N=0`) | **A (recommended)** — **eroare** — cel puțin un apel expandat |
+| **D258** | **Constraints / index** | **A** — fiecare fact expandat validat **separat** în **aceeași** tranzacție atomică; index delta = N ops ca N linii manuale |
+| **D259** | **Trace `logic-mut`** | **A** — trace arată ops **expandate** (ground), nu forma cu `each` |
+| **D260** | **Ordine sintaxă `each`** | **A (confirmed 2026-08-24)** — **postfix** F25: `text each V`, `text list each M`; **respins** prefix `each text …` |
+
+
+### Exemple țintă
+
+**Zip simplu — doi vectori:**
+
+```logts
+logic {
+    + car(text each ownersVec, text each carsVec)
+}
+```
+
+`ownersVec` = 6 celule, `carsVec` = 6 celule → **6 facts** `car/2` (index 0..5).
+
+**Matrix per owner (cazul discutat):**
+
+```logts
+logic {
+    + car(text each ownersVec, text list each carsMatrix)
+}
+```
+
+| Rând | Owner | Cars (după skip `\0`) |
+| ---- | ----- | --------------------- |
+| 0 | john | `[toyota, bmw, audi]` |
+| 1 | carla | `[bmw, porsche]` |
+| 2 | steve | `[mercedes]` |
+
+→ 3 facts; al doilea arg = listă Prolog **per rând**.
+
+**Broadcast — arg fără `each` (D250-C):**
+
+```logts
+logic {
+    + owns(text each ownersVec, active, text list allTagsVec)
+}
+```
+
+→ N apeluri: ownerᵢ diferit; `active` literal identic; `allTagsVec` rezolvat **o dată** ca listă întreagă, repetat.
+
+**F25 neschimbat:**
+
+```logts
+logic {
+    + batch(text list ownersVec, text list carsVec)
+}
+```
+
+→ **1 fact** cu două liste.
+
+### Pipeline **(D252)**
+
+```
+parse logic { + car(text each A, text list each M) }
+    ↓
+expandMutationEachOps (pre-resolve)
+    → [ + car(A₀, L₀), + car(A₁, L₁), … ]
+    ↓
+for each op (ordine păstrată):
+    resolve wire refs (F25)
+    apply ± to proposed store
+    ↓
+validate constraints on all + facts (F12)
+    ↓
+COMMIT or ROLLBACK (F11)
+```
+
+**Invariant:** după expand, **niciun** arg nu mai conține `eachFlag`; engine-ul downstream **nu** știe de sugar.
+
+### Erori elaborare (mesaje draft)
+
+
+| Condiție | Rezultat |
+| -------- | -------- |
+| `text each V` count 6 + `text list each M` rows 5 | **error** — `each: row count mismatch (6 vs 5)` |
+| `text list each` pe `8wire[N]` vector | **error** — `each list requires matrix wire` |
+| `text list M` fără `each` (F25 azi) | **error** neschimbat — `text list expects a vector wire` |
+| Rând matrix doar fill | **error** — `text list cannot contain 0 elements` |
+| Niciun arg cu `each` | **no expand** — 1 op ca azi |
+| Wire inexistent | **error** — ca F11 |
+
+
+### Fișiere țintă
+
+
+| Fișier | Schimbare |
+| ------ | --------- |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | `parseMutationTerm` — F25 `bindType` + `list?` + **`each?`** + `wireName`; AST `wireRef.eachFlag`; `each` reserved în context mutation |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `logicExpandMutationEachOps`, `logicEachRowCount`, `logicWireRowToListTerm` (matrix row slice + F25 fill skip) |
+| `[components/logic.js](../v0_3_2/core/components/logic.js)` | Hook expand în `_collectMutationOps` / check path **înainte** de resolve |
+| `[interpreter.js](../v0_3_2/core/interpreter.js)` | `.check({ … })` — același expand |
+| `[logic-runtime.md](../v0_3_2/doc/logic-runtime.md)` | Secțiune **each** + exemple owners/matrix |
+| `[logic-constraints.md](../v0_3_2/doc/logic-constraints.md)` | Validate per fact expandat |
+| `[comp-logic.md](../v0_3_2/doc/comp-logic.md)` | Exec block syntax |
+| `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | Cross-link |
+| `tests/test_suite.js` | **3864+** legacy+wave |
+
+
+### Teste draft (checklist)
+
+
+| ID | Scenariu |
+| -- | -------- |
+| 3864 | parse `+ car(text each a, text each b)` |
+| 3865 | expand 3 vectori → 3 facts ground; query OK |
+| 3866 | `text each` + `text list each` matrix 3×3 — liste per rând |
+| 3867 | row count mismatch → fail tranzacție |
+| 3868 | broadcast: `+ tag(text each V, meta, text list L)` — L repetat |
+| 3869 | `- car(text each …)` — remove N facts |
+| 3870 | `.check({ + … text each … })` — paritate mutation validate |
+| 3871 | fără `each`: `+ batch(text list A, text list B)` — regresie F25 |
+| 3872 | constraint fail pe al 2-lea fact expandat → rollback total |
+| 3873 | `logic-mut` trace — ops expandate vizibile |
+
+
+### Livrabile F33
+
+- [x] Parser postfix `each` (`bindType list? each? wire`) + AST `eachFlag`
+- [x] `logicExpandMutationEachOps` + matrix row list decode
+- [x] Integrare mutation + check (pre-resolve)
+- [x] Teste **3864–3882** legacy+wave
+- [x] Doc EN `logic-runtime.md`, `logic-constraints.md`, `comp-logic.md`
+- [x] Regen doc-data + verify logic pages
+
+### Estimare
+
+Medie — parser + expand + matrix row codec + teste (~2–3 zile). Nu atinge solver/backtracking.
+
+### Decizii F33 — status
+
+**Toate D248–D260 confirmed** — F33 **completed**.
