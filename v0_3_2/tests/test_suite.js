@@ -43072,5 +43072,183 @@ comp [logic] .worldLogic:
   reg(3913, 'logic', 'F35a member regression (legacy)', runF35aRegression);
   reg(3914, 'logic', 'F35a member regression (wave)', runF35aRegression, { propagation: 'wave' });
 
+  reg(3915, 'logic', 'keysort/2 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved keysort',
+      function() { parseLogicBody('keysort(X, Y) <- X = Y'); },
+      "'keysort/2' is reserved",
+    );
+  });
+
+  reg(3916, 'logic', 'keysort/2 sort pairs by key', function(h) {
+    const prog = parseLogicBody('query q: keysort([pair(b, 2), pair(a, 1)], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first key a', sols[0].S.head.args[0].name, 'a');
+    h.assert('second key b', sols[0].S.tail.head.args[0].name, 'b');
+  });
+  reg(3917, 'logic', 'keysort/2 sort pairs by key (wave)', function(h) {
+    const prog = parseLogicBody('query q: keysort([pair(b, 2), pair(a, 1)], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first key a', sols[0].S.head.args[0].name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(3918, 'logic', 'msort/2 stable equal elements', function(h) {
+    const prog = parseLogicBody('query q: msort([2, 1, 2, 1], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first 1', String(sols[0].S.head.value), '1');
+    h.assert('second 1', String(sols[0].S.tail.head.value), '1');
+    h.assert('first 2', String(sols[0].S.tail.tail.head.value), '2');
+    h.assert('second 2', String(sols[0].S.tail.tail.tail.head.value), '2');
+  });
+  reg(3919, 'logic', 'msort/2 stable equal elements (wave)', function(h) {
+    const prog = parseLogicBody('query q: msort([2, 1, 2, 1], S)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first 1', String(sols[0].S.head.value), '1');
+  }, { propagation: 'wave' });
+
+  reg(3920, 'logic', 'prefix/2 backtracking four solutions', function(h) {
+    const prog = parseLogicBody('query q: prefix(P, [a, b, c])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('four sols', String(sols.length), '4');
+    h.assert('full prefix', sols[3].P.tail.tail.tail.nil, true);
+    h.assert('full head a', sols[3].P.head.name, 'a');
+  });
+  reg(3921, 'logic', 'prefix/2 backtracking (wave)', function(h) {
+    const prog = parseLogicBody('query q: prefix(P, [a, b, c])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('four sols', String(sols.length), '4');
+  }, { propagation: 'wave' });
+
+  reg(3922, 'logic', 'suffix/2 backtracking four solutions', function(h) {
+    const prog = parseLogicBody('query q: suffix(S, [a, b, c])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('four sols', String(sols.length), '4');
+    h.assert('empty suffix', sols[3].S.nil, true);
+    h.assert('full suffix head', sols[0].S.head.name, 'a');
+  });
+  reg(3923, 'logic', 'suffix/2 backtracking (wave)', function(h) {
+    const prog = parseLogicBody('query q: suffix(S, [a, b, c])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('four sols', String(sols.length), '4');
+  }, { propagation: 'wave' });
+
+  reg(3924, 'logic', 'is_set/1 no duplicates', function(h) {
+    const ok = parseLogicBody('query ok: is_set([a, b, c])');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+  });
+  reg(3925, 'logic', 'is_set/1 fails with duplicate', function(h) {
+    const bad = parseLogicBody('query bad: is_set([a, b, a])');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(bad.queries[0]), {}).length), '0');
+  });
+  reg(3926, 'logic', 'is_set/1 no duplicates (wave)', function(h) {
+    const ok = parseLogicBody('query ok: is_set([a, b, c])');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(ok.queries[0]), {}).length), '1');
+  }, { propagation: 'wave' });
+
+  reg(3927, 'logic', 'prefix/2 non-list fails', function(h) {
+    const prog = parseLogicBody('query bad: prefix(X, notList)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF35bKeysortComp(h, session) {
+    const src = `inline [logic] .scores:
+
+    query ranked:
+        keysort([pair(bob, 80), pair(ann, 95), pair(cal, 70)], Sorted),
+        member(pair(Name, Score), Sorted),
+        show(Name, Score)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+:
+
+1wire trigger = 1
+
+.scoreLogic:{
+    query = ranked
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ann', String(session.outIncludes(interp, 'ann')), 'true');
+    h.assert('bob', String(session.outIncludes(interp, 'bob')), 'true');
+    h.assert('cal', String(session.outIncludes(interp, 'cal')), 'true');
+  }
+
+  reg(3928, 'logic', 'F35b keysort comp query show (legacy)', runF35bKeysortComp);
+  reg(3929, 'logic', 'F35b keysort comp query show (wave)', runF35bKeysortComp, { propagation: 'wave' });
+
+  function runF35bIsSetComp(h, session) {
+    const src = `inline [logic] .tags:
+
+    query check:
+        is_set([red, green, blue]),
+        show("unique tags")
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = check
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('unique', String(session.outIncludes(interp, 'unique tags')), 'true');
+  }
+
+  reg(3930, 'logic', 'F35b is_set comp query show (legacy)', runF35bIsSetComp);
+  reg(3931, 'logic', 'F35b is_set comp query show (wave)', runF35bIsSetComp, { propagation: 'wave' });
+
+  function runF35bSortRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        sort([3, 1, 2], S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sorted', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  }
+
+  reg(3932, 'logic', 'F35b sort/2 regression (legacy)', runF35bSortRegression);
+  reg(3933, 'logic', 'F35b sort/2 regression (wave)', runF35bSortRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

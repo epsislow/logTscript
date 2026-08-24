@@ -111,8 +111,8 @@ todos:
     content: "F35a: last/2, select/3, selectchk/3, flatten/2, same_length/2 — teste 3900+"
     status: completed
   - id: logic-list-35b
-    content: "F35b: keysort/2, msort/2, prefix/2, suffix/2, is_set/1 — teste 3910+"
-    status: pending
+    content: "F35b: keysort/2, msort/2, prefix/2, suffix/2, is_set/1 — teste 3915+"
+    status: completed
   - id: logic-list-35c
     content: "F35c: list_to_set/2, union/3, intersection/3, subtract/3 — teste 3920+"
     status: pending
@@ -8037,7 +8037,7 @@ Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
 
 ---
 
-### F35b — Sortare & structură
+### F35b — Sortare & structură **(completed)**
 
 | Predicate | Semnificație |
 | --------- | ------------ |
@@ -8237,7 +8237,7 @@ comp [logic] .mapLogic:
 ### Livrabile F35 (umbrella)
 
 - [x] **F35a** — 5 builtins acces/eliminare
-- [ ] **F35b** — 5 builtins sort/structură
+- [x] **F35b** — 5 builtins sort/structură
 - [ ] **F35c** — 4 builtins mulțimi
 - [ ] **F35d** — 4 builtins range/agregare
 - [ ] **F35e** — 3 builtins combinatorică

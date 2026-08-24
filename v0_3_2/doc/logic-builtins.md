@@ -27,6 +27,11 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`flatten/2`** | 2 | yes | no | Recursively flatten nested ground lists |
 | **`same_length/2`** | 2 | yes | no | Equal list lengths; bind anonymous list |
 | **`sort/2`** | 2 | yes | no | Sort ground list by standard term order |
+| **`keysort/2`** | 2 | yes | no | Sort compound pairs by first argument (key) |
+| **`msort/2`** | 2 | yes | no | Stable sort by standard term order |
+| **`prefix/2`** | 2 | yes | no | List prefix with backtracking |
+| **`suffix/2`** | 2 | yes | no | List suffix with backtracking |
+| **`is_set/1`** | 1 | yes | no | True when list has no duplicate elements |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -714,6 +719,205 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints **`[a, b, c]`**.
+
+---
+
+## `keysort/2`
+
+**`keysort(Pairs, Sorted)`** — sort a ground list of **compound pairs** by the **first argument** (the key). Use **`pair(Key, Value)`** (or any compound with at least one argument). **Duplicates are kept.**
+
+| Call | Behaviour |
+|------|-----------|
+| `keysort([pair(b, 2), pair(a, 1)], S)` | `S = [pair(a, 1), pair(b, 2)]` |
+| Non-compound element | **Fail** |
+| Non-list or partial list | **Fail** |
+
+**Reserved head:** you cannot define **`keysort/2`** as fact, rule, or constraint head.
+
+### Example — rank by name
+
+```logts-play
+inline [logic] .scores:
+
+    query ranked:
+        keysort([pair(bob, 80), pair(ann, 95), pair(cal, 70)], Sorted),
+        member(pair(Name, Score), Sorted),
+        show(Name, Score)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+:
+
+1wire trigger = 1
+
+.scoreLogic:{
+    query = ranked
+    set = trigger
+}
+```
+
+**Load & Run** prints **`ann 95`**, then **`bob 80`**, then **`cal 70`** (sorted by name).
+
+---
+
+## `msort/2`
+
+**`msort(List, Sorted)`** — like **`sort/2`**, but **stable**: equal elements keep their original relative order. **`List`** must be a **ground** closed list.
+
+| Call | Behaviour |
+|------|-----------|
+| `msort([2, 1, 2, 1], S)` | `S = [1, 1, 2, 2]` (first `1` stays before second `1`) |
+| Same constraints as **`sort/2`** | Ground closed list required |
+
+**Reserved head:** you cannot define **`msort/2`** as fact, rule, or constraint head.
+
+### Example — stable reorder
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        msort([2, 1, 2, 1], S),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[1, 1, 2, 2]`**.
+
+---
+
+## `prefix/2`
+
+**`prefix(Prefix, List)`** — **`Prefix`** is a leading sublist of **`List`**. Backtracks over all prefixes (including **`[]`**).
+
+| Call | Behaviour |
+|------|-----------|
+| `prefix(P, [a, b, c])` | Four solutions: `[]`, `[a]`, `[a, b]`, `[a, b, c]` |
+| `prefix([a, b], L)` | Binds **`L`** to a list starting with **`[a, b]`** |
+| Non-list second arg | **Fail** |
+
+**Reserved head:** you cannot define **`prefix/2`** as fact, rule, or constraint head.
+
+### Example — enumerate prefixes
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        prefix(P, [go, stop, wait]),
+        show(P)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[]`**, **`[go]`**, **`[go, stop]`**, **`[go, stop, wait]`** (one line each).
+
+---
+
+## `suffix/2`
+
+**`suffix(Suffix, List)`** — **`Suffix`** is a trailing sublist of **`List`**. Backtracks over all suffixes (including **`[]`**).
+
+| Call | Behaviour |
+|------|-----------|
+| `suffix(S, [a, b, c])` | Four solutions: `[a, b, c]`, `[b, c]`, `[c]`, `[]` |
+| Non-list second arg | **Fail** |
+
+**Reserved head:** you cannot define **`suffix/2`** as fact, rule, or constraint head.
+
+### Example — tail segments
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        suffix(S, [red, green, blue]),
+        show(S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints the full list, then **`[green, blue]`**, **`[blue]`**, and **`[]`**.
+
+---
+
+## `is_set/1`
+
+**`is_set(List)`** — succeeds when **`List`** is a **ground** closed list with **no duplicate** elements (standard term equality).
+
+| Call | Behaviour |
+|------|-----------|
+| `is_set([a, b, c])` | Succeeds |
+| `is_set([a, b, a])` | **Fail** |
+| Open list or free variable | **Fail** |
+
+**Reserved head:** you cannot define **`is_set/1`** as fact, rule, or constraint head.
+
+### Example — validate unique tags
+
+```logts-play
+inline [logic] .tags:
+
+    query check:
+        is_set([red, green, blue]),
+        show("unique tags")
+
+:
+
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagLogic:{
+    query = check
+    set = trigger
+}
+```
+
+**Load & Run** prints **`unique tags`**.
 
 ---
 

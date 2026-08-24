@@ -22,6 +22,11 @@ const LOGIC_BUILTIN_SELECT_PRED = 'select';
 const LOGIC_BUILTIN_SELECTCHK_PRED = 'selectchk';
 const LOGIC_BUILTIN_FLATTEN_PRED = 'flatten';
 const LOGIC_BUILTIN_SAME_LENGTH_PRED = 'same_length';
+const LOGIC_BUILTIN_KEYSORT_PRED = 'keysort';
+const LOGIC_BUILTIN_MSORT_PRED = 'msort';
+const LOGIC_BUILTIN_PREFIX_PRED = 'prefix';
+const LOGIC_BUILTIN_SUFFIX_PRED = 'suffix';
+const LOGIC_BUILTIN_IS_SET_PRED = 'is_set';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -50,6 +55,11 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_SELECTCHK_PRED]: [3],
   [LOGIC_BUILTIN_FLATTEN_PRED]: [2],
   [LOGIC_BUILTIN_SAME_LENGTH_PRED]: [2],
+  [LOGIC_BUILTIN_KEYSORT_PRED]: [2],
+  [LOGIC_BUILTIN_MSORT_PRED]: [2],
+  [LOGIC_BUILTIN_PREFIX_PRED]: [2],
+  [LOGIC_BUILTIN_SUFFIX_PRED]: [2],
+  [LOGIC_BUILTIN_IS_SET_PRED]: [1],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -556,6 +566,21 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_SAME_LENGTH_PRED && arity === 2) {
     return "'same_length/2' is reserved — cannot define same_length as fact or rule head";
   }
+  if (predicate === LOGIC_BUILTIN_KEYSORT_PRED && arity === 2) {
+    return "'keysort/2' is reserved — cannot define keysort as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_MSORT_PRED && arity === 2) {
+    return "'msort/2' is reserved — cannot define msort as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_PREFIX_PRED && arity === 2) {
+    return "'prefix/2' is reserved — cannot define prefix as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SUFFIX_PRED && arity === 2) {
+    return "'suffix/2' is reserved — cannot define suffix as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_IS_SET_PRED && arity === 1) {
+    return "'is_set/1' is reserved — cannot define is_set as fact or rule head";
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -644,6 +669,16 @@ function logicValidateProgram(prog) {
         logicError("'flatten/2' is reserved — cannot define flatten as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_SAME_LENGTH_PRED && arity === 2) {
         logicError("'same_length/2' is reserved — cannot define same_length as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_KEYSORT_PRED && arity === 2) {
+        logicError("'keysort/2' is reserved — cannot define keysort as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_MSORT_PRED && arity === 2) {
+        logicError("'msort/2' is reserved — cannot define msort as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_PREFIX_PRED && arity === 2) {
+        logicError("'prefix/2' is reserved — cannot define prefix as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SUFFIX_PRED && arity === 2) {
+        logicError("'suffix/2' is reserved — cannot define suffix as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_IS_SET_PRED && arity === 1) {
+        logicError("'is_set/1' is reserved — cannot define is_set as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

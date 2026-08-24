@@ -11407,6 +11407,7 @@ comp [logic] .characterLogic:
 | **\`indexFacts:\`** | **\`0\`** or **\`1\`** (default **1**) — persistent fact index; **\`0\`** disables index |
 | **\`indexRebuild:\`** | **\`full\`** (default) or **\`delta\`** — index update after commit; ignored when **\`indexFacts: 0\`** |
 | **\`data:\`** | **\`overlay\`** (default), **\`static\`**, or **\`seed\`** — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
+| **\`randomSeed:\`** | Optional — integer literal **0 … 4294967295** or **number wire ≤ 32 bits**; reseeds RNG at each exec pass (before mutations/queries). See [logic-builtins.md — random](logic-builtins.md#random_between3-and-set_random1) |
 
 ### Program block bindings
 
@@ -20593,7 +20594,8 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
-| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
+| **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
 | **Value kinds** | **\`atom\`**, **\`number\`**, **\`list\`**, **\`compound\`**; type tests **\`atom/1\`** … **\`compound/1\`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | \`doc(inline.logic)\` — syntax template; \`doc(.myModule)\` — **summary** (counts, query/constraint names, predicate histogram) |
@@ -20675,7 +20677,7 @@ Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **\
 
 **Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as \`X = [X | _]\` fail ). A bare list term cannot stand alone as a goal — bind it with \`=\` or pass it to a predicate.
 
-List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`**) are documented in [logic-builtins.md](logic-builtins.md).
+List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`nth0/3\`**, **\`nth1/3\`**) are documented in [logic-builtins.md](logic-builtins.md).
 
 **\`show/N\`** prints ground lists as \`[a, b, c]\` and partial lists as \`[a, b|Rest]\` when the tail is still a variable.
 
@@ -24249,11 +24251,18 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`append/3\`** | 3 | yes | no | Concatenate or decompose lists |
 | **\`length/2\`** | 2 | yes | no | List length; generative when **\`N\`** is ground |
 | **\`reverse/2\`** | 2 | yes | no | Reverse list order (bidirectional) |
+| **\`last/2\`** | 2 | yes | no | Last element of a non-empty ground list |
+| **\`select/3\`** | 3 | yes | no | Remove one occurrence; SWI backtracking |
+| **\`selectchk/3\`** | 3 | yes | no | Like **\`select/3\`**, first match only |
+| **\`flatten/2\`** | 2 | yes | no | Recursively flatten nested ground lists |
+| **\`same_length/2\`** | 2 | yes | no | Equal list lengths; bind anonymous list |
 | **\`sort/2\`** | 2 | yes | no | Sort ground list by standard term order |
 | **\`atom/1\`** | 1 | yes | no | Type test — argument is an atom |
 | **\`number/1\`** | 1 | yes | no | Type test — argument is an integer |
 | **\`list/1\`** | 1 | yes | no | Type test — argument is a list |
 | **\`compound/1\`** | 1 | yes | no | Type test — argument is a compound (not a list) |
+| **\`random_between/3\`** | 3 | yes | yes (RNG) | Uniform random integer in \`[Low, High]\` inclusive |
+| **\`set_random/1\`** | 1 | yes | yes (RNG) | Reseed the global integer RNG |
 
 Type predicates filter bound terms — see [logic-value-types.md](logic-value-types.md).
 
@@ -24615,6 +24624,214 @@ comp [logic] .worldLogic:
 
 ---
 
+## \`last/2\`
+
+**\`last(List, Elem)\`** — **\`Elem\`** is the last element of non-empty **\`List\`**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`last([a, b, c], X)\` | \`X = c\` |
+| \`last([], X)\` | **Fail** |
+| Non-list | **Fail** |
+| Open or partial list | **Fail** |
+
+**Reserved head:** you cannot define **\`last/2\`** as fact, rule, or constraint head.
+
+### Example — last element
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        last([alpha, beta, gamma], X),
+        show(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`gamma\`**.
+
+---
+
+## \`select/3\`
+
+**\`select(Elem, List, Rest)\`** — **\`Rest\`** is **\`List\`** with **one** occurrence of **\`Elem\`** removed. Standard SWI-style backtracking: duplicate elements yield multiple solutions.
+
+| Call | Behaviour |
+|------|-----------|
+| \`select(b, [a, b, c], R)\` | \`R = [a, c]\` |
+| \`select(X, [a, b, a], R)\` | Three solutions (\`X\` = each \`a\` in turn) |
+| Non-list second arg | **Fail** |
+
+**Reserved head:** you cannot define **\`select/3\`** as fact, rule, or constraint head.
+
+### Example — draw from a deck
+
+\`\`\`logts-play
+inline [logic] .deck:
+
+    query draw:
+        select(Card, [go, jail, chance], Rest),
+        show("drew:", Card),
+        show("rest:", Rest)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = draw
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints one drawn card and the remaining list (order preserved except for the removed card).
+
+---
+
+## \`selectchk/3\`
+
+**\`selectchk(Elem, List, Rest)\`** — same as **\`select/3\`**, but **deterministic**: only the **first** matching occurrence is removed; no choice point for alternate positions.
+
+| Call | Behaviour |
+|------|-----------|
+| \`selectchk(b, [a, b, c, b], R)\` | \`R = [a, c, b]\` (second **\`b\`** kept) |
+| \`selectchk(X, [a, b, a], R)\` | One solution only |
+
+**Reserved head:** you cannot define **\`selectchk/3\`** as fact, rule, or constraint head.
+
+### Example — first match only
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        selectchk(b, [a, b, c, b], R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[a, c, b]\`**.
+
+---
+
+## \`flatten/2\`
+
+**\`flatten(Nested, Flat)\`** — **\`Flat\`** is **\`Nested\`** with all nested list structure removed recursively. Only **ground** closed lists are accepted; variables inside or open tails → **fail**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`flatten([a, [b, c], d], F)\` | \`F = [a, b, c, d]\` |
+| \`flatten([], F)\` | \`F = []\` |
+| Non-list or partial list | **Fail** |
+
+**Reserved head:** you cannot define **\`flatten/2\`** as fact, rule, or constraint head.
+
+### Example — nested zones
+
+\`\`\`logts-play
+inline [logic] .map:
+
+    zones([floor1, [roomA, roomB], floor2])
+
+    query rooms:
+        zones(Z),
+        flatten(Z, Flat),
+        member(R, Flat),
+        show(R)
+
+:
+
+comp [logic] .mapLogic:
+    on: 1
+    .map { }
+:
+
+1wire trigger = 1
+
+.mapLogic:{
+    query = rooms
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`floor1\`**, **\`roomA\`**, **\`roomB\`**, and **\`floor2\`** (one line each).
+
+---
+
+## \`same_length/2\`
+
+**\`same_length(List1, List2)\`** — both lists have the same number of elements.
+
+| Call | Behaviour |
+|------|-----------|
+| \`same_length([a, b], [1, 2])\` | Succeeds |
+| \`same_length([a, b], L)\` | \`L = [_, _]\` (anonymous variables) |
+| \`same_length(L1, L2)\` with both free | **Fail** |
+| Non-list argument | **Fail** |
+| Open or partial list | **Fail** when comparing lengths |
+
+**Reserved head:** you cannot define **\`same_length/2\`** as fact, rule, or constraint head.
+
+### Example — bind length
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        same_length([x, y, z], L),
+        length(L, N),
+        show(N)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`3\`**.
+
+---
+
 ## \`reverse/2\`
 
 **\`reverse(List, Rev)\`** — **\`Rev\`** is **\`List\`** with element order reversed.
@@ -24764,6 +24981,90 @@ comp [logic] .worldLogic:
 \`\`\`
 
 **Load & Run** prints **\`red\`** then **\`green\`**. Switch to **\`viaBuiltin\`** for the same behaviour using the built-in **\`member/2\`**.
+
+---
+
+## \`random_between/3\` and \`set_random/1\`
+
+Integer random numbers for dice, board steps, and other game logic. **No floats** — only ground integers in the ranges below.
+
+| Builtin | Arguments | Range |
+|---------|-----------|-------|
+| **\`set_random(+Seed)\`** | **\`Seed\`** ground integer | **0 … 4294967295** (32-bit unsigned) |
+| **\`random_between(+Low, +High, -Int)\`** | **\`Low\`**, **\`High\`**, **\`Int\`** | **-2147483648 … 2147483647** (signed 32-bit) |
+
+**Rules:**
+
+- **\`Low\`**, **\`High\`**, and **\`Seed\`** must be **ground** integers in range — free variables or out-of-range values → **fail**.
+- **\`Low\` > \`High\`** → **fail** (not an engine error).
+- **\`Int\`** is bound to a uniform integer in **\`[Low, High]\`** inclusive.
+- **Backtracking:** re-satisfying the same **\`random_between/3\`** goal returns the **same** **\`Int\`** (SWI-style impure semantics).
+- **RNG scope:** one global generator per run. **\`set_random/1\`** in a query body resets it; a later **\`set_random/1\`** overrides an earlier seed in the same query.
+- **Reserved heads:** you cannot define **\`random_between/3\`** or **\`set_random/1\`** as fact, rule, or constraint heads.
+
+**Component seed:** optional **\`randomSeed:\`** on **\`comp [logic]\`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass, equivalent to **\`set_random(Val)\`** before mutations and queries. See [comp-logic.md — \`randomSeed:\`](comp-logic.md#component-attributes).
+
+### Example — dice with deterministic seed
+
+\`\`\`logts-play
+inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        set_random(42),
+        roll(D),
+        show("die:", D)
+
+:
+
+comp [logic] .diceLogic:
+    on: 1
+    .dice { }
+:
+
+1wire trigger = 1
+
+.diceLogic:{
+    query = oneRoll
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`die: 4\`** (fixed for seed **42** with the built-in generator).
+
+### Example — board step with \`is/2\` and comp redirect
+
+\`\`\`logts-play
+inline [logic] .walker:
+
+    roll(D) <- random_between(1, 6, D)
+
+    step(P, S0, S1) <-
+        roll(D),
+        S1 is S0 + D
+
+    query advance:
+        step(p1, 10, NewSquare)
+
+:
+
+comp [logic] .walkerLogic:
+    on: 1
+    randomSeed: 42
+    .walker { }
+:
+
+16wire newPos = 0000000000000000
+1wire trigger = 1
+
+.walkerLogic:{
+    advance >= newPos
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** sets **\`newPos\`** to **14** (10 + die **4**). Random runs inside rule **\`step/3\`**; the script only triggers query **\`advance\`** via the comp redirect.
 `,
     'logic-constraints.md': `# Logic constraints — validate runtime state
 

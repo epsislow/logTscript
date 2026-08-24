@@ -313,6 +313,21 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'same_length' && g0.arity === 2) {
       return this._solveSameLength(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'keysort' && g0.arity === 2) {
+      return this._solveKeysort(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'msort' && g0.arity === 2) {
+      return this._solveMsort(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'prefix' && g0.arity === 2) {
+      return this._solvePrefix(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'suffix' && g0.arity === 2) {
+      return this._solveSuffix(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'is_set' && g0.arity === 1) {
+      return this._solveIsSet(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -834,6 +849,105 @@ class LogicEngine {
     }
     return false;
   }
+
+  _solveKeysort(list, sorted, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const sortedList = logicKeysortGroundList(ld, env, this.table);
+    if (sortedList == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(sorted, sortedList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveMsort(list, sorted, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    const sortedList = logicMsortGroundList(ld, env, this.table);
+    if (sortedList == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(sorted, sortedList, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solvePrefix(prefix, list, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._prefixWalk(prefix, list, cont, env);
+  }
+
+  _solveSuffix(suffix, list, restGoals, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(restGoals, env, depth + 1, onSuccess, onDepthExceeded);
+    return this._suffixWalk(suffix, list, cont, env);
+  }
+
+  _prefixWalk(prefix, list, cont, env) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list') return false;
+    let any = false;
+    const trail = env.trailLength();
+    if (logicUnify(prefix, { kind: 'list', nil: true }, env, this.table)) {
+      if (cont()) any = true;
+      if (this._solutionCapReached || env.cutCommitted) {
+        env.undo(trail);
+        return any;
+      }
+    }
+    env.undo(trail);
+    if (!logicListIsNil(ld)) {
+      const restVar = { kind: 'var', name: `__pfx${this._renameSerial++}` };
+      const rebuilt = { kind: 'list', head: ld.head, tail: restVar };
+      const trail2 = env.trailLength();
+      if (logicUnify(list, rebuilt, env, this.table)) {
+        const tailPrefixVar = { kind: 'var', name: `__pfx${this._renameSerial++}` };
+        const extPrefix = { kind: 'list', head: ld.head, tail: tailPrefixVar };
+        const trail3 = env.trailLength();
+        if (logicUnify(prefix, extPrefix, env, this.table)) {
+          if (this._prefixWalk(tailPrefixVar, restVar, cont, env)) any = true;
+        }
+        env.undo(trail3);
+      }
+      env.undo(trail2);
+    }
+    return any;
+  }
+
+  _suffixWalk(suffix, list, cont, env) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list') return false;
+    let any = false;
+    const trail = env.trailLength();
+    if (logicUnify(suffix, ld, env, this.table)) {
+      if (cont()) any = true;
+      if (this._solutionCapReached || env.cutCommitted) {
+        env.undo(trail);
+        return any;
+      }
+    }
+    env.undo(trail);
+    if (!logicListIsNil(ld)) {
+      const restVar = { kind: 'var', name: `__sfx${this._renameSerial++}` };
+      const rebuilt = { kind: 'list', head: ld.head, tail: restVar };
+      const trail2 = env.trailLength();
+      if (logicUnify(list, rebuilt, env, this.table)) {
+        if (this._suffixWalk(suffix, restVar, cont, env)) any = true;
+      }
+      env.undo(trail2);
+    }
+    return any;
+  }
+
+  _solveIsSet(list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(list, env);
+    if (ld.kind !== 'list' || !logicListIsGroundClosed(ld, env)) return false;
+    if (!logicListIsGroundSet(ld, env, this.table)) return false;
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
 }
 
 function logicRenameApartClause(clause, idRef) {
@@ -1210,6 +1324,39 @@ function logicReverseGroundList(listD, env) {
   if (elems == null) return null;
   elems.reverse();
   return logicArrayToList(elems);
+}
+
+function logicKeysortGroundList(listD, env, table) {
+  const elems = logicGroundListToArray(listD, env);
+  if (elems == null) return null;
+  for (const e of elems) {
+    if (e.kind !== 'compound' || !e.args || e.args.length < 1) return null;
+  }
+  const sorted = elems.slice().sort((a, b) => logicCompareTerms(a.args[0], b.args[0], env, table));
+  return logicArrayToList(sorted);
+}
+
+function logicMsortGroundList(listD, env, table) {
+  const elems = logicGroundListToArray(listD, env);
+  if (elems == null) return null;
+  const indexed = elems.map((e, i) => ({ e, i }));
+  indexed.sort((a, b) => {
+    const c = logicCompareTerms(a.e, b.e, env, table);
+    if (c !== 0) return c;
+    return a.i - b.i;
+  });
+  return logicArrayToList(indexed.map((x) => x.e));
+}
+
+function logicListIsGroundSet(listD, env, table) {
+  const elems = logicGroundListToArray(listD, env);
+  if (elems == null) return false;
+  for (let i = 0; i < elems.length; i++) {
+    for (let j = i + 1; j < elems.length; j++) {
+      if (logicCompareTerms(elems[i], elems[j], env, table) === 0) return false;
+    }
+  }
+  return true;
 }
 
 function logicEvalNumber(term, env, table) {
