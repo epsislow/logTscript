@@ -136,7 +136,7 @@ todos:
     status: completed
   - id: logic-list-35j
     content: "F35j: length/2 generativ + nth1/4 — teste 3990+"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -8149,7 +8149,7 @@ Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
 
 ---
 
-### F35j — Avansate SWI
+### F35j — Avansate SWI **(completed)**
 
 | Predicate | Semnificație |
 | --------- | ------------ |
@@ -8245,7 +8245,7 @@ comp [logic] .mapLogic:
 - [x] **F35g** — maplist/2, maplist/3
 - [x] **F35h** — foldl/4, foldl/5
 - [x] **F35i** — findall, bagof, setof
-- [ ] **F35j** — length generativ + nth1/4
+- [x] **F35j** — length generativ + nth1/4
 - [ ] Doc EN complet + verify după fiecare subfază
 
 ### Decizii F35 — status

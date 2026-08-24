@@ -257,10 +257,13 @@ class LogicEngine {
       return this._solveShow(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call' && g0.predicate === 'nth0' && g0.arity === 3) {
-      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, false);
+      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, false, null);
     }
     if (g0.kind === 'call' && g0.predicate === 'nth1' && g0.arity === 3) {
-      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, true);
+      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, true, null);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'nth1' && g0.arity === 4) {
+      return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, true, g0.args[3]);
     }
     if (g0.kind === 'call' && g0.predicate === 'is' && g0.arity === 2) {
       return this._solveIs(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
@@ -519,7 +522,7 @@ class LogicEngine {
     return false;
   }
 
-  _solveNth(goal, rest, env, depth, onSuccess, onDepthExceeded, oneBased) {
+  _solveNth(goal, rest, env, depth, onSuccess, onDepthExceeded, oneBased, restTerm) {
     const iTerm = goal.args[0];
     const listTerm = goal.args[1];
     const elemTerm = goal.args[2];
@@ -535,17 +538,18 @@ class LogicEngine {
       } else if (idx < 0) {
         return false;
       }
-      return this._solveNthGroundIndex(idx, listTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded);
+      return this._solveNthGroundIndex(idx, listTerm, listD, elemTerm, restTerm, rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (listD.kind === 'var') return false;
-    return this._solveNthVarIndex(iTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded, oneBased);
+    return this._solveNthVarIndex(iTerm, listD, elemTerm, restTerm, rest, env, depth, onSuccess, onDepthExceeded, oneBased);
   }
 
-  _solveNthGroundIndex(idx, listTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+  _solveNthGroundIndex(idx, listTerm, listD, elemTerm, restTerm, rest, env, depth, onSuccess, onDepthExceeded) {
     if (listD.kind === 'var') {
       if (idx !== 0) return false;
       const trail = env.trailLength();
-      const cons = { kind: 'list', head: elemTerm, tail: { kind: 'var', name: '_' } };
+      const tailNode = restTerm != null ? restTerm : { kind: 'var', name: '_' };
+      const cons = { kind: 'list', head: elemTerm, tail: tailNode };
       if (!logicUnify(listTerm, cons, env, this.table)) {
         env.undo(trail);
         return false;
@@ -567,10 +571,14 @@ class LogicEngine {
       env.undo(trail);
       return false;
     }
+    if (restTerm != null && !logicUnify(restTerm, cur.tail, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
-  _solveNthVarIndex(iTerm, listD, elemTerm, rest, env, depth, onSuccess, onDepthExceeded, oneBased) {
+  _solveNthVarIndex(iTerm, listD, elemTerm, restTerm, rest, env, depth, onSuccess, onDepthExceeded, oneBased) {
     let cur = listD;
     let pos = 0;
     let any = false;
@@ -579,6 +587,13 @@ class LogicEngine {
       const iVal = oneBased ? pos + 1 : pos;
       if (iTerm.name !== '_') env.bind(iTerm.name, { kind: 'number', value: iVal });
       if (!logicUnify(elemTerm, cur.head, env, this.table)) {
+        env.undo(trail);
+        cur = logicDeref(cur.tail, env);
+        if (cur.kind === 'var') break;
+        pos++;
+        continue;
+      }
+      if (restTerm != null && !logicUnify(restTerm, cur.tail, env, this.table)) {
         env.undo(trail);
         cur = logicDeref(cur.tail, env);
         if (cur.kind === 'var') break;

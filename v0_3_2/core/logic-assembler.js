@@ -564,7 +564,7 @@ function logicIsReservedPredicateHead(head) {
 function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_SHOW_PRED) return "'show/N' is reserved — cannot define show as fact or rule head";
   if (predicate === LOGIC_BUILTIN_NTH0_PRED || predicate === LOGIC_BUILTIN_NTH1_PRED) {
-    return `'${predicate}/3' is reserved — cannot define ${predicate} as fact or rule head`;
+    return `'${predicate}/${arity}' is reserved — cannot define ${predicate} as fact or rule head`;
   }
   if (predicate === LOGIC_BUILTIN_IS_PRED && arity === 2) {
     return "'is/2' is reserved — cannot define is as fact or rule head";

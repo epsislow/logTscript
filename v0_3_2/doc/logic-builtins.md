@@ -16,6 +16,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`count/2`** | 2 | no¹ | no | Number of solutions to a goal |
 | **`nth0/3`** | 3 | yes | no | List element at **0-based** index |
 | **`nth1/3`** | 3 | yes | no | List element at **1-based** index |
+| **`nth1/4`** | 4 | yes | no | Element at **1-based** index + list suffix after it |
 | **`is/2`** | 2 | yes | no | Integer arithmetic (+ infix **`M is Expr`**) |
 | **`member/2`** | 2 | yes | no | List membership with backtracking |
 | **`append/3`** | 3 | yes | no | Concatenate or decompose lists |
@@ -233,6 +234,75 @@ comp [logic] .rentsLogic:
 ```text
 10
 ```
+
+### `nth1/4` — element and suffix
+
+**`nth1(I, List, Elem, Rest)`** — like **`nth1/3`**, but **`Rest`** is unified with the list **after** the element at **`I`** (1-based).
+
+| Call | Result |
+|------|--------|
+| `nth1(1, [a, b, c], X, R)` | `X = a`, `R = [b, c]` |
+| `nth1(3, [a, b, c], X, R)` | `X = c`, `R = []` |
+| `nth1(4, [a, b, c], X, R)` | **Fail** (out of range) |
+
+**`I`** may be a variable (backtracking). Open or partial lists **fail** when the spine is not ground enough to reach **`I`**.
+
+#### Example — split a route at the second step
+
+```logts-play
+inline [logic] .route:
+
+    query split:
+        nth1(2, [start, path, end], Mid, Tail),
+        show(Mid),
+        show(Tail)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .route { }
+:
+
+1wire trigger = 1
+
+.routeLogic:{
+    query = split
+    set = trigger
+}
+```
+
+**Load & Run** prints **`path`** then **`[end]`**.
+
+#### Example — generative length + indexing
+
+Build a list of known length, then pin the first cell (see also [`length/2`](#length2)):
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        length(L, 3),
+        nth1(1, L, first, Rest),
+        first = red,
+        show(Rest)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints a two-cell suffix starting with anonymous variables (e.g. **`[_, _]`**).
 
 ---
 

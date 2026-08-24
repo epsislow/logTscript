@@ -44409,5 +44409,165 @@ comp [logic] .statsLogic:
   reg(4051, 'logic', 'F35i foldl regression (legacy)', runF35iFoldlRegression);
   reg(4052, 'logic', 'F35i foldl regression (wave)', runF35iFoldlRegression, { propagation: 'wave' });
 
+  reg(4053, 'logic', 'nth1/4 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved nth1/4',
+      function() { parseLogicBody('nth1(I, L, E, R) <- L = E'); },
+      "'nth1/4' is reserved",
+    );
+  });
+
+  reg(4054, 'logic', 'nth1/4 element and suffix', function(h) {
+    const prog = parseLogicBody('query q: nth1(2, [a, b, c, d], E, R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('elem b', sols[0].E.name, 'b');
+    h.assert('rest c', sols[0].R.head.name, 'c');
+    h.assert('rest d', sols[0].R.tail.head.name, 'd');
+    h.assert('nil', sols[0].R.tail.tail.nil, true);
+  });
+  reg(4055, 'logic', 'nth1/4 element and suffix (wave)', function(h) {
+    const prog = parseLogicBody('query q: nth1(2, [a, b, c, d], E, R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('elem b', sols[0].E.name, 'b');
+    h.assert('rest c', sols[0].R.head.name, 'c');
+  }, { propagation: 'wave' });
+
+  reg(4056, 'logic', 'nth1/4 last element empty rest', function(h) {
+    const prog = parseLogicBody('query q: nth1(3, [a, b, c], E, R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('elem c', sols[0].E.name, 'c');
+    h.assert('empty rest', sols[0].R.nil, true);
+  });
+
+  reg(4057, 'logic', 'nth1/4 out of range fails', function(h) {
+    const prog = parseLogicBody('query bad: nth1(5, [a, b], E, R)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4058, 'logic', 'nth1/4 variable index backtracking', function(h) {
+    const prog = parseLogicBody('query q: nth1(I, [a, b, c], b, R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('index 2', sols[0].I.value, 2);
+    h.assert('rest c', sols[0].R.head.name, 'c');
+  });
+  reg(4059, 'logic', 'nth1/4 variable index backtracking (wave)', function(h) {
+    const prog = parseLogicBody('query q: nth1(I, [a, b, c], b, R)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('index 2', sols[0].I.value, 2);
+  }, { propagation: 'wave' });
+
+  reg(4060, 'logic', 'length/2 generative empty list', function(h) {
+    const prog = parseLogicBody('query q: length(L, 0)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('empty', sols[0].L.nil, true);
+  });
+
+  reg(4061, 'logic', 'length/2 generative binds anonymous spine', function(h) {
+    const prog = parseLogicBody('query q: length(L, 2), nth1(1, L, a, _)');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  });
+  reg(4062, 'logic', 'length/2 generative binds anonymous spine (wave)', function(h) {
+    const prog = parseLogicBody('query q: length(L, 2), nth1(1, L, a, _)');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  }, { propagation: 'wave' });
+
+  function runF35jNth1Comp(h, session) {
+    const src = `inline [logic] .route:
+
+    query split:
+        nth1(2, [start, path, end], Mid, Tail),
+        show(Mid),
+        show(Tail)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .route { }
+:
+
+1wire trigger = 1
+
+.routeLogic:{
+    query = split
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('mid path', String(session.outIncludes(interp, 'path')), 'true');
+    h.assert('tail end', String(session.outIncludes(interp, '[end]')), 'true');
+  }
+
+  reg(4063, 'logic', 'F35j nth1/4 comp show (legacy)', runF35jNth1Comp);
+  reg(4064, 'logic', 'F35j nth1/4 comp show (wave)', runF35jNth1Comp, { propagation: 'wave' });
+
+  function runF35jNth1Regression(h, session) {
+    const src = `inline [logic] .rents:
+
+    rent(N, C) <- nth1(N, [2, 10, 30, 90, 160, 250], C)
+
+    query house2:
+        rent(2, C),
+        show(C)
+
+:
+
+comp [logic] .rentsLogic:
+    on: 1
+    .rents { }
+:
+
+1wire trigger = 1
+
+.rentsLogic:{
+    query = house2
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('rent 10', String(session.outIncludes(interp, '10')), 'true');
+  }
+
+  reg(4065, 'logic', 'F35j nth1/3 regression (legacy)', runF35jNth1Regression);
+  reg(4066, 'logic', 'F35j nth1/3 regression (wave)', runF35jNth1Regression, { propagation: 'wave' });
+
+  function runF35jLengthRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        length([a, b, c], N),
+        show(N)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('length 3', String(session.outIncludes(interp, '3')), 'true');
+  }
+
+  reg(4067, 'logic', 'F35j length/2 regression (legacy)', runF35jLengthRegression);
+  reg(4068, 'logic', 'F35j length/2 regression (wave)', runF35jLengthRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
