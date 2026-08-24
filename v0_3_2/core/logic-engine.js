@@ -400,6 +400,12 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'setof' && g0.arity === 3) {
       return this._solveSetof(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'true' && g0.arity === 0) {
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'fail' && g0.arity === 0) {
+      return false;
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }

@@ -69,7 +69,7 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | `\+ Goal` | `\+ Goal` — negation as failure (same idea as Prolog) |
 | `!` | Cut — commit current clause (same idea as Prolog) |
 | `is` | Arithmetic evaluate-and-bind — **`Left is Right`** or **`is(Left, Right)`** (built-in) |
-| `true` / `fail` | Not built-in — use facts, `\+`, or empty query failure |
+| `true` / `fail` | **`true/0`**, **`fail/0`** — reserved builtins ([logic-builtins.md](logic-builtins.md#true0-and-fail0)) |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms `'John'` | Use **`"John"`** string literals (show labels) or lowercase atoms |
 | Arbitrary arity / DCG / modules | Single inline namespace + `use` merge |
@@ -606,7 +606,7 @@ inline [logic] .world:
 | **`[_, X, _]`** fixed slot | Supported |
 | **`append/3`**, **`member/2`**, **`length/2`**, … | Built-ins (reserved names) |
 | User **`member/2`** rule | **Not allowed** — use another name (`userMember/2`, …) |
-| **`true` / `fail`** goals | **Not built-in** — use facts, **`\+`**, or empty body failure |
+| **`true` / `fail`** goals | **`true/0`**, **`fail/0`** — see [logic-builtins.md — `true/0` · `fail/0`](logic-builtins.md#true0-and-fail0) |
 | DCG **`NonTerminal --> …`** | **Not supported** |
 | Open / partial lists in **`reverse/2`**, **`sort/2`**, **`length/2`** count | **Fail** until the spine is ground |
 | Cyclic **`X = [X\|_]`** | **Fails** (occurs-check) |
@@ -1184,6 +1184,24 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints **`total 15`**. Run again with **`query = unify`** (use **Load**, change the query name, **Load & Run**) to see **`struct +(N, 1)`**-style output for **`M = N + 1`** when **`N`** is free — unification, not arithmetic.
+
+---
+
+## `true/0` and `fail/0`
+
+Reserved builtins — always succeed or always fail. Full reference: [logic-builtins.md — `true/0` · `fail/0`](logic-builtins.md#true0-and-fail0).
+
+| Goal | Effect |
+|------|--------|
+| **`true`** | Succeeds; body continues |
+| **`fail`** | Fails immediately |
+
+```logts
+ok() <- true
+never(X) <- fail, member(X, [a])
+```
+
+**`\+ fail`** succeeds (useful sanity check). Prefer **`true`** over **`X = X`** for readability.
 
 ---
 

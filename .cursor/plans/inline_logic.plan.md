@@ -137,6 +137,9 @@ todos:
   - id: logic-list-35j
     content: "F35j: length/2 generativ + nth1/4 — teste 3990+"
     status: completed
+  - id: logic-true-fail-36a
+    content: "F36a: true/0, fail/0 — teste 4069+"
+    status: completed
 isProject: false
 ---
 
@@ -8246,8 +8249,22 @@ comp [logic] .mapLogic:
 - [x] **F35h** — foldl/4, foldl/5
 - [x] **F35i** — findall, bagof, setof
 - [x] **F35j** — length generativ + nth1/4
+- [x] **F36a** — true/0, fail/0
 - [ ] Doc EN complet + verify după fiecare subfază
 
 ### Decizii F35 — status
 
 **D267–D278 draft** — **F35a ready-to-implement** (confirmare user la start).
+
+---
+
+### F36a — true / fail **(completed)**
+
+| Predicate | Semnificație |
+| --------- | ------------ |
+| **`true/0`** | Goal care reușește mereu (înlocuiește idiomul `X = X`) |
+| **`fail/0`** | Goal care eșuează mereu (Prolog-style, nu `false/0`) |
+
+**Teste:** 4069–4080 · regresie member
+
+**Doc:** `logic-builtins.md` + `inline-logic.md` (tabel Prolog vs LogTScript actualizat)

@@ -56,6 +56,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`findall/3`** | 3 | yes | no | Collect all template instances for a goal (**`[]`** if none) |
 | **`bagof/3`** | 3 | yes | no | Like findall, groups by existential goal vars; **fail** if none |
 | **`setof/3`** | 3 | yes | no | Like bagof, then unique + sorted list |
+| **`true/0`** | 0 | yes | no | Always succeeds (Prolog-style) |
+| **`fail/0`** | 0 | yes | no | Always fails (Prolog-style) |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -69,7 +71,7 @@ Type predicates filter bound terms — see [logic-value-types.md](logic-value-ty
 
 **Scope:** all builtins work in rule bodies, named queries, constraint bodies, **`.world:query({ … })`**, and **`.world:check({ … })`**.
 
-**Not in this table:** **`!`** (cut) and **`\+`** (negation) are goal operators — see [inline-logic.md](inline-logic.md).
+**Not in this table:** **`!`** (cut) and **`\+`** (negation) are goal operators — see [inline-logic.md](inline-logic.md). **`true/0`** and **`fail/0`** are zero-arity call builtins in the table above.
 
 ---
 
@@ -1929,6 +1931,84 @@ comp [logic] .scoresLogic:
 ```
 
 **Load & Run** prints **`[alice, bob, carol]`**.
+
+---
+
+## `true/0` and `fail/0`
+
+Prolog-style **control goals** with no arguments.
+
+| Builtin | Behaviour |
+|---------|-----------|
+| **`true`** | Always **succeeds** — continues to the next goal in the body |
+| **`fail`** | Always **fails** — the current path stops (no solutions through this branch) |
+
+**Reserved heads:** you cannot define **`true/0`** or **`fail/0`** as fact, rule, or constraint heads.
+
+**Notes:**
+
+- Replaces the old idiom **`X = X`** for a trivial success goal.
+- **`\+ fail`** succeeds (negation as failure over a goal that never succeeds).
+- Other arities named **`true`** or **`fail`** (e.g. **`true(X)`**) are **not** builtins — they remain ordinary user predicates if you define them.
+
+### Example — `true` in a rule body
+
+```logts-play
+inline [logic] .world:
+
+    always_ok() <- true
+
+    query check:
+        always_ok(),
+        member(C, [red, green]),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = check
+    set = trigger
+}
+```
+
+**Load & Run** prints **`red`** then **`green`**.
+
+### Example — `fail` blocks a branch
+
+```logts-play
+inline [logic] .gate:
+
+    query blocked:
+        fail,
+        show("never")
+
+    query open:
+        true,
+        show("ok")
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = open
+    set = trigger
+}
+```
+
+**Load & Run** prints **`ok`**. Switch to **`query = blocked`** — no output (query fails).
 
 ---
 

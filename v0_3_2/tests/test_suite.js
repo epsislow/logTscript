@@ -44569,5 +44569,118 @@ comp [logic] .worldLogic:
   reg(4067, 'logic', 'F35j length/2 regression (legacy)', runF35jLengthRegression);
   reg(4068, 'logic', 'F35j length/2 regression (wave)', runF35jLengthRegression, { propagation: 'wave' });
 
+  reg(4069, 'logic', 'true/0 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved true',
+      function() { parseLogicBody('true() <- fail'); },
+      "'true/0' is reserved",
+    );
+  });
+
+  reg(4070, 'logic', 'fail/0 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved fail',
+      function() { parseLogicBody('fail() <- true'); },
+      "'fail/0' is reserved",
+    );
+  });
+
+  reg(4071, 'logic', 'true/0 succeeds in query', function(h) {
+    const prog = parseLogicBody('query ok: true, member(X, [a])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('a', sols[0].X.name, 'a');
+  });
+  reg(4072, 'logic', 'true/0 succeeds in query (wave)', function(h) {
+    const prog = parseLogicBody('query ok: true, member(X, [a])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('a', sols[0].X.name, 'a');
+  }, { propagation: 'wave' });
+
+  reg(4073, 'logic', 'fail/0 fails query', function(h) {
+    const prog = parseLogicBody('query bad: fail');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4074, 'logic', 'fail/0 blocks rule body', function(h) {
+    const prog = parseLogicBody('ok() <- true\nbad() <- fail, member(X, [a])\nquery q1: ok()\nquery q2: bad()');
+    const eng = new LogicEngine(prog.clauses);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+    h.assert('bad', String(eng.solveQuery(logicQueryGoals(prog.queries[1]), {}).length), '0');
+  });
+
+  reg(4075, 'logic', 'negation of fail/0 succeeds', function(h) {
+    const prog = parseLogicBody('query ok: \\+ fail');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  });
+  reg(4076, 'logic', 'negation of fail/0 succeeds (wave)', function(h) {
+    const prog = parseLogicBody('query ok: \\+ fail');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  }, { propagation: 'wave' });
+
+  function runF36aTrueComp(h, session) {
+    const src = `inline [logic] .world:
+
+    always_ok() <- true
+
+    query check:
+        always_ok(),
+        member(C, [red, green]),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = check
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+  }
+
+  reg(4077, 'logic', 'F36a true/0 comp show (legacy)', runF36aTrueComp);
+  reg(4078, 'logic', 'F36a true/0 comp show (wave)', runF36aTrueComp, { propagation: 'wave' });
+
+  function runF36aMemberRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        member(C, [red, green]),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('green', String(session.outIncludes(interp, 'green')), 'true');
+  }
+
+  reg(4079, 'logic', 'F36a member regression (legacy)', runF36aMemberRegression);
+  reg(4080, 'logic', 'F36a member regression (wave)', runF36aMemberRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
