@@ -125,7 +125,15 @@ function runBlock(sandbox, src) {
   } catch (e) {
     err = e;
   }
-  return { session, err, out, interp: session.interp };
+  const interp = session.interp;
+  if (err && interp && interp.lastReportedError) {
+    const lr = interp.lastReportedError;
+    if (lr.message && lr.message !== err.message) {
+      err = new Error(lr.message);
+      err.lastReported = lr;
+    }
+  }
+  return { session, err, out, interp };
 }
 
 function runCase(sandbox, caseDef) {

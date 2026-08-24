@@ -25520,6 +25520,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Syntax** | \`.module:query({ goals }, Var=wire, maxDepth=\\\\N, maxSolutions=\\\\N;policy)\` |
 | **Goals** | Prolog body in \`{ }\` — comma = AND, \`\\+\`, \`=:=\`, etc. |
 | **Inputs** | Optional \`, Var=text wire\`, \`Var=number wire\`, \`Var=bool wire\`, or \`Var=<type> list wire\` |
+| **Output hints** | Scalar/matrix with free vars: \`, Var=text\` (no wire) — **required**; width alone does not infer type |
 | **Limits** | Optional \`, maxDepth=\\\\N\`, \`, maxSolutions=\\\\N\` (decimal literals; default **256** / **64**) |
 | **Column select** | Optional \`;sel(i,j)\` before policy — 0-based column indices into free variables |
 | **Result policy** | Optional trailing \`;unique\`, \`;first\`, or \`;last\` (after bindings/options) |
@@ -25568,7 +25569,7 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 
 \`\`\`logts
 8wire[4] cars = .world:query({ owns(john, _) };unique)
-40wire last = .world:query({ owns(john, X) };last)
+40wire last = .world:query({ owns(john, X) }, X=text;last)
 1wire ok = .world:query({ owns(john, X) }, X=text car;unique)
 \`\`\`
 
@@ -25644,7 +25645,7 @@ inline [logic] .world:
 
 :
 
-40wire car = 01100011'01101000'01100101'01110110'01111001
+40wire car = "chevy"
 
 1wire ok = .world:query({ owns(john, X) }, X=text car)
 
@@ -25666,9 +25667,9 @@ inline [logic] .world:
 
 :
 
-40wire firstCar = .world:query({ owns(john, X) })
+40wire firstCar = .world:query({ owns(john, X) }, X=text)
 
-8wire firstChar = .world:query({ owns(john, X) })
+8wire firstChar = .world:query({ owns(john, X) }, X=text)
 
 show(firstCar; ascii)
 show(firstChar; ascii)
@@ -25682,7 +25683,7 @@ show(firstChar; ascii)
 Wider wires pad with \`\\0\`:
 
 \`\`\`logts
-80wire name = .world:query({ owns(john, X) })   # "chevy" + zero-fill to 80 bits
+80wire name = .world:query({ owns(john, X) }, X=text)   # "chevy" + zero-fill to 80 bits
 \`\`\`
 
 ### Vector — all cars john owns (full names)
@@ -25740,7 +25741,7 @@ inline [logic] .world:
 
 1wire ok = .world:query({ person(X), \\+ banned(X) })
 
-40wire[4] eligible = .world:query({ person(X), \\+ banned(X) })
+40wire[4] eligible = .world:query({ person(X), \\+ banned(X) }, X=text)
 
 show(ok)
 show(eligible; ascii)
@@ -25759,7 +25760,7 @@ inline [logic] .world:
 
 :
 
-32wire[3, 2] table = .world:query({ age(X, Y) })
+32wire[3, 2] table = .world:query({ age(X, Y) }, X=text, Y=number)
 
 show(table)
 \`\`\`
@@ -25799,8 +25800,8 @@ inline [logic] .world:
 
 :
 
-8wire firstChar = .world:query({ owns(john, X) };first)
-8wire lastChar = .world:query({ owns(john, X) };last)
+8wire firstChar = .world:query({ owns(john, X) }, X=text;first)
+8wire lastChar = .world:query({ owns(john, X) }, X=text;last)
 
 show(firstChar; ascii)
 show(lastChar; ascii)
@@ -25819,7 +25820,7 @@ inline [logic] .world:
 
 :
 
-32wire[2, 2] table = .world:query({ carInfo(X, Y, Z, K) };sel(0,2);unique)
+32wire[2, 2] table = .world:query({ carInfo(X, Y, Z, K) }, X=text, Z=number;sel(0,2);unique)
 
 show(table; ascii)
 \`\`\`
