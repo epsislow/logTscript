@@ -1,6 +1,6 @@
 # Inline logic query — `.world:query({ })`
 
-Run **ad-hoc Prolog goals** on an `inline [logic]` instance **directly from a LogTScript expression**, without `comp [logic]`. Same goal syntax as a `query name:` body in [inline-logic.md](inline-logic.md). Return shape follows the **LHS wire** (scalar / vector / matrix), using the same encoding as [comp-logic.md](comp-logic.md) redirects.
+Run **ad-hoc Prolog goals** on an `inline [logic]` instance **directly from a LogTScript expression**, without `comp [logic]`. Same goal syntax as a `query name:` body in [inline-logic.md](inline-logic.md). Return shape follows the **LHS wire** (scalar / vector / matrix), using the same encoding as [comp-logic.md](comp-logic.md) redirects. **Wire hints** (`Var=text`, `Var=number`) encode bits — they are not logic kinds; see [logic-value-types.md](logic-value-types.md).
 
 In the **documentation viewer**, `logts-play` blocks support **Load** and **Load & Run**.
 

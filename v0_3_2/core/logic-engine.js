@@ -232,6 +232,18 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'sort' && g0.arity === 2) {
       return this._solveSort(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'atom' && g0.arity === 1) {
+      return this._solveTypePred(g0.args[0], 'atom', rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'number' && g0.arity === 1) {
+      return this._solveTypePred(g0.args[0], 'number', rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'list' && g0.arity === 1) {
+      return this._solveTypePred(g0.args[0], 'list', rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'compound' && g0.arity === 1) {
+      return this._solveTypePred(g0.args[0], 'compound', rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -434,6 +446,17 @@ class LogicEngine {
   _solveMember(elem, list, rest, env, depth, onSuccess, onDepthExceeded) {
     const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     return this._memberWalk(elem, list, cont, env);
+  }
+
+  _solveTypePred(term, expectedKind, rest, env, depth, onSuccess, onDepthExceeded) {
+    const d = logicDeref(term, env);
+    if (!d || d.kind === 'var') return false;
+    if (expectedKind === 'compound') {
+      if (d.kind !== 'compound') return false;
+    } else if (d.kind !== expectedKind) {
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
   _memberWalk(elem, list, cont, env) {

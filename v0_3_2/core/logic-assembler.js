@@ -11,6 +11,16 @@ const LOGIC_BUILTIN_APPEND_PRED = 'append';
 const LOGIC_BUILTIN_LENGTH_PRED = 'length';
 const LOGIC_BUILTIN_REVERSE_PRED = 'reverse';
 const LOGIC_BUILTIN_SORT_PRED = 'sort';
+const LOGIC_BUILTIN_ATOM_PRED = 'atom';
+const LOGIC_BUILTIN_NUMBER_PRED = 'number';
+const LOGIC_BUILTIN_LIST_PRED = 'list';
+const LOGIC_BUILTIN_COMPOUND_PRED = 'compound';
+const LOGIC_BUILTIN_TYPE_PREDS = new Set([
+  LOGIC_BUILTIN_ATOM_PRED,
+  LOGIC_BUILTIN_NUMBER_PRED,
+  LOGIC_BUILTIN_LIST_PRED,
+  LOGIC_BUILTIN_COMPOUND_PRED,
+]);
 const LOGIC_BUILTIN_RESERVED_HEADS = new Set([
   LOGIC_BUILTIN_SHOW_PRED,
   LOGIC_BUILTIN_NTH0_PRED,
@@ -22,6 +32,10 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_LENGTH_PRED]: [2],
   [LOGIC_BUILTIN_REVERSE_PRED]: [2],
   [LOGIC_BUILTIN_SORT_PRED]: [2],
+  [LOGIC_BUILTIN_ATOM_PRED]: [1],
+  [LOGIC_BUILTIN_NUMBER_PRED]: [1],
+  [LOGIC_BUILTIN_LIST_PRED]: [1],
+  [LOGIC_BUILTIN_COMPOUND_PRED]: [1],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -496,6 +510,9 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_SORT_PRED && arity === 2) {
     return "'sort/2' is reserved — cannot define sort as fact or rule head";
   }
+  if (LOGIC_BUILTIN_TYPE_PREDS.has(predicate) && arity === 1) {
+    return `'${predicate}/1' is reserved — cannot define ${predicate} as fact or rule head`;
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -568,6 +585,8 @@ function logicValidateProgram(prog) {
         logicError("'reverse/2' is reserved — cannot define reverse as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_SORT_PRED && arity === 2) {
         logicError("'sort/2' is reserved — cannot define sort as constraint head", c.line);
+      } else if (LOGIC_BUILTIN_TYPE_PREDS.has(pred) && arity === 1) {
+        logicError(`'${pred}/1' is reserved — cannot define ${pred} as constraint head`, c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

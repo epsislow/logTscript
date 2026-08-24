@@ -20,6 +20,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **List patterns** | `[H|T]`, `[_, X, _]`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | `functor(Arg, …)`, nested `prop(N, rents(…))` — see [Compound terms](#compound-terms) |
 | **List builtins** | **`member/2`**, **`append/3`**, **`length/2`**, **`reverse/2`**, **`sort/2`**, **`nth0/3`**, **`nth1/3`** — [logic-builtins.md](logic-builtins.md) |
+| **Value kinds** | **`atom`**, **`number`**, **`list`**, **`compound`**; type tests **`atom/1`** … **`compound/1`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | `constraint Head <= Body` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | `doc(inline.logic)` — syntax template; `doc(.myModule)` — **summary** (counts, query/constraint names, predicate histogram) |
 

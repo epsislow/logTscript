@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–29, F25, **F31** complete; F30 doc mini-monopoly (doc-only); 2+h random draft F32.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — F31 complete; **Faza 32** ready (logic-value-types + atom/1…compound/1); F30 doc monopoly; F33 random 2+h.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -92,12 +92,15 @@ todos:
   - id: logic-doc-monopoly
     content: "Faza 30: doc mini-monopoly-logic.md — tutorial end-to-end (doc-only, fără engine nou)"
     status: pending
-  - id: logic-random-2h
-    content: "2+h (draft F32): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
-    status: pending
   - id: logic-sel-i
     content: "Faza 31: ;sel(i) vector o coloană — extinde F29; _ interzis la sel; hints pe nume din goal"
     status: completed
+  - id: logic-value-types-doc
+    content: "Faza 32: logic-value-types.md + atom/1…compound/1 — completed"
+    status: completed
+  - id: logic-random-2h
+    content: "2+h (draft F33): builtin random_between/3 integer — SWI-style; fără float; set_random pentru teste"
+    status: pending
 isProject: false
 ---
 
@@ -1351,9 +1354,10 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 26** `is/2` evaluare aritmetică                  | D152–D159                                                                                            | **(completed)**                                   |
 | **Faza 27** Builtins listă + doc `logic-builtins.md`    | D160–D169                                                                                            | **(completed)**                                   |
 | **Faza 29** Query N vars + `;sel(i,j)` redirect         | D170–D181                                                                                            | **(completed)**                                   |
-| **Faza 25** Liste tipate pe wire (**2+c**)                | D182–D199 (extinde D59, D32, D140)                                                                   | **(completed)**                                   |
-| **Faza 30** Doc tutorial mini-monopoly                    | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(doc-only — pending)**                          |
-| **Faza 31** Query `;sel(i)` vector 1 coloană            | D217–D227 — extinde F29; `_` interzis la sel                                                         | **(următoarea — ready-to-implement)**             |
+| **Faza 25** Liste tipate pe wire (**2+c**)              | D182–D199 (extinde D59, D32, D140)                                                                   | **(completed)**                                   |
+| **Faza 30** Doc tutorial mini-monopoly                  | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(doc-only — pending)**                          |
+| **Faza 31** Query `;sel(i)` vector 1 coloană            | D217–D227 — extinde F29; `_` interzis la sel                                                         | **(completed)**                                   |
+| **Faza 32** Doc logic values + type predicates          | D228–D247 — doc + engine; `logic-value-types.md`                                                     | **(completed)**                                   |
 
 
 ---
@@ -2785,7 +2789,7 @@ comp [logic] .whLogic:
 | ------- | ------- | ----------------------------------------------------------------------------------------------- |
 | **D60** | **A**   | Index + `count/2`                                                                               |
 | **D61** | **A**   | Index pe KB **efectivă** per comp; **B** (static/dynamic separat) — follow-up dacă static uriaș |
-| **D62** | **B**   | Attribute `indexRebuild: full` (default) `| delta`; init = mereu full; `indexFacts: 0` → ignore |
+| **D62** | **B**   | Attribute `indexRebuild: full` (default) `                                                      |
 | **D63** | **A**   | `count(Goals, N)` — nu B (ordine ISO), nu C                                                     |
 | **D64** | **A**   | Număr soluții; înlocuiește pattern `badTriple`                                                  |
 | **D65** | **A**   | N output sau ground; vars din head legate în G                                                  |
@@ -3714,7 +3718,7 @@ La trecerea la `use` **strict**, orice exemplu sau test care **depindea** de ski
 | **D91** | **A**   | `seed` **solve**: **facts** din dynamic; **rules + constraints** din `merged` (nemutate) |
 | **D92** | **A**   | `seed` **init**: validate constraints pe KB seeded (ca init static overlay)              |
 | **D93** | **A**   | `seed` **mutation**: `-` = delete dynamic; **fără tombstone**; `+`/`-` pe store mutabil  |
-| **D94** | **A**   | Attribute `data: overlay | static | seed`; omit = overlay; invalid → elaboration error   |
+| **D94** | **A**   | Attribute `data: overlay                                                                 |
 
 
 ---
@@ -4650,7 +4654,7 @@ comp [logic] .peopleLogic:
 | **D128** | **Sintaxă listă literală** | **A (confirmed)** — `[T1, T2, …, Tn]`                                                                                                                                                                             |
 | **D129** | **Listă goală**            | **A (confirmed)** — `[]`                                                                                                                                                                                          |
 | **D130** | **Cons / pipe**            | **A (confirmed)** — token **`                                                                                                                                                                                     |
-| **D131** | **Reprezentare engine**    | **A (confirmed)** — literal ground desugar → **lanț cons** `[a|[b|[c|[]]]]`; `[]` = nil; `[H|T]` = cons cell; **un singur** path unify                                                                            |
+| **D131** | **Reprezentare engine**    | **A (confirmed)** — literal ground desugar → **lanț cons** `[a                                                                                                                                                    |
 | **D132** | **Unificare**              | **A (confirmed)** — Prolog standard + **occurs-check**; vezi [D132 — explicație](#d132--unificare-explicație)                                                                                                     |
 | **D133** | **Imbricare**              | **A (confirmed)** — liste imbricate permise                                                                                                                                                                       |
 | **D134** | **Limită lungime literal** | **A (confirmed)** — max **1024** elemente într-un literal `[…]`; parse/elaboration error peste cap                                                                                                                |
@@ -4659,8 +4663,8 @@ comp [logic] .peopleLogic:
 | **D137** | **Builtins listă**         | **A (confirmed)** — `nth` **→ F23** **(completed)**; `member`**/**`append`**/**`length`**/**`reverse`**/**`sort` **builtin** → **F27** (promovat din **2+d**); reguli user + exemple doc rămân valide până la F27 |
 | **D138** | **Cut în F22**             | **A (confirmed)** — **fără cut**; traversare cu backtracking normal; `!` **→ F24** (nimic de decis suplimentar)                                                                                                   |
 | **D139** | **Unde e permis**          | **A (confirmed)** — facts, reguli, query, constraints, `.world:query`, `.world:check`, mutation ground                                                                                                            |
-| **D140** | **Wire / redirect listă**  | **Amânat → F25** — superseded de **D182–D199** (liste tipate + binding explicit)                                                                                                                                 |
-| **D141** | **Scope tokenizer**        | **A (confirmed)** — `[` `]` `|` parse logic în: `inline [logic] … :`, `logic { }` (comp exec), `.world:query({ })`, `.world:check({ })`; tokenizer logic separat de script top-level                              |
+| **D140** | **Wire / redirect listă**  | **Amânat → F25** — superseded de **D182–D199** (liste tipate + binding explicit)                                                                                                                                  |
+| **D141** | **Scope tokenizer**        | **A (confirmed)** — `[` `]` `                                                                                                                                                                                     |
 | **D142** | **Teste & livrare**        | **A (confirmed)** — implementare: teste **3699+** legacy+wave, doc logts-play, sketch Monopoly fără cut; **nu e decizie user** — checklist dev                                                                    |
 
 
@@ -4669,13 +4673,13 @@ comp [logic] .peopleLogic:
 **Unificare listă** = aceleași reguli ca în Prolog:
 
 
-| Situație            | Rezultat                           |
-| ------------------- | ---------------------------------- |
-| `[] = []`           | succes                             |
-| `[] = [a|_]`        | **eșec**                           |
-| `[H|T] = [1, 2, 3]` | `H=1`, `T=[2,3]` (restul ca listă) |
-| `X = [john, mary]`  | leagă variabila `X`                |
-| `[A,B|C] = [1,2,3]` | `A=1`, `B=2`, `C=[]`               |
+| Situație           | Rezultat            |
+| ------------------ | ------------------- |
+| `[] = []`          | succes              |
+| `[] = [a           | _]`                 |
+| `[H                | T] = [1, 2, 3]`     |
+| `X = [john, mary]` | leagă variabila `X` |
+| `[A,B              | C] = [1,2,3]`       |
 
 
 **Occurs-check:** `X = [X|_]` → **eșec** (lista ar conține pe X în mod infinit — ca la compound). Fără asta, motorul ar accepta structuri imposibile.
@@ -4683,11 +4687,11 @@ comp [logic] .peopleLogic:
 ### D136 — Out of scope (explicație)
 
 
-| Concept                | Ce e                                                      | De ce nu în F22                                                         |
-| ---------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| **Dif-list**           | `[H|T]-Tail` — listă cu „coadă deschisă” la ambele capete | Pattern avansat Prolog; Monopoly nu îl cere                             |
-| **Lazy list**          | Elemente generate la demand                               | Model execution diferit; out of scope                                   |
-| **String = char list** | `"abc"` ≡ `[97,98,99]`                                    | Avem `"..."` string literals (F21); nu convertim automat string ↔ listă |
+| Concept                | Ce e                        | De ce nu în F22                                                         |
+| ---------------------- | --------------------------- | ----------------------------------------------------------------------- |
+| **Dif-list**           | `[H                         | T]-Tail` — listă cu „coadă deschisă” la ambele capete                   |
+| **Lazy list**          | Elemente generate la demand | Model execution diferit; out of scope                                   |
+| **String = char list** | `"abc"` ≡ `[97,98,99]`      | Avem `"..."` string literals (F21); nu convertim automat string ↔ listă |
 
 
 ### D131 — Reprezentare internă (decizie implementare)
@@ -4728,7 +4732,7 @@ inline [logic] .monopoly:
 
 | Fișier                                                    | Schimbări                                                  |
 | --------------------------------------------------------- | ---------------------------------------------------------- |
-| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | Token `[` `]` `|`; `parseListTerm`; validate               |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | Token `[` `]` `                                            |
 | `[logic-engine.js](../v0_3_2/core/logic-engine.js)`       | `kind:'list'`, intern, unify, deref, resolve, occurs-check |
 | `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | `logicFormatTerm` / fingerprint liste                      |
 | `[inline-logic.md](../v0_3_2/doc/inline-logic.md)`        | Secțiune liste; actualizează „Differences from Prolog”     |
@@ -4737,12 +4741,12 @@ inline [logic] .monopoly:
 **Blocuri unde tokenizer logic (D141) se aplică:**
 
 
-| Bloc         | Exemplu                                   |
-| ------------ | ----------------------------------------- |
-| Modul inline | `inline [logic] .world: … :`              |
-| Exec comp    | `.whLogic:{ logic { + fact([a,b]) } }`    |
-| Query ad-hoc | `.world:query({ member(X, [john | _]) })` |
-| Check ad-hoc | `.world:check({ … liste … })`             |
+| Bloc         | Exemplu                                |
+| ------------ | -------------------------------------- |
+| Modul inline | `inline [logic] .world: … :`           |
+| Exec comp    | `.whLogic:{ logic { + fact([a,b]) } }` |
+| Query ad-hoc | `.world:query({ member(X, [john        |
+| Check ad-hoc | `.world:check({ … liste … })`          |
 
 
 **Fișiere:** `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)`, `[logic-engine.js](../v0_3_2/core/logic-engine.js)`, `[components/logic.js](../v0_3_2/core/components/logic.js)`  
@@ -5294,11 +5298,11 @@ query q:
 ```
 
 
-| Opțiune                          | Comportament                                                        | Pro                        | Contra                     |
-| -------------------------------- | ------------------------------------------------------------------- | -------------------------- | -------------------------- |
-| **A — Prolog SWI (recommended)** | Backtracking pe toate elemente; `[H|T]`; List variabilă unificabilă | Identic doc F22 user rules | —                          |
-| **B — doar List ground**         | Fail dacă List e variabilă nelegată                                 | Implementare simplă        | Pierde mod Prolog          |
-| **C — prima soluție doar**       | Fără backtracking (determinist)                                     | Rapid                      | **Nu** e `member/2` Prolog |
+| Opțiune                          | Comportament                        | Pro                             | Contra                     |
+| -------------------------------- | ----------------------------------- | ------------------------------- | -------------------------- |
+| **A — Prolog SWI (recommended)** | Backtracking pe toate elemente; `[H | T]`; List variabilă unificabilă | Identic doc F22 user rules |
+| **B — doar List ground**         | Fail dacă List e variabilă nelegată | Implementare simplă             | Pierde mod Prolog          |
+| **C — prima soluție doar**       | Fără backtracking (determinist)     | Rapid                           | **Nu** e `member/2` Prolog |
 
 
 **Non-list** (atom, number ca List): **fail** (toate opțiunile).
@@ -5829,8 +5833,6 @@ allCarInfos;sel(1,3):1 >= rowYK   ; wire [2] = [blue, truck]
 
 ---
 
-
-
 incepe implementarea
 
 sa adaugi exemple cu butoane load si load and run
@@ -5889,13 +5891,13 @@ După `;first` → **1 rând**: `(toyota, red)`.
 ### D179 — Validare elaboration `;sel` **(de confirmat)**
 
 
-| Condiție           | Rezultat                       |
-| ------------------ | ------------------------------ |
-| `;sel(0,2)` cu N=4 | OK                             |
-| `;sel(0,4)`        | **error** — index out of range |
-| `;sel(1,1)`        | **error** — duplicate index    |
-| `;sel(0,1,2)`      | **error** — arity ≠ 2 (F29); **`;sel(i)` arity 1 → [Faza 31](#faza-31--query-seli-vector-o-coloană-următoarea) |
-| `;sel(a,b)`        | **error** — non-integer        |
+| Condiție           | Rezultat                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `;sel(0,2)` cu N=4 | OK                                                                                                            |
+| `;sel(0,4)`        | **error** — index out of range                                                                                |
+| `;sel(1,1)`        | **error** — duplicate index                                                                                   |
+| `;sel(0,1,2)`      | **error** — arity ≠ 2 (F29); **`;sel(i)` arity 1 → [Faza 31](#faza-31--query-seli-vector-o-coloană-completed) |
+| `;sel(a,b)`        | **error** — non-integer                                                                                       |
 
 
 ---
@@ -5988,7 +5990,7 @@ comp [logic] .worldLogic:
 
 ## Decizii Faza 25 — liste tipate pe wire + binding explicit (**2+c**, D182+) **(draft — următoarea fază)**
 
-> **User / design:** 2026-08-21 — model **unificat** `text` | `number` | `bool` + modificator opțional **`list`** pe **trei suprafețe**: mutation/check (D59), program block comp, `.world:query` (D32).  
+> **User / design:** 2026-08-21 — model **unificat** `text` | `number` | `bool` + modificator opțional `list` pe **trei suprafețe**: mutation/check (D59), program block comp, `.world:query` (D32).  
 > **Relație F29:** `;sel` proiectează **cols scalare** din N vars; F25 = **un termen listă** ↔ **vector** (flatten omogen). **Distinct.**  
 > **Relație F22:** liste Prolog în engine **(completed)**; F25 = **codec wire** (pack/unpack). D140 amânat → **D182+**.  
 > **Neproducție:** F25 **elimină infer** din query — tip obligatoriu peste tot (canonic cu mutation / program block). D187 respins.
@@ -5997,23 +5999,27 @@ comp [logic] .worldLogic:
 
 Același vocabular `text | number | bool` + opțional `list` pe **toate** suprafețele. **Nicăieri** nu se ghicește tipul din lățimea wire-ului.
 
-| Suprafață | Formă | Exemplu |
-|-----------|--------|---------|
-| **Mutation / `:check`** | `scalarType [list] wire` | `+ path(a, text list w)` |
-| **Program block** | `Var is scalarType [list] pin` | `Nodes is text list routePin` |
-| **Query input** | `Var=scalarType [list] wireExpr` | `Nodes=text list routeIn` |
-| **Query output hint** | `Var=scalarType [list]` (fără wire) | `Nodes=text list` |
+
+| Suprafață               | Formă                               | Exemplu                       |
+| ----------------------- | ----------------------------------- | ----------------------------- |
+| **Mutation /** `:check` | `scalarType [list] wire`            | `+ path(a, text list w)`      |
+| **Program block**       | `Var is scalarType [list] pin`      | `Nodes is text list routePin` |
+| **Query input**         | `Var=scalarType [list] wireExpr`    | `Nodes=text list routeIn`     |
+| **Query output hint**   | `Var=scalarType [list]` (fără wire) | `Nodes=text list`             |
+
 
 **Eliminat F25:** `Var=wire`, `Var=w` fără keyword tip, `logicInferBindType` pe query bindings. Teste **3544+** și doc EN migrate la formă canonică.
 
 ### Context — problema
 
-| Azi | Limită |
-|-----|--------|
-| **Mutation/check** (D59) | `text w`, `number w`, `bool w` — **scalar**; fără listă |
-| **Program block** | `X is text pin` — scalar; fără listă |
-| **`.world:query`** (D32) | **D196:** `Var=text\|number\|bool [list] wire` — tip obligatoriu; **fără infer** |
-| **Redirect output** | listă Prolog → **fill** (`logicEncodeSolutionTerm` ignoră `list`) |
+
+| Azi                      | Limită                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| **Mutation/check** (D59) | `text w`, `number w`, `bool w` — **scalar**; fără listă                        |
+| **Program block**        | `X is text pin` — scalar; fără listă                                           |
+| `.world:query` (D32)     | **D196:** `Var=text|number|bool [list] wire` — tip obligatoriu; **fără infer** |
+| **Redirect output**      | listă Prolog → **fill** (`logicEncodeSolutionTerm` ignoră `list`)              |
+
 
 **Motiv eliminare infer:** `32wire` inferat ca text era ambiguu/incorect pentru numeric — tip explicit obligatoriu ca la D59 / program block.
 
@@ -6044,14 +6050,16 @@ listType   := scalarType list          ; listă omogenă Prolog ↔ vector wire
 })
 ```
 
-| Formă | Wire | Prolog |
-|-------|------|--------|
-| `text w` | scalar | atom |
-| `number w` | scalar | integer |
-| `bool w` | scalar | 0/1 |
-| **`text list w`** | **`Kwire[N]` vector** | `[atom, …]` |
-| **`number list w`** | vector | `[n, …]` |
-| **`bool list w`** | vector (`1wire[N]` sau `8wire[N]` — vezi D193) | `[0\|1, …]` |
+
+| Formă           | Wire                                           | Prolog      |
+| --------------- | ---------------------------------------------- | ----------- |
+| `text w`        | scalar                                         | atom        |
+| `number w`      | scalar                                         | integer     |
+| `bool w`        | scalar                                         | 0/1         |
+| `text list w`   | `Kwire[N]` **vector**                          | `[atom, …]` |
+| `number list w` | vector                                         | `[n, …]`    |
+| `bool list w`   | vector (`1wire[N]` sau `8wire[N]` — vezi D193) | `[0|1, …]`  |
+
 
 #### (2) Program block `comp [logic]`
 
@@ -6079,37 +6087,41 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 
 ### Rezumat decizii
 
-| ID | Subiect | Decizie | Status |
-|----|---------|---------|--------|
-| **D182** | **Model unificat** | **A** — același vocabular `text\|number\|bool` + `list` pe mutation, program block, query | **(confirmed)** |
-| **D183** | **Listă omogenă MVP** | **A** — flatten `[e1,…,eN]` ↔ vector; **fără** imbricare / eterogen | **(confirmed)** |
-| **D184** | **Mutation/check list** | **A** — `text list w`, `number list w`, `bool list w` (extinde D59) | **(confirmed)** |
-| **D185** | **Program block list** | **A** — `Var is text list pin`, etc. | **(confirmed)** |
-| **D187** | **~~Infer din lățime~~** | **respins** — D196 C; fără `Var=wire`, fără `logicInferBindType` la query | **(eliminated)** |
-| **D186** | **Query binding explicit** | **A** — `Var=text w`, `Var=number w`, `Var=text list w`, … — **singura** formă validă | **(confirmed)** |
-| **D188** | **Encode element listă** | **A** — același codec ca scalar per slot (D12b): text→ASCII, number→binary, bool→0/1 | **(confirmed)** |
-| **D189** | **Output redirect listă** | **A** — query cu var listă + `>= vector` / LHS vector inline → flatten listă ground | **(confirmed)** |
-| **D190** | **Out of scope MVP** | **A** — listă imbricată, listă eterogenă, vector-of-lists (blob per soluție) → backlog | **(confirmed)** |
-| **D191** | **`bool list` wire shape** | **A** — vector `1wire[N]` (1 bit / element) | **(confirmed)** |
-| **D192** | **Lungime listă N** | **C** — vector → N din `[N]`; scalar → packed per tip (bool 1, text 8, number 16) | **(confirmed)** |
-| **D193** | **Underfill (decode input)** | **C** — skip sloturi fill; 0 elemente → eroare; `""`/`\0` nu e text valid | **(confirmed)** |
-| **D194** | **Overflow (encode input)** | **A** — truncate primele N la pack pe wire input | **(confirmed)** |
-| **D195** | **Fill sentinel** | **C** — slot fill = `\0` (text); ignorat la decode; nu e element valid | **(confirmed)** |
-| **D196** | **Query: fără infer** | **C** — tip obligatoriu input + output; canonic cu mutation/program block | **(confirmed)** |
-| **D197** | **Query output: tip obligatoriu** | **C** — var liberă + LHS wire → `Var=type [list]` fără wire (output hint) | **(confirmed)** |
-| **D198** | **Parser query binding** | **A** — `Var=text list expr` parse după `=` (keywords rezervate în context query) | **(ready — implicit A)** |
-| **D199** | **Teste & livrare** | **A** — 3816+ legacy+wave; mutation list, pin list, query typed, redirect flatten | **(draft checklist)** |
+
+| ID       | Subiect                           | Decizie                                                                                 | Status                   |
+| -------- | --------------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
+| **D182** | **Model unificat**                | **A** — același vocabular `text|number|bool` + `list` pe mutation, program block, query | **(confirmed)**          |
+| **D183** | **Listă omogenă MVP**             | **A** — flatten `[e1,…,eN]` ↔ vector; **fără** imbricare / eterogen                     | **(confirmed)**          |
+| **D184** | **Mutation/check list**           | **A** — `text list w`, `number list w`, `bool list w` (extinde D59)                     | **(confirmed)**          |
+| **D185** | **Program block list**            | **A** — `Var is text list pin`, etc.                                                    | **(confirmed)**          |
+| **D187** | ~~**Infer din lățime**~~          | **respins** — D196 C; fără `Var=wire`, fără `logicInferBindType` la query               | **(eliminated)**         |
+| **D186** | **Query binding explicit**        | **A** — `Var=text w`, `Var=number w`, `Var=text list w`, … — **singura** formă validă   | **(confirmed)**          |
+| **D188** | **Encode element listă**          | **A** — același codec ca scalar per slot (D12b): text→ASCII, number→binary, bool→0/1    | **(confirmed)**          |
+| **D189** | **Output redirect listă**         | **A** — query cu var listă + `>= vector` / LHS vector inline → flatten listă ground     | **(confirmed)**          |
+| **D190** | **Out of scope MVP**              | **A** — listă imbricată, listă eterogenă, vector-of-lists (blob per soluție) → backlog  | **(confirmed)**          |
+| **D191** | `bool list` **wire shape**        | **A** — vector `1wire[N]` (1 bit / element)                                             | **(confirmed)**          |
+| **D192** | **Lungime listă N**               | **C** — vector → N din `[N]`; scalar → packed per tip (bool 1, text 8, number 16)       | **(confirmed)**          |
+| **D193** | **Underfill (decode input)**      | **C** — skip sloturi fill; 0 elemente → eroare; `""`/`\0` nu e text valid               | **(confirmed)**          |
+| **D194** | **Overflow (encode input)**       | **A** — truncate primele N la pack pe wire input                                        | **(confirmed)**          |
+| **D195** | **Fill sentinel**                 | **C** — slot fill = `\0` (text); ignorat la decode; nu e element valid                  | **(confirmed)**          |
+| **D196** | **Query: fără infer**             | **C** — tip obligatoriu input + output; canonic cu mutation/program block               | **(confirmed)**          |
+| **D197** | **Query output: tip obligatoriu** | **C** — var liberă + LHS wire → `Var=type [list]` fără wire (output hint)               | **(confirmed)**          |
+| **D198** | **Parser query binding**          | **A** — `Var=text list expr` parse după `=` (keywords rezervate în context query)       | **(ready — implicit A)** |
+| **D199** | **Teste & livrare**               | **A** — 3816+ legacy+wave; mutation list, pin list, query typed, redirect flatten       | **(draft checklist)**    |
+
 
 ---
 
 ### D191 — `bool list` — shape wire **(confirmed: A)**
 
-| Opțiune | Wire | Pro | Contra |
-|---------|------|-----|--------|
-| **A — `1wire[N]` ✓** | N biți, un bool/slot | Compact | Diferit de text/number (multiplu 8) |
-| **B — `8wire[N]`** | 0/1 pe octet | Uniform element width | 8× bits |
 
-**Decizie:** **A** — pe vector, `bool list` folosește **`1wire[N]`** (1 bit per element). Pe scalar packed (D192), fiecare bit al wire-ului = un element.
+| Opțiune                  | Wire                 | Pro                   | Contra                              |
+| ------------------------ | -------------------- | --------------------- | ----------------------------------- |
+| **A —** `1wire[N]` **✓** | N biți, un bool/slot | Compact               | Diferit de text/number (multiplu 8) |
+| **B —** `8wire[N]`       | 0/1 pe octet         | Uniform element width | 8× bits                             |
+
+
+**Decizie:** **A** — pe vector, `bool list` folosește `1wire[N]` (1 bit per element). Pe scalar packed (D192), fiecare bit al wire-ului = un element.
 
 ---
 
@@ -6117,18 +6129,22 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 
 **N nu vine mereu din dimensiunea vectorului.** Două moduri:
 
-| Mod | Când | N (număr elemente) | Lățime element |
-|-----|------|---------------------|----------------|
-| **Vector** | `Kwire[N]` (sau `1wire[N]` pentru bool list) | **N** = dimensiunea vectorului | **K** biți / slot (bool list: **K=1**) |
-| **Scalar packed** | wire fără `[N]` | derivat din **tip listă + lățime totală wire** | vezi tabelul de mai jos |
+
+| Mod               | Când                                         | N (număr elemente)                             | Lățime element                         |
+| ----------------- | -------------------------------------------- | ---------------------------------------------- | -------------------------------------- |
+| **Vector**        | `Kwire[N]` (sau `1wire[N]` pentru bool list) | **N** = dimensiunea vectorului                 | **K** biți / slot (bool list: **K=1**) |
+| **Scalar packed** | wire fără `[N]`                              | derivat din **tip listă + lățime totală wire** | vezi tabelul de mai jos                |
+
 
 **Scalar packed — reguli per tip listă:**
 
-| Tip listă | Biți / element | Exemplu scalar | N | Eroare dacă |
-|-----------|----------------|----------------|---|-------------|
-| **`bool list`** | **1** | `32wire` | 32 | — (orice lățime ≥ 1) |
-| **`text list`** | **8** | `32wire` | 4 | lățime **nu** e multiplu de 8 (ex. `33wire` → eroare) |
-| **`number list`** | **16** (doar scalar) | `32wire` | 2 | lățime **nu** e multiplu de 16 |
+
+| Tip listă     | Biți / element       | Exemplu scalar | N   | Eroare dacă                                           |
+| ------------- | -------------------- | -------------- | --- | ----------------------------------------------------- |
+| `bool list`   | **1**                | `32wire`       | 32  | — (orice lățime ≥ 1)                                  |
+| `text list`   | **8**                | `32wire`       | 4   | lățime **nu** e multiplu de 8 (ex. `33wire` → eroare) |
+| `number list` | **16** (doar scalar) | `32wire`       | 2   | lățime **nu** e multiplu de 16                        |
+
 
 **Mesaje eroare EN (elaboration):**
 
@@ -6142,11 +6158,13 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 3. **Inconsistență documentată:** scalar `number` (D12b) = lățime arbitrară unsigned pe un singur slot; **number list scalar packed** = chunks fixe de **16 biți** — explicit în doc.
 4. Același codec la encode/decode (D188): text→ASCII pe slot, number→binary pe slot, bool→0/1.
 
-| Opțiune (istoric) | Regulă | Status |
-|---------|--------|--------|
-| **A — N = dimensiune vector** | doar vector | parțial — subsumed de **C** |
-| **B — cap global** | ex. max 1024 | respins MVP |
-| **C — vector + scalar packed ✓** | hibrid per tabel | **confirmed** |
+
+| Opțiune (istoric)                | Regulă           | Status                      |
+| -------------------------------- | ---------------- | --------------------------- |
+| **A — N = dimensiune vector**    | doar vector      | parțial — subsumed de **C** |
+| **B — cap global**               | ex. max 1024     | respins MVP                 |
+| **C — vector + scalar packed ✓** | hibrid per tabel | **confirmed**               |
+
 
 ---
 
@@ -6154,12 +6172,14 @@ Exec: `textsPin = routeWire` — pin listă ↔ vector (round-trip ca pin scalar
 
 **Doar wire → pin / wire → query binding** (`routePin = routeIn`, `Nodes=text list routeIn`).
 
-| Regulă | Comportament |
-|--------|--------------|
-| **Skip fill** | Sloturi fill (`\0` pe text) **ignorate** — nu contează poziția (nu „stop la primul fill”) |
-| **Compact** | Elementele non-fill, în ordinea sloturilor → listă Prolog |
-| **0 elemente** | Toate sloturi fill → **eroare** |
-| **Text invalid** | `""` și `\0` **nu** sunt text valid pe wire (MVP) — slot `\0` = fill, nu atom gol |
+
+| Regulă           | Comportament                                                                              |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| **Skip fill**    | Sloturi fill (`\0` pe text) **ignorate** — nu contează poziția (nu „stop la primul fill”) |
+| **Compact**      | Elementele non-fill, în ordinea sloturilor → listă Prolog                                 |
+| **0 elemente**   | Toate sloturi fill → **eroare**                                                           |
+| **Text invalid** | `""` și `\0` **nu** sunt text valid pe wire (MVP) — slot `\0` = fill, nu atom gol         |
+
 
 **Exemple decode** (`8wire[4]`):
 
@@ -6179,10 +6199,12 @@ north, \0, \0, east   →  [north, east]
 
 Apare când pui pe wire-ul de intrare o listă cu **k > N** elemente (capacitate wire).
 
-| Opțiune | Comportament |
-|---------|--------------|
+
+| Opțiune            | Comportament                                                           |
+| ------------------ | ---------------------------------------------------------------------- |
 | **A — truncate ✓** | Scrii primele **N** elemente pe wire; restul dropped — **fără eroare** |
-| **B — error** | respins MVP |
+| **B — error**      | respins MVP                                                            |
+
 
 **Exemplu — query cu binding input:**
 
@@ -6223,11 +6245,13 @@ Overflow D194 = la pasul **înainte** când listă > N e scrisă pe `routeIn`.
 
 ### D195 — Fill sentinel **(confirmed: C — aliniat D193)**
 
-| Tip | Fill per slot | La decode |
-|-----|---------------|-----------|
-| **text list** | `\0` (8 bit) | slot ignorat; **nu** e element `""` |
-| **number list** | `0` pe lățime element | slot ignorat |
-| **bool list** | `0` (1 bit) | slot ignorat |
+
+| Tip             | Fill per slot         | La decode                           |
+| --------------- | --------------------- | ----------------------------------- |
+| **text list**   | `\0` (8 bit)          | slot ignorat; **nu** e element `""` |
+| **number list** | `0` pe lățime element | slot ignorat                        |
+| **bool list**   | `0` (1 bit)           | slot ignorat                        |
+
 
 Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit din runtime.
 
@@ -6239,11 +6263,13 @@ Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit d
 
 Înainte de F25, `X=carWire` apela `logicInferBindType(lățime)` — **respins definitiv**. User 2026-08-22: canonic cu mutation / program block; teste migrate.
 
+
 | Lățime (vechi infer) | Tip ghicit (eliminat) |
-|----------------------|------------------------|
-| 1 | `bool` |
-| multiplu de 8 | `text` |
-| altceva | `number` |
+| -------------------- | --------------------- |
+| 1                    | `bool`                |
+| multiplu de 8        | `text`                |
+| altceva              | `number`              |
+
 
 #### Decizie **C** — tip obligatoriu peste tot la query
 
@@ -6253,16 +6279,18 @@ Fill capturat la elaborare din init wire (`:= \0`), ca D12a — **nu** recitit d
 Var = scalarType [list] wireExpr
 ```
 
-| Formă | Rezultat |
-|-------|----------|
-| `X=text carWire` | OK |
-| `X=number scoreIn` | OK |
-| `X=bool flagWire` | OK |
-| `Nodes=text list routeIn` | OK |
-| `X=carWire` | **error** — lipsește tip |
-| `X=wire carWire` | **error** — `wire` nu e tip |
 
-**Implementare:** parser extrage `bindType` + `listFlag` din binding; **`interpreter.js`** nu mai apelează `logicInferBindType` pentru query. Funcția poate rămâne în engine pentru alte contexte interne, dar **nu** pentru `.world:query`.
+| Formă                     | Rezultat                    |
+| ------------------------- | --------------------------- |
+| `X=text carWire`          | OK                          |
+| `X=number scoreIn`        | OK                          |
+| `X=bool flagWire`         | OK                          |
+| `Nodes=text list routeIn` | OK                          |
+| `X=carWire`               | **error** — lipsește tip    |
+| `X=wire carWire`          | **error** — `wire` nu e tip |
+
+
+**Implementare:** parser extrage `bindType` + `listFlag` din binding; `interpreter.js` nu mai apelează `logicInferBindType` pentru query. Funcția poate rămâne în engine pentru alte contexte interne, dar **nu** pentru `.world:query`.
 
 **Mesaj eroare EN:** `query binding requires explicit type (text, number, bool, or … list)`
 
@@ -6381,11 +6409,13 @@ Aici tipul e în **program block** (`text list routePin`), nu în apel inline �
 
 #### Erori
 
-| Caz | Eroare |
-|-----|--------|
-| Var liberă, fără output hint | `query output requires explicit type for 'Nodes'` |
-| `Nodes=text list` dar LHS scalar | shape mismatch (elaboration) |
-| Hint `X=text list` dar soluția e atom | encode error / elaboration |
+
+| Caz                                   | Eroare                                            |
+| ------------------------------------- | ------------------------------------------------- |
+| Var liberă, fără output hint          | `query output requires explicit type for 'Nodes'` |
+| `Nodes=text list` dar LHS scalar      | shape mismatch (elaboration)                      |
+| Hint `X=text list` dar soluția e atom | encode error / elaboration                        |
+
 
 **Respinge D197-A:** infer listă doar din LHS vector — prea implicit; `32wire[8]` nu spune text vs number list.
 
@@ -6393,32 +6423,36 @@ Aici tipul e în **program block** (`text list routePin`), nu în apel inline �
 
 ### D199 — Teste & livrare **(draft checklist)**
 
-| ID | Scenariu |
-|----|----------|
-| 3816 | parse mutation: `+ fact(X, text list w)` |
-| 3817 | parse program: `Nodes is number list pin` |
-| 3818 | parse query: `Nodes=text list routeVec` |
-| 3819 | query `N=number scoreIn` pe `8wire` — round-trip numeric |
-| 3820–3821 | mutation list text in/out legacy+wave |
-| 3822–3823 | pin `is text list` round-trip legacy+wave |
+
+| ID        | Scenariu                                                         |
+| --------- | ---------------------------------------------------------------- |
+| 3816      | parse mutation: `+ fact(X, text list w)`                         |
+| 3817      | parse program: `Nodes is number list pin`                        |
+| 3818      | parse query: `Nodes=text list routeVec`                          |
+| 3819      | query `N=number scoreIn` pe `8wire` — round-trip numeric         |
+| 3820–3821 | mutation list text in/out legacy+wave                            |
+| 3822–3823 | pin `is text list` round-trip legacy+wave                        |
 | 3824–3825 | query output `Nodes=text list` flatten → `32wire[8]` legacy+wave |
-| 3826 | query binding fără tip → elaboration error |
-| 3827 | query output fără tip hint pe var liberă → error |
-| 3828 | listă imbricată la pack → error (per D190) |
-| 3829 | migrate suite: toate query bindings **3544+** fără infer |
+| 3826      | query binding fără tip → elaboration error                       |
+| 3827      | query output fără tip hint pe var liberă → error                 |
+| 3828      | listă imbricată la pack → error (per D190)                       |
+| 3829      | migrate suite: toate query bindings **3544+** fără infer         |
+
 
 **Doc EN:** `logic-runtime.md`, `comp-logic.md`, `logic-query-exec.md`, `inline-logic.md` — secțiuni typed list; exemple logts-play Load & Run.
 
 ### Sketch implementare
 
-| Layer | Schimbare |
-|-------|-----------|
-| **`logic-assembler.js`** | `parseMutationTerm`: `text list w`; `parseLogicProgramBlock`: `is text list pin`; keywords `list` în context tip |
-| **`parser.js`** | Query bindings tipate: `Var=text [list] expr`; respinge binding fără tip |
-| **`logic-engine.js`** | codec listă; encode/decode cu `bindType` explicit — **nu** infer pe query |
-| **`logic.js`** | Pin storage list (N × ew); redirect când sol[var] e list |
-| **`interpreter.js`** | `evalLogicInlineQuery`: `bindType`/`listFlag` din parse; **elimină** `logicInferBindType` pe bindings |
-| **Teste** | 3816–3828+; **migrate 3544+** la tip explicit |
+
+| Layer                | Schimbare                                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `logic-assembler.js` | `parseMutationTerm`: `text list w`; `parseLogicProgramBlock`: `is text list pin`; keywords `list` în context tip |
+| `parser.js`          | Query bindings tipate: `Var=text [list] expr`; respinge binding fără tip                                         |
+| `logic-engine.js`    | codec listă; encode/decode cu `bindType` explicit — **nu** infer pe query                                        |
+| `logic.js`           | Pin storage list (N × ew); redirect când sol[var] e list                                                         |
+| `interpreter.js`     | `evalLogicInlineQuery`: `bindType`/`listFlag` din parse; **elimină** `logicInferBindType` pe bindings            |
+| **Teste**            | 3816–3828+; **migrate 3544+** la tip explicit                                                                    |
+
 
 **Estimare:** medie-mare — trei suprafețe parse + codec listă; **fără** schimbare engine unify/list (F22).
 
@@ -6486,45 +6520,46 @@ comp [logic] .worldLogic:
 Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 
 
-| Topic                                  | ID backlog                                                |
-| -------------------------------------- | --------------------------------------------------------- |
-| Fazele 0–17                            | **(completed)**                                           |
-| **Faza 18** `query = …` explicit       | **1+l** **(completed)**                                   |
-| **Faza 19** constraint-as-query helper | **1+u** **(completed)**                                   |
-| **Faza 20a** `use .mod as alias`       | **(completed)** — D107–D116                               |
-| **Faza 21** builtin `show/N`           | **(completed)** — D117–D127                               |
-| **Faza 22** Liste Prolog               | **(completed)** — D128–D142                               |
-| **Faza 23** `nth0` / `nth1`            | **(completed)** — D143–D146                               |
-| **Faza 24** Cut `!` (**1+i**)          | **(completed)** — D147–D151                               |
-| **Faza 26** `is/2` arithmetic          | D152–D159                                                 |
-| **Faza 27** builtins listă + doc       | D160–D169                                                 |
-| **Faza 29** query N vars + `;sel`      | D170–D181                                                 | **(completed)** |
-| **Faza 25** liste tipate pe wire       | **2+c** D182–D199                                         | **(completed)** |
-| **Faza 30** doc mini-monopoly tutorial | D200–D210 — `doc/mini-monopoly-logic.md`                  | **(doc-only — pending)** |
-| **Faza 31** `;sel(i)` vector 1 col     | D217–D227 — extinde F29                                   | **(următoarea)** |
-| **F20b** scope blocks                  | **2+a** **(deferred)**                                    |
-| **F20c** reguli import relative        | **2+b** **(deferred)**                                    |
-| ~~**Builtins listă** member/append~~   | ~~**2+d**~~                                               |
-| **Liste avansate** dif/lazy/char       | **2+e** **(deferred)** — D136                             |
-| **Builtins listă suplimentare**        | **2+g** **(deferred)** — post-F27; catalog Prolog complet |
-| **Builtins random (integer)**          | **2+h** **(deferred)** — `random_between/3`; draft **F32?** |
-| `use` **/** `use once`                 | **Faza 15** **(completed)**                               |
-| Constraint `#K (line L)` trace         | **1+v** **(pause)**                                       |
-| POUT declarate comp                    | **1+k**                                                   |
-| Persistență KB                         | **1+o**                                                   |
-| Validare constraints la query          | **1+p**                                                   |
-| `mutationReason` text pout             | **1+s**                                                   |
+| Topic                                          | ID backlog                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| Fazele 0–17                                    | **(completed)**                                             |
+| **Faza 18** `query = …` explicit               | **1+l** **(completed)**                                     |
+| **Faza 19** constraint-as-query helper         | **1+u** **(completed)**                                     |
+| **Faza 20a** `use .mod as alias`               | **(completed)** — D107–D116                                 |
+| **Faza 21** builtin `show/N`                   | **(completed)** — D117–D127                                 |
+| **Faza 22** Liste Prolog                       | **(completed)** — D128–D142                                 |
+| **Faza 23** `nth0` / `nth1`                    | **(completed)** — D143–D146                                 |
+| **Faza 24** Cut `!` (**1+i**)                  | **(completed)** — D147–D151                                 |
+| **Faza 26** `is/2` arithmetic                  | D152–D159                                                   |
+| **Faza 27** builtins listă + doc               | D160–D169                                                   |
+| **Faza 29** query N vars + `;sel`              | D170–D181                                                   |
+| **Faza 25** liste tipate pe wire               | **2+c** D182–D199                                           |
+| **Faza 30** doc mini-monopoly tutorial         | D200–D210 — `doc/mini-monopoly-logic.md`                    |
+| **Faza 31** `;sel(i)` vector 1 col             | D217–D227 — extinde F29                                     |
+| **Faza 32** doc logic values + type predicates | D228–D247 — `logic-value-types.md` + engine                          | **(ready-to-implement)** |
+| **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
+| **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
+| ~~**Builtins listă** member/append~~           | ~~**2+d**~~                                                 |
+| **Liste avansate** dif/lazy/char               | **2+e** **(deferred)** — D136                               |
+| **Builtins listă suplimentare**                | **2+g** **(deferred)** — post-F27; catalog Prolog complet   |
+| **Builtins random (integer)**                  | **2+h** **(deferred)** — `random_between/3`; draft **F33?** |
+| `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
+| Constraint `#K (line L)` trace                 | **1+v** **(pause)**                                         |
+| POUT declarate comp                            | **1+k**                                                     |
+| Persistență KB                                 | **1+o**                                                     |
+| Validare constraints la query                  | **1+p**                                                     |
+| `mutationReason` text pout                     | **1+s**                                                     |
 
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 29~~ **(completed)** · ~~F25~~ **(completed)**
-2. **Faza 31** — **`;sel(i)`** vector o coloană (D217–D227) — **următoarea implementare**
+1. ~~Faza 0~~ → ~~Faza 31~~ **(completed)** · ~~F25~~ **(completed)**
+2. **Faza 32** — **logic-value-types.md** + builtins `atom/1`…`compound/1` (D228=B) — **ready-to-implement**
 3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel
 4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a … 2+h**
+5. Apoi faze amânate **2+a … 2+h** (random → draft **F33**)
 
 ---
 
@@ -6567,16 +6602,16 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 Tabel master **2+a … 2+h** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 
-| Stare | ID          | Subiect                     | Detaliu                                                                                                        | Fază draft | Legat de                  |
-| ----- | ----------- | --------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------- |
-| ⏳     | **2+a**     | Scope blocks nested         | `warehouse { inside(…) … }` — path relativ în același inline                                                   | **F20b**   | F20a, D107                |
-| ⏳     | **2+b**     | Reguli sub prefix import    | `v.c.carSize <- carWheel` → `v.c.carWheel`; body relativ la `use as`                                           | **F20c**   | F20a, D107                |
+| Stare | ID          | Subiect                     | Detaliu                                                                                                        | Fază draft | Legat de                        |
+| ----- | ----------- | --------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------- |
+| ⏳     | **2+a**     | Scope blocks nested         | `warehouse { inside(…) … }` — path relativ în același inline                                                   | **F20b**   | F20a, D107                      |
+| ⏳     | **2+b**     | Reguli sub prefix import    | `v.c.carSize <- carWheel` → `v.c.carWheel`; body relativ la `use as`                                           | **F20c**   | F20a, D107                      |
 | ⏳     | **2+c**     | Liste tipate pe wire        | **F25 următoarea** — D182–D199; mutation/program/query + codec listă                                           | **F25**    | D182+, F22, F29 **(completed)** |
-| ✅     | ~~**2+d**~~ | Builtins listă (core)       | `member/2` ****`append/3` ****`length/2` ****`reverse/2` ****`sort/2`                                          | **F27**    | D137, D160–D168, F22      |
-| ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                 |
-| ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                 |
-| ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23 |
-| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)      | **F32?**   | F30 D203, Monopoly doc    |
+| ✅     | ~~**2+d**~~ | Builtins listă (core)       | `member/2` ****`append/3` ****`length/2` ****`reverse/2` ****`sort/2`                                          | **F27**    | D137, D160–D168, F22            |
+| ⏳     | **2+e**     | Liste avansate Prolog       | Dif-list, lazy lists, string ↔ char list                                                                       | —          | D136, F22                       |
+| ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                       |
+| ⏳     | **2+g**     | Builtins listă suplimentare | Restul bibliotecii Prolog pentru liste (post-**F27**) — catalog complet + priorități                           | **F28?**   | **2+d**, **F27**, F22–F23       |
+| ⏳     | **2+h**     | Builtins random (integer)   | `random_between/3` (+ seed opțional); model SWI; **fără float** — vezi [2+h](#2h--builtins-random-integer)     | **F33?**   | F30 D203, Monopoly doc          |
 
 
 **Ordine recomandată (când se promovează):** **F29** (N vars + sel) **→ apoi 2+c/F25**; **2+a** / **2+b** independent; ~~**2+d**~~ **→ F27**; **2+g** post-F27; **2+e** independent; **2+f** post-F24; **2+h** independent (util pentru Monopoly doc v2). **Faza 31** (`;sel(i)`) = fază normală, nu backlog.
@@ -6625,7 +6660,7 @@ Dif-list, lazy lists, conversie automată string ↔ listă de caractere — Pro
 | --------------------------------------------------------- | ----------------------------------------- |
 | `nth0/3`, `nth1/3`                                        | **F23** **(completed)**                   |
 | `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2` | **F27** (ex-**2+d**)                      |
-| **Liste ca termeni** (`[]`, `[H|T]`, unificare)           | **F22** **(completed)**                   |
+| **Liste ca termeni** (`[]`, `[H                           | T]`, unificare)                           |
 | **Dif-list, lazy, char-list**                             | **2+e** (model listă, nu builtin library) |
 | **Liste pe wire**                                         | **2+c** → **F25**                         |
 
@@ -6735,19 +6770,21 @@ Ordine recomandată dacă Monopoly / logic inline cere mai mult — **subseturi 
 
 **Notă:** la promovare, **nu** tot catalogul dintr-o dată — alegeri ca la **F27** (5 predicate), teste **38xx+** legacy+wave, doc EN, head rezervat per arity.
 
-#### **2+h** ⏳ — Builtins random (integer) **(draft F32)**
+#### **2+h** ⏳ — Builtins random (integer) **(draft F33)**
 
 > **Sursă:** confirmare user 2026-08-22 — D203 F30 (Monopoly doc) folosește **wire/counter** pentru zar; **2+h** = fază amânată pentru random în engine.  
 > **Legat de:** [Faza 30](#faza-30--doc-tutorial-mini-monopoly-logic-doc-only--următoarea) (D203-A), `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` (no floats).
 
 **Context SWI-Prolog (referință — nu ISO standard):**
 
-| Predicate SWI | Semnificație |
-|---------------|--------------|
-| **`random(-Float)`** | Float în `[0.0, 1.0)` — RNG global impur |
-| **`random_between(+Low, +High, -Int)`** | Integer uniform inclusiv `[Low, High]` — uzual pentru zar (`random_between(1, 6, D)`) |
-| **`set_random(+Seed)`** | Reseed explicit — reproducibilitate test |
-| **`getrand(+State)`** / **`setrand(+State)`** | Salvare/restaurare stare RNG |
+
+| Predicate SWI                         | Semnificație                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------- |
+| `random(-Float)`                      | Float în `[0.0, 1.0)` — RNG global impur                                              |
+| `random_between(+Low, +High, -Int)`   | Integer uniform inclusiv `[Low, High]` — uzual pentru zar (`random_between(1, 6, D)`) |
+| `set_random(+Seed)`                   | Reseed explicit — reproducibilitate test                                              |
+| `getrand(+State)` / `setrand(+State)` | Salvare/restaurare stare RNG                                                          |
+
 
 Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP** — API similar, dar **nu** portabil ISO.
 
@@ -6755,24 +6792,28 @@ Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP*
 
 **LogTScript azi — ce NU avem:**
 
-| Topic | Stare |
-|-------|--------|
-| **`random/*` în `logic-engine.js`** | **Lipsă** — zero builtins random |
-| **Float în logic** | **Nu** — doar **integers** (atoms, liste, compounds) — vezi `inline-logic.md`: *Floats — Not supported* |
-| **Float pe wire la comp pin** | **`number`** = unsigned integer binary, **nu** IEEE float |
-| **ISO Prolog standard random** | N/A — nu există în standard |
+
+| Topic                               | Stare                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `random/*` **în** `logic-engine.js` | **Lipsă** — zero builtins random                                                                        |
+| **Float în logic**                  | **Nu** — doar **integers** (atoms, liste, compounds) — vezi `inline-logic.md`: *Floats — Not supported* |
+| **Float pe wire la comp pin**       | `number` = unsigned integer binary, **nu** IEEE float                                                   |
+| **ISO Prolog standard random**      | N/A — nu există în standard                                                                             |
+
 
 **Implicație pentru MVP 2+h:** **nu** portăm `random/1` float din SWI; MVP propus = **doar integer**:
 
-| Predicate (draft) | Arity | Rol |
-|-------------------|-------|-----|
-| **`random_between(Low, High, Int)`** | 3 | `Low`/`High` ground integers; `Int` variabilă output — uniform inclusiv |
-| **`set_random(Seed)`** | 1 | Opțional — seed pentru teste legacy+wave deterministe |
+
+| Predicate (draft)                | Arity | Rol                                                                     |
+| -------------------------------- | ----- | ----------------------------------------------------------------------- |
+| `random_between(Low, High, Int)` | 3     | `Low`/`High` ground integers; `Int` variabilă output — uniform inclusiv |
+| `set_random(Seed)`               | 1     | Opțional — seed pentru teste legacy+wave deterministe                   |
+
 
 **Out of scope 2+h (explicit):**
 
-- **`random(Float)`** cu float — **respins** (fără tip float în logic)
-- **`random/1` pe wire** — nu la MVP
+- `random(Float)` cu float — **respins** (fără tip float în logic)
+- `random/1` **pe wire** — nu la MVP
 - Distribuții non-uniforme, `random_member/2`, crypto RNG
 
 **Exemplu țintă (post-2+h) — zar Monopoly:**
@@ -6781,26 +6822,30 @@ Alte implementări: **GNU Prolog** (`random/1`, `random/3`), **SICStus**, **YAP*
 roll(D) <- random_between(1, 6, D)
 ```
 
-**Fișiere țintă (când se promovează → F32):**
+**Fișiere țintă (când se promovează → F33):**
 
-| Fișier | Rol |
-|--------|-----|
-| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `_solveRandomBetween`, RNG state (seed) |
-| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiune `random_between/3`, impuritate, vs SWI |
-| `inline-logic.md` | Notă cross-link; floats rămân interzise |
-| `tests/test_suite.js` | **38xx+** legacy+wave; seed fix pentru determinism |
-| `mini-monopoly-logic.md` | Actualizare Phase C — zar în logic (doc v2) |
+
+| Fișier                                                 | Rol                                                |
+| ------------------------------------------------------ | -------------------------------------------------- |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)`    | `_solveRandomBetween`, RNG state (seed)            |
+| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiune `random_between/3`, impuritate, vs SWI    |
+| `inline-logic.md`                                      | Notă cross-link; floats rămân interzise            |
+| `tests/test_suite.js`                                  | **38xx+** legacy+wave; seed fix pentru determinism |
+| `mini-monopoly-logic.md`                               | Actualizare Phase C — zar în logic (doc v2)        |
+
 
 **Decizii draft (de confirmat la promovare — D211+):**
 
-| ID | Propunere |
-|----|-----------|
-| **D211** | MVP = **`random_between/3`** integer only |
-| **D212** | **`set_random/1`** pentru teste — seed integer |
-| **D213** | Head **`random_between/3`** rezervat (builtin call only) |
-| **D214** | **Fără** `random/1` float — aliniat la „no floats in logic” |
+
+| ID       | Propunere                                                         |
+| -------- | ----------------------------------------------------------------- |
+| **D211** | MVP = `random_between/3` integer only                             |
+| **D212** | `set_random/1` pentru teste — seed integer                        |
+| **D213** | Head `random_between/3` rezervat (builtin call only)              |
+| **D214** | **Fără** `random/1` float — aliniat la „no floats in logic”       |
 | **D215** | Documentare impuritate + interacțiune cu backtracking (SWI-style) |
-| **D216** | Opțional comp: seed wire la elaborare — **post-MVP** |
+| **D216** | Opțional comp: seed wire la elaborare — **post-MVP**              |
+
 
 **Estimare:** mică–medie (~1 fază) — un builtin + seed + teste; **fără** float infrastructure.
 
@@ -6868,31 +6913,35 @@ Ideea D72-B (`#K (line L)` în rollback) rămâne în backlog; **nu** se promove
 
 ## Faza 30 — Doc tutorial **mini-monopoly-logic** **(doc-only — următoarea)**
 
-> **Scop:** pagină EN de documentație (model **[huffman-v2.md](../v0_3_2/doc/huffman-v2.md)**, **[mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)**, **[plc.md](../v0_3_2/doc/plc.md)**) — cum ai construi un **Monopoly minimal** cu **`inline [logic]`** + **`comp [logic]`** + wire-uri + butoane UI.  
+> **Scop:** pagină EN de documentație (model **[huffman-v2.md](../v0_3_2/doc/huffman-v2.md)**, **[mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)**, **[plc.md](../v0_3_2/doc/plc.md)**) — cum ai construi un **Monopoly minimal** cu `inline [logic]` + `comp [logic]` + wire-uri + butoane UI.  
 > **Nu** implementare engine / feature nou în cod — doar doc + eventual `_verify_doc_examples.js` pe scriptul final.  
 > **User (2026-08-22):** planificare înainte de implementare; script complet la finalul paginii; problemă deschisă: **alegeri jucător** (buy / pass / pay rent / next player).
 
 ### Fișiere țintă (doar doc)
 
-| Fișier | Rol |
-|--------|-----|
-| `[doc/mini-monopoly-logic.md](../v0_3_2/doc/mini-monopoly-logic.md)` | Pagină principală — arhitectură, faze, gaps, script complet |
-| `[doc/doc-index.json](../v0_3_2/doc/doc-index.json)` | Secțiune **Tutorials** sau **Logic** — link + search keywords |
-| `node/_gen_doc_data.js` | Regenerare viewer |
-| `node/doc_verify/mini-monopoly-logic.js` | Opțional — assert-uri wire pe scriptul final |
-| `[doc/comp-logic.md](../v0_3_2/doc/comp-logic.md)` | Cross-link „see also” |
+
+| Fișier                                                               | Rol                                                           |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `[doc/mini-monopoly-logic.md](../v0_3_2/doc/mini-monopoly-logic.md)` | Pagină principală — arhitectură, faze, gaps, script complet   |
+| `[doc/doc-index.json](../v0_3_2/doc/doc-index.json)`                 | Secțiune **Tutorials** sau **Logic** — link + search keywords |
+| `node/_gen_doc_data.js`                                              | Regenerare viewer                                             |
+| `node/doc_verify/mini-monopoly-logic.js`                             | Opțional — assert-uri wire pe scriptul final                  |
+| `[doc/comp-logic.md](../v0_3_2/doc/comp-logic.md)`                   | Cross-link „see also”                                         |
+
 
 ### Scope MVP doc (joc minimal)
 
-| Element | Propunere doc |
-|---------|----------------|
-| **Placă** | 8–12 pătrate (`square(n, name, price, rent)`) — loop cu `mod` pe poziție |
-| **Jucători** | 2 jucători, cash + poziție (`player(p1, cash, pos)`) |
-| **Zar** | **Nu** random în logic — `comp [counter]` / dip 1–6 sau wire `diceIn` |
-| **Tura** | Fact `turn(p1)` / `turn(p2)`; buton **Next player** → mutație sau swap |
-| **Aterizare** | Query `resolveLanding(P)` — go / tax / rent / offer buy |
-| **Proprietăți** | `owns(P, Square)` + `constraint` / mutație `+ owns(...)` |
-| **Câștig** | Query boolean `gameOver(Winner)` |
+
+| Element         | Propunere doc                                                            |
+| --------------- | ------------------------------------------------------------------------ |
+| **Placă**       | 8–12 pătrate (`square(n, name, price, rent)`) — loop cu `mod` pe poziție |
+| **Jucători**    | 2 jucători, cash + poziție (`player(p1, cash, pos)`)                     |
+| **Zar**         | **Nu** random în logic — `comp [counter]` / dip 1–6 sau wire `diceIn`    |
+| **Tura**        | Fact `turn(p1)` / `turn(p2)`; buton **Next player** → mutație sau swap   |
+| **Aterizare**   | Query `resolveLanding(P)` — go / tax / rent / offer buy                  |
+| **Proprietăți** | `owns(P, Square)` + `constraint` / mutație `+ owns(...)`                 |
+| **Câștig**      | Query boolean `gameOver(Winner)`                                         |
+
 
 ### Arhitectură doc (faze — ca huffman-v2)
 
@@ -6920,14 +6969,18 @@ flowchart LR
   RT --> Wires
 ```
 
-| Fază doc | Conținut | Building blocks existente |
-|----------|----------|---------------------------|
-| **A — Board** | Facts + constraints init | `inline [logic]`, `constraint … <=` |
-| **B — Turn** | `turn(P)`, next player | `logic { ± }`, `query =`, `on: 1` |
-| **C — Move** | poziție + dice wire | pin `number`, `is/2`, `mod` sau aritmetică wire |
-| **D — Land** | rent / tax / buy-offer | query + redirect boolean / scalar |
-| **E — Choice** | buy vs pass | **problema deschisă** — vezi D204–D208 |
-| **F — Script complet** | un bloc `logts-play` la final | Load & Run |
+
+
+
+| Fază doc               | Conținut                      | Building blocks existente                       |
+| ---------------------- | ----------------------------- | ----------------------------------------------- |
+| **A — Board**          | Facts + constraints init      | `inline [logic]`, `constraint … <=`             |
+| **B — Turn**           | `turn(P)`, next player        | `logic { ± }`, `query =`, `on: 1`               |
+| **C — Move**           | poziție + dice wire           | pin `number`, `is/2`, `mod` sau aritmetică wire |
+| **D — Land**           | rent / tax / buy-offer        | query + redirect boolean / scalar               |
+| **E — Choice**         | buy vs pass                   | **problema deschisă** — vezi D204–D208          |
+| **F — Script complet** | un bloc `logts-play` la final | Load & Run                                      |
+
 
 ### Problema centrală: **alegeri jucător**
 
@@ -6935,14 +6988,16 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 
 #### Pattern-uri posibile (de comparat în doc)
 
-| ID | Pattern | Cum arată | Pro | Contra |
-|----|---------|-----------|-----|--------|
-| **P1** | **Choice code pe wire** | `8wire choiceIn`; pin `C is number choicePin`; query `applyChoice(P, C)` | Un singur comp; extensibil | User trebuie să știe codurile (1=buy, 2=pass) |
-| **P2** | **Comp-uri separate per acțiune** | `.gameBuy:{ logic { + owns } … }` / `.gamePass:{ … }` | Butoane clare în UI | Multe blocuri exec; stare trebuie sincronizată |
-| **P3** | **`query =` subset** | Un comp, butoane setează `query = buy` vs `query = pass` | Folosește F18 | Necesită re-trigger `set` per buton |
-| **P4** | **Liste legale → vector** | `legalChoice(P, Code)` → `legalChoices >= choiceVec` | Apropie „meniu dinamic” | UI tot mapează index → acțiune; fără `call/N` |
-| **P5** | **PLC orchestrator + logic validate** | `inline [plc]` scan cu `CASE choice OF` + `.rules:check({…})` | Familiar industrial | Două limbaje; doc mai lung |
-| **P6** | **State machine extern** | `comp [counter]` / LUT pentru `phase` (move/choose/pay) | Clar pentru începători | Logic devine per-phase KB fragment |
+
+| ID     | Pattern                               | Cum arată                                                                | Pro                        | Contra                                         |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------ | -------------------------- | ---------------------------------------------- |
+| **P1** | **Choice code pe wire**               | `8wire choiceIn`; pin `C is number choicePin`; query `applyChoice(P, C)` | Un singur comp; extensibil | User trebuie să știe codurile (1=buy, 2=pass)  |
+| **P2** | **Comp-uri separate per acțiune**     | `.gameBuy:{ logic { + owns } … }` / `.gamePass:{ … }`                    | Butoane clare în UI        | Multe blocuri exec; stare trebuie sincronizată |
+| **P3** | `query =` **subset**                  | Un comp, butoane setează `query = buy` vs `query = pass`                 | Folosește F18              | Necesită re-trigger `set` per buton            |
+| **P4** | **Liste legale → vector**             | `legalChoice(P, Code)` → `legalChoices >= choiceVec`                     | Apropie „meniu dinamic”    | UI tot mapează index → acțiune; fără `call/N`  |
+| **P5** | **PLC orchestrator + logic validate** | `inline [plc]` scan cu `CASE choice OF` + `.rules:check({…})`            | Familiar industrial        | Două limbaje; doc mai lung                     |
+| **P6** | **State machine extern**              | `comp [counter]` / LUT pentru `phase` (move/choose/pay)                  | Clar pentru începători     | Logic devine per-phase KB fragment             |
+
 
 **Recomandare doc (draft D204):** **P1 + P4** — wire `choiceIn` + query `legalChoice(P, C)` (boolean redirect dacă illegal) + secțiune scurtă **P2** ca alternativă „editor-friendly”.
 
@@ -6954,50 +7009,54 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 - **Query selection** `query = stillAtC1` — F18  
 - **Check** simulare mutație — F19  
 - **Cut** pentru „commit choice, no backtrack” — F24  
-- **`show/N`**, **`is/2`**, **`nth0`**, **`member`**, liste — F21–F27  
+- `show/N`, `is/2`, `nth0`, `member`, liste — F21–F27  
 - **Next-step trigger** — `comp [logic] on: 1` + `set = trigger` (ca toate exemplele doc)
 
 ### Lipsuri / limitări (secțiune obligatorie în doc)
 
-| Lipsă | Impact Monopoly | Workaround doc |
-|-------|-----------------|----------------|
-| **Fără `call/N` / goal din wire** | Nu poți „apelează predicatul X din atom” | Cod numeric/text pe wire + reguli `choice(P, 1)` … |
-| **Fără `findall`/`bagof`** | Meniu dinamic mai greu | Query cu vector bulk + soluții multiple pe `legalChoice` |
-| **Fără random în logic** | Zar | Wire/counter (F30 doc); **→ [2+h](#2h--builtins-random-integer)** `random_between/3` |
-| **Fără persistență KB (1+o)** | Save game | Re-RUN = reset; menționăm explicit |
-| **Fără UI list binding automată** | Butoane ≠ soluții Prolog | Mapare manuală dip/switch → cod |
-| **Un singur `set` = un pass** | Turn multi-step | Faze: `phase(move)`, `phase(choose)` ca facts |
-| **2+ jucători async** | Hot-seat pe telefon | Doc: **hot-seat** — un singur device, Next player |
+
+| Lipsă                                 | Impact Monopoly                          | Workaround doc                                                                       |
+| ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Fără** `call/N` **/ goal din wire** | Nu poți „apelează predicatul X din atom” | Cod numeric/text pe wire + reguli `choice(P, 1)` …                                   |
+| **Fără** `findall`**/**`bagof`        | Meniu dinamic mai greu                   | Query cu vector bulk + soluții multiple pe `legalChoice`                             |
+| **Fără random în logic**              | Zar                                      | Wire/counter (F30 doc); **→ [2+h](#2h--builtins-random-integer)** `random_between/3` |
+| **Fără persistență KB (1+o)**         | Save game                                | Re-RUN = reset; menționăm explicit                                                   |
+| **Fără UI list binding automată**     | Butoane ≠ soluții Prolog                 | Mapare manuală dip/switch → cod                                                      |
+| **Un singur** `set` **= un pass**     | Turn multi-step                          | Faze: `phase(move)`, `phase(choose)` ca facts                                        |
+| **2+ jucători async**                 | Hot-seat pe telefon                      | Doc: **hot-seat** — un singur device, Next player                                    |
+
 
 ### Decizii draft (D200–D210)
 
-| ID | Decizie | Propunere |
-|----|---------|-----------|
-| **D200** | **Doc-only** | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)** |
-| **D201** | **Nume fișier** | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)** |
-| **D202** | **2 jucători, 8 casute** | MVP suficient pentru tutorial — **(confirmed)** |
-| **D203** | **Zar la F30** | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F32**) |
-| **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2) |
-| **D205** | **Turn advance** | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1` |
-| **D206** | **Script final** | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2) |
-| **D207** | **Blocuri intermediare** | `logts-play` per fază A–E (runnable incremental) |
-| **D208** | **Verificare** | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next) |
-| **D209** | **Out of scope doc** | AI, negociere, carduri Chance, auction, 4+ jucători online |
-| **D210** | **Promovare viitoare** | **2+h** random; **F31** `;sel(i)` pentru extract coloană Z; **1+p** validate; doc Monopoly v2 |
+
+| ID       | Decizie                    | Propunere                                                                                                                                          |
+| -------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D200** | **Doc-only**               | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)**                                                                   |
+| **D201** | **Nume fișier**            | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)**                                                                  |
+| **D202** | **2 jucători, 8 casute**   | MVP suficient pentru tutorial — **(confirmed)**                                                                                                    |
+| **D203** | **Zar la F30**             | **A (confirmed)** — wire/counter extern în doc; SWI are `random_between/3`, noi **nu** (→ **[2+h](#2h--builtins-random-integer)** / draft **F33**) |
+| **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2)                                                                                      |
+| **D205** | **Turn advance**           | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1`                                                                                          |
+| **D206** | **Script final**           | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2)                                                                                      |
+| **D207** | **Blocuri intermediare**   | `logts-play` per fază A–E (runnable incremental)                                                                                                   |
+| **D208** | **Verificare**             | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next)                                                                    |
+| **D209** | **Out of scope doc**       | AI, negociere, carduri Chance, auction, 4+ jucători online                                                                                         |
+| **D210** | **Promovare viitoare**     | **2+h** random; **F32** logic values doc; **F33** type builtins?; **1+p** validate; doc Monopoly v2                                                |
+
 
 ### Structură pagină (outline)
 
-1. Title + one-liner + link la inline/comp logic  
-2. **Principle** (tabel reguli)  
-3. **Architecture** (mermaid + tabel faze)  
-4. **State model** — facts, dynamic, constraints  
-5. **Phase A** — board inline (snippet)  
-6. **Phase B** — turn + next player button  
-7. **Phase C** — dice + move (`number` pin)  
-8. **Phase D** — landing (rent / tax / buy offer)  
-9. **Phase E — Player choices** (compară P1–P6; recomandă P1+P4)  
-10. **Gaps & workarounds**  
-11. **Full game script** (`logts-play`)  
+1. Title + one-liner + link la inline/comp logic
+2. **Principle** (tabel reguli)
+3. **Architecture** (mermaid + tabel faze)
+4. **State model** — facts, dynamic, constraints
+5. **Phase A** — board inline (snippet)
+6. **Phase B** — turn + next player button
+7. **Phase C** — dice + move (`number` pin)
+8. **Phase D** — landing (rent / tax / buy offer)
+9. **Phase E — Player choices** (compară P1–P6; recomandă P1+P4)
+10. **Gaps & workarounds**
+11. **Full game script** (`logts-play`)
 12. **Test / verify** + **See also**
 
 ### Livrabile F30
@@ -7021,44 +7080,50 @@ Medie — ~1 pagină doc densă (similar huffman-v2 ca lungime), mostly prose + 
 
 ### Problemă (stare azi post-F29)
 
-| Situație | Comportament azi |
-|----------|------------------|
-| `;sel(0,2)` + matrix LHS | ✅ 2 coloane (F29) |
-| `;sel(2)` arity 1 | ❌ parse/validare — arity ≠ 2 |
+
+| Situație                                         | Comportament azi                            |
+| ------------------------------------------------ | ------------------------------------------- |
+| `;sel(0,2)` + matrix LHS                         | ✅ 2 coloane (F29)                           |
+| `;sel(2)` arity 1                                | ❌ parse/validare — arity ≠ 2                |
 | `{ carInfo(_, _, Z, _) }` + vector doar pe **Z** | ❌ prea multe `__collect` / hint-uri confuze |
-| Regulă `year(Z) <- carInfo(_, _, Z, _)` | ✅ workaround manual |
+| Regulă `year(Z) <- carInfo(_, _, Z, _)`          | ✅ workaround manual                         |
+
 
 **Scop F31:** `;sel(i)` cu **un** index → pack **vector** `Wwire[N]` (o coloană), aceeași indexare 0-based ca F29.
 
-### Decizii F31 **(confirmed — ready-to-implement)**
+### Decizii F31 **(confirmed — completed)**
 
-| ID | Decizie | Alegere |
-|----|---------|---------|
-| **D217** | **Arity `;sel`** | **A** — `;sel(i)` = 1 col vector; `;sel(i,j)` = 2 col matrix (F29, neschimbat) |
-| **D218** | **Semantica index `i`** | **A** — **poziția argumentului** în goal (0-based), ca D171 F29 — nu „al N-lea nume liber” |
-| **D219** | **`_` la sel** | **A (confirmed)** — **interzis** selectarea unei poziții `_`; eroare elaborare clară |
-| **D220** | **Hint output** | **A** — binding `Var=type` folosește **numele din goal** (`Z=number`); **fără** alias arbitrar (`M`, `Q`) |
-| **D221** | **Hints necesare** | **A** — doar pentru variabilele **selectate** (`;sel(2)` → doar `Z=number`) |
-| **D222** | **`_` neselectat** | **A** — `_` în poziții **neincluse** în sel rămâne permis (`carInfo(X, _, Z, _), sel(0,2)`) |
-| **D223** | **LHS wire** | **A** — `;sel(i)` → **vector** `ewire[N]`; `;sel(i,j)` → **matrix** `ewire[R,C]` (F29) |
-| **D224** | **Paritate comp** | **A** — `allCarInfos;sel(2) >= years` pe redirect comp (vector bulk 1 col) |
-| **D225** | **Validare sel vs AST** | **A** — verificare `_` **înainte** de rename la `__collectN` (pe goal parse brut / term map pre-prep) |
-| **D226** | **Policy trailing** | **A** — `;sel(2);unique` / `;first` / `;last` — aceeași ordine ca F10/F29 |
-| **D227** | **Out of scope** | Tip pe index (`sel(0:text)`) respins; alias `M=text` respins; `sel(2,2)` rămâne invalid |
+
+| ID       | Decizie                 | Alegere                                                                                                   |
+| -------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| **D217** | **Arity** `;sel`        | **A** — `;sel(i)` = 1 col vector; `;sel(i,j)` = 2 col matrix (F29, neschimbat)                            |
+| **D218** | **Semantica index** `i` | **A** — **poziția argumentului** în goal (0-based), ca D171 F29 — nu „al N-lea nume liber”                |
+| **D219** | `_` **la sel**          | **A (confirmed)** — **interzis** selectarea unei poziții `_`; eroare elaborare clară                      |
+| **D220** | **Hint output**         | **A** — binding `Var=type` folosește **numele din goal** (`Z=number`); **fără** alias arbitrar (`M`, `Q`) |
+| **D221** | **Hints necesare**      | **A** — doar pentru variabilele **selectate** (`;sel(2)` → doar `Z=number`)                               |
+| **D222** | `_` **neselectat**      | **A** — `_` în poziții **neincluse** în sel rămâne permis (`carInfo(X, _, Z, _), sel(0,2)`)               |
+| **D223** | **LHS wire**            | **A** — `;sel(i)` → **vector** `ewire[N]`; `;sel(i,j)` → **matrix** `ewire[R,C]` (F29)                    |
+| **D224** | **Paritate comp**       | **A** — `allCarInfos;sel(2) >= years` pe redirect comp (vector bulk 1 col)                                |
+| **D225** | **Validare sel vs AST** | **A** — verificare `_` **înainte** de rename la `__collectN` (pe goal parse brut / term map pre-prep)     |
+| **D226** | **Policy trailing**     | **A** — `;sel(2);unique` / `;first` / `;last` — aceeași ordine ca F10/F29                                 |
+| **D227** | **Out of scope**        | Tip pe index (`sel(0:text)`) respins; alias `M=text` respins; `sel(2,2)` rămâne invalid                   |
+
 
 ### Erori elaborare (mesaje draft)
 
-| Condiție | Rezultat |
-|----------|----------|
-| `;sel(1)` pe `carInfo(_, _, Z, _)` | **error** — `sel(1): column 1 is anonymous (_); name the variable to select it` |
-| `;sel(2)` fără `Z=number` | **error** — `query output requires explicit type for 'Z'` |
-| `;sel(2)` + `32wire[3,2]` matrix LHS | **error** — `sel(i) requires vector wire LHS` |
-| `;sel(0,2)` pe poziție `_` | **error** — aceeași regulă D219 per index |
-| `;sel(5)` N=4 | **error** — index out of range |
+
+| Condiție                             | Rezultat                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------- |
+| `;sel(1)` pe `carInfo(_, _, Z, _)`   | **error** — `sel(1): column 1 is anonymous (_); name the variable to select it` |
+| `;sel(2)` fără `Z=number`            | **error** — `query output requires explicit type for 'Z'`                       |
+| `;sel(2)` + `32wire[3,2]` matrix LHS | **error** — `sel(i) requires vector wire LHS`                                   |
+| `;sel(0,2)` pe poziție `_`           | **error** — aceeași regulă D219 per index                                       |
+| `;sel(5)` N=4                        | **error** — index out of range                                                  |
+
 
 ### Exemple țintă
 
-**Vector — doar anii (cazul `carInfo`):**
+**Vector — doar anii (cazul** `carInfo`**):**
 
 ```logts
 16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2);unique)
@@ -7091,27 +7156,31 @@ solve → N cols → ;sel(i,j) → 2 cols → policy → logicPackMatrixSolution
 
 ### Fișiere țintă
 
-| Fișier | Schimbare |
-|--------|-----------|
-| `[parser.js](../v0_3_2/core/parser.js)` | `parseLogicQueryModifiers` — `sel(i)` **sau** `sel(i,j)`; comp redirect idem |
-| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `logicEncodeInlineQueryResult` — ramură `packVars.length === 1` + vector (există parțial); pack cu hint pe var selectată |
-| `[components/logic.js](../v0_3_2/core/components/logic.js)` | Elaborare sel arity 1; validare `_` pe argument index; redirect `;sel(i) >= vector` |
-| `[interpreter.js](../v0_3_2/core/interpreter.js)` | Inline query — transmite `columnSelect` scalar `[i]` vs pereche `[i,j]` |
-| `[logic-query-exec.md](../v0_3_2/doc/logic-query-exec.md)` | Secțiune `;sel(i)` + exemple `years` / `carInfo` |
-| `[comp-logic.md](../v0_3_2/doc/comp-logic.md)` | Redirect vector `;sel(i)` |
-| `tests/test_suite.js` | **3814+** legacy+wave |
+
+| Fișier                                                      | Schimbare                                                                                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `[parser.js](../v0_3_2/core/parser.js)`                     | `parseLogicQueryModifiers` — `sel(i)` **sau** `sel(i,j)`; comp redirect idem                                             |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)`         | `logicEncodeInlineQueryResult` — ramură `packVars.length === 1` + vector (există parțial); pack cu hint pe var selectată |
+| `[components/logic.js](../v0_3_2/core/components/logic.js)` | Elaborare sel arity 1; validare `_` pe argument index; redirect `;sel(i) >= vector`                                      |
+| `[interpreter.js](../v0_3_2/core/interpreter.js)`           | Inline query — transmite `columnSelect` scalar `[i]` vs pereche `[i,j]`                                                  |
+| `[logic-query-exec.md](../v0_3_2/doc/logic-query-exec.md)`  | Secțiune `;sel(i)` + exemple `years` / `carInfo`                                                                         |
+| `[comp-logic.md](../v0_3_2/doc/comp-logic.md)`              | Redirect vector `;sel(i)`                                                                                                |
+| `tests/test_suite.js`                                       | **3814+** legacy+wave                                                                                                    |
+
 
 ### Teste draft (D227 checklist)
 
-| ID | Scenariu |
-|----|----------|
-| 3814 | parse inline `;sel(2);unique` arity 1 |
+
+| ID   | Scenariu                                                      |
+| ---- | ------------------------------------------------------------- |
+| 3814 | parse inline `;sel(2);unique` arity 1                         |
 | 3815 | `carInfo(_,_,Z,_); sel(2)` + `Z=number` → vector years corect |
-| 3816 | `sel(1)` pe `_` → elaboration error |
-| 3817 | `sel(2)` + matrix LHS → error |
-| 3818 | comp `allCarInfos;sel(2) >= years` (legacy+wave) |
-| 3819 | regresie F29 `;sel(0,2)` neschimbat |
-| 3820 | `;sel(0,2)` cu `_` la index 1 OK (Y neinclus în sel) |
+| 3816 | `sel(1)` pe `_` → elaboration error                           |
+| 3817 | `sel(2)` + matrix LHS → error                                 |
+| 3818 | comp `allCarInfos;sel(2) >= years` (legacy+wave)              |
+| 3819 | regresie F29 `;sel(0,2)` neschimbat                           |
+| 3820 | `;sel(0,2)` cu `_` la index 1 OK (Y neinclus în sel)          |
+
 
 ### Livrabile F31
 
@@ -7123,3 +7192,433 @@ solve → N cols → ;sel(i,j) → 2 cols → policy → logicPackMatrixSolution
 ### Estimare
 
 Mică — extensie F29 (~1–2 zile): parser arity, validare `_`, ramură pack vector deja apropiată de F29.
+
+---
+
+## Faza 32 — Logic values + type predicates **(ready-to-implement — D228–D241 confirmed)**
+
+> **Sursă:** sketch [logic_value_types](../my_ideas/logic_value_types) — **filtrat:** sketch-ul propunea 6 categorii; **model canonic = 4 kind-uri logic** (`atom`, `number`, `list`, `compound`). `text` / `bool` / `number` la **pin/wire** = **conversii frontieră**, nu categorii KB. Predicate tip țintă: `atom/1` ****`number/1` ****`list/1` ****`compound/1` — fără `text/1` / `bool/1`.  
+> **Extinde:** [Faza 4](#faza-4--docstests-completed) (`inline-logic.md`), [Faza 21](#faza-21--builtin-shown--string-literals-completed) (string literals → atom), [Faza 22](#faza-22--liste-prolog-completed), [Faza 25](#faza-25--liste-tipate-pe-wire-2c-completed) (wire bind types), [Faza 30](#faza-30--doc-tutorial-mini-monopoly-doc-only). **Nu** e fază amânată backlog.
+
+### Problemă clară (sketch vs engine) **— parțial rezolvată**
+
+
+| Sketch (6 categorii) | Verdict user + engine                                                                                                            | Status                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| **atom**             | ✅ kind logic — `john`, `red`, `"hello"` (quoted = tot **atom**)                                                                  | **confirmed**                   |
+| **number**           | ✅ kind logic — integer în KB; `number` **la wire** = conversie pin (D14, F25)                                                    | **confirmed**                   |
+| **list**             | ✅ kind logic — F22                                                                                                               | **confirmed**                   |
+| **compound**         | ✅ kind logic — functor + arity                                                                                                   | **confirmed**                   |
+| **text**             | ❌ **nu** kind logic — string literal devine **atom**; `text` **la wire** = `bindType` encode/decode                              | **confirmed — respins ca kind** |
+| **bool**             | ❌ **nu** kind logic — `bool` **la wire** = satisfiability / 1-bit redirect; success/fail = rezultat query (`1wire ok`), NAF `\+` | **confirmed — respins ca kind** |
+
+
+**Consecință doc:** pagina F32 explică **4 valori logic** + secțiune separată **„Wire boundary (text / number / bool)”** — nu duplicăm sketch-ul cu 6 rânduri egale.
+
+### Problemă rămasă (doc)
+
+
+| Lipsă doc                                        | Impact                                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------------------------- |
+| **Pagină unificată** 4 kind-uri + frontieră wire | Atom quoted vs unquoted, `Z=number` hint vs kind logic                           |
+| **Type predicates**                              | `atom/1`…`compound/1` — **nu există în engine azi**; F32 le documentă **și** (recomandat) le implementează |
+| **Container vs element**                         | `list(X)` vs test pe element (`member/2`)                                        |
+| **Tip per soluție**                              | Aceeași variabilă, kind diferit între soluții                                    |
+| **Success vs bool value**                        | Query pe `1wire` = „există soluție?” — nu valoare `bool` în KB                   |
+
+
+### Ce spune sketch-ul — ce păstrăm / ce respingem
+
+
+| Secțiune sketch                     | Păstrăm  | Respingem / rescriem                                                     |
+| ----------------------------------- | -------- | ------------------------------------------------------------------------ |
+| Predicate ca **filtre**             | ✅        | —                                                                        |
+| Ordinea goal-urilor                 | ✅        | —                                                                        |
+| Tip **per soluție**                 | ✅        | „text” ca kind separat                                                   |
+| List vs compound                    | ✅        | —                                                                        |
+| Container vs element                | ✅        | `text(X)` pe listă → `atom(X)` pe element via `member/2`                 |
+| 6 categorii egale                   | —        | ❌ **text**, **bool** ca valori logic                                     |
+| `text/1`, `bool/1`                  | —        | ❌ predicate — doar `atom/1` ****`number/1` ****`list/1` ****`compound/1` |
+| Exemplu `value("hello")`, `text(X)` | Rescriem | `value("hello")`, `atom(X)` — același kind ca `value(red)`               |
+| Exemplu `bool` 0/1                  | Rescriem | secțiune **wire / query success**                                        |
+
+
+### Model canonic **(confirmed user 2026-08-24)**
+
+```
+Logic KB (4 kinds)          Wire boundary (bindType — conversii)
+─────────────────          ─────────────────────────────────────
+atom     john, red, "hi"    text   → ASCII bits pe pin/wire
+number   15, -4, 2020       number → integer bits
+list     [a,b], [H|T]       bool   → 1 bit (satisfiability / flag)
+compound person(j,25)
+```
+
+
+| Regulă   | Enunț                                                                                                                                                 |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D243** | **4 kind-uri logic** — `atom`, `number`, `list`, `compound` — singura taxonomie KB                                                                    |
+| **D244** | **Quoted = atom** — `"hello"` și `hello` sunt același kind; diferență = **sintaxă + show** (`logicTraceAsString`), nu kind                            |
+| **D245** | **Fără** `text/1` — filtrare string = `atom/1`; `text` rămâne term wire (`Var=text`, `bindType`)                                                      |
+| **D246** | **Fără** `bool/1` **în KB** — adevăr/fals = **rezultat query** (`1wire ok`), redirect satisfiability, NAF `\+`; `bool` **bindType** doar la frontieră |
+| **D247** | `number` **dual** — kind logic în facts **și** bindType wire; doc separă explicit cele două roluri                                                    |
+
+
+### Implementare azi (ground truth engine)
+
+
+| Kind logic                    | Stare           | Exemple                                                                                      |
+| ----------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| **atom**                      | ✅               | `john`, `boardwalk`, `"hello "` (literal → atom + optional `logicTraceAsString` pentru show) |
+| **number**                    | ✅               | `15`, `-4`; comparații, `is/2`                                                               |
+| **list**                      | ✅               | `[]`, `[a,b,c]`, `[H|T]`                                                                     |
+| **compound**                  | ✅               | `person(john, 25)`, `property(boardwalk, 400, […], 200)`                                     |
+| `atom/1` … `compound/1`       | ❌ neimplementat | **țintă F32** dacă D228=B (doc + engine) |
+| **bindType text/number/bool** | ✅ frontieră     | F25, `logic-query-exec`, comp redirect — **nu** kinds                                        |
+
+
+### Exemple sketch — filtrare (post-D243–D247)
+
+
+| Exemplu sketch                                 | Verdict doc F32                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `value(10)`, `number(X)`                       | ✅ exemplu doc + test (după D228=B) |
+| `value("hello")`, `text(X)`                    | 🔄 `value("hello")`**,** `atom(X)` — același filtru ca `value(red)` |
+| `value(red)`, `atom(X)`                        | ✅ canonical                                                         |
+| `bool`, `0`/`1` ca valoare                     | 🔄 `1wire ok = .world:query({…})` + secțiune bindType bool          |
+| `validScore(X) <- score(X), number(X), X >= 0` | ✅                                                                   |
+| `property(…, [50,…], …)`                       | ✅ runnable                                                          |
+| `member(Item, X), text(Item)`                  | 🔄 `member(Item, X), atom(Item)`                                    |
+| Query „textValues” / „numericValues”           | 🔄 redenumite **atomValues** / **numericValues** (kind logic)       |
+
+
+### Decizii F32 — tabel rezumat
+
+| ID | Subiect (pe scurt) | Confirmat |
+|----|--------------------|-----------|
+| **D228** | F32 = doc **și** engine (`atom/1`…`compound/1`) | ✅ **B** |
+| **D229** | Path pagină doc | ✅ **B** — `logic-value-types.md` |
+| **D230** | Model: **4 kind-uri** logic (nu 6 ca sketch) | ✅ **B** |
+| **D231** | `text` **nu** e kind; quoted = atom | ✅ |
+| **D232** | `bool` **nu** e kind; success pe `1wire` / `\+` | ✅ |
+| **D233** | Exemple `logts-play` cu predicate **runnable** | ✅ *(D228=B)* |
+| **D234** | Predicate: **`atom/1` only** — fără `text/1` | ✅ **C** |
+| **D235** | `list/1` și `compound/1` — tipuri distincte | ✅ **A** |
+| **D236** | Predicate tip = **filtre**, nu generatoare | ✅ **A** |
+| **D237** | Secțiune logic kind vs **`Z=number` wire hint** | ✅ **C** |
+| **D238** | Secțiune **wire boundary** (bindType) | ✅ **A** |
+| **D239** | Blocuri `logts-play` (8–12) | ✅ **A** |
+| **D240** | Verify doc (`_verify_doc_examples.js`) | ✅ **A** |
+| **D241** | Cross-links din paginile logic | ✅ **A** |
+| **D243** | Taxonomie KB = atom, number, list, compound | ✅ |
+| **D244** | `"hello"` = atom (quoted), același kind ca `hello` | ✅ |
+| **D245** | Fără builtin `text/1` | ✅ |
+| **D246** | Fără builtin `bool/1` | ✅ |
+| **D247** | `number` = kind logic **și** bindType wire (roluri separate) | ✅ |
+
+> **Notă:** **F33** în plan = alt subiect (**random 2+h**), **nu** type predicates. Referința „F33 pentru atom/1” a fost **greșită** — predicate tip aparțin **F32** dacă alegi D228=B.
+
+---
+
+### D228 — Scope fază: doc singur sau doc + engine?
+
+**Problema:** Azi poți scrie `value(10)` și `carInfo(X,…)` în logic, dar **`number(X)` ca goal eșuează** — nu există predicate tip în engine (spre deosebire de `member/2`, `is/2`). Sketch-ul presupune filtre `atom(X)`, `number(X)`, etc. F32 trebuie să decidă dacă **doar explicăm** modelul sau **și implementăm** cele 4 predicate.
+
+| Opțiune | Ce face F32 | Ce **nu** face |
+|---------|-------------|----------------|
+| **A — doc only** | Pagină `logic-value-types.md`; exemple fără `number(X)` runnable | Engine, teste 3851+ |
+| **B — doc + engine** *(confirmat)* | Pagină doc **+** builtins `atom/1`, `number/1`, `list/1`, `compound/1` **+** teste legacy/wave **+** verify runnable | `text/1`, `bool/1` |
+
+**Confirmat: B** (user 2026-08-24).
+
+```logts
+query numericValues:
+    value(X),
+    number(X)
+```
+
+**Exemplu diferență:**
+
+```logts
+# D228=A — merge azi (fără number/1):
+query allValues:
+    value(X)
+
+# D228=B — trebuie implementat în F32:
+query numericValues:
+    value(X),
+    number(X)
+```
+
+---
+
+### D229 — Unde publicăm documentația? (path fișier)
+
+**Problema:** Nu e nume de variabilă — e **locația paginii** în folderul `v0_3_2/doc/`, cum apare în doc viewer (alături de `inline-logic.md`, `logic-builtins.md`).
+
+| Opțiune | Path | Efect |
+|---------|------|-------|
+| **B — pagină nouă** *(confirmat)* | `v0_3_2/doc/logic-value-types.md` | Intrare nouă în index **Logic** |
+
+**Confirmat: B** — titlu pagină: „Logic values and type predicates”.
+
+---
+
+### D230 — Câte categorii de valori logic documentăm?
+
+**Problema:** Sketch-ul lista 6 (atom, text, number, bool, list, compound). Engine-ul are 4 term kinds.
+
+| Opțiune | Conținut |
+|---------|----------|
+| **A** | Păstrăm 6 categorii ca sketch |
+| **B** *(confirmat)* | **4 kind-uri:** atom, number, list, compound; text/bool = wire / query success |
+
+**Confirmat: B** (user 2026-08-24).
+
+---
+
+### D231 — `text` este kind logic?
+
+**Problema:** Sketch separa `atom(john)` de `text("hello")`. În engine, `"hello"` → `kind: 'atom'`.
+
+| Opțiune | Regulă |
+|---------|--------|
+| **A** | Kind viitor `text` |
+| **B** *(confirmat)* | **Fără kind text**; `"hello"` și `hello` = **atom**; cuvântul **text** = doar `Var=text` la wire |
+
+**Confirmat: B** — quoted vs unquoted = sintaxă + show, nu kind diferit.
+
+---
+
+### D232 — `bool` este kind logic?
+
+**Problema:** Sketch lista bool 0/1. În KB nu există term `bool`; există `1wire ok` după query și `bindType: bool` pe pin.
+
+| Opțiune | Regulă |
+|---------|--------|
+| **A** | Kind `bool` în KB |
+| **B** *(confirmat)* | **Fără kind bool**; adevăr/fals = rezultat query / `\+` / redirect `1wire` |
+
+**Confirmat: B.**
+
+```logts
+# satisfiability — nu valoare bool în KB:
+1wire ok = .world:query({ score(X), number(X), X >= 0 })
+```
+
+---
+
+### D233 — Exemple doc cu predicate tip runnable?
+
+**Problema:** Depinde **direct** de D228. Nu e fază separată.
+
+| Opțiune | Dacă D228=A | Dacă D228=B |
+|---------|-------------|-------------|
+| Prose only | ✅ | — |
+| Runnable `number(X)` etc. | ❌ | ✅ *(recomandat)* |
+
+**Confirmat: da** (D228=B) — blocurile cu `atom/1`…`compound/1` sunt runnable și intră în verify.
+
+---
+
+### D234 — Implementăm `text/1`?
+
+**Problema:** Sketch avea `text/1` separat de `atom/1`.
+
+| Opțiune | Predicate |
+|---------|-----------|
+| **A** | `atom/1` unquoted; `text/1` quoted |
+| **B** | Ambele pe orice atom |
+| **C** *(confirmat)* | **Doar `atom/1`** — `"hello"` și `red` trec ambele |
+
+**Confirmat: C** — filtrare string = `atom(X)`, nu `text(X)`.
+
+---
+
+### D235 — `list/1` vs `compound/1`
+
+**Problema:** `[a,b]` vs `person(a,b)` — același în unele Prolog-uri intern, nu la noi.
+
+| Opțiune | Regulă |
+|---------|--------|
+| **A** *(confirmat)* | **Mutual exclusive** — `list/1` pe liste, `compound/1` pe functori; `compound([a,b])` e fals |
+
+**Confirmat: A.**
+
+---
+
+### D236 — Predicate tip generează valori?
+
+**Problema:** `number(X)` singur nu produce toate integer-urile.
+
+| Opțiune | Semantics |
+|---------|-----------|
+| **A** *(confirmat)* | **Filtru** pe binding existent; eșuează dacă X nelegat sau kind greșit |
+
+**Confirmat: A** — `score(X), number(X)` da; `number(X)` singur nu.
+
+---
+
+### D237 — Kind logic vs hint `Z=number`
+
+**Problema:** `Z=number` la `.world:query` e encoding pe wire, nu tip static Prolog.
+
+| Opțiune | Doc |
+|---------|-----|
+| **A** | Doar kind logic |
+| **B** | Doar wire |
+| **C** *(confirmat)* | **Două secțiuni** + exemplu același `Z` în KB vs la redirect |
+
+**Confirmat: C.**
+
+```logts
+# kind logic în fact:
+value(10).
+
+# hint wire — nu schimbă kind-ul lui Z în KB:
+16wire[3] years = .world:query({ carInfo(_, _, Z, _) }, Z=number; sel(2))
+```
+
+---
+
+### D238 — Secțiune wire boundary
+
+**Problema:** Cititorii confundă `text`/`number`/`bool` din query cu kind-uri KB.
+
+| Opțiune | Doc |
+|---------|-----|
+| **A** *(confirmat)* | Secțiune dedicată + link `logic-query-exec.md` |
+
+**Confirmat: A.**
+
+---
+
+### D239 — Blocuri `logts-play`
+
+| Opțiune | Cantitate |
+|---------|-----------|
+| **A** *(confirmat)* | 8–12 blocuri (kind-uri, list vs compound, member+atom, Monopoly property, mixed values) |
+
+**Confirmat: A.**
+
+---
+
+### D240 — Verify doc
+
+| Opțiune | Verificare |
+|---------|------------|
+| **A** *(confirmat)* | `node node/_verify_doc_examples.js logic-value-types` |
+
+**Confirmat: A** (fără `doc_verify` extra).
+
+---
+
+### D241 — Cross-links
+
+| Opțiune | Linkuri |
+|---------|---------|
+| **A** *(confirmat)* | Din `inline-logic.md`, `logic-builtins.md`, `logic-query-exec.md` → `logic-value-types.md` |
+
+**Confirmat: A.**
+
+---
+
+### D243 — Taxonomie KB (4 kinds)
+
+**Confirmat:** singurele kind-uri în facts/rules = **atom, number, list, compound**.
+
+---
+
+### D244 — String literal = atom
+
+**Confirmat:** `"hello"` parsează ca atom; optional afișare cu ghilimele la `show/N`.
+
+---
+
+### D245 — Fără `text/1`
+
+**Confirmat:** nu implementăm și nu documentăm predicate `text/1`.
+
+---
+
+### D246 — Fără `bool/1`
+
+**Confirmat:** nu implementăm `bool/1`; documentăm success/fail separat (D232).
+
+---
+
+### D247 — `number` logic vs wire
+
+**Confirmat:** același cuvânt **number**, două roluri — integer în KB vs conversie bits pe pin (F25).
+
+---
+
+### Pattern-uri doc (D229 related)
+
+| ID | Unde scriem | Recomandare |
+|----|-------------|-------------|
+| **V1** | Fișier nou `logic-value-types.md` | ✅ D229=B |
+| **V2** | Secțiune în `inline-logic.md` | doar dacă D229=C |
+| **V3** | Două fișiere (values + predicates) | overkill |
+| **V4** | Secțiune în `logic-builtins.md` | amestecă cu member/count |
+
+### Pipeline conceptual
+
+```
+facts / rules
+    ↓
+unification → candidate bindings
+    ↓
+atom/1 | number/1 | list/1 | compound/1 | comparisons | …  (filters)
+    ↓
+solutions
+```
+
+### Structură pagină (outline)
+
+1. Title — 4 logic kinds + wire conversions  
+2. The four logic kinds  
+3. Variables are not values  
+4. Atoms (unquoted + quoted)  
+5. Numbers  
+6. Lists and compounds  
+7. List vs compound  
+8. Container vs element (`member/2`)  
+9. Wire boundary — text / number / bool (bindType)  
+10. Query success and `1wire`  
+11. Type predicates — `atom/1` `number/1` `list/1` `compound/1`  
+12. Filters not generators  
+13. Different kind per solution  
+14. Logic kinds vs output hints  
+15. Examples — `logts-play`  
+16. Sketch delta (6→4 categorii)  
+17. See also  
+
+### Fișiere țintă
+
+| Fișier | Schimbare |
+|--------|-----------|
+| `[logic-value-types.md](../v0_3_2/doc/logic-value-types.md)` | Pagină nouă (D229=B) |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `atom/1`, `number/1`, `list/1`, `compound/1` (D228=B) |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | Reserved heads |
+| `tests/test_suite.js` | **3851+** legacy+wave |
+| `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | Cross-link (D241) |
+| `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | See also |
+| `[logic-query-exec.md](../v0_3_2/doc/logic-query-exec.md)` | Wire hints vs kinds |
+| regen doc-data + verify | D240 — `logic-value-types` |
+
+### Livrabile F32 **(D228=B confirmed)**
+
+- [x] `doc/logic-value-types.md` — EN, 8–12 blocuri `logts-play` runnable  
+- [x] Engine: `atom/1`, `number/1`, `list/1`, `compound/1`  
+- [x] Teste **3851–3863** legacy+wave  
+- [x] Cross-links (D241)  
+- [x] Regen doc-data + verify  
+
+### Estimare
+
+Medie — doc + 4 builtins + teste (~2–3 zile).
+
+### Decizii F32 — status
+
+**Toate D228–D247 confirmed** — F32 **completed**.

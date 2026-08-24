@@ -42185,5 +42185,165 @@ comp [logic] .worldLogic:
   reg(3849, 'logic', 'F31 matrix ;sel(0,2) with named skip _ (legacy)', runF31MatrixSel02PartialAnon);
   reg(3850, 'logic', 'F31 matrix ;sel(0,2) with named skip _ (wave)', runF31MatrixSel02PartialAnon, { propagation: 'wave' });
 
+  const INLINE_F32_SAMPLES = `inline [logic] .world:
+
+    sample(10)
+    sample("hello")
+    sample(red)
+    sample([1, 2, 3])
+    sample(person(john, 25))
+
+    query numericValues:
+        sample(X),
+        number(X),
+        show(X)
+
+    query atomValues:
+        sample(X),
+        atom(X),
+        show(X)
+
+    query listValues:
+        sample(X),
+        list(X),
+        show(X)
+
+    query compoundValues:
+        sample(X),
+        compound(X),
+        show(X)
+
+:`;
+
+  function runF32NumericValues(h, session) {
+    const src = INLINE_F32_SAMPLES + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = numericValues
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('one numeric', String(session.outIncludes(interp, '10')), 'true');
+    h.assert('not hello', String(session.outIncludes(interp, 'hello')), 'false');
+  }
+
+  function runF32AtomValues(h, session) {
+    const src = INLINE_F32_SAMPLES + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = atomValues
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('hello', String(session.outIncludes(interp, 'hello')), 'true');
+    h.assert('red', String(session.outIncludes(interp, 'red')), 'true');
+    h.assert('not 10', String(session.outIncludes(interp, '10')), 'false');
+  }
+
+  function runF32ListCompound(h, session) {
+    const src = `inline [logic] .world:
+
+    query listOk:
+        list([a, b])
+
+    query compoundOk:
+        compound(person(a, b))
+
+:` + `
+1wire listOk = .world:query({ list([a, b]) })
+1wire compoundOk = .world:query({ compound(person(a, b)) })
+1wire listNotCompound = .world:query({ compound([a, b]) })`;
+    const { interp } = session.run(src);
+    h.assert('list ok', interp.getWireEffectiveValue('listOk'), '1');
+    h.assert('compound ok', interp.getWireEffectiveValue('compoundOk'), '1');
+    h.assert('list not compound', interp.getWireEffectiveValue('listNotCompound'), '0');
+  }
+
+  function runF32UnboundNumber(h, session) {
+    const prog = parseLogicBody('query q: number(X)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('no solutions', String(sols.length), '0');
+  }
+
+  function runF32ValidScore(h, session) {
+    const src = `inline [logic] .world:
+
+    score(10)
+    score(20)
+    score(50)
+
+    validScore(X) <-
+        score(X),
+        number(X),
+        X >= 0,
+        X =< 100
+
+    query valid:
+        validScore(X),
+        show(X)
+
+:` + `
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = valid
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('10', String(session.outIncludes(interp, '10')), 'true');
+    h.assert('20', String(session.outIncludes(interp, '20')), 'true');
+    h.assert('50', String(session.outIncludes(interp, '50')), 'true');
+  }
+
+  reg(3851, 'logic', 'F32 number/1 filter numericValues (legacy)', runF32NumericValues);
+  reg(3852, 'logic', 'F32 number/1 filter numericValues (wave)', runF32NumericValues, { propagation: 'wave' });
+  reg(3853, 'logic', 'F32 atom/1 filter atomValues (legacy)', runF32AtomValues);
+  reg(3854, 'logic', 'F32 atom/1 filter atomValues (wave)', runF32AtomValues, { propagation: 'wave' });
+  reg(3855, 'logic', 'F32 list/1 vs compound/1 (legacy)', runF32ListCompound);
+  reg(3856, 'logic', 'F32 list/1 vs compound/1 (wave)', runF32ListCompound, { propagation: 'wave' });
+  reg(3857, 'logic', 'F32 number(X) alone no solutions (legacy)', runF32UnboundNumber);
+  reg(3858, 'logic', 'F32 number(X) alone no solutions (wave)', runF32UnboundNumber, { propagation: 'wave' });
+  reg(3859, 'logic', 'F32 validScore number filter (legacy)', runF32ValidScore);
+  reg(3860, 'logic', 'F32 validScore number filter (wave)', runF32ValidScore, { propagation: 'wave' });
+
+  reg(3861, 'logic', 'atom/1 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved atom',
+      () => parseLogicBody('atom(X) <- X = X'),
+      "'atom/1' is reserved",
+    );
+  });
+
+  reg(3862, 'logic', 'F32 compound/1 listValues inline query (legacy)', function(h, session) {
+    const src = INLINE_F32_SAMPLES + `
+1wire ok = .world:query({ sample(X), list(X), show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('list shown', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  });
+  reg(3863, 'logic', 'F32 compound/1 listValues inline query (wave)', function(h, session) {
+    const src = INLINE_F32_SAMPLES + `
+1wire ok = .world:query({ sample(X), list(X), show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('list shown', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

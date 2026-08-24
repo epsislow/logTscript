@@ -2,7 +2,7 @@
 
 Reserved **built-in predicates** in the logic engine — evaluated directly by `comp [logic]` and **`.world:query({ … })`**, not by user clauses.
 
-Related: [inline-logic.md](inline-logic.md) (syntax) · [comp-logic.md](comp-logic.md) (wiring) · [logic-indexing.md](logic-indexing.md) (`indexFacts`, `count/2` in constraints)
+Related: [inline-logic.md](inline-logic.md) (syntax) · [comp-logic.md](comp-logic.md) (wiring) · [logic-value-types.md](logic-value-types.md) (value kinds, type predicates) · [logic-indexing.md](logic-indexing.md) (`indexFacts`, `count/2` in constraints)
 
 In the **documentation viewer**, `logts-play` blocks support **Load** and **Load & Run**.
 
@@ -22,6 +22,12 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`length/2`** | 2 | yes | no | List length; generative when **`N`** is ground |
 | **`reverse/2`** | 2 | yes | no | Reverse list order (bidirectional) |
 | **`sort/2`** | 2 | yes | no | Sort ground list by standard term order |
+| **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
+| **`number/1`** | 1 | yes | no | Type test — argument is an integer |
+| **`list/1`** | 1 | yes | no | Type test — argument is a list |
+| **`compound/1`** | 1 | yes | no | Type test — argument is a compound (not a list) |
+
+Type predicates filter bound terms — see [logic-value-types.md](logic-value-types.md).
 
 ¹ Only **`count/2`** is intercepted — other arities named `count` remain user predicates.
 
