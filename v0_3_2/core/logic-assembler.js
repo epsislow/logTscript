@@ -45,6 +45,9 @@ const LOGIC_BUILTIN_PARTITION_PRED = 'partition';
 const LOGIC_BUILTIN_CONVLIST_PRED = 'convlist';
 const LOGIC_BUILTIN_MAPLIST_PRED = 'maplist';
 const LOGIC_BUILTIN_FOLDL_PRED = 'foldl';
+const LOGIC_BUILTIN_FINDALL_PRED = 'findall';
+const LOGIC_BUILTIN_BAGOF_PRED = 'bagof';
+const LOGIC_BUILTIN_SETOF_PRED = 'setof';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -96,6 +99,9 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_CONVLIST_PRED]: [3],
   [LOGIC_BUILTIN_MAPLIST_PRED]: [2, 3],
   [LOGIC_BUILTIN_FOLDL_PRED]: [4, 5],
+  [LOGIC_BUILTIN_FINDALL_PRED]: [3],
+  [LOGIC_BUILTIN_BAGOF_PRED]: [3],
+  [LOGIC_BUILTIN_SETOF_PRED]: [3],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -671,6 +677,15 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_FOLDL_PRED && (arity === 4 || arity === 5)) {
     return `'foldl/${arity}' is reserved — cannot define foldl as fact or rule head`;
   }
+  if (predicate === LOGIC_BUILTIN_FINDALL_PRED && arity === 3) {
+    return "'findall/3' is reserved — cannot define findall as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_BAGOF_PRED && arity === 3) {
+    return "'bagof/3' is reserved — cannot define bagof as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_SETOF_PRED && arity === 3) {
+    return "'setof/3' is reserved — cannot define setof as fact or rule head";
+  }
   return `'${predicate}' is reserved`;
 }
 
@@ -805,6 +820,12 @@ function logicValidateProgram(prog) {
         logicError(`'maplist/${arity}' is reserved — cannot define maplist as constraint head`, c.line);
       } else if (pred === LOGIC_BUILTIN_FOLDL_PRED && (arity === 4 || arity === 5)) {
         logicError(`'foldl/${arity}' is reserved — cannot define foldl as constraint head`, c.line);
+      } else if (pred === LOGIC_BUILTIN_FINDALL_PRED && arity === 3) {
+        logicError("'findall/3' is reserved — cannot define findall as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_BAGOF_PRED && arity === 3) {
+        logicError("'bagof/3' is reserved — cannot define bagof as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SETOF_PRED && arity === 3) {
+        logicError("'setof/3' is reserved — cannot define setof as constraint head", c.line);
       } else {
         logicError(`'${pred}/3' is reserved — cannot define ${pred} as constraint head`, c.line);
       }

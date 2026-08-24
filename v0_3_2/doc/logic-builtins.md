@@ -52,6 +52,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`maplist/3`** | 3 | yes | no | Map template goal across parallel lists |
 | **`foldl/4`** | 4 | yes | no | Left fold with accumulator over one list |
 | **`foldl/5`** | 5 | yes | no | Left fold with accumulator over two parallel lists |
+| **`findall/3`** | 3 | yes | no | Collect all template instances for a goal (**`[]`** if none) |
+| **`bagof/3`** | 3 | yes | no | Like findall, groups by existential goal vars; **fail** if none |
+| **`setof/3`** | 3 | yes | no | Like bagof, then unique + sorted list |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
@@ -1625,6 +1628,237 @@ comp [logic] .pairsLogic:
 ```
 
 **Load & Run** prints **`33`** (`0+1+10`, then `11+2+20`).
+
+---
+
+## `findall/3`, `bagof/3`, and `setof/3`
+
+Solution aggregators — collect answers from a template goal into a list. All three take:
+
+| Argument | Role |
+|----------|------|
+| **`Template`** | Term built for **each** successful goal solution (free variables captured per solution) |
+| **`Goal`** | Callable compound goal (same shape as **`call/1`**) |
+| **`List`** | Output list (or ground list to verify) |
+
+### Comparison at a glance
+
+| Builtin | Zero solutions | Existential vars in **`Goal`** | Duplicates | Order |
+|---------|----------------|--------------------------------|------------|-------|
+| **`findall/3`** | **`[]`** (succeeds) | Ignored — all solutions in one list | Kept | Goal order |
+| **`bagof/3`** | **Fail** | Grouped — **backtracks** per binding | Kept per group | Goal order per group |
+| **`setof/3`** | **Fail** | Same grouping as **`bagof/3`** | Removed | Sorted (standard term order) |
+
+**Existential variables** = variables appearing in **`Goal`** but **not** in **`Template`**, and still **free** when the aggregator runs. Each distinct binding produces a separate **`bagof/3`** or **`setof/3`** solution.
+
+**Cut** inside **`Goal`** does not escape the aggregator (same barrier as **`call/1`**).
+
+### Example — `findall/3` collects every solution
+
+```logts-play
+inline [logic] .deck:
+
+    query allCards:
+        findall(Card, member(Card, [ace, king, queen]), Hand),
+        show(Hand)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = allCards
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[ace, king, queen]`**.
+
+### Example — `findall/3` with no solutions
+
+```logts-play
+inline [logic] .deck:
+
+    query empty:
+        findall(Card, member(Card, []), Hand),
+        show(Hand)
+
+:
+
+comp [logic] .deckLogic:
+    on: 1
+    .deck { }
+:
+
+1wire trigger = 1
+
+.deckLogic:{
+    query = empty
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[]`** — **`findall/3`** always succeeds.
+
+### Example — compound template
+
+```logts-play
+inline [logic] .tags:
+
+    query labelled:
+        findall(tag(Color), member(Color, [red, blue]), Tags),
+        show(Tags)
+
+:
+
+comp [logic] .tagsLogic:
+    on: 1
+    .tags { }
+:
+
+1wire trigger = 1
+
+.tagsLogic:{
+    query = labelled
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[tag(red), tag(blue)]`**.
+
+### Example — `findall/3` vs `bagof/3` (existential grouping)
+
+Same facts, different aggregation:
+
+```logts-play
+inline [logic] .party:
+
+    likes(mary, food)
+    likes(mary, wine)
+    likes(john, beer)
+
+    query allItems:
+        findall(Item, likes(Person, Item), Items),
+        show("findall:", Items)
+
+    query perPerson:
+        bagof(Item, likes(Person, Item), Items),
+        show("bagof person:", Person),
+        show("bagof items:", Items)
+
+:
+
+comp [logic] .partyLogic:
+    on: 1
+    .party { }
+:
+
+1wire trigger = 1
+
+.partyLogic:{
+    query = allItems
+    set = trigger
+}
+```
+
+**Load & Run** with **`allItems`** prints **`findall: [food, wine, beer]`** — every item, one list.
+
+Switch **`query = perPerson`** to see **`bagof`** backtrack: first **`mary`** with **`[food, wine]`**, then **`john`** with **`[beer]`**.
+
+### Example — `bagof/3` with a pre-bound variable
+
+When **`Person`** is already bound, grouping collapses to a single bag:
+
+```logts-play
+inline [logic] .party:
+
+    likes(mary, food)
+    likes(mary, wine)
+    likes(john, beer)
+
+    query maryOnly:
+        Person = mary,
+        bagof(Item, likes(Person, Item), Items),
+        show(Items)
+
+:
+
+comp [logic] .partyLogic:
+    on: 1
+    .party { }
+:
+
+1wire trigger = 1
+
+.partyLogic:{
+    query = maryOnly
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[food, wine]`**.
+
+### Example — `setof/3` removes duplicates and sorts
+
+```logts-play
+inline [logic] .votes:
+
+    query ranked:
+        setof(Color, member(Color, [green, red, blue, red, green]), Unique),
+        show(Unique)
+
+:
+
+comp [logic] .votesLogic:
+    on: 1
+    .votes { }
+:
+
+1wire trigger = 1
+
+.votesLogic:{
+    query = ranked
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[blue, green, red]`** — duplicates dropped, standard term order.
+
+### Example — collect unique players from facts
+
+```logts-play
+inline [logic] .scores:
+
+    scored(alice, 10)
+    scored(bob, 5)
+    scored(alice, 3)
+    scored(carol, 7)
+
+    query leaders:
+        setof(Player, scored(Player, _), Players),
+        show(Players)
+
+:
+
+comp [logic] .scoresLogic:
+    on: 1
+    .scores { }
+:
+
+1wire trigger = 1
+
+.scoresLogic:{
+    query = leaders
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[alice, bob, carol]`**.
 
 ---
 

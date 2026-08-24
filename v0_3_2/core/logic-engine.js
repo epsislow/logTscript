@@ -388,6 +388,15 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'foldl' && g0.arity === 5) {
       return this._solveFoldl5(g0.args[0], g0.args[1], g0.args[2], g0.args[3], g0.args[4], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'findall' && g0.arity === 3) {
+      return this._solveFindall(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'bagof' && g0.arity === 3) {
+      return this._solveBagof(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'setof' && g0.arity === 3) {
+      return this._solveSetof(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -1563,6 +1572,124 @@ class LogicEngine {
     env.cutCommitted = savedCutCommitted;
     return { ok, resultTerm };
   }
+
+  _goalFromFindallTerm(goalTerm, env) {
+    return logicGoalFromCallableTerm(logicDeref(goalTerm, env));
+  }
+
+  _collectFindallInstances(template, goalTerm, env, depth, onDepthExceeded) {
+    const innerGoal = this._goalFromFindallTerm(goalTerm, env);
+    if (!innerGoal) return null;
+    const collected = [];
+    const savedCutDepth = env.cutDepth;
+    const savedCutCommitted = env.cutCommitted;
+    env.cutDepth = env.choiceDepth();
+    env.cutCommitted = false;
+    const trail = env.trailLength();
+    this._solveGoals([innerGoal], env, depth + 1, () => {
+      collected.push(logicResolveTerm(template, env, this.table));
+      return true;
+    }, onDepthExceeded);
+    env.undo(trail);
+    env.cutDepth = savedCutDepth;
+    env.cutCommitted = savedCutCommitted;
+    return collected;
+  }
+
+  _solveFindall(template, goalTerm, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const collected = this._collectFindallInstances(template, goalTerm, env, depth, onDepthExceeded);
+    if (collected == null) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(list, logicArrayToList(collected), env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _collectBagofGroups(template, goalTerm, env, depth, onDepthExceeded, uniqueSorted) {
+    const innerGoal = this._goalFromFindallTerm(goalTerm, env);
+    if (!innerGoal) return null;
+    const existVars = logicExistentialVarsForBagof(template, innerGoal, env);
+    const records = [];
+    const savedCutDepth = env.cutDepth;
+    const savedCutCommitted = env.cutCommitted;
+    env.cutDepth = env.choiceDepth();
+    env.cutCommitted = false;
+    const trail = env.trailLength();
+    this._solveGoals([innerGoal], env, depth + 1, () => {
+      const existBindings = {};
+      for (const v of existVars) {
+        existBindings[v] = logicResolveTerm({ kind: 'var', name: v }, env, this.table);
+      }
+      records.push({
+        existBindings,
+        item: logicResolveTerm(template, env, this.table),
+      });
+      return true;
+    }, onDepthExceeded);
+    env.undo(trail);
+    env.cutDepth = savedCutDepth;
+    env.cutCommitted = savedCutCommitted;
+    if (!records.length) return [];
+    const groups = [];
+    for (const rec of records) {
+      let group = null;
+      for (const g of groups) {
+        if (logicBagofBindingsEqual(g.existBindings, rec.existBindings, env, this.table)) {
+          group = g;
+          break;
+        }
+      }
+      if (!group) {
+        group = { existBindings: rec.existBindings, items: [] };
+        groups.push(group);
+      }
+      group.items.push(rec.item);
+    }
+    if (uniqueSorted) {
+      for (const g of groups) {
+        g.items = logicSetofUniqueSort(g.items, env, this.table);
+      }
+    }
+    return groups;
+  }
+
+  _applyBagofGroup(group, list, env) {
+    for (const [name, term] of Object.entries(group.existBindings || {})) {
+      if (!logicUnify({ kind: 'var', name }, logicCloneTerm(term), env, this.table)) return false;
+    }
+    return logicUnify(list, logicArrayToList(group.items), env, this.table);
+  }
+
+  _walkBagofGroups(groups, pos, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    if (pos >= groups.length) return false;
+    let any = false;
+    for (let i = pos; i < groups.length; i++) {
+      if (this._solutionCapReached) break;
+      const trail = env.trailLength();
+      if (!this._applyBagofGroup(groups[i], list, env)) {
+        env.undo(trail);
+        continue;
+      }
+      if (this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded)) any = true;
+      env.undo(trail);
+      if (this._solutionCapReached) break;
+    }
+    return any;
+  }
+
+  _solveBagof(template, goalTerm, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const groups = this._collectBagofGroups(template, goalTerm, env, depth, onDepthExceeded, false);
+    if (!groups || groups.length === 0) return false;
+    return this._walkBagofGroups(groups, 0, list, rest, env, depth, onSuccess, onDepthExceeded);
+  }
+
+  _solveSetof(template, goalTerm, list, rest, env, depth, onSuccess, onDepthExceeded) {
+    const groups = this._collectBagofGroups(template, goalTerm, env, depth, onDepthExceeded, true);
+    if (!groups || groups.length === 0) return false;
+    return this._walkBagofGroups(groups, 0, list, rest, env, depth, onSuccess, onDepthExceeded);
+  }
 }
 
 function logicRenameApartClause(clause, idRef) {
@@ -1819,6 +1946,13 @@ function logicTermTypeRank(term) {
   return -1;
 }
 
+function logicAtomDisplayName(atom, table) {
+  if (!atom || atom.kind !== 'atom') return '';
+  if (atom.name != null) return atom.name;
+  if (atom.id != null) return table.name(atom.id);
+  return '';
+}
+
 function logicCompareTerms(a, b, env, table) {
   const da = logicDeref(a, env);
   const db = logicDeref(b, env);
@@ -1828,8 +1962,8 @@ function logicCompareTerms(a, b, env, table) {
   if (ra !== rb) return ra - rb;
   if (da.kind === 'number') return da.value - db.value;
   if (da.kind === 'atom') {
-    const na = table.name(da.id);
-    const nb = table.name(db.id);
+    const na = logicAtomDisplayName(da, table);
+    const nb = logicAtomDisplayName(db, table);
     if (na < nb) return -1;
     if (na > nb) return 1;
     return 0;
@@ -2210,6 +2344,66 @@ function logicVarNamesInTerm(term) {
   return names;
 }
 
+function logicCollectFreeVarsInTerm(term) {
+  const names = [];
+  const seen = new Set();
+  function walk(t) {
+    if (!t) return;
+    if (t.kind === 'var' && t.name !== '_') {
+      if (!seen.has(t.name)) {
+        seen.add(t.name);
+        names.push(t.name);
+      }
+      return;
+    }
+    if (t.kind === 'compound') {
+      for (const a of t.args || []) walk(a);
+    } else if (t.kind === 'list' && !t.nil) {
+      walk(t.head);
+      walk(t.tail);
+    } else if (t.kind === 'arith') {
+      walk(t.left);
+      walk(t.right);
+    }
+  }
+  walk(term);
+  return names;
+}
+
+function logicExistentialVarsForBagof(template, innerGoal, env) {
+  const templateVars = new Set(logicCollectFreeVarsInTerm(logicDeref(template, env)));
+  return logicCollectFreeVarsInGoal(innerGoal).filter((v) => {
+    if (templateVars.has(v)) return false;
+    return logicDeref({ kind: 'var', name: v }, env).kind === 'var';
+  });
+}
+
+function logicBagofBindingsEqual(a, b, env, table) {
+  const keysA = Object.keys(a || {});
+  const keysB = Object.keys(b || {});
+  if (keysA.length !== keysB.length) return false;
+  for (const k of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (logicCompareTerms(a[k], b[k], env, table) !== 0) return false;
+  }
+  return true;
+}
+
+function logicSetofUniqueSort(items, env, table) {
+  const unique = [];
+  for (const item of items || []) {
+    let dup = false;
+    for (const u of unique) {
+      if (logicCompareTerms(item, u, env, table) === 0) {
+        dup = true;
+        break;
+      }
+    }
+    if (!dup) unique.push(item);
+  }
+  return unique.slice().sort((a, b) => logicCompareTerms(a, b, env, table));
+}
+
 function logicTermVarByName(term, varName) {
   let found = null;
   function walk(t) {
@@ -2355,7 +2549,7 @@ function logicResolveTerm(term, env, table) {
   const d = logicDeref(term, env);
   if (d.kind === 'number') return { kind: 'number', value: d.value };
   if (d.kind === 'atom') {
-    const r = { kind: 'atom', name: table.name(d.id) };
+    const r = { kind: 'atom', name: logicAtomDisplayName(d, table) };
     if (d.logicTraceAsString) r.logicTraceAsString = true;
     return r;
   }

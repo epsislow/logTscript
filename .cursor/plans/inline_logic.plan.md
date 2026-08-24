@@ -133,7 +133,7 @@ todos:
     status: completed
   - id: logic-list-35i
     content: "F35i: findall/3, bagof/3, setof/3 — teste 3980+"
-    status: pending
+    status: completed
   - id: logic-list-35j
     content: "F35j: length/2 generativ + nth1/4 — teste 3990+"
     status: pending
@@ -8133,7 +8133,7 @@ Mică–medie (~1–2 zile) — un builtin impur + seed + teste; fără float.
 
 ---
 
-### F35i — findall / bagof / setof
+### F35i — findall / bagof / setof **(completed)**
 
 | Predicate | Semnificație |
 | --------- | ------------ |
@@ -8244,7 +8244,7 @@ comp [logic] .mapLogic:
 - [x] **F35f** — `call/1` + 4 builtins filtrare
 - [x] **F35g** — maplist/2, maplist/3
 - [x] **F35h** — foldl/4, foldl/5
-- [ ] **F35i** — findall, bagof, setof
+- [x] **F35i** — findall, bagof, setof
 - [ ] **F35j** — length generativ + nth1/4
 - [ ] Doc EN complet + verify după fiecare subfază
 

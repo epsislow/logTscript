@@ -44186,5 +44186,228 @@ comp [logic] .mathLogic:
   reg(4030, 'logic', 'F35h maplist regression (legacy)', runF35hMaplistRegression);
   reg(4031, 'logic', 'F35h maplist regression (wave)', runF35hMaplistRegression, { propagation: 'wave' });
 
+  reg(4032, 'logic', 'findall/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved findall',
+      function() { parseLogicBody('findall(X, Y, Z) <- X = Y'); },
+      "'findall/3' is reserved",
+    );
+  });
+
+  reg(4033, 'logic', 'bagof/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved bagof',
+      function() { parseLogicBody('bagof(X, Y, Z) <- X = Y'); },
+      "'bagof/3' is reserved",
+    );
+  });
+
+  reg(4034, 'logic', 'setof/3 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved setof',
+      function() { parseLogicBody('setof(X, Y, Z) <- X = Y'); },
+      "'setof/3' is reserved",
+    );
+  });
+
+  reg(4035, 'logic', 'findall/3 collects all solutions', function(h) {
+    const prog = parseLogicBody('query q: findall(X, member(X, [a, b, c]), L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first a', sols[0].L.head.name, 'a');
+    h.assert('second b', sols[0].L.tail.head.name, 'b');
+    h.assert('third c', sols[0].L.tail.tail.head.name, 'c');
+    h.assert('nil', sols[0].L.tail.tail.tail.nil, true);
+  });
+  reg(4036, 'logic', 'findall/3 collects all solutions (wave)', function(h) {
+    const prog = parseLogicBody('query q: findall(X, member(X, [a, b, c]), L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('third c', sols[0].L.tail.tail.head.name, 'c');
+  }, { propagation: 'wave' });
+
+  reg(4037, 'logic', 'findall/3 empty goal yields empty list', function(h) {
+    const prog = parseLogicBody('query q: findall(X, member(X, []), L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('empty', sols[0].L.nil, true);
+  });
+
+  reg(4038, 'logic', 'bagof/3 empty goal fails', function(h) {
+    const prog = parseLogicBody('query bad: bagof(X, member(X, []), L)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4039, 'logic', 'setof/3 empty goal fails', function(h) {
+    const prog = parseLogicBody('query bad: setof(X, member(X, []), L)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4040, 'logic', 'findall/3 template with compound', function(h) {
+    const prog = parseLogicBody('query q: findall(tag(X), member(X, [red, blue]), L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first tag red', sols[0].L.head.predicate, 'tag');
+    h.assert('first arg red', sols[0].L.head.args[0].name, 'red');
+    h.assert('second tag blue', sols[0].L.tail.head.args[0].name, 'blue');
+  });
+
+  const likesProg = 'likes(mary, food)\nlikes(mary, wine)\nlikes(john, beer)\n';
+
+  reg(4041, 'logic', 'findall/3 ignores existential vars in goal', function(h) {
+    const prog = parseLogicBody(likesProg + 'query q: findall(D, likes(A, D), L)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('first food', sols[0].L.head.name, 'food');
+    h.assert('second wine', sols[0].L.tail.head.name, 'wine');
+    h.assert('third beer', sols[0].L.tail.tail.head.name, 'beer');
+  });
+
+  reg(4042, 'logic', 'bagof/3 groups by existential vars', function(h) {
+    const prog = parseLogicBody(likesProg + 'query q: bagof(D, likes(A, D), L)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('two sols', String(sols.length), '2');
+    h.assert('mary', sols[0].A.name, 'mary');
+    h.assert('mary food', sols[0].L.head.name, 'food');
+    h.assert('mary wine', sols[0].L.tail.head.name, 'wine');
+    h.assert('john', sols[1].A.name, 'john');
+    h.assert('john beer', sols[1].L.head.name, 'beer');
+  });
+  reg(4043, 'logic', 'bagof/3 groups by existential vars (wave)', function(h) {
+    const prog = parseLogicBody(likesProg + 'query q: bagof(D, likes(A, D), L)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('two sols', String(sols.length), '2');
+    h.assert('john beer', sols[1].L.head.name, 'beer');
+  }, { propagation: 'wave' });
+
+  reg(4044, 'logic', 'setof/3 unique sorted list', function(h) {
+    const prog = parseLogicBody('query q: setof(X, member(X, [c, a, b, a]), L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('a', sols[0].L.head.name, 'a');
+    h.assert('b', sols[0].L.tail.head.name, 'b');
+    h.assert('c', sols[0].L.tail.tail.head.name, 'c');
+  });
+  reg(4045, 'logic', 'setof/3 unique sorted list (wave)', function(h) {
+    const prog = parseLogicBody('query q: setof(X, member(X, [c, a, b, a]), L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('sorted c last', sols[0].L.tail.tail.head.name, 'c');
+  }, { propagation: 'wave' });
+
+  reg(4046, 'logic', 'bagof/3 bound existential var single group', function(h) {
+    const prog = parseLogicBody(likesProg + 'query q: A = mary, bagof(D, likes(A, D), L)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('mary food wine', sols[0].L.head.name, 'food');
+    h.assert('second wine', sols[0].L.tail.head.name, 'wine');
+  });
+
+  function runF35iFindallComp(h, session) {
+    const src = `inline [logic] .party:
+
+    likes(mary, food)
+    likes(mary, wine)
+    likes(john, beer)
+
+    query everyone:
+        findall(P, likes(P, _), People),
+        show(People)
+
+:
+
+comp [logic] .partyLogic:
+    on: 1
+    .party { }
+:
+
+1wire trigger = 1
+
+.partyLogic:{
+    query = everyone
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('mary', String(session.outIncludes(interp, 'mary')), 'true');
+    h.assert('john', String(session.outIncludes(interp, 'john')), 'true');
+  }
+
+  reg(4047, 'logic', 'F35i findall comp show (legacy)', runF35iFindallComp);
+  reg(4048, 'logic', 'F35i findall comp show (wave)', runF35iFindallComp, { propagation: 'wave' });
+
+  function runF35iBagofComp(h, session) {
+    const src = `inline [logic] .party:
+
+    likes(mary, food)
+    likes(mary, wine)
+    likes(john, beer)
+
+    query byPerson:
+        bagof(Item, likes(Person, Item), Items),
+        show(Person),
+        show(Items)
+
+:
+
+comp [logic] .partyLogic:
+    on: 1
+    .party { }
+:
+
+1wire trigger = 1
+
+.partyLogic:{
+    query = byPerson
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('mary', String(session.outIncludes(interp, 'mary')), 'true');
+    h.assert('food', String(session.outIncludes(interp, 'food')), 'true');
+    h.assert('john', String(session.outIncludes(interp, 'john')), 'true');
+    h.assert('beer', String(session.outIncludes(interp, 'beer')), 'true');
+  }
+
+  reg(4049, 'logic', 'F35i bagof comp show (legacy)', runF35iBagofComp);
+  reg(4050, 'logic', 'F35i bagof comp show (wave)', runF35iBagofComp, { propagation: 'wave' });
+
+  function runF35iFoldlRegression(h, session) {
+    const src = `inline [logic] .stats:
+
+    plus(A, B, C) <- C is A + B
+
+    query total:
+        foldl(plus(A, X, C), [1, 2, 3, 4], 0, S),
+        show(S)
+
+:
+
+comp [logic] .statsLogic:
+    on: 1
+    .stats { }
+:
+
+1wire trigger = 1
+
+.statsLogic:{
+    query = total
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sum 10', String(session.outIncludes(interp, '10')), 'true');
+  }
+
+  reg(4051, 'logic', 'F35i foldl regression (legacy)', runF35iFoldlRegression);
+  reg(4052, 'logic', 'F35i foldl regression (wave)', runF35iFoldlRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
