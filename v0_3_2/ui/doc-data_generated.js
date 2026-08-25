@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -20647,7 +20647,8 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | \`true\` / \`fail\` | **\`true/0\`**, **\`fail/0\`** — reserved builtins ([logic-builtins.md](logic-builtins.md#true0-and-fail0)) |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms \`'John'\` | Use **\`"John"\`** string literals (show labels) or lowercase atoms |
-| Arbitrary arity / DCG / modules | Single inline namespace + \`use\` merge |
+| Arbitrary arity / modules | Single inline namespace + \`use\` merge |
+| **DCG** \`name(Args) --> …\` | Supported — see [logic-dcg.md](logic-dcg.md) |
 | Top-level consult | **\`inline [logic]\`** + **\`comp [logic]\`** split |
 | Depth / solution limits | Configurable on **\`comp [logic]\`** — see [comp-logic.md](comp-logic.md) |
 
@@ -21183,7 +21184,7 @@ inline [logic] .world:
 | **\`append/3\`**, **\`member/2\`**, **\`length/2\`**, … | Built-ins (reserved names) |
 | User **\`member/2\`** rule | **Not allowed** — use another name (\`userMember/2\`, …) |
 | **\`true\` / \`fail\`** goals | **\`true/0\`**, **\`fail/0\`** — see [logic-builtins.md — \`true/0\` · \`fail/0\`](logic-builtins.md#true0-and-fail0) |
-| DCG **\`NonTerminal --> …\`** | **Not supported** |
+| DCG **\`name(Args) --> …\`** | Supported — [logic-dcg.md](logic-dcg.md) (\`{ … }\` for Prolog goals) |
 | Open / partial lists in **\`reverse/2\`**, **\`sort/2\`**, **\`length/2\`** count | **Fail** until the spine is ground |
 | Cyclic **\`X = [X\\|_]\`** | **Fails** (occurs-check) |
 | Bare **\`[a,b]\`** as a goal | **Parse error** — wrap in **\`X = [a,b]\`** or pass to a predicate |
@@ -22245,6 +22246,7 @@ doc(.character)
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
 - **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
+- **DCG grammars** → [logic-dcg.md](logic-dcg.md)
 - Static vs dynamic KB, \`logic { + / - }\`, tombstones, **\`each\`** row expansion → [logic-runtime.md](logic-runtime.md)
 - Constraints \`<=\` vs rules \`<-\` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
@@ -27337,6 +27339,329 @@ Constraint and mutation results are intended to be **identical** under wave and 
 - [logic-runtime.md](logic-runtime.md) — mutations, tombstones, overlay
 - [inline-logic.md](inline-logic.md) — facts, rules, queries
 - [comp-logic.md](comp-logic.md) — exec block, redirects, \`mutationFailed\`
+`,
+    'logic-dcg.md': `# Logic DCG — definite clause grammars
+
+**Definite Clause Grammars (DCG)** in \`inline [logic]\` describe how to **consume** or **generate** lists of tokens. Rules use the neck **\`-->\`** (distinct from derivation rules **\`<-\`**).
+
+Related: [inline-logic.md](inline-logic.md) (general syntax) · [logic-builtins.md](logic-builtins.md) (\`between/3\`, \`append/2\`, list builtins) · [comp-logic.md](comp-logic.md) (wiring queries)
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (\`on: 1\` on the component).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **DCG neck** | \`name(Args) --> Body\` |
+| **Normal rule** | \`name(Args) <- Body\` |
+| **Terminal** | \`[...]\` in body — consumes or generates list elements |
+| **Non-terminal** | \`nt(Args)\` in body (no braces) — calls another DCG rule |
+| **Prolog goal** | \`{ Goal }\` or \`{ G1, G2 }\` — **must** be braced; does **not** consume the list |
+| **Expansion** | Each DCG rule becomes a normal rule with **two extra list arguments** (input position, remainder) |
+| **MVP head arity** | At most **one** visible argument in the DCG head (equivalent to \`//0\` or \`//1\`) |
+| **Reserved** | You cannot define a normal rule whose head matches an **expanded** DCG predicate (e.g. \`digits/3\` after \`digits([D\\|Ds]) --> …\`) |
+
+---
+
+## \`-->\` vs \`<-\`
+
+| Construct | Neck | Role |
+|-----------|------|------|
+| **DCG rule** | \`-->\` | Grammar — terminals and non-terminals over a list |
+| **Logic rule** | \`<-\` | Derivation — ordinary Prolog-style clauses |
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    is_digit(D) <- between(0, 9, D)
+
+:
+\`\`\`
+
+---
+
+## What consumes the list?
+
+| Body fragment | Consumes? | Example |
+|---------------|-----------|---------|
+| \`[D]\` | **Yes** — one element | \`digit(D) --> [D], { between(0, 9, D) }\` |
+| \`[a, b]\` | **Yes** — sequence | \`ab --> [a], [b]\` |
+| \`[]\` | **Yes** — empty (no elements) | \`empty --> []\` |
+| \`digits(Ds)\` | **Yes** — via the called DCG rule | recursive \`digits(Ds)\` |
+| \`{ between(0, 9, D) }\` | **No** — Prolog goal only | constraint on a digit |
+| \`{ G1, G2 }\` | **No** — goal sequence | \`{ between(0, 9, D), D > 5 }\` |
+
+**Prolog goals in the DCG body must appear inside \`{ … }\`.** A bare \`between(0, 9, D)\` is treated as a non-terminal call; if no DCG rule exists for that name and arity, elaboration fails.
+
+---
+
+## Expansion and calling grammars
+
+DCG rules are **compiled** to ordinary logic rules with **two additional list arguments** at the end (input list position and remainder). You do not write these in the DCG source; they are inserted at compile time.
+
+| DCG source (what you write) | Expanded predicate (conceptual) |
+|-----------------------------|----------------------------------|
+| \`digits([]) --> []\` | \`digits([], L, L)\` |
+| \`digits([D \\| Ds]) --> …\` | \`digits([D \\| Ds], L0, L)\` |
+
+To **parse** a closed input list, call the expanded predicate with the same list twice and an empty remainder:
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query parseClosed:
+        digits([1, 2, 3], [1, 2, 3], []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parseClosed
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`ok\`** when the list is fully consumed.
+
+---
+
+## Base case \`digits([]) --> []\`
+
+The empty-list clause closes recursion:
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    digits([]) --> []
+
+    query emptyOk:
+        digits([], [], []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = emptyOk
+    set = trigger
+}
+\`\`\`
+
+---
+
+## Terminals and non-terminals — \`kv\` with \`=\`
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    digit(D) --> [D], { between(0, 9, D) }
+
+    kv --> digit(K), [61], digit(V)
+
+    query parseKv:
+        kv([3, 61, 7], [3, 61, 7], []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parseKv
+    set = trigger
+}
+\`\`\`
+
+\`[61]\` is a **terminal** (the number code for \`=\`). \`digit(K)\` is a **non-terminal** DCG call.
+
+---
+
+## Multi-element terminal
+
+A single \`[a, b, c]\` terminal consumes three elements in order:
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    abc --> [a, b, c]
+
+    query match:
+        abc([a, b, c], [a, b, c], []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = match
+    set = trigger
+}
+\`\`\`
+
+---
+
+## Braced goal sequence \`{ G1, G2 }\`
+
+Multiple goals that do not consume the list can share one brace pair:
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    strong(D) --> [D], { between(0, 9, D), D > 5 }
+
+    query strongDigit:
+        strong([7], [7], []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = strongDigit
+    set = trigger
+}
+\`\`\`
+
+---
+
+## DCG and normal rules in one module
+
+DCG rules and \`<-\` rules can coexist. Normal rules are called from \`{ … }\` or from separate queries:
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    is_digit(D) <- between(0, 9, D)
+
+    query both:
+        digits([5], [5], []),
+        is_digit(5),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = both
+    set = trigger
+}
+\`\`\`
+
+---
+
+## Module loads with DCG — ordinary query still works
+
+A grammar does not block normal logic queries:
+
+\`\`\`logts-play
+inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    color(red)
+    color(green)
+
+    query colors:
+        member(C, [red, green, blue]),
+        show(C)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = colors
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`** and **\`green\`** (backtracking over \`member/2\`).
+
+---
+
+## Reserved expanded heads
+
+If you define \`digits([D | Ds]) --> …\`, the expanded predicate **\`digits/3\`** is **reserved**. You cannot add a normal rule with the same name and arity. Elaboration fails with **\`'digits/3' is reserved\`**.
+
+\`\`\`logts
+inline [logic] .bad:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits(A, B, C) <- A = B
+
+:
+\`\`\`
+
+---
+
+## Limits (MVP)
+
+| Topic | Status |
+|-------|--------|
+| DCG head with **0 or 1** visible argument | Supported |
+| DCG head with **2+** visible arguments | Not supported |
+| \`{ … }\` SWI extras (freeze, meta) | Not supported |
+
+---
+
+## See also
+
+- [inline-logic.md](inline-logic.md) — facts, rules, queries
+- [logic-builtins.md](logic-builtins.md) — \`between/3\`, \`append/2\`, list predicates
+- [comp-logic.md](comp-logic.md) — \`comp [logic]\` pipeline
 `,
     'logic-indexing.md': `# Logic indexing — fact index and \`count/2\`
 

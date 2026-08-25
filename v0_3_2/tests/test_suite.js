@@ -45219,5 +45219,124 @@ comp [logic] .numsLogic:
     );
   });
 
+  reg(4141, 'logic', 'DCG parse clause and expand to /3', function(h) {
+    const prog = parseLogicBody([
+      'digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)',
+      'digits([])       --> []',
+    ].join('\n'));
+    const digitsRules = prog.clauses.filter((c) => c.head.predicate === 'digits' && c.head.args.length === 3);
+    h.assert('two expanded rules', String(digitsRules.length), '2');
+    const emptyRule = digitsRules.find((c) => c.head.args[0].nil);
+    h.assert('empty head rule', String(!!emptyRule), 'true');
+    h.assert('empty body goals', String(emptyRule.body.length), '1');
+    h.assert('empty unify', String(emptyRule.body[0].kind === 'unify'), 'true');
+    const consRule = digitsRules.find((c) => !c.head.args[0].nil);
+    h.assert('cons head rule', String(!!consRule), 'true');
+    const betweenCall = consRule.body.find((g) => g.kind === 'call' && g.predicate === 'between');
+    h.assert('between in expanded body', String(!!betweenCall), 'true');
+    const digitsCall = consRule.body.find((g) => g.kind === 'call' && g.predicate === 'digits');
+    h.assert('recursive digits call', String(!!digitsCall), 'true');
+    h.assert('digits call arity 3', String(digitsCall.args.length), '3');
+  });
+
+  reg(4142, 'logic', 'DCG expand //0 equivalent digits([])', function(h) {
+    const prog = parseLogicBody('digits([]) --> []');
+    const rule = prog.clauses.find((c) => c.head.predicate === 'digits');
+    h.assert('expanded arity 3', String(rule.head.args.length), '3');
+    h.assert('nil head arg', String(rule.head.args[0].nil), 'true');
+    h.assert('one body goal', String(rule.body.length), '1');
+    h.assert('list close unify', String(rule.body[0].kind === 'unify'), 'true');
+  });
+
+  reg(4143, 'logic', 'DCG expand //1 terminal chain', function(h) {
+    const prog = parseLogicBody('tok([A, B]) --> [a], [b]');
+    const rule = prog.clauses.find((c) => c.head.predicate === 'tok');
+    h.assert('expanded', String(rule.head.args.length === 3), 'true');
+    const unifies = rule.body.filter((g) => g.kind === 'unify');
+    h.assert('two terminal unifies', String(unifies.length), '2');
+  });
+
+  reg(4144, 'logic', 'DCG goal without braces parse error', function(h) {
+    h.assertThrows(
+      'braced required',
+      () => parseLogicBody('digit(D) --> [D], between(0, 9, D)'),
+      'DCG goal must be braced',
+    );
+  });
+
+  function runLogicDcgDigitsParse(h, session) {
+    const src = `inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query parseClosed:
+        digits([1, 2, 3], [1, 2, 3], []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parseClosed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('success', String(session.outIncludes(interp, 'ok')), 'true');
+  }
+
+  reg(4145, 'logic', 'DCG expanded digits parse closed (legacy)', runLogicDcgDigitsParse);
+  reg(4146, 'logic', 'DCG expanded digits parse closed (wave)', runLogicDcgDigitsParse, { propagation: 'wave' });
+
+  function runLogicDcgCoexist(h, session) {
+    const src = `inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    is_digit(D) <- between(0, 9, D)
+
+    query both:
+        digits([5], [5], []),
+        is_digit(5),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = both
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', String(session.outIncludes(interp, 'ok')), 'true');
+  }
+
+  reg(4147, 'logic', 'DCG coexists with normal rules (legacy)', runLogicDcgCoexist);
+  reg(4148, 'logic', 'DCG coexists with normal rules (wave)', runLogicDcgCoexist, { propagation: 'wave' });
+
+  reg(4159, 'logic', 'DCG expanded predicate head reserved', function(h) {
+    h.assertThrows(
+      'reserved digits/3',
+      () => parseLogicBody([
+        'digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)',
+        'digits(A, B, C) <- A = B',
+      ].join('\n')),
+      "'digits/3' is reserved",
+    );
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

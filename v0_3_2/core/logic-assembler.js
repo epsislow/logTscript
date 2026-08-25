@@ -168,6 +168,11 @@ function logicTokenize(src) {
     if (ch === '!') {
       tokens.push({ type: 'BANG', value: '!', line: startLine }); i++; continue;
     }
+    if (ch === '{') { tokens.push({ type: 'LBRACE', value: '{', line: startLine }); i++; continue; }
+    if (ch === '}') { tokens.push({ type: 'RBRACE', value: '}', line: startLine }); i++; continue; }
+    if (ch === '-' && src[i + 1] === '-' && src[i + 2] === '>') {
+      tokens.push({ type: 'DCG_ARROW', value: '-->', line: startLine }); i += 3; continue;
+    }
     if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
       tokens.push({ type: 'OP', value: ch, line: startLine }); i++; continue;
     }
@@ -311,13 +316,84 @@ class LogicParser {
 
   parseClause() {
     const line = this.peek().line;
-    const head = this.parseCompound();
+    let predicate = this.expect('ID').value;
+    while (this.at('DOT')) {
+      this.advance();
+      if (!this.at('ID')) {
+        logicError('expected predicate name after .', this.peek().line);
+      }
+      predicate += '.' + this.advance().value;
+    }
+    let head;
     let body = [];
-    if (this.at('ARROW')) {
+    let dcg = false;
+    if (this.at('LP')) {
+      this.expect('LP');
+      const args = [];
+      if (!this.at('RP')) {
+        args.push(this.parseTerm());
+        while (this.at('COMMA')) {
+          this.advance();
+          args.push(this.parseTerm());
+        }
+      }
+      this.expect('RP');
+      head = { kind: 'compound', predicate, args };
+    } else if (this.at('DCG_ARROW')) {
+      head = { kind: 'compound', predicate, args: [] };
+    } else {
+      logicError('expected (', this.peek().line);
+    }
+    if (this.at('DCG_ARROW')) {
+      this.advance();
+      dcg = true;
+      body = this.parseDcgBodyGoals();
+    } else if (this.at('ARROW')) {
       this.advance();
       body = this.parseBodyGoals();
     }
-    return { head, body, line };
+    return { head, body, line, dcg };
+  }
+
+  parseDcgBodyGoals() {
+    const goals = [];
+    if (this.at('EOF')) return goals;
+    goals.push(this.parseDcgBodyItem());
+    while (this.at('COMMA')) {
+      this.advance();
+      goals.push(this.parseDcgBodyItem());
+    }
+    return goals;
+  }
+
+  parseDcgBodyItem() {
+    if (this.at('LBRACE')) {
+      return this.parseDcgBracedGoals();
+    }
+    if (this.at('LBRACKET')) {
+      const list = this.parseList();
+      return { kind: 'dcg_terminal', list };
+    }
+    if (this.looksLikeCompound()) {
+      const compound = this.parseCompound();
+      return { kind: 'dcg_nt', compound };
+    }
+    logicError('DCG goal must be braced: { ... }', this.peek().line);
+  }
+
+  parseDcgBracedGoals() {
+    const line = this.peek().line;
+    this.expect('LBRACE');
+    const goals = [];
+    if (!this.at('RBRACE')) {
+      goals.push(this.parseBodyGoal());
+      while (this.at('COMMA')) {
+        this.advance();
+        goals.push(this.parseBodyGoal());
+      }
+    }
+    this.expect('RBRACE');
+    return { kind: 'dcg_brace', goals, line };
   }
 
   parseBodyGoals() {
@@ -569,10 +645,256 @@ class LogicParser {
   }
 }
 
+let logicDcgExpandVarSerial = 0;
+
+function logicDcgNextVar() {
+  logicDcgExpandVarSerial += 1;
+  return { kind: 'var', name: '__DCG' + logicDcgExpandVarSerial };
+}
+
+function logicCloneTerm(term) {
+  if (!term) return term;
+  if (term.kind === 'var') return { kind: 'var', name: term.name };
+  if (term.kind === 'atom') {
+    const r = { kind: 'atom', name: term.name };
+    if (term.logicTraceAsString) r.logicTraceAsString = true;
+    return r;
+  }
+  if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      args: (term.args || []).map(logicCloneTerm),
+    };
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicCloneTerm(term.head),
+      tail: logicCloneTerm(term.tail),
+    };
+  }
+  if (term.kind === 'dif_list') {
+    return {
+      kind: 'dif_list',
+      front: logicCloneTerm(term.front),
+      hole: logicCloneTerm(term.hole),
+    };
+  }
+  if (term.kind === 'arith') {
+    return {
+      kind: 'arith',
+      op: term.op,
+      left: logicCloneTerm(term.left),
+      right: logicCloneTerm(term.right),
+    };
+  }
+  return term;
+}
+
+function logicCloneGoal(goal) {
+  if (!goal) return goal;
+  if (goal.kind === 'not') return { kind: 'not', goal: logicCloneGoal(goal.goal) };
+  if (goal.kind === 'cut') return { kind: 'cut' };
+  if (goal.kind === 'call') {
+    return {
+      kind: 'call',
+      predicate: goal.predicate,
+      args: (goal.args || []).map(logicCloneTerm),
+    };
+  }
+  if (goal.kind === 'cmp') {
+    return {
+      kind: 'cmp',
+      op: goal.op,
+      left: logicCloneTerm(goal.left),
+      right: logicCloneTerm(goal.right),
+    };
+  }
+  if (goal.kind === 'unify') {
+    return {
+      kind: 'unify',
+      left: logicCloneTerm(goal.left),
+      right: logicCloneTerm(goal.right),
+    };
+  }
+  if (goal.kind === 'is') {
+    return {
+      kind: 'is',
+      left: logicCloneTerm(goal.left),
+      right: logicCloneTerm(goal.right),
+    };
+  }
+  return goal;
+}
+
+function logicDcgVisibleArity(head) {
+  return (head && head.args) ? head.args.length : 0;
+}
+
+function logicDcgExpandedArity(visibleArity) {
+  return visibleArity + 2;
+}
+
+function logicCollectDcgReservedArities(clauses) {
+  const map = new Map();
+  for (const c of clauses || []) {
+    if (!c.dcg) continue;
+    const pred = c.head.predicate;
+    const vis = logicDcgVisibleArity(c.head);
+    if (vis > 1) {
+      logicError('DCG head must have at most 1 visible argument', c.line);
+    }
+    const expArity = logicDcgExpandedArity(vis);
+    if (!map.has(pred)) map.set(pred, new Set());
+    map.get(pred).add(expArity);
+  }
+  return map;
+}
+
+function logicDcgReservedHeadError(predicate, arity) {
+  return `'${predicate}/${arity}' is reserved — cannot define ${predicate} as fact or rule head`;
+}
+
+function logicValidateDcgReservedHeads(clauses, reservedMap) {
+  for (const c of clauses || []) {
+    if (c.dcg) continue;
+    if (!c.head || c.head.kind !== 'compound') continue;
+    const pred = c.head.predicate;
+    const arity = logicDcgVisibleArity(c.head);
+    const reserved = reservedMap.get(pred);
+    if (reserved && reserved.has(arity)) {
+      logicError(logicDcgReservedHeadError(pred, arity), c.line);
+    }
+  }
+}
+
+function logicExpandDcgTerminal(listTerm, inVar, outVar) {
+  const goals = [];
+  if (!listTerm || listTerm.nil) {
+    goals.push({ kind: 'unify', left: logicCloneTerm(inVar), right: logicCloneTerm(outVar) });
+    return goals;
+  }
+  let curIn = inVar;
+  let cur = listTerm;
+  while (cur && !cur.nil) {
+    const tailIsNil = !cur.tail || cur.tail.nil;
+    const nextVar = tailIsNil ? outVar : logicDcgNextVar();
+    goals.push({
+      kind: 'unify',
+      left: logicCloneTerm(curIn),
+      right: {
+        kind: 'list',
+        head: logicCloneTerm(cur.head),
+        tail: logicCloneTerm(nextVar),
+      },
+    });
+    if (tailIsNil) break;
+    curIn = nextVar;
+    cur = cur.tail;
+  }
+  return goals;
+}
+
+function logicExpandDcgBodyItems(items, s0, sEnd) {
+  const goals = [];
+  let cur = s0;
+  for (let i = 0; i < (items || []).length; i++) {
+    const item = items[i];
+    const isLast = i === items.length - 1;
+    if (item.kind === 'dcg_brace') {
+      for (const g of item.goals || []) goals.push(logicCloneGoal(g));
+      continue;
+    }
+    const next = isLast ? sEnd : logicDcgNextVar();
+    if (item.kind === 'dcg_terminal') {
+      goals.push(...logicExpandDcgTerminal(item.list, cur, next));
+    } else if (item.kind === 'dcg_nt') {
+      const comp = item.compound;
+      goals.push({
+        kind: 'call',
+        predicate: comp.predicate,
+        args: [...(comp.args || []).map(logicCloneTerm), logicCloneTerm(cur), logicCloneTerm(next)],
+      });
+    }
+    cur = next;
+  }
+  if (!items || !items.length) {
+    goals.push({ kind: 'unify', left: logicCloneTerm(s0), right: logicCloneTerm(sEnd) });
+  }
+  return goals;
+}
+
+function logicExpandDcgClause(clause) {
+  const visibleArgs = (clause.head.args || []).map(logicCloneTerm);
+  const s0 = logicDcgNextVar();
+  const sEnd = logicDcgNextVar();
+  const head = {
+    kind: 'compound',
+    predicate: clause.head.predicate,
+    args: [...visibleArgs, s0, sEnd],
+  };
+  const body = logicExpandDcgBodyItems(clause.body, s0, sEnd);
+  return { head, body, line: clause.line };
+}
+
+function logicBuildDcgNonTerminalIndex(clauses) {
+  const map = new Map();
+  for (const c of clauses || []) {
+    if (!c.dcg) continue;
+    const pred = c.head.predicate;
+    const vis = logicDcgVisibleArity(c.head);
+    if (!map.has(pred)) map.set(pred, new Set());
+    map.get(pred).add(vis);
+  }
+  return map;
+}
+
+function logicValidateDcgBodyItems(items, ntIndex, line) {
+  for (const item of items || []) {
+    if (item.kind === 'dcg_brace' || item.kind === 'dcg_terminal') continue;
+    if (item.kind === 'dcg_nt') {
+      const pred = item.compound.predicate;
+      const vis = (item.compound.args || []).length;
+      const arities = ntIndex.get(pred);
+      if (!arities || !arities.has(vis)) {
+        logicError('DCG goal must be braced: { ... }', line);
+      }
+    }
+  }
+}
+
+function logicValidateDcgBodies(clauses, ntIndex) {
+  for (const c of clauses || []) {
+    if (!c.dcg) continue;
+    logicValidateDcgBodyItems(c.body, ntIndex, c.line);
+  }
+}
+
+function logicExpandDcgProgram(prog) {
+  logicDcgExpandVarSerial = 0;
+  const clauses = prog.clauses || [];
+  const ntIndex = logicBuildDcgNonTerminalIndex(clauses);
+  logicValidateDcgBodies(clauses, ntIndex);
+  const reservedMap = logicCollectDcgReservedArities(clauses);
+  logicValidateDcgReservedHeads(clauses, reservedMap);
+  const out = [];
+  for (const c of clauses) {
+    if (c.dcg) out.push(logicExpandDcgClause(c));
+    else out.push(c);
+  }
+  prog.clauses = out;
+  prog.dcgReservedArities = reservedMap;
+  return prog;
+}
+
 function parseLogicBody(bodyRaw) {
   const src = bodyRaw == null ? '' : String(bodyRaw);
   const tokens = logicTokenize(src);
   const parsed = new LogicParser(tokens).parseProgram();
+  logicExpandDcgProgram(parsed);
   logicValidateProgram(parsed);
   return parsed;
 }

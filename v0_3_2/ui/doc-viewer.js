@@ -162,6 +162,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
       { file: 'chip-board-execution.md', label: 'Chip and board execution' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
+      { file: 'logic-dcg.md', label: 'Logic DCG — definite clause grammars' },
       { file: 'logic-indexing.md', label: 'Logic indexing — fact index and `count/2`' },
       { file: 'logic-query-exec.md', label: 'Inline logic query — `.world:query({ })`' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },

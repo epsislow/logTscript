@@ -72,7 +72,8 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | `true` / `fail` | **`true/0`**, **`fail/0`** — reserved builtins ([logic-builtins.md](logic-builtins.md#true0-and-fail0)) |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms `'John'` | Use **`"John"`** string literals (show labels) or lowercase atoms |
-| Arbitrary arity / DCG / modules | Single inline namespace + `use` merge |
+| Arbitrary arity / modules | Single inline namespace + `use` merge |
+| **DCG** `name(Args) --> …` | Supported — see [logic-dcg.md](logic-dcg.md) |
 | Top-level consult | **`inline [logic]`** + **`comp [logic]`** split |
 | Depth / solution limits | Configurable on **`comp [logic]`** — see [comp-logic.md](comp-logic.md) |
 
@@ -608,7 +609,7 @@ inline [logic] .world:
 | **`append/3`**, **`member/2`**, **`length/2`**, … | Built-ins (reserved names) |
 | User **`member/2`** rule | **Not allowed** — use another name (`userMember/2`, …) |
 | **`true` / `fail`** goals | **`true/0`**, **`fail/0`** — see [logic-builtins.md — `true/0` · `fail/0`](logic-builtins.md#true0-and-fail0) |
-| DCG **`NonTerminal --> …`** | **Not supported** |
+| DCG **`name(Args) --> …`** | Supported — [logic-dcg.md](logic-dcg.md) (`{ … }` for Prolog goals) |
 | Open / partial lists in **`reverse/2`**, **`sort/2`**, **`length/2`** count | **Fail** until the spine is ground |
 | Cyclic **`X = [X\|_]`** | **Fails** (occurs-check) |
 | Bare **`[a,b]`** as a goal | **Parse error** — wrap in **`X = [a,b]`** or pass to a predicate |
@@ -1670,6 +1671,7 @@ doc(.character)
 
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
 - **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
+- **DCG grammars** → [logic-dcg.md](logic-dcg.md)
 - Static vs dynamic KB, `logic { + / - }`, tombstones, **`each`** row expansion → [logic-runtime.md](logic-runtime.md)
 - Constraints `<=` vs rules `<-` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — `inline.type{logic}`

@@ -156,7 +156,7 @@ todos:
     content: "Faza amânată 2+j: lazy streams/I/O — promovat din F37c D296 (out of scope F37c)"
     status: pending
   - id: logic-dcg-2i
-    content: "Faza 38 (2+i): DCG — rule//, phrase/2, phrase/3 — după F37a; D290 out of scope F37"
+    content: "Faza 38 (2+i): DCG — D297–D304 confirmed; F38a parse+expand+doc logic-dcg (partea 1); F38b phrase+doc+teste"
     status: pending
 isProject: false
 ---
@@ -1419,8 +1419,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 34** Builtins random integer (**2+h**)           | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:` comp; fără float                              | **(completed)**        |
 | **Faza 35** Builtins listă suplimentare (**2+g**)       | **F35a…F35j** — catalog complet 2+g în 10 subfaze echilibrate (~2–4 zile/subfază)                                     | **(completed)** |
 | **Faza 36a** `true/0`, `fail/0`                         | —                                                                                                                     | **(completed)**   |
-| **Faza 37** Liste avansate Prolog (**2+e**)             | **F37a✅ F37b✅ F37c** — lazy + `between/3`; **D293–D296 confirmed** 2026-08-25 · **F37c next**                  | **(ready-to-implement)** |
-| **Faza 38** DCG Prolog (`phrase//`) (**2+i**)           | Draft — `rule//`, `phrase/2`, `phrase/3`; **depinde F37a** (dif-list); promovat din D290-B                        | **(deferred)**          |
+| **Faza 37** Liste avansate Prolog (**2+e**)             | **F37a✅ F37b✅ F37c✅** — D279–D296 confirmed |
+| **Faza 38** DCG Prolog (`phrase//`) (**2+i**)           | **D297–D304✅** confirmed — F38a→F38b — [Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement) | **(ready-to-implement)** |
 
 
 ---
@@ -6608,8 +6608,8 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
 | **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
 | ~~**Builtins listă** member/append~~           | ~~**2+d**~~ → **F27**                                       |
-| **Faza 37** liste avansate (**2+e**)           | **F37a✅ F37b✅ F37c** — D293–D296 **confirmed**; **F37c next** |
-| **Faza 38** DCG **`phrase//`** (**2+i**)       | **2+i** **(deferred)** — D290-B; D297+ la promovare; după F37a dif-list     |
+| **Faza 37** liste avansate (**2+e**)           | **F37a✅ F37b✅ F37c✅** — D279–D296 **confirmed** |
+| **Faza 38** DCG **`phrase//`** (**2+i**)       | **D297–D304✅** confirmed — **F38a next** — [Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement) |
 | **Lazy streams / I/O** (**2+j**)               | **2+j** **(deferred)** — out of scope **F37c** (D296); promovat din F37c     |
 | ~~**Builtins listă supl.**~~                   | ~~**2+g**~~ → **F35a…F35j** (catalog complet)               |
 | `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
@@ -6681,11 +6681,11 @@ Tabel master **2+a … 2+j** — faze **amânate** discutate/planificate, distin
 | ⏳     | **2+f**     | Cut în NAF — local cut      | `\+ (Goal, !)` — inner cut **contorizat** (ISO/SWI); F24 MVP = **eroare elaborare** dacă `!` apare în `\+ (…)` | —          | D149, F24                       |
 | ✅     | ~~**2+g**~~ | Builtins listă suplimentare | **Promovat → Faza 35** — catalog complet **F35a…F35j** (10 subfaze); vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g) | **F35**    | **2+d**, **F27**, F22–F23       |
 | ✅     | ~~**2+h**~~ | Builtins random (integer)   | **Promovat → Faza 34** — `random_between/3`, `set_random/1`, `randomSeed:`; vezi [Faza 34](#faza-34--builtins-random-integer-2h--completed) | **F34**    | F30 D203, Monopoly doc v2       |
-| ⏳     | **2+i**     | DCG Prolog                  | `rule//`, `phrase/2`, `phrase/3` — gramatici dif-list; **nu** în F37 (D290-B) → **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** | **F38**    | D290, F37a                      |
+| ⏳     | **2+i**     | DCG Prolog                  | **D297–D304✅** — F38a parse+expand, F38b `phrase/2,3` → **[Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement)** | **F38**    | D290, D297–D304, F37a |
 | ⏳     | **2+j**     | Lazy streams / I/O          | `lazy_read_lines`, lazy pe stream/file/wire, `lazy_findall`, engines — **out of scope F37c** (D296); promovat din **[F37c](#f37c--lazy-4121-post-f37b--d289-c)** | —          | D296, F37c, F22               |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34** · ~~**2+g**~~ **→ F35** · ~~**2+e**~~ **→ F37** · **F37c** next · **2+i** (DCG) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34** · ~~**2+g**~~ **→ F35** · ~~**2+e**~~ **→ F37✅** · **2+i → F38** (ready) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -6711,7 +6711,7 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2`. **F22** livrează termeni + reguli user (exemple doc); `nth0`**/**`nth1` → **F23** **(completed)**. User 2026-08-21: scope extins cu `length`, `reverse`, `sort`.
 
-#### ~~**2+e**~~ → **Faza 37** (liste avansate) **(F37a✅ F37b✅ — F37c next)**
+#### ~~**2+e**~~ → **Faza 37** (liste avansate) **(F37a✅ F37b✅ F37c✅)**
 
 **Promovat 2026-08-25** — vezi [Faza 37](#faza-37--liste-avansate-prolog-2e--f37c-next). **D279–D296 confirmed** (D293–D296 user 2026-08-25). **F37a✅ F37b✅** livrate; **F37c** următor.
 
@@ -6743,42 +6743,20 @@ Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`,
 
 #### **2+i** ⏳ → **Faza 38** (DCG Prolog)
 
-**Amânat** — promovat în backlog la confirmarea **D290-B** (DCG **out of scope F37**).
+**Amânat** — promovat la **D290-B** (DCG out of scope F37). **Secțiune completă:** [Faza 38 — DCG Prolog](#faza-38--dcg-prolog-phrase-2i--ready-to-implement) (**D297–D304✅** confirmed).
 
-**Ce este:** **Definite Clause Grammars** — sintaxă `Head//Arity`, expand la goals cu dif-list, builtins **`phrase/2`**, **`phrase/3`** (SWI).
+**Ce este:** **Definite Clause Grammars** — reguli **`-->`** (D297), expand intern cu args listă ascunși, builtins **`phrase/2`**, **`phrase/3`**.
 
-**De ce fază separată:** parser + assembler + engine (expand `//`, terminatori listă, dif-list în body DCG) — mult peste F37a/b; F37a livrează doar **primitivul** dif-list + `append/2`.
+**Dependență:** **F37a✅** (dif-list `L-H`, `append/2`).
 
-**Dependență:** **F37a** (dif-list `L-H`) — obligatoriu înainte de F38.
+**Status decizii:** **D297–D304✅** confirmed 2026-08-25 — **ready-to-implement** (F38a → F38b).
 
-**Scope draft (la promovare — decizii D297+):**
-
-| Livrabil | Descriere |
-| -------- | --------- |
-| `rule//` | Reguli DCG în inline logic (sintaxă `//` arity) |
-| Expand DCG | `a//0` → `a([], [])`; `a//1` → `a([H\|T], T)` pattern |
-| `phrase/2` | `phrase(Goal, List)` — parse/generate listă închisă |
-| `phrase/3` | `phrase(Goal, List, Rest)` — dif-list `List-Rest` |
-
-**Out of scope draft F38:** DCG pe wire/binary (protocol), `{}` semantica SWI extra, `call_dcg` meta.
-
-**Exemplu țintă (Prolog SWI — ce face F38):**
-
-```prolog
-% Regulă DCG
-digits([D|Ds]) --> [D], { between(0, 9, D) }, digits(Ds).
-digits([])     --> [].
-
-?- phrase(digits, [1,2,3], []).
-true.
-```
-
-**LogTScript țintă (sketch — după F37a+F38):**
+**Exemplu țintă LogTScript (D297-A):**
 
 ```logts
 inline [logic] .grammar:
 
-    digits([D | Ds]) --> [D], between(0, 9, D), digits(Ds)
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
     digits([])       --> []
 
     query parse123:
@@ -6786,10 +6764,18 @@ inline [logic] .grammar:
 
 :
 
-1wire ok = .grammar:query({ parse123 })
-```
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
 
-**Status:** ⏳ backlog **2+i** — **fără decizii D297+ încă**; secțiune completă la promovare (ca F37).
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parse123
+    set = trigger
+}
+```
 
 #### **2+j** ⏳ — Lazy streams / I/O (post-F37c)
 
@@ -6811,7 +6797,7 @@ inline [logic] .grammar:
 
 **Nu confunda cu:** **Faza 35** (builtins listă `numlist`, `member`, …) — alt scope; **2+j** vine din **F37c**, nu din F35.
 
-**Status:** ⏳ backlog **2+j** — fără decizii **D297+** încă (numerotare partajată cu F38 la promovare; F38 = DCG, **2+j** = streams).
+**Status:** ⏳ backlog **2+j** — fără decizii proprii încă (streams/I/O; separat de **Faza 38** DCG **D297–D304**).
 
 #### **2+g** ✅ → **Faza 35** (builtins listă suplimentare)
 
@@ -8393,13 +8379,13 @@ comp [logic] .mapLogic:
 
 ---
 
-## Faza 37 — Liste avansate Prolog (**2+e**) **(F37c next)**
+## Faza 37 — Liste avansate Prolog (**2+e**) **(completed)**
 
 > **Promovat:** 2026-08-25 — **2+e** → fază normală **F37** cu **3 subfaze** (**F37a…F37c**).  
 > **Decizii:** **D279–D296 confirmed** (D293–D296 user 2026-08-25).  
 > **Livrat:** **F37a✅** dif-list · **F37b✅** char/codes · **F37c** lazy + `between/3` — **următor pas implementare**.  
 > **Extinde:** [Faza 22](#faza-22--liste-prolog-completed) (cons + unificare), [Faza 27](#faza-27--builtins-listă--doc-logic-builtinsmd-completed) (`append/3`), [D136](#d136--out-of-scope-explicație).  
-> **Nu include:** DCG / `phrase//` (→ **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** / **2+i**, D290-B), lazy streams/I/O (→ **[2+j](#2j--lazy-streams--io-post-f37c)** / D296), unificare automată `"abc" = [97,98,99]` (D286-B), `append/3` schimbat.
+> **Nu include:** DCG / `phrase//` (→ **[Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement)** / **2+i**, D290-B), lazy streams/I/O (→ **[2+j](#2j--lazy-streams--io-post-f37c)** / D296), unificare automată `"abc" = [97,98,99]` (D286-B), `append/3` schimbat.
 
 ### Problemă (stare azi post-F37b)
 
@@ -8438,7 +8424,7 @@ comp [logic] .mapLogic:
 | **D287** | **Char-list MVP builtins** | ✅ **A** — SWI quartet `/2`, **bidirecțional** | **(confirmed)** |
 | **D288** | **Element char-list** | ✅ **A** — chars = atomi 1 char; codes = integer ASCII | **(confirmed)** |
 | **D289** | **Lazy list model** | ✅ **C** — **F37c după F37b**; `lazy_list/2` SWI-style când promovăm F37c | **(confirmed)** |
-| **D290** | **DCG `phrase//`** | ✅ **B** — out of scope F37 → backlog **[2+i](#2i--faza-38-dcg-prolog)** / **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** | **(confirmed)** |
+| **D290** | **DCG `phrase//`** | ✅ **B** — out of scope F37 → backlog **[2+i](#2i--faza-38-dcg-prolog)** / **[Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement)** | **(confirmed)** |
 | **D291** | **Head rezervat** | ✅ **A** — builtin call only (ca F27/F35) | **(confirmed)** |
 | **D292** | **Teste & livrare** | ✅ **A** — **4081+** F37a; **4095+** F37b; **4121+** F37c; doc EN per subfază | **(confirmed)** |
 | **D293** | **Lazy list model** | ✅ **D** — **hibrid B+A** (goal-template + regulă generator) | **(confirmed 2026-08-25)** |
@@ -8768,7 +8754,7 @@ X = 1 ; X = 2 ; X = 3.
 
 | Topic | Unde |
 | ----- | ---- |
-| DCG `rule//`, `-->`, `phrase/2`, `phrase/3` | **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** / **2+i** (D290) |
+| DCG `rule//`, `-->`, `phrase/2`, `phrase/3` | **[Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement)** / **2+i** (D290) |
 | Lazy streams / file / wire / `lazy_findall` | Backlog **[2+j](#2j--lazy-streams--io-post-f37c)** — promovat din F37c |
 | `maplist`/`sort` pe lazy infinit | **2+j** sau niciodată (documentat ca anti-pattern) |
 | `between/4`, `inf` High | post-F37c |
@@ -8785,7 +8771,7 @@ X = 1 ; X = 2 ; X = 3.
 | **B — doar primitiv dif-list ✓** | F37a pregătește terenul | **da** |
 | **C — DCG minimal** | doar `phrase/2` fără `//` | Jumătate măsură, tot mult |
 
-**Decizie:** **B** — F37 livrează **dif-list + append/2**; DCG → backlog **[2+i](#2i--faza-38-dcg-prolog)** promovat ca **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** (draft, decizii **D297+** la implementare).
+**Decizie:** **B** — F37 livrează **dif-list + append/2**; DCG → backlog **[2+i](#2i--faza-38-dcg-prolog)** promovat ca **[Faza 38](#faza-38--dcg-prolog-phrase-2i--ready-to-implement)** (**D297–D304✅**).
 
 ---
 
@@ -8874,12 +8860,12 @@ Medie–mare: **~1–2 săptămâni** (F37a+b); **+1 săptămână** dacă inclu
 
 ---
 
-## Faza 38 — DCG Prolog (`phrase//`) **2+i** **(deferred)**
+## Faza 38 — DCG Prolog (`phrase//`) **2+i** **(ready-to-implement)**
 
 > **Backlog:** **2+i** — promovat din **D290-B** (DCG out of scope F37).  
-> **Dependență:** **[F37a](#f37a)** dif-list (`L-H`, `append/2`) — obligatoriu.  
-> **Extinde:** [Faza 22](#faza-22--liste-prolog-completed), [Faza 37](#faza-37--liste-avansate-prolog-2e--ready--f37a-next).  
-> **Status:** ⏳ **deferred** — fără decizii **D297+** încă; secțiune completă la promovare (după F37a livrat).
+> **Dependență:** **F37a✅** dif-list (`L-H`, `append/2`) — îndeplinită.  
+> **Extinde:** [Faza 22](#faza-22--liste-prolog-completed), [Faza 37](#faza-37--liste-avansate-prolog-2e--completed).  
+> **Status:** **ready-to-implement** — **D297–D304✅** confirmed 2026-08-25; următor: **F38a** (parse `-->` + expand).
 
 ### Problemă (de ce nu e în F37)
 
@@ -8887,30 +8873,347 @@ Medie–mare: **~1–2 săptămâni** (F37a+b); **+1 săptămână** dacă inclu
 | ----- | ------------ | ---------- |
 | Dif-list `L-H` | ✅ F37a | folosit în `phrase/3` |
 | `append/2` dif-list | ✅ F37a | helper DCG |
-| Sintaxă `Head//N` | ❌ | parser + expand DCG |
+| Sintaxă **`Head --> Body`** | ❌ | parser DCG (distinct de `<-`) |
+| Expand intern `//` (hidden list args) | ❌ | la compile, după parse |
 | `phrase/2`, `phrase/3` | ❌ | builtins meta-parse |
-| Reguli `--> ` | ❌ | body DCG + terminatori listă |
+| Terminale `[...]` în body DCG | ❌ | consum/generare listă |
 
 **Motiv D290-B:** DCG = parser + assembler + expand + engine — fază proprie, nu sub-fază F37.
 
-### Scope draft (la promovare)
+### Scope (confirmat D297–D304)
 
-| Livrabil | Descriere |
-| -------- | --------- |
-| **`rule//`** | Predicate DCG: `name(Args) --> Body` |
-| **Expand `//`** | `p//0` → `p([], [])`; `p//1` → `p([Arg\|T], T)` |
-| **`phrase/2`** | `phrase(Goal, List)` — listă închisă |
-| **`phrase/3`** | `phrase(Goal, List, Rest)` — dif-list `List-Rest` |
+| Livrabil | Subfază | Descriere |
+| -------- | ------- | --------- |
+| **Reguli `-->`** | F38a | `name(Args) --> Body` — args Prolog în head (D297-A) |
+| **Body `{ }`** | F38a | Goals Prolog în `{}` obligatoriu (D299-B') |
+| **Expand intern** | F38a | DCG → predicate cu 2 args listă ascunși (D298); heads expandate rezervate (D301) |
+| **`logic-dcg.md` (partea 1)** | F38a | Pagină nouă — sintaxă, consum listă, exemple F38a (~8–10 `logts-play`) |
+| **`phrase/2`** | F38b | `phrase(Goal, List)` — listă închisă (D300) |
+| **`phrase/3`** | F38b | `phrase(Goal, List, Rest)` — dif-list `List-Rest` (D300) |
+| **`logic-dcg.md` (partea 2)** | F38b | `phrase/2`, `phrase/3`, parse+generate, dif-list rest (~10–12 `logts-play`) |
+| **Linkuri doc** | F38b | `inline-logic.md`, `logic-builtins.md`, `doc-viewer.js` |
+| **Teste 4141+** | F38a+b | legacy+wave (D303) — split pe subfaze |
 
-**Out of scope draft:** DCG binar/wire, `{}` SWI full, `call_dcg/2` meta (poate F38b).
+**Out of scope (D304):** DCG binar/wire, `{}` SWI full, `call_dcg/2` meta, `//2+` MVP.
+
+### Documentație — `logic-dcg.md` **(pagină nouă, livrare incrementală)**
+
+Model: ca **`logic-constraints.md`** — topic dedicat, nu secțiune în `logic-builtins.md`.
+
+**Fișier:** `[doc/logic-dcg.md](../v0_3_2/doc/logic-dcg.md)` — creat la **F38a**, extins la **F38b**.
+
+**Total țintă:** **~18–22** blocuri `logts-play` (nu doar 6) + verify `_verify_doc_examples.js logic-dcg`.
+
+#### F38a — ce intră în pagină (partea 1)
+
+| Secțiune | Conținut |
+| -------- | -------- |
+| Intro + quick reference | `-->` vs `<-`; tabel consum listă (`[...]` / NT / `{ }`) |
+| Reguli DCG | head cu args; `//0` / `//1` echivalent (fără notație `//` la user) |
+| Body B' | `{ between(0, 9, D) }`; `{ G1, G2 }`; eroare dacă goal fără `{}` |
+| Terminale | `[D]`, `[=]`, `[]`, liste mixte |
+| Non-terminale | `digits(Ds)` fără `{}` |
+| Coexistență D301 | DCG `-->` + reguli `<-` în același inline; reserved head expandat |
+| Out of scope (preview) | stub „phrase — F38b”; wire, `//2+`, `{}` SWI full |
+| Linkuri | `append/2` dif-list, `between/3` — [logic-builtins.md](../v0_3_2/doc/logic-builtins.md) |
+
+**Exemple `logts-play` F38a (~8–10)** — runnable unde se poate; restul erori de elaborare în teste suite:
+
+| # | Scenariu | Ce demonstrează |
+| - | -------- | --------------- |
+| 1 | `digits` minimal `//1` | regulă `-->` + `{ between }` + NT recursiv |
+| 2 | `digits([]) --> []` | echivalent `//0` |
+| 3 | terminale `pair` cu `=` | NT + terminal atom |
+| 4 | listă terminală multi-element `[1, 2, 3]` | consum secvențial |
+| 5 | `{ G1, G2 }` în același `{}` | secvență goals fără consum |
+| 6 | DCG + `<-` `is_digit` în același modul | D301 coexistență |
+| 7 | grammar + query normală (non-DCG) | DCG nu strică reguli existente |
+| 8 | eroare: goal fără `{}` | mesaj parse clar (test 414x; doc poate nota expected error) |
+| 9 | eroare: user definește `digits/3` cu `<-` | reserved head expandat |
+| 10 | (opțional) show/trace structură parse — dacă util | elaborare reușită |
+
+**F38a — actualizări cross-doc:**
+
+- `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` — înlocuiește „DCG not supported” → link `logic-dcg.md`; paragraf scurt `-->` vs `<-`
+- `doc-viewer.js` — intrare **Logic DCG** (partea 1 poate fi marcată „syntax”; partea 2 completează la F38b)
+
+**Notă F38a:** fără `phrase/2,3`, exemplele runnable folosesc **elaborare + query-uri non-DCG** sau goals care nu necesită `phrase` (ex. coexistență, init OK). Secțiunea „Running grammars” = placeholder până la F38b.
+
+#### F38b — ce se adaugă în pagină (partea 2)
+
+| Secțiune | Conținut |
+| -------- | -------- |
+| `phrase/2` | parse listă închisă; generate |
+| `phrase/3` | rest dif-list `List-Rest`; parse parțial |
+| Bidirecțional | același grammar parse + generate (D300) |
+| Reserved | `phrase/2`, `phrase/3` heads |
+| Integrare | `comp [logic]` + `trigger`; legătură F37a `append/2` |
+| Limitări MVP | D304 — fără wire, `call_dcg`, `//2+` |
+
+**Exemple `logts-play` F38b (~10–12):**
+
+| # | Scenariu |
+| - | -------- |
+| 1 | `phrase(digits, [1,2,3], [])` parse |
+| 2 | `phrase(digits, Xs, [])` generate |
+| 3 | `phrase/2` round-trip digits |
+| 4 | `phrase/3` cu rest nevid |
+| 5 | `phrase/3` + dif-list `Front-Hole` explicit |
+| 6 | `pair` parse `3=7` |
+| 7 | `pair` generate |
+| 8 | grammar cu `{ member/2 }` în `{}` |
+| 9 | grammar cu `{ append/2 }` dif-list helper |
+| 10 | reserved head `phrase/2` error |
+| 11 | `comp [logic]` pipeline complet (trigger) |
+| 12 | (opțional) grammar nested NT + `between` |
+
+**F38b — actualizări cross-doc:**
+
+- `logic-builtins.md` — intrări `phrase/2`, `phrase/3` în quick reference + secțiune scurtă → link `logic-dcg.md`
+- `inline-logic.md` — tabel features: DCG → link
+- `doc-viewer.js` — descriere completă; regen `doc-data_generated.js`
+- verify: `_verify_doc_examples.js logic-dcg` (toate blocurile F38a+F38b)
 
 ### Ordine recomandată
 
-După **F37a** (dif-list) — **înainte sau paralel** cu F37b/F37c, la nevoie DCG.
+După **F37** complet (F37a+b+c ✅) — **F38a** parse `-->` + expand; **F38b** `phrase/2` + `phrase/3`.
 
-### Decizii
+### Rezumat decizii F38 **(D297–D304)**
 
-**D297+** — de draft la promovare (ca D279 pentru F37). **Notă:** D293–D296 sunt rezervate pentru **F37c** lazy.
+| ID | Subiect | Status | Recomandare |
+| -- | ------- | ------ | ----------- |
+| **D297** | Sintaxă reguli DCG (`-->`) | ✅ **confirmed** 2026-08-25 | **A** — `-->` cu args în head |
+| **D298** | Expand intern `//` (hidden list args) | ✅ **confirmed** 2026-08-25 | **A + B** — SWI 2 hidden args; MVP `//0` + `//1` |
+| **D299** | Body DCG: `{}` și goals | ✅ **confirmed** 2026-08-25 | **B'** — `{}` **obligatoriu** pentru goals Prolog |
+| **D300** | `phrase/2`, `phrase/3` | ✅ **confirmed** 2026-08-25 | **A + C** — bidirecțional; heads rezervate |
+| **D301** | Coexistență DCG vs `<-` | ✅ **confirmed** 2026-08-25 | **B** — expand la compile; predicate expandat rezervat |
+| **D302** | Subfaze F38 | ✅ **confirmed** 2026-08-25 | **C** — F38a expand; F38b phrase |
+| **D303** | Teste (ID-uri) | ✅ **confirmed** 2026-08-25 | **A** — **4141+** legacy+wave |
+| **D304** | Out of scope F38 | ✅ **confirmed** 2026-08-25 | **A** — confirmă draft (wire, `call_dcg`, `{}` full) |
+
+### Decizii (detaliu)
+
+#### D297 — Sintaxă reguli DCG **(confirmed: A — `-->` cu args în head)**
+
+| Opțiune | Formă | Pro | Contra |
+| ------- | ----- | --- | ------ |
+| **A — `-->` + args în head ✓** | `digits([D\|Ds]) --> [D], between(0, 9, D), digits(Ds)` | Citibil; standard manuale Prolog; distinct clar de `<-` | Expand intern pentru list args |
+| **B — `//N` în head** | `digits//1 --> [D], ...` | Compact SWI | Mai puțin intuitiv fără experiență DCG |
+| **C — ambele** | A + B | Flexibil | Dublă sintaxă, mai mult de întreținut |
+
+**Decizie:** **A** — user 2026-08-25: **îi place `-->`**; argumentele rămân în head ca la Prolog (`digits([D\|Ds])`, `digits([])`). **Nu** introducem `digits//1 -->` ca sintaxă de suprafață în MVP.
+
+**Consecințe implementare:**
+- **`<-`** — reguli logică normale (neschimbat)
+- **`-->`** — **doar** reguli DCG; parse/assembler branch separat
+- Head DCG: același format args ca la `<-` (`name(Arg1, …)`)
+- Body DCG: terminale `[…]`, non-terminale, goals Prolog (`between/3`, etc.)
+- `//N` poate exista doar **intern** la expand (D298), nu obligatoriu în textul scris de user
+
+**Exemplu țintă LogTScript (D297-A):**
+
+```logts
+inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query parse123:
+        phrase(digits, [1, 2, 3], [])
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parse123
+    set = trigger
+}
+```
+
+---
+
+#### D298 — Expand intern DCG → predicate Prolog **(confirmed: A + B — SWI expand; MVP //0 + //1)**
+
+Fiecare regulă `p(Args) --> Body` devine intern un predicate Prolog cu **2 argumente listă ascunse** (`List`, `Rest`), model SWI.
+
+| Opțiune | Semnificație | Recomandare |
+| ------- | ------------ | ----------- |
+| **A — SWI 2 hidden args ✓** | `digits([D\|Ds]) --> …` → `digits([D\|Ds], List, Rest)` intern | **da** |
+| **B — doar arity 0/1 MVP** | `//0` și `//1` echivalent; `//2+` amânat | pentru primul release |
+| **C — fără expand** | interpret DCG direct în engine | mai lent, mai complex |
+
+**Decizie:** **A + B** — user 2026-08-25.
+
+**Exemple expand (intern, user nu scrie asta):**
+
+| Regulă DCG (D297) | Predicate intern (după expand) |
+| ----------------- | ------------------------------ |
+| `digits([]) --> []` | `digits([], L, L)` — succes când consumă nimic |
+| `digits([D\|Ds]) --> [D], …` | `digits([D\|Ds], L0, L)` cu legături listă din body |
+
+---
+
+#### D299 — Body DCG: terminale, non-terminale, `{}` **(confirmed: B' — `{}` obligatoriu pentru goals Prolog)**
+
+| Fragment în body | Consumă listă? | Sintaxă |
+| ---------------- | -------------- | ------- |
+| `[a, b]`, `[D]`, `[]` | **da** — terminal | fără `{}` |
+| `digits(Ds)` | **da** — non-terminal DCG | fără `{}` (trebuie regulă `-->`) |
+| `{ between(0, 9, D) }` | **nu** — goal Prolog | **`{}` obligatoriu** |
+| `{ G1, G2 }` | **nu** — secvență goals | **`{}` obligatoriu** |
+
+| Opțiune | `{}` în body | Status |
+| ------- | ------------ | ------ |
+| **A — fără `{}`** | Goals direct: `between(0, 9, D)` | respins |
+| **B — `{}` opțional** | sugar echivalent cu goal fără acolade | respins (prea ambiguu) |
+| **B' — `{}` obligatoriu ✓** | orice goal Prolog **trebuie** în `{}` | **confirmed** |
+| **C — `{}` SWI complet** | freeze, `call/1`, semantica extra | **out of scope** (D304) |
+
+**Decizie:** **B'** — user 2026-08-25: claritate „ce consumă / ce nu”; aliniat manuale Prolog DCG.
+
+**Reguli body DCG (B'):**
+
+1. **`[...]`** — terminal (consumă/generează din listă de intrare)
+2. **`name(Args)`** fără `{}` — **doar** apel non-terminal DCG (există regulă `-->` cu același nume/arity vizibil)
+3. **`{ Goal }`** sau **`{ G1, G2, … }`** — goal(uri) Prolog care **nu consumă** listă (builtins, reguli `<-`, unificări, `is`, etc.)
+4. Goal Prolog **fără** `{}` în body DCG → **eroare parse** (mesaj: „DCG goal must be braced: `{ … }`”)
+
+**Exemplu țintă (B'):**
+
+```logts
+inline [logic] .digits:
+
+  digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+  digits([])       --> []
+
+  digit(D) --> [D], { between(0, 9, D) }
+
+  pair(K, V) --> digit(K), "=", digit(V)
+
+  query parse:
+    phrase(digits, [1, 2, 3], [])
+
+:
+```
+
+**Tokenizare `{` `}` — fără conflict:**
+
+- `logic-assembler.js` (`logicTokenize`) **nu** are încă token `{` / `}` — sunt **libere** de adăugat
+- `logic { + / - }` din **exec block** `comp [logic]` e parsat de **alt** parser (nivel LogTScript), nu de body-ul `inline [logic]`
+- Tokenii `LBRACE` / `RBRACE` se activează **doar** în parserul body DCG (după `-->`), nu în reguli `<-` sau query-uri
+
+**Alternative sintactice** (doar dacă apare problemă la implementare — **preferat: `{` `}`**):
+
+| Token | Exemplu | Pro | Contra |
+| ----- | ------- | --- | ------ |
+| **`{` `}` ✓** | `{ between(0, 9, D) }` | standard SWI/Prolog DCG | trebuie adăugați 2 tokeni (simplu) |
+| `{{` `}}` | `{{ between(0, 9, D) }}` | zero ambiguitate vizuală | neobișnuit |
+| `do` … `end` | `do between(0, 9, D) end` | fără caractere speciale | verbos, non-Prolog |
+| `\|` … `\|` | `\| between(0, 9, D) \|` | distinct de `\|` listă | confuz cu pipe cons |
+
+**Recomandare implementare:** `{` `}` (D299-B'); alternativele rămân fallback documentat, nu schimbă decizia semantică B'.
+
+---
+
+#### D300 — `phrase/2` și `phrase/3` **(confirmed: A + C — bidirecțional; heads rezervate)**
+
+| Builtin | Semantica propusă |
+| ------- | ----------------- |
+| **`phrase(Goal, List)`** | Echivalent `phrase(Goal, List, [])` — listă închisă consumată integral |
+| **`phrase(Goal, List, Rest)`** | `List-Rest` dif-list; parse parțial sau generate cu rest |
+
+| Opțiune | Comportament | Recomandare |
+| ------- | ------------ | ----------- |
+| **A — bidirecțional ✓** | Parse **și** generate (SWI) | **da** |
+| **B — doar parse** | `phrase` consumă listă | prea limitat |
+| **C — heads rezervate** | user nu poate defini `phrase/2` ca regulă | **da** (ca F27) |
+
+**Decizie:** **A + C** — user 2026-08-25. `phrase/2` și `phrase/3` reserved heads (pattern F27); parse **și** generate în MVP.
+
+---
+
+#### D301 — Coexistență DCG (`-->`) vs reguli normale (`<-`) **(confirmed: B — expand la compile; predicate expandat rezervat)**
+
+| Opțiune | Comportament | Recomandare |
+| ------- | ------------ | ----------- |
+| **A — separate strict** | Același nume nu poate avea și `<-` și `-->` | clar, dar restrictiv |
+| **B — expand la compile ✓** | `digits([D\|Ds]) --> …` → `digits/3` intern; user **nu** definește manual `digits/3` cu `<-` | **SWI-like** |
+| **C — ambele permise** | Confuzie la apel | nu |
+
+**Decizie:** **B** — user 2026-08-25. DCG expandat la compile; predicate-ul expandat (ex. `digits/3` cu 2 list args) e **rezervat** — user nu poate defini același nume+arity cu `<-`.
+
+---
+
+#### D302 — Subfaze F38 **(confirmed: C — F38a expand; F38b phrase)**
+
+| Opțiune | Împărțire | Estimare |
+| ------- | --------- | -------- |
+| **A — 3 subfaze** | F38a parse+expand; F38b `phrase/2`; F38c `phrase/3`+dif-list | incremental |
+| **B — o fază** | tot dintr-o dată | ~1–2 săpt. |
+| **C — 2 subfaze ✓** | **F38a** parse `-->` + expand; **F38b** `phrase/2` + `phrase/3` | echilibrat |
+
+**Decizie:** **C** — user 2026-08-25.
+
+| Subfază | Livrabil cod | Livrabil doc |
+| ------- | ------------ | ------------ |
+| **F38a** | Token `-->` + `LBRACE`/`RBRACE`; parse DCG clauses; expand intern; validate heads rezervate expandate; teste **4141–4144**, **4155**, **4157** (parse/expand/reserved) | **`logic-dcg.md` partea 1** (~8–10 `logts-play`); `inline-logic.md` stub link; `doc-viewer` intrare |
+| **F38b** | `phrase/2`, `phrase/3` engine; reserved heads; teste **4145+**, **4151+** (phrase, generate, dif-list) | **`logic-dcg.md` partea 2** (~10–12 `logts-play`); `logic-builtins.md` `phrase/*`; verify `logic-dcg` complet |
+
+---
+
+#### D303 — Teste **(confirmed: A — 4141+ legacy+wave; split F38a / F38b)**
+
+| ID | Subfază | Scenariu |
+| -- | ------- | -------- |
+| 4141 | F38a | parse `-->` / DCG clause struct |
+| 4142 | F38a | expand `digits//0` echivalent (`digits([])`) |
+| 4143 | F38a | expand `digits//1` echivalent |
+| 4144 | F38a | goal fără `{}` → parse error |
+| 4145 | F38b | `phrase/2` parse listă închisă (legacy+wave) |
+| 4147 | F38b | `phrase/3` cu rest dif-list (legacy+wave) |
+| 4151 | F38b | generate round-trip (legacy+wave) |
+| 4155 | F38a | regresie F37a (`append/2`, dif-list) |
+| 4157 | F38b | reserved head `phrase/2`, `phrase/3` |
+| 4159 | F38b | reserved head predicate expandat (ex. `digits/3`) |
+
+**Decizie:** **A** — user 2026-08-25. Perechi **legacy+wave** pentru integrare; unit tests pentru parse/expand.
+
+---
+
+#### D304 — Out of scope F38 **(confirmed: A — draft out of scope)**
+
+| Topic | Unde |
+| ----- | ---- |
+| DCG pe wire / protocol binary | backlog viitor (nu F38) |
+| `call_dcg/2`, `phrase/4` meta | **F38b** sau amânat |
+| `{}` semantica SWI completă | amânat |
+| Module / `public` DCG separate | amânat |
+| `//2+` în MVP | post-F38 (dacă D298-B) |
+
+**Decizie:** **A** — user 2026-08-25. Confirmă draft; la fel ca D296 pentru F37c.
+
+---
+
+### Decizii F38 — status **(toate confirmed 2026-08-25)**
+
+| ID | Decizie |
+| -- | ------- |
+| D297 | **`-->`** cu args în head (A) |
+| D298 | Expand SWI +2 list args; MVP echivalent **//0** și **//1** (A + B) |
+| D299 | **`{}` obligatoriu** pentru goals Prolog în body DCG (B') |
+| D300 | **`phrase/2`, `phrase/3`** bidirecțional + heads rezervate (A + C) |
+| D301 | Expand la compile; predicate expandat **rezervat** (B) |
+| D302 | **F38a** parse+expand+**doc p.1** → **F38b** `phrase/2`+`phrase/3`+**doc p.2** (C) |
+| D303 | Teste **4141+** legacy+wave; split F38a/F38b (A) |
+| D304 | Out of scope: wire DCG, `call_dcg`, `{}` SWI full, `//2+` MVP (A) |
+
+**Următor pas implementare:** **F38a** — token `-->` + `LBRACE`/`RBRACE` + expand intern + **`doc/logic-dcg.md` partea 1** (~8–10 `logts-play`).
 
 ### Legături
 
