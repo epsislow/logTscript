@@ -45028,5 +45028,196 @@ comp [logic] .worldLogic:
   reg(4109, 'logic', 'F37b member regression (legacy)', runLogicCharListMemberRegression);
   reg(4110, 'logic', 'F37b member regression (wave)', runLogicCharListMemberRegression, { propagation: 'wave' });
 
+  reg(4121, 'logic', 'between/3 backtracking', function(h) {
+    const prog = parseLogicBody('query q: between(1, 3, X)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('three', String(sols.length), '3');
+    h.assert('first', String(sols[0].X.value), '1');
+    h.assert('last', String(sols[2].X.value), '3');
+  });
+
+  reg(4122, 'logic', 'between/3 fail and ground', function(h) {
+    const prog1 = parseLogicBody('query q: between(3, 1, X)');
+    const eng1 = new LogicEngine([]);
+    h.assert('low>high fail', String(eng1.solveQuery(logicQueryGoals(prog1.queries[0]), {}).length), '0');
+    const prog2 = parseLogicBody('query q: between(1, 3, 2)');
+    const eng2 = new LogicEngine([]);
+    h.assert('ground ok', String(eng2.solveQuery(logicQueryGoals(prog2.queries[0]), {}).length), '1');
+  });
+
+  function runLogicLazyBetweenMember(h, session) {
+    const src = `inline [logic] .nums:
+
+    query pick:
+        lazy_list(Xs, between(1, 3, X)),
+        member(Y, Xs),
+        show(Y)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = pick
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('one', String(session.outIncludes(interp, '1')), 'true');
+    h.assert('two', String(session.outIncludes(interp, '2')), 'true');
+    h.assert('three', String(session.outIncludes(interp, '3')), 'true');
+  }
+
+  reg(4123, 'logic', 'lazy_list/2 between member (legacy)', runLogicLazyBetweenMember);
+  reg(4124, 'logic', 'lazy_list/2 between member (wave)', runLogicLazyBetweenMember, { propagation: 'wave' });
+
+  function runLogicLazyChunkGenerator(h, session) {
+    const src = `inline [logic] .chunks:
+
+    chunk(Slice, Tail) <- Slice = [p], Tail = []
+    chunk(Slice, Tail) <- Slice = [q], Tail = []
+
+    query pick:
+        lazy_list(Xs, chunk),
+        member(Y, Xs),
+        show(Y)
+
+:
+
+comp [logic] .chunksLogic:
+    on: 1
+    .chunks { }
+:
+
+1wire trigger = 1
+
+.chunksLogic:{
+    query = pick
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('p', String(session.outIncludes(interp, 'p')), 'true');
+    h.assert('q', String(session.outIncludes(interp, 'q')), 'true');
+  }
+
+  reg(4125, 'logic', 'lazy_list/2 rule generator (legacy)', runLogicLazyChunkGenerator);
+  reg(4126, 'logic', 'lazy_list/2 rule generator (wave)', runLogicLazyChunkGenerator, { propagation: 'wave' });
+
+  function runLogicLazyShow(h, session) {
+    const src = `inline [logic] .nums:
+
+    query showLazy:
+        lazy_list(Xs, between(1, 2, X)),
+        show(Xs)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = showLazy
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('lazy marker', String(session.outIncludes(interp, 'lazy(between(1, 2))')), 'true');
+  }
+
+  reg(4127, 'logic', 'show lazy_list term (legacy)', runLogicLazyShow);
+  reg(4128, 'logic', 'show lazy_list term (wave)', runLogicLazyShow, { propagation: 'wave' });
+
+  function runLogicLazyLength(h, session) {
+    const src = `inline [logic] .nums:
+
+    query len:
+        lazy_list(Xs, between(1, 5, X)),
+        length(Xs, N),
+        show(N)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = len
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('len 5', String(session.outIncludes(interp, '5')), 'true');
+  }
+
+  reg(4129, 'logic', 'length/2 on between lazy_list (legacy)', runLogicLazyLength);
+  reg(4130, 'logic', 'length/2 on between lazy_list (wave)', runLogicLazyLength, { propagation: 'wave' });
+
+  reg(4131, 'logic', 'sort/2 fails on lazy_list (legacy)', function(h) {
+    const prog = parseLogicBody('query q: lazy_list(Xs, between(1, 2, X)), sort(Xs, S)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4132, 'logic', 'sort/2 fails on lazy_list (wave)', function(h) {
+    const prog = parseLogicBody('query q: lazy_list(Xs, between(1, 2, X)), sort(Xs, S)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  }, { propagation: 'wave' });
+
+  function runLogicLazyMaterialize(h, session) {
+    const src = `inline [logic] .nums:
+
+    query mat:
+        lazy_list(Xs, between(1, 3, X)),
+        lazy_list_materialize(Xs),
+        show(Xs)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = mat
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('materialized', String(session.outIncludes(interp, '[1, 2, 3]')), 'true');
+  }
+
+  reg(4133, 'logic', 'lazy_list_materialize/1 (legacy)', runLogicLazyMaterialize);
+  reg(4134, 'logic', 'lazy_list_materialize/1 (wave)', runLogicLazyMaterialize, { propagation: 'wave' });
+
+  reg(4135, 'logic', 'lazy_list/2 reserved head', function(h) {
+    h.assertThrows(
+      'reserved lazy_list',
+      () => parseLogicBody('lazy_list(A, B) <- A = B'),
+      "'lazy_list/2' is reserved",
+    );
+  });
+
+  reg(4136, 'logic', 'between/3 reserved head', function(h) {
+    h.assertThrows(
+      'reserved between',
+      () => parseLogicBody('between(L, H, V) <- L = H'),
+      "'between/3' is reserved",
+    );
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

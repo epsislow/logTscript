@@ -25,6 +25,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`string_to_codes/2`** | 2 | yes | no | Atom or string literal ↔ list of character codes (integers) |
 | **`atom_chars/2`** | 2 | yes | no | Atom ↔ list of one-character atoms |
 | **`atom_codes/2`** | 2 | yes | no | Atom ↔ list of character codes (integers) |
+| **`between/3`** | 3 | yes | no | Integer range with backtracking (`Low` … `High` inclusive) |
+| **`lazy_list/2`** | 2 | yes | no | Lazy list from `between/3` template or a 2-arg generator rule |
+| **`lazy_list_materialize/1`** | 1 | yes | no | Convert a lazy list to a ground cons list |
 | **`length/2`** | 2 | yes | no | List length; generative when **`N`** is ground |
 | **`reverse/2`** | 2 | yes | no | Reverse list order (bidirectional) |
 | **`last/2`** | 2 | yes | no | Last element of a non-empty ground list |
@@ -718,6 +721,169 @@ comp [logic] .textLogic:
 ```
 
 **Load & Run** prints **`"Go"`** after decoding the code list.
+
+---
+
+## Lazy lists and `between/3`
+
+**`between(Low, High, Value)`** generates integers from **`Low`** through **`High`** (inclusive) with backtracking when **`Value`** is a variable. **`Low > High`** fails. All three arguments must be integers when ground.
+
+**`lazy_list(List, Source)`** builds a **lazy list** that is expanded on demand (for example when **`member/2`** walks it). Two source forms are supported:
+
+| Source form | Example | Meaning |
+|-------------|---------|---------|
+| **Goal template** | `between(1, 10, X)` | Numeric range lazy list (sugar over **`between/3`**) |
+| **Generator atom** | `chunk` | Calls user rule **`chunk(Slice, Tail)`** repeatedly; each **`Slice`** is a ground list chunk, **`Tail = []`** when done |
+
+**`lazy_list_materialize/1`** converts a lazy list into a normal ground cons list.
+
+### Integration rules
+
+| Builtin | On lazy lists |
+|---------|----------------|
+| **`member/2`** | Supported — walks the stream with backtracking |
+| **`length/2`** | Supported for **`between`** lazy lists (known finite size); **fail** on rule generators |
+| **`show/N`** | Prints a marker such as **`lazy(between(1, 3))`** or **`lazy(chunk)`** |
+| **`sort/2`**, **`maplist/2`**, **`append/3`**, … | **Fail** — eager builtins do not accept lazy lists |
+
+Lazy lists do **not** unify with ordinary cons lists until **`lazy_list_materialize/1`**.
+
+### Example — `between/3`
+
+```logts-play
+inline [logic] .nums:
+
+    query range:
+        between(1, 3, N),
+        show(N)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = range
+    set = trigger
+}
+```
+
+**Load & Run** prints **`1`**, then **`2`**, then **`3`** (one line per solution when stepping, or combined output depending on query policy).
+
+### Example — `lazy_list/2` with `between/3` and `member/2`
+
+```logts-play
+inline [logic] .nums:
+
+    query pick:
+        lazy_list(Xs, between(1, 3, X)),
+        member(Y, Xs),
+        show(Y)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = pick
+    set = trigger
+}
+```
+
+**Load & Run** prints **`1`**, **`2`**, **`3`**.
+
+### Example — rule generator
+
+```logts-play
+inline [logic] .chunks:
+
+    chunk(Slice, Tail) <- Slice = [a, b], Tail = []
+    chunk(Slice, Tail) <- Slice = [c], Tail = []
+
+    query pick:
+        lazy_list(Xs, chunk),
+        member(Y, Xs),
+        show(Y)
+
+:
+
+comp [logic] .chunksLogic:
+    on: 1
+    .chunks { }
+:
+
+1wire trigger = 1
+
+.chunksLogic:{
+    query = pick
+    set = trigger
+}
+```
+
+**Load & Run** prints **`a`**, **`b`**, **`c`** across solutions.
+
+### Example — materialize and `length/2`
+
+```logts-play
+inline [logic] .nums:
+
+    query mat:
+        lazy_list(Xs, between(1, 4, X)),
+        length(Xs, N),
+        lazy_list_materialize(Xs),
+        show(N, Xs)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = mat
+    set = trigger
+}
+```
+
+**Load & Run** prints **`4`** and **`[1, 2, 3, 4]`**.
+
+### Example — show lazy form
+
+```logts-play
+inline [logic] .nums:
+
+    query showLazy:
+        lazy_list(Xs, between(1, 2, X)),
+        show(Xs)
+
+:
+
+comp [logic] .numsLogic:
+    on: 1
+    .nums { }
+:
+
+1wire trigger = 1
+
+.numsLogic:{
+    query = showLazy
+    set = trigger
+}
+```
+
+**Load & Run** prints **`lazy(between(1, 2))`**.
 
 ---
 

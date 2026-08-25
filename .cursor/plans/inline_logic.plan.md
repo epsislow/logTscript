@@ -151,7 +151,7 @@ todos:
     status: completed
   - id: logic-lazy-list-37c
     content: "F37c: lazy_list/2 (hibrid B+A), between/3 — teste 4121+; D293–D296 confirmed"
-    status: pending
+    status: completed
   - id: logic-lazy-streams-2j
     content: "Faza amânată 2+j: lazy streams/I/O — promovat din F37c D296 (out of scope F37c)"
     status: pending
@@ -8852,7 +8852,7 @@ Ca F27/F35: user **nu** poate defini `append/2` (dif-list), `string_to_list/2`, 
 
 - [x] **F37a** — dif-list + `append/2` + unificare + show
 - [x] **F37b** — 4 builtins char/codes
-- [ ] **F37c** — `lazy_list/2` (hibrid D293) + `between/3` (D294) — **ready-to-implement**
+- [x] **F37c** — `lazy_list/2` (hibrid D293) + `between/3` (D294) — **completed**
 - [ ] Doc EN + verify per subfază F37c
 - [ ] Actualizare [2+e scope](#2e--faza-37-liste-avansate-confirmed--f37a-next) → completed la livrare F37c
 

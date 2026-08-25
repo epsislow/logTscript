@@ -422,6 +422,15 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'atom_codes' && g0.arity === 2) {
       return this._solveAtomCodes(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'between' && g0.arity === 3) {
+      return this._solveBetween(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'lazy_list' && g0.arity === 2) {
+      return this._solveLazyList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'lazy_list_materialize' && g0.arity === 1) {
+      return this._solveLazyListMaterialize(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call' && g0.predicate === 'true' && g0.arity === 0) {
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
@@ -685,7 +694,152 @@ class LogicEngine {
 
   _solveMember(elem, list, rest, env, depth, onSuccess, onDepthExceeded) {
     const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
-    return this._memberWalk(elem, list, cont, env);
+    return this._memberWalk(elem, list, cont, env, depth, onDepthExceeded);
+  }
+
+  _solveBetween(lowTerm, highTerm, valTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const lowD = logicDeref(lowTerm, env);
+    const highD = logicDeref(highTerm, env);
+    const valD = logicDeref(valTerm, env);
+    if (lowD.kind !== 'number' || highD.kind !== 'number') return false;
+    if (!Number.isInteger(lowD.value) || !Number.isInteger(highD.value)) return false;
+    if (lowD.value > highD.value) return false;
+    if (valD.kind === 'number') {
+      if (!Number.isInteger(valD.value)) return false;
+      if (valD.value < lowD.value || valD.value > highD.value) return false;
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (valD.kind === 'var') {
+      let any = false;
+      for (let v = lowD.value; v <= highD.value; v++) {
+        const trail = env.trailLength();
+        if (valD.name !== '_') env.bind(valD.name, { kind: 'number', value: v });
+        if (this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded)) any = true;
+        env.undo(trail);
+        if (this._solutionCapReached || env.cutCommitted) break;
+      }
+      return any;
+    }
+    return false;
+  }
+
+  _solveLazyList(listTerm, sourceTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(listTerm, env);
+    const built = logicBuildLazyListFromSource(sourceTerm, env, this.table);
+    if (built === false) return false;
+    if (ld.kind === 'var') {
+      const trail = env.trailLength();
+      if (!logicUnify(listTerm, built, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (ld.kind === 'lazy_list') {
+      if (!logicLazyListGenEqual(ld.gen, built.gen)) return false;
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _solveLazyListMaterialize(listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const ld = logicDeref(listTerm, env);
+    if (ld.kind === 'lazy_list') {
+      const materialized = logicMaterializeLazyList(ld, this, env, depth, onDepthExceeded);
+      if (materialized === false) return false;
+      const trail = env.trailLength();
+      if (listTerm.kind === 'var' && listTerm.name !== '_') {
+        env.bind(listTerm.name, materialized);
+      } else if (!logicUnify(listTerm, materialized, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (ld.kind === 'list' && logicListIsGroundClosed(ld, env)) {
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _lazyListRuleMemberWalk(elem, lazyTerm, cont, env, depth, onDepthExceeded) {
+    const pred = lazyTerm.gen.predicate;
+    const key = logicPredicateKey(pred, 2);
+    const clauses = this.index.get(key) || [];
+    let any = false;
+    for (let i = 0; i < clauses.length; i++) {
+      if (this._solutionCapReached) break;
+      const clause = clauses[i];
+      const trail0 = env.trailLength();
+      const cutParent = env.choiceDepth();
+      env.pushChoice({ type: 'lazy_chunk', cutParent, trail: trail0 });
+      this._renameSerial += 1;
+      const renamed = logicRenameApartClause(clause, { n: this._renameSerial });
+      const sliceVar = { kind: 'var', name: `__lz${this._renameSerial++}` };
+      const tailVar = { kind: 'var', name: `__lz${this._renameSerial++}` };
+      const goal = { kind: 'call', predicate: pred, arity: 2, args: [sliceVar, tailVar] };
+      const head = logicDerefCompound(renamed.head, env);
+      if (!logicUnifyCompound(goal, head, env, this.table)) {
+        env.undo(trail0);
+        if (env.choiceDepth() > cutParent) env.popChoice();
+        continue;
+      }
+      const savedCut = env.cutDepth;
+      const savedCutCommitted = env.cutCommitted;
+      env.cutDepth = cutParent;
+      env.cutCommitted = false;
+      const ok = this._solveGoals(renamed.body || [], env, depth + 1, () => {
+        const sliceD = logicDeref(sliceVar, env);
+        if (!logicListIsGroundClosed(sliceD, env)) return false;
+        const elems = logicGroundListToArray(sliceD, env);
+        if (elems == null || elems.length === 0) return false;
+        return this._lazyMemberElems(elem, elems, 0, cont, env);
+      }, onDepthExceeded);
+      const cutCommitted = env.cutCommitted;
+      env.cutDepth = savedCut;
+      env.cutCommitted = savedCutCommitted || cutCommitted;
+      env.undo(trail0);
+      if (env.choiceDepth() > cutParent) env.popChoice();
+      if (this._solutionCapReached) {
+        if (ok) any = true;
+        break;
+      }
+      if (ok) any = true;
+      if (cutCommitted) break;
+    }
+    return any;
+  }
+
+  _lazyMemberElems(elem, elems, idx, cont, env) {
+    if (idx >= elems.length) return false;
+    let any = false;
+    const trail = env.trailLength();
+    if (logicUnify(elem, elems[idx], env, this.table)) {
+      if (cont()) any = true;
+      if (!this._solutionCapReached && !env.cutCommitted) {
+        if (this._lazyMemberElems(elem, elems, idx + 1, cont, env)) any = true;
+      }
+    }
+    env.undo(trail);
+    return any;
+  }
+
+  _lazyListBetweenMemberWalk(elem, lazyTerm, cont, env) {
+    const gen = lazyTerm.gen;
+    let any = false;
+    for (let v = gen.low; v <= gen.high; v++) {
+      const trail = env.trailLength();
+      if (logicUnify(elem, { kind: 'number', value: v }, env, this.table)) {
+        if (cont()) any = true;
+        if (this._solutionCapReached || env.cutCommitted) {
+          env.undo(trail);
+          return any;
+        }
+      }
+      env.undo(trail);
+      if (this._solutionCapReached || env.cutCommitted) break;
+    }
+    return any;
   }
 
   _solveTypePred(term, expectedKind, rest, env, depth, onSuccess, onDepthExceeded) {
@@ -693,14 +847,25 @@ class LogicEngine {
     if (!d || d.kind === 'var') return false;
     if (expectedKind === 'compound') {
       if (d.kind !== 'compound') return false;
+    } else if (expectedKind === 'list') {
+      if (d.kind !== 'list' && d.kind !== 'lazy_list') return false;
     } else if (d.kind !== expectedKind) {
       return false;
     }
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
-  _memberWalk(elem, list, cont, env) {
+  _memberWalk(elem, list, cont, env, depth, onDepthExceeded) {
     const ld = logicDeref(list, env);
+    if (ld.kind === 'lazy_list') {
+      if (ld.gen.type === 'between') {
+        return this._lazyListBetweenMemberWalk(elem, ld, cont, env);
+      }
+      if (ld.gen.type === 'rule') {
+        return this._lazyListRuleMemberWalk(elem, ld, cont, env, depth, onDepthExceeded);
+      }
+      return false;
+    }
     if (ld.kind !== 'list' || logicListIsNil(ld)) return false;
     let any = false;
     const trail = env.trailLength();
@@ -712,7 +877,7 @@ class LogicEngine {
       }
     }
     env.undo(trail);
-    if (this._memberWalk(elem, ld.tail, cont, env)) any = true;
+    if (this._memberWalk(elem, ld.tail, cont, env, depth, onDepthExceeded)) any = true;
     return any;
   }
 
@@ -849,6 +1014,19 @@ class LogicEngine {
   _solveLength(list, nTerm, rest, env, depth, onSuccess, onDepthExceeded) {
     const nd = logicDeref(nTerm, env);
     const ld = logicDeref(list, env);
+    if (ld.kind === 'lazy_list') {
+      const lazyLen = logicLazyListKnownLength(ld);
+      if (lazyLen == null) return false;
+      if (nd.kind === 'number') {
+        if (!Number.isInteger(nd.value) || nd.value !== lazyLen) return false;
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      if (nd.kind === 'var') {
+        if (nd.name !== '_') env.bind(nd.name, { kind: 'number', value: lazyLen });
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      return false;
+    }
     if (nd.kind === 'number') {
       if (nd.value < 0 || !Number.isInteger(nd.value)) return false;
       if (ld.kind === 'var') {
@@ -1831,6 +2009,9 @@ function logicRenameApartClause(clause, idRef) {
     if (t.kind === 'dif_list') {
       return { kind: 'dif_list', front: walkTerm(t.front), hole: walkTerm(t.hole) };
     }
+    if (t.kind === 'lazy_list') {
+      return { kind: 'lazy_list', gen: { ...t.gen } };
+    }
     if (t.kind === 'arith') {
       return { kind: 'arith', op: t.op, left: walkTerm(t.left), right: walkTerm(t.right) };
     }
@@ -1992,6 +2173,80 @@ function logicDerefCompound(term, env) {
   return d.kind === 'compound' ? d : term;
 }
 
+function logicBuildLazyListFromSource(sourceTerm, env, table) {
+  const sd = logicDeref(sourceTerm, env);
+  if (sd.kind === 'compound' && sd.predicate === 'between' && sd.arity === 3) {
+    const lowD = logicDeref(sd.args[0], env);
+    const highD = logicDeref(sd.args[1], env);
+    if (lowD.kind !== 'number' || highD.kind !== 'number') return false;
+    if (!Number.isInteger(lowD.value) || !Number.isInteger(highD.value)) return false;
+    if (lowD.value > highD.value) return false;
+    return { kind: 'lazy_list', gen: { type: 'between', low: lowD.value, high: highD.value } };
+  }
+  if (sd.kind === 'atom') {
+    const predName = logicAtomDisplayName(sd, table);
+    if (!predName) return false;
+    return { kind: 'lazy_list', gen: { type: 'rule', predicate: predName } };
+  }
+  return false;
+}
+
+function logicLazyListGenEqual(a, b) {
+  if (!a || !b || a.type !== b.type) return false;
+  if (a.type === 'between') return a.low === b.low && a.high === b.high;
+  if (a.type === 'rule') return a.predicate === b.predicate;
+  return false;
+}
+
+function logicLazyListKnownLength(lazyTerm) {
+  if (!lazyTerm || lazyTerm.kind !== 'lazy_list') return null;
+  if (lazyTerm.gen.type === 'between') {
+    return lazyTerm.gen.high - lazyTerm.gen.low + 1;
+  }
+  return null;
+}
+
+function logicMaterializeLazyList(lazyTerm, engine, env, depth, onDepthExceeded) {
+  if (!lazyTerm || lazyTerm.kind !== 'lazy_list') return false;
+  if (lazyTerm.gen.type === 'between') {
+    return logicBuildNumlist(lazyTerm.gen.low, lazyTerm.gen.high);
+  }
+  if (lazyTerm.gen.type === 'rule') {
+    const elems = [];
+    const pred = lazyTerm.gen.predicate;
+    const key = logicPredicateKey(pred, 2);
+    const clauses = engine.index.get(key) || [];
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      const trail0 = env.trailLength();
+      engine._renameSerial += 1;
+      const renamed = logicRenameApartClause(clause, { n: engine._renameSerial });
+      const sliceVar = { kind: 'var', name: `__lm${engine._renameSerial++}` };
+      const tailVar = { kind: 'var', name: `__lm${engine._renameSerial++}` };
+      const goal = { kind: 'call', predicate: pred, arity: 2, args: [sliceVar, tailVar] };
+      const head = logicDerefCompound(renamed.head, env);
+      if (!logicUnifyCompound(goal, head, env, engine.table)) {
+        env.undo(trail0);
+        continue;
+      }
+      const chunkTrail = env.trailLength();
+      const ok = engine._solveGoals(renamed.body || [], env, depth + 1, () => {
+        const sliceD = logicDeref(sliceVar, env);
+        if (!logicListIsGroundClosed(sliceD, env)) return false;
+        const chunk = logicGroundListToArray(sliceD, env);
+        if (chunk == null) return false;
+        for (const e of chunk) elems.push(e);
+        return true;
+      }, onDepthExceeded);
+      env.undo(chunkTrail);
+      env.undo(trail0);
+      if (!ok) return false;
+    }
+    return logicArrayToList(elems);
+  }
+  return false;
+}
+
 function logicUnify(t1, t2, env, table) {
   const a = logicDeref(t1, env);
   const b = logicDeref(t2, env);
@@ -2024,6 +2279,16 @@ function logicUnify(t1, t2, env, table) {
     return true;
   }
   if (b.kind === 'dif_list' && a.kind === 'var') return logicUnify(b, a, env, table);
+  if (a.kind === 'lazy_list' && b.kind === 'lazy_list') {
+    return logicLazyListGenEqual(a.gen, b.gen);
+  }
+  if (a.kind === 'lazy_list' && b.kind === 'var') {
+    if (b.name === '_') return true;
+    if (logicOccurs(b.name, a, env)) return false;
+    env.bind(b.name, a);
+    return true;
+  }
+  if (b.kind === 'lazy_list' && a.kind === 'var') return logicUnify(b, a, env, table);
   if (logicListIsNil(a) && logicListIsNil(b)) return true;
   if (logicListIsNil(a) && b.kind === 'var') {
     if (b.name === '_') return true;
@@ -2055,6 +2320,7 @@ function logicOccurs(name, term, env) {
   if (d.kind === 'dif_list') {
     return logicOccurs(name, d.front, env) || logicOccurs(name, d.hole, env);
   }
+  if (d.kind === 'lazy_list') return false;
   if (d.kind === 'list') {
     if (d.nil) return false;
     return logicOccurs(name, d.head, env) || logicOccurs(name, d.tail, env);
@@ -2492,6 +2758,16 @@ function logicCloneTerm(term) {
       tail: logicCloneTerm(term.tail),
     };
   }
+  if (term.kind === 'dif_list') {
+    return {
+      kind: 'dif_list',
+      front: logicCloneTerm(term.front),
+      hole: logicCloneTerm(term.hole),
+    };
+  }
+  if (term.kind === 'lazy_list') {
+    return { kind: 'lazy_list', gen: { ...term.gen } };
+  }
   if (term.kind === 'arith') {
     return {
       kind: 'arith',
@@ -2816,6 +3092,9 @@ function logicResolveTerm(term, env, table) {
       front: logicResolveTerm(d.front, env, table),
       hole: logicResolveTerm(d.hole, env, table),
     };
+  }
+  if (d.kind === 'lazy_list') {
+    return { kind: 'lazy_list', gen: { ...d.gen } };
   }
   return d;
 }
@@ -3296,7 +3575,19 @@ function logicFormatShowTerm(term, env, table) {
   }
   if (d.kind === 'list') return logicFormatListShow(d, env, table);
   if (d.kind === 'dif_list') return logicFormatDifListShow(d, env, table);
+  if (d.kind === 'lazy_list') return logicFormatLazyListShow(d);
   return '?';
+}
+
+function logicFormatLazyListShow(term) {
+  if (!term || term.kind !== 'lazy_list') return '?';
+  if (term.gen.type === 'between') {
+    return `lazy(between(${term.gen.low}, ${term.gen.high}))`;
+  }
+  if (term.gen.type === 'rule') {
+    return `lazy(${term.gen.predicate})`;
+  }
+  return 'lazy(?)';
 }
 
 function logicFormatDifListShow(term, env, table) {
