@@ -1704,6 +1704,15 @@ class Interpreter {
     return { value: text, isText: true, varName: `${inst.name}:decode` };
   }
 
+  _logicQueryBindingWireName(expr) {
+    if (!expr) return null;
+    if (expr.var) return expr.var;
+    if (Array.isArray(expr) && expr.length === 1 && expr[0] && expr[0].var) {
+      return expr[0].var;
+    }
+    return null;
+  }
+
   evalLogicInlineQuery(invoke) {
     const instName = invoke.var;
     const inlineInst = this.inlineInstances.get(instName);
@@ -1739,14 +1748,27 @@ class Interpreter {
     const outputHints = {};
     for (const bind of invoke.bindings || []) {
       if (bind.outputHintOnly) {
-        outputHints[bind.name] = { bindType: bind.bindType, listFlag: !!bind.listFlag };
+        outputHints[bind.name] = {
+          bindType: bind.bindType,
+          listFlag: !!bind.listFlag,
+          numberFormat: bind.numberFormat || null,
+        };
         continue;
       }
+      const bindWireName = this._logicQueryBindingWireName(bind.expr);
       const bits = this._evalCallArgValue(bind.expr);
       let wireShape = null;
       let fillBits = '0'.repeat(8);
-      if (bind.expr && bind.expr.var && this.wires.has(bind.expr.var)) {
-        const wire = this.wires.get(bind.expr.var);
+      if (bindWireName && this.wires.has(bindWireName)) {
+        const wire = this.wires.get(bindWireName);
+        const validateFn = typeof logicValidateBindAgainstWire === 'function'
+          ? logicValidateBindAgainstWire : null;
+        if (validateFn) {
+          validateFn(
+            bind.bindType, bind.numberFormat, bind.listFlag, wire, this,
+            `${instName}:query binding '${bind.name}'`,
+          );
+        }
         wireShape = shapeFn(wire, this);
         fillBits = fillFn ? fillFn(wire, this) : '0'.repeat(wireShape.ew || 8);
       } else {
@@ -1755,9 +1777,9 @@ class Interpreter {
           : 8);
       }
       if (bind.listFlag) {
-        inputEnv[bind.name] = listFn(bits, bind.bindType, fillBits, wireShape);
+        inputEnv[bind.name] = listFn(bits, bind.bindType, fillBits, wireShape, bind.numberFormat);
       } else {
-        inputEnv[bind.name] = pinFn(bits, bind.bindType);
+        inputEnv[bind.name] = pinFn(bits, bind.bindType, bind.numberFormat);
         if (bind.bindType === 'text' && inputEnv[bind.name] && inputEnv[bind.name].kind === 'atom') {
           inputEnv[bind.name].logicTraceAsString = true;
         }

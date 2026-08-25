@@ -80,6 +80,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/protocol-assembler.js",
   "core/plc-assembler.js",
   "core/logic-assembler.js",
+  "core/logic-number-formats.js",
   "core/logic-engine.js",
   "core/lut-labels.js",
   "core/lut-decode.js",

@@ -45473,5 +45473,198 @@ comp [logic] .grammarLogic:
     );
   });
 
+  function runF39aSignedQueryInput(h, session) {
+    const src = `inline [logic] .temps:
+
+    expect(-3)
+
+    query q:
+        expect(T)
+
+:
+
+8wire tempIn = 11111101
+
+1wire ok = .temps:query({ expect(T) }, T=number/s8 tempIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4160, 'logic', 'F39a number/s8 signed query input (legacy)', runF39aSignedQueryInput);
+  reg(4161, 'logic', 'F39a number/s8 signed query input (wave)', runF39aSignedQueryInput, { propagation: 'wave' });
+
+  function runF39aUnsignedExplicit(h, session) {
+    const src = `inline [logic] .vals:
+
+    expect(100)
+
+    query q:
+        expect(N)
+
+:
+
+32wire valIn = 00000000000000000000000001100100
+
+1wire ok = .vals:query({ expect(N) }, N=number/u32 valIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4162, 'logic', 'F39a number/u32 explicit query (legacy)', runF39aUnsignedExplicit);
+  reg(4163, 'logic', 'F39a number/u32 explicit query (wave)', runF39aUnsignedExplicit, { propagation: 'wave' });
+
+  function runF39aSignedListVector(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1, 2])
+
+    query q:
+        row(1, L)
+
+:
+
+16wire[2] vecIn = 0000000000000001 + 0000000000000010
+
+1wire ok = .batch:query({ row(1, L) }, L=number/u16 list vecIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4164, 'logic', 'F39a number/u16 list vector input (legacy)', runF39aSignedListVector);
+  reg(4165, 'logic', 'F39a number/u16 list vector input (wave)', runF39aSignedListVector, { propagation: 'wave' });
+
+  function runF39aCompPinRoundTrip(h, session) {
+    const src = `inline [logic] .data:
+
+    sample(42)
+
+    query q:
+        sample(V)
+
+:
+
+comp [logic] .dataLogic:
+    on: 1
+
+    .data {
+        V is number/s32 valPin
+    }
+
+:
+
+32wire valIn = 00000000000000000000000000101010
+1wire ok = 0
+1wire trigger = 1
+
+.dataLogic:{
+    valPin = valIn
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4166, 'logic', 'F39a comp pin number/s32 round-trip (legacy)', runF39aCompPinRoundTrip);
+  reg(4167, 'logic', 'F39a comp pin number/s32 round-trip (wave)', runF39aCompPinRoundTrip, { propagation: 'wave' });
+
+  function runF39aMutationSignedWire(h, session) {
+    const src = `inline [logic] .store:
+
+    reading(Id, Val)
+
+:
+
+8wire sensorIn = 11111101
+
+comp [logic] .storeLogic:
+    on: 1
+    .store { }
+:
+
+1wire trigger = 1
+
+.storeLogic:{
+    logic {
+        + reading(1, number/s8 sensorIn)
+    }
+    set = trigger
+}
+
+1wire ok = .store:query({ reading(1, V) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4168, 'logic', 'F39a mutation number/s8 wire (legacy)', runF39aMutationSignedWire);
+  reg(4169, 'logic', 'F39a mutation number/s8 wire (wave)', runF39aMutationSignedWire, { propagation: 'wave' });
+
+  function runF39aWidthMismatchError(h, session, isWave) {
+    const src = `inline [logic] .x:
+
+    expect(0)
+
+    query q:
+        expect(T)
+
+:
+
+32wire wideIn = 00000000000000000000000000000000
+
+1wire ok = .x:query({ expect(T) }, T=number/u8 wideIn)`;
+    if (isWave) {
+      h.assertThrows('width mismatch', function() {
+        session.run(src);
+      }, 'does not match wire width');
+    } else {
+      session.run(src);
+      const err = session.interp && session.interp.lastReportedError;
+      h.assert('width mismatch', err && /does not match wire width/.test(err.message) ? '1' : '0', '1');
+    }
+  }
+
+  reg(4170, 'logic', 'F39a format width mismatch error (legacy)', function(h, session) {
+    runF39aWidthMismatchError(h, session, false);
+  });
+  reg(4171, 'logic', 'F39a format width mismatch error (wave)', function(h, session) {
+    runF39aWidthMismatchError(h, session, true);
+  }, { propagation: 'wave' });
+
+  reg(4172, 'logic', 'F39a unsupported format q4p4', function(h, session) {
+    const src = `inline [logic] .x:
+
+    query q:
+        true
+
+:
+
+8wire w = 0
+
+1wire ok = .x:query({ true }, T=number/q4p4 w)`;
+    h.assertThrows('unsupported format', function() {
+      session.run(src);
+    }, 'unsupported number format');
+  });
+
+  function runF39aNumberLegacyRegression(h, session) {
+    const src = `inline [logic] .scores:
+
+    level(box1, 42)
+
+    query q:
+        level(box1, N)
+
+:
+
+16wire scoreIn = 0000000000101010
+
+1wire ok = .scores:query({ level(box1, N) }, N=number scoreIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4173, 'logic', 'F39a number without slash regression (legacy)', runF39aNumberLegacyRegression);
+  reg(4174, 'logic', 'F39a number without slash regression (wave)', runF39aNumberLegacyRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -4014,7 +4014,7 @@ function logicArrayToPrologList(elements) {
   return tail;
 }
 
-function logicDecodeListSlot(cellBits, bindType) {
+function logicDecodeListSlot(cellBits, bindType, numberFormat) {
   if (bindType === 'bool') {
     return { kind: 'number', value: cellBits[cellBits.length - 1] === '1' ? 1 : 0 };
   }
@@ -4030,7 +4030,8 @@ function logicDecodeListSlot(cellBits, bindType) {
   }
   if (bindType === 'number') {
     if (/^0+$/.test(cellBits)) return null;
-    let n = parseInt(cellBits, 2);
+    const decodeFn = typeof logicDecodeNumberBits === 'function' ? logicDecodeNumberBits : null;
+    let n = decodeFn ? decodeFn(cellBits, numberFormat) : parseInt(cellBits, 2);
     if (isNaN(n)) n = 0;
     return { kind: 'number', value: n };
   }
@@ -4043,6 +4044,7 @@ function logicCloneMutationTerm(term) {
     return {
       kind: 'wireRef',
       bindType: term.bindType,
+      numberFormat: term.numberFormat || null,
       listFlag: !!term.listFlag,
       eachFlag: !!term.eachFlag,
       eachIndex: term.eachIndex,
@@ -4088,12 +4090,12 @@ function logicEachRowCountForWireRef(term, wire, ctx) {
   throw Error('each requires vector or matrix wire');
 }
 
-function logicWireRowToListTerm(bits, matrixShape, rowIndex, bindType, fillBits) {
+function logicWireRowToListTerm(bits, matrixShape, rowIndex, bindType, fillBits, numberFormat) {
   const cols = matrixShape.cols;
   const ew = matrixShape.ew;
   const rowBits = bits.substr(rowIndex * cols * ew, cols * ew);
   const virtualShape = { kind: 'vector', count: cols, ew };
-  return logicWireBitsToListTerm(rowBits, bindType, fillBits, virtualShape);
+  return logicWireBitsToListTerm(rowBits, bindType, fillBits, virtualShape, numberFormat);
 }
 
 function logicExpandOneMutationEachItem(item, ctx) {
@@ -4126,6 +4128,7 @@ function logicExpandOneMutationEachItem(item, ctx) {
         return {
           kind: 'wireRef',
           bindType: a.bindType,
+          numberFormat: a.numberFormat || null,
           listFlag: a.listFlag,
           eachFlag: false,
           eachIndex: row,
@@ -4155,13 +4158,16 @@ function logicExpandMutationEachOps(items, ctx) {
   return out;
 }
 
-function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape) {
+function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape, numberFormat) {
   const layout = logicResolveListWireLayout(bits.length, bindType, vectorShape);
+  const listFmt = typeof logicEffectiveListNumberFormat === 'function'
+    ? logicEffectiveListNumberFormat(numberFormat, vectorShape)
+    : (vectorShape && vectorShape.kind === 'vector' ? numberFormat : null);
   const elements = [];
   for (let i = 0; i < layout.slotCount; i++) {
     const cell = bits.substr(i * layout.elementWidth, layout.elementWidth);
     if (logicIsListSlotFill(cell, bindType, fillBits)) continue;
-    const el = logicDecodeListSlot(cell, bindType);
+    const el = logicDecodeListSlot(cell, bindType, listFmt);
     if (el == null) continue;
     elements.push(el);
   }
@@ -4171,13 +4177,13 @@ function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape) {
   return logicArrayToPrologList(elements);
 }
 
-function logicEncodeListToVectorBits(term, bindType, elementCount, elementWidth, fillBits) {
+function logicEncodeListToVectorBits(term, bindType, elementCount, elementWidth, fillBits, numberFormat) {
   const elements = term && term.kind === 'list' ? logicPrologListToArray(term) : [];
   const truncated = elements.slice(0, elementCount);
   const cells = [];
   for (let i = 0; i < elementCount; i++) {
     if (i < truncated.length) {
-      cells.push(logicEncodeSolutionTerm(truncated[i], elementWidth));
+      cells.push(logicEncodeSolutionTerm(truncated[i], elementWidth, numberFormat));
     } else {
       cells.push(fillBits);
     }
@@ -4221,15 +4227,18 @@ function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scal
       throw Error(`query output requires explicit type for '${packVars[0]}'`);
     }
     if (hint.listFlag && solutions && solutions.length > 0) {
+      const listFmt = typeof logicEffectiveListNumberFormat === 'function'
+        ? logicEffectiveListNumberFormat(hint.numberFormat, shape)
+        : hint.numberFormat;
       return logicEncodeListToVectorBits(
-        solutions[0][packVars[0]], hint.bindType, shape.count, shape.ew, fillBits,
+        solutions[0][packVars[0]], hint.bindType, shape.count, shape.ew, fillBits, listFmt,
       );
     }
     if (hint.listFlag) {
       return fillBits.repeat(shape.count);
     }
     return logicPackVectorSolutions(
-      solutions, packVars, shape.count, shape.ew, fillBits,
+      solutions, packVars, shape.count, shape.ew, fillBits, hint.numberFormat,
     );
   }
   if (packVars.length === 2 && shape && shape.kind === 'matrix') {
@@ -4253,9 +4262,14 @@ function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scal
     const term = solutions[0][packVars[0]];
     if (hint.listFlag) {
       const layout = logicResolveListWireLayout(w, hint.bindType, shape);
-      return logicEncodeListToVectorBits(term, hint.bindType, layout.slotCount, layout.elementWidth, fillBits);
+      const listFmt = typeof logicEffectiveListNumberFormat === 'function'
+        ? logicEffectiveListNumberFormat(hint.numberFormat, shape)
+        : hint.numberFormat;
+      return logicEncodeListToVectorBits(
+        term, hint.bindType, layout.slotCount, layout.elementWidth, fillBits, listFmt,
+      );
     }
-    return logicTermToWireValue(term, w, hint.bindType);
+    return logicTermToWireValue(term, w, hint.bindType, hint.numberFormat);
   }
   if (shape && shape.kind === 'vector') {
     return fillBits.repeat(shape.count);
@@ -4284,15 +4298,18 @@ function logicNumberToBits(n, width) {
   return (v >>> 0).toString(2).padStart(width, '0').slice(-width);
 }
 
-function logicEncodeSolutionTerm(term, elementWidth) {
+function logicEncodeSolutionTerm(term, elementWidth, numberFormat) {
   if (!term) return '0'.repeat(elementWidth);
-  if (term.kind === 'number') return logicNumberToBits(term.value, elementWidth);
+  if (term.kind === 'number') {
+    const encFn = typeof logicEncodeNumberValue === 'function' ? logicEncodeNumberValue : null;
+    return encFn ? encFn(term.value, elementWidth, numberFormat) : logicNumberToBits(term.value, elementWidth);
+  }
   if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, elementWidth);
   if (term.kind === 'list') {
     const bt = logicListBindTypeFromTerm(term);
     const ew = logicListPackedElementWidth(bt);
     const arr = logicPrologListToArray(term);
-    if (arr.length > 0) return logicEncodeSolutionTerm(arr[0], elementWidth);
+    if (arr.length > 0) return logicEncodeSolutionTerm(arr[0], elementWidth, numberFormat);
     return '0'.repeat(elementWidth);
   }
   return '0'.repeat(elementWidth);
@@ -4307,12 +4324,12 @@ function logicGetElementFill(wire, ctx) {
   return '0'.repeat(ew);
 }
 
-function logicPackVectorSolutions(solutions, freeVars, elementCount, elementWidth, fillBits) {
+function logicPackVectorSolutions(solutions, freeVars, elementCount, elementWidth, fillBits, numberFormat) {
   const cells = [];
   const k = Math.min(solutions.length, elementCount);
   for (let i = 0; i < elementCount; i++) {
     if (i < k && freeVars.length >= 1) {
-      cells.push(logicEncodeSolutionTerm(solutions[i][freeVars[0]], elementWidth));
+      cells.push(logicEncodeSolutionTerm(solutions[i][freeVars[0]], elementWidth, numberFormat));
     } else {
       cells.push(fillBits);
     }
@@ -4360,7 +4377,7 @@ function logicPackMatrixCol(solutions, freeVars, colIndex, maxRows, elementWidth
   return bits;
 }
 
-function logicTermToWireValue(term, width, bindType) {
+function logicTermToWireValue(term, width, bindType, numberFormat) {
   if (bindType === 'bool') {
     if (term.kind === 'number') return term.value !== 0 ? '1' : '0';
     return '0';
@@ -4372,14 +4389,17 @@ function logicTermToWireValue(term, width, bindType) {
     return logicAtomToAsciiBits(s, width);
   }
   if (bindType === 'number' || !bindType) {
-    if (term.kind === 'number') return logicNumberToBits(term.value, width);
+    if (term.kind === 'number') {
+      const encFn = typeof logicEncodeNumberValue === 'function' ? logicEncodeNumberValue : null;
+      return encFn ? encFn(term.value, width, numberFormat) : logicNumberToBits(term.value, width);
+    }
     if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, width);
     return '0'.repeat(width);
   }
   return '0'.repeat(width);
 }
 
-function logicPinToInputValue(bits, bindType) {
+function logicPinToInputValue(bits, bindType, numberFormat) {
   const width = bits.length;
   if (bindType === 'bool') {
     return { kind: 'number', value: bits[bits.length - 1] === '1' ? 1 : 0 };
@@ -4394,7 +4414,8 @@ function logicPinToInputValue(bits, bindType) {
     if (!s) return { kind: 'atom', name: '' };
     return { kind: 'atom', name: s };
   }
-  let n = parseInt(bits, 2);
+  const decodeFn = typeof logicDecodeNumberBits === 'function' ? logicDecodeNumberBits : null;
+  let n = decodeFn ? decodeFn(bits, numberFormat) : parseInt(bits, 2);
   if (isNaN(n)) n = 0;
   return { kind: 'number', value: n };
 }

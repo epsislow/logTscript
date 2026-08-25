@@ -432,6 +432,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       pinDefs[b.pinName] = {
         logicVar: b.logicVar,
         bindType: b.bindType,
+        numberFormat: b.numberFormat || null,
         listFlag: !!b.listFlag,
         bits: b.bindType === 'bool'
           ? 1
@@ -558,6 +559,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         ref: `&${storageIdx}`,
         logicVar: meta.logicVar,
         bindType: meta.bindType,
+        numberFormat: meta.numberFormat || null,
         listFlag: !!meta.listFlag,
       };
     }
@@ -628,22 +630,53 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       if (pin.listFlag) {
         if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
         pin.bits = bits.length;
+        if (pin.bindType === 'number' && pin.numberFormat && bits.length > 0) {
+          const fw = typeof logicNumberFormatBitWidth === 'function'
+            ? logicNumberFormatBitWidth(pin.numberFormat, bits.length)
+            : null;
+          if (fw != null && bits.length > fw && bits.length % fw === 0) {
+            if (typeof logicValidateNumberFormatWidth === 'function') {
+              logicValidateNumberFormatWidth(
+                pin.numberFormat, fw, `logic pin '${pinName}'`,
+              );
+            }
+          } else if (typeof logicValidateNumberFormatWidth === 'function') {
+            logicValidateNumberFormatWidth(
+              pin.numberFormat, bits.length, `logic pin '${pinName}'`,
+            );
+          }
+        }
       } else if (pin.bindType === 'text') {
         bits = this._writeTextPinStorage(pin, bits, ctx);
       } else if (pin.bindType === 'number') {
         bits = this._writeNumberPinStorage(pin, bits, ctx);
+        if (pin.numberFormat && typeof logicValidateNumberFormatWidth === 'function') {
+          logicValidateNumberFormatWidth(
+            pin.numberFormat, bits.length, `logic pin '${pinName}'`,
+          );
+        }
       } else {
         if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
         else if (bits.length > pin.bits) bits = bits.slice(-pin.bits);
       }
       const term = typeof logicPinToInputValue === 'function'
         ? (pin.listFlag && typeof logicWireBitsToListTerm === 'function'
-          ? logicWireBitsToListTerm(
-            bits, pin.bindType,
-            '0'.repeat(pin.bindType === 'bool' ? 1 : pin.bindType === 'number' ? 16 : 8),
-            null,
-          )
-          : logicPinToInputValue(bits, pin.bindType))
+          ? (() => {
+            let wireShape = null;
+            if (pin.numberFormat && typeof logicNumberFormatBitWidth === 'function') {
+              const fw = logicNumberFormatBitWidth(pin.numberFormat, bits.length);
+              if (bits.length > fw && bits.length % fw === 0) {
+                wireShape = { kind: 'vector', count: bits.length / fw, ew: fw };
+              }
+            }
+            return logicWireBitsToListTerm(
+              bits, pin.bindType,
+              '0'.repeat(pin.bindType === 'bool' ? 1 : pin.bindType === 'number' ? 16 : 8),
+              wireShape,
+              pin.numberFormat,
+            );
+          })()
+          : logicPinToInputValue(bits, pin.bindType, pin.numberFormat))
         : { kind: 'number', value: parseInt(bits, 2) || 0 };
       inputEnv[pin.logicVar] = term;
     }
@@ -662,6 +695,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       const listFn = typeof logicWireBitsToListTerm === 'function' ? logicWireBitsToListTerm : null;
       if (!pinFn) throw Error('Logic engine is not loaded');
       const wire = ctx.wires.get(wireName);
+      const validateFn = typeof logicValidateBindAgainstWire === 'function'
+        ? logicValidateBindAgainstWire : null;
+      if (validateFn) {
+        validateFn(
+          term.bindType, term.numberFormat, term.listFlag, wire, ctx,
+          `logic ${compName}: mutation wire '${wireName}'`,
+        );
+      }
       const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;
       const fillFn = typeof logicGetElementFill === 'function' ? logicGetElementFill : null;
       const wireShape = wire && shapeFn ? shapeFn(wire, ctx) : null;
@@ -675,7 +716,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           }
           const rowFn = typeof logicWireRowToListTerm === 'function' ? logicWireRowToListTerm : null;
           if (!rowFn) throw Error('Logic engine is not loaded');
-          resolved = rowFn(bits, wireShape, idx, term.bindType, fillBits);
+          resolved = rowFn(bits, wireShape, idx, term.bindType, fillBits, term.numberFormat);
         } else {
           if (!wireShape || wireShape.kind !== 'vector') {
             throw Error(`logic ${compName}: each scalar requires vector wire '${wireName}'`);
@@ -685,12 +726,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           if (cellBits.length < ew) {
             throw Error(`logic ${compName}: each index ${idx} out of range on wire '${wireName}'`);
           }
-          resolved = pinFn(cellBits, term.bindType);
+          resolved = pinFn(cellBits, term.bindType, term.numberFormat);
         }
       } else if (term.listFlag && listFn) {
-        resolved = listFn(bits, term.bindType, fillBits, wireShape);
+        resolved = listFn(bits, term.bindType, fillBits, wireShape, term.numberFormat);
       } else {
-        resolved = pinFn(bits, term.bindType);
+        resolved = pinFn(bits, term.bindType, term.numberFormat);
       }
       if (term.bindType === 'text' && resolved && resolved.kind === 'atom') {
         return { ...resolved, logicTraceAsString: true };
@@ -971,18 +1012,25 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
             const listBtFn = typeof logicListBindTypeFromTerm === 'function'
               ? logicListBindTypeFromTerm : null;
             let listBindType = null;
+            let listNumberFormat = null;
             for (const pin of Object.values(comp.pinStorage || {})) {
               if (pin.logicVar === packVars[0] && pin.listFlag) {
                 listBindType = pin.bindType;
+                listNumberFormat = pin.numberFormat || null;
                 break;
               }
             }
             if (sol0 && sol0.kind === 'list' && listEncFn && (listBindType || listBtFn)) {
+              const listFmt = typeof logicEffectiveListNumberFormat === 'function'
+                ? logicEffectiveListNumberFormat(listNumberFormat, shape)
+                : listNumberFormat;
               bits = listEncFn(
-                sol0, listBindType || listBtFn(sol0), shape.count, shape.ew, fillBits,
+                sol0, listBindType || listBtFn(sol0), shape.count, shape.ew, fillBits, listFmt,
               );
             } else {
-              bits = packVecFn(solutions, packVars, shape.count, shape.ew, fillBits);
+              bits = packVecFn(
+                solutions, packVars, shape.count, shape.ew, fillBits, listNumberFormat,
+              );
             }
           } else if (shape.kind === 'matrix' && packMatFn) {
             const matPackVars = matrixPackVarsFn

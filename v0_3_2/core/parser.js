@@ -1376,6 +1376,21 @@ parseLogicQueryBindingAfterEq(bindName) {
   }
   const bindType = this.c.value;
   this.eat('ID');
+  let numberFormat = null;
+  if (bindType === 'number' && this.c.type === 'SYM' && this.c.value === '/') {
+    this.eat('SYM', '/');
+    if (this.c.type !== 'ID') {
+      throw Error(`expected number format after '/' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (typeof parseLogicNumberFormatToken !== 'function') {
+      throw new Error('logic-number-formats is not loaded');
+    }
+    numberFormat = parseLogicNumberFormatToken(
+      this.c.value,
+      `query binding for '${bindName}'`,
+    );
+    this.eat('ID');
+  }
   this.t.skip();
   let listFlag = false;
   if (this.c.type === 'ID' && this.c.value === 'list') {
@@ -1389,6 +1404,7 @@ parseLogicQueryBindingAfterEq(bindName) {
       kind: 'binding',
       name: bindName,
       bindType,
+      numberFormat,
       listFlag,
       outputHintOnly: true,
     };
@@ -1398,6 +1414,7 @@ parseLogicQueryBindingAfterEq(bindName) {
     kind: 'binding',
     name: bindName,
     bindType,
+    numberFormat,
     listFlag,
     expr: bindExpr,
     outputHintOnly: false,

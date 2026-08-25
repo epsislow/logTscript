@@ -302,10 +302,70 @@ On **`comp [logic]`** pins and **`.world:query`**, **`text`**, **`number`**, and
 | Wire hint | Role |
 |-----------|------|
 | **`Var=text wire`** | Wire bits → ASCII atom; atom → wire on output |
-| **`Var=number wire`** | Wire bits → integer; integer → wire on output |
+| **`Var=number wire`** | Wire bits → unsigned integer; integer → wire on output |
+| **`Var=number/<format> wire`** | Explicit codec — `u8`…`u64`, `s8`…`s64`, or parametric `uX` / `sX` (width = wire width) |
 | **`Var=bool wire`** | 1 bit ↔ 0/1 (packed bool lists on vector wires — see [logic-query-exec.md](logic-query-exec.md)) |
 
+**`number`** without a slash keeps the same unsigned behaviour as before. **`number/s8`**, **`number/u32`**, and similar forms select signed or unsigned two's-complement decode/encode at the boundary. The format width must match the wire width (or vector element width for `number/s16 list` on `16wire[N]`); otherwise elaboration reports a width mismatch error.
+
 Facts in the inline KB remain **atoms** and **numbers**; conversion happens at the pin boundary.
+
+### Signed `number/s8` query input
+
+```logts-play
+inline [logic] .temps:
+
+    expect(-3)
+
+    query check:
+        expect(T)
+
+:
+
+8wire tempIn = 11111101
+
+1wire ok = .temps:query({ expect(T) }, T=number/s8 tempIn)
+```
+
+**Load & Run:** **`ok = 1`** — wire `11111101` decodes as **−3** (8-bit two's complement).
+
+### Explicit unsigned `number/u32`
+
+```logts-play
+inline [logic] .vals:
+
+    expect(100)
+
+    query check:
+        expect(N)
+
+:
+
+32wire valIn = 00000000000000000000000001100100
+
+1wire ok = .vals:query({ expect(N) }, N=number/u32 valIn)
+```
+
+**Load & Run:** **`ok = 1`**.
+
+### Explicit format list on a vector wire
+
+```logts-play
+inline [logic] .batch:
+
+    row(1, [1, 2])
+
+    query check:
+        row(1, L)
+
+:
+
+16wire[2] vecIn = 0000000000000001 + 0000000000000010
+
+1wire ok = .batch:query({ row(1, L) }, L=number/u16 list vecIn)
+```
+
+**Load & Run:** **`ok = 1`** — each 16-bit cell uses the `u16` codec.
 
 ---
 

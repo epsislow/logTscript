@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38** (2+i) **F38a✅ F38b✅**; **Faza 37** (2+e) **F37a✅ F37b✅ F37c✅**; **Faza 25** (2+c) **completed**; următor backlog deschis **2+j** (lazy streams/I/O).
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39** (2+k) **`number/<format>`** D305–D315✅ **ready**; amânat **2+l** post-F39; backlog **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -164,6 +164,18 @@ todos:
   - id: logic-dcg-38b
     content: "F38b: phrase/2, phrase/3 engine + doc partea 2 + logic-builtins — teste 4149+"
     status: completed
+  - id: logic-number-format-2k
+    content: "Faza 39 (2+k): number/<format> la frontieră — u/s/q/fp codecs wire; extinde F25"
+    status: pending
+  - id: logic-number-format-39a
+    content: "F39a: sintaxă number[/fmt] + default number/u<W> + signed s8…s64 — teste 4160+"
+    status: pending
+  - id: logic-number-format-39b
+    content: "F39b: fixed-point q4p4 q8p8 qXpY — codec reutilizat — teste 4175+"
+    status: pending
+  - id: logic-number-format-39c
+    content: "F39c: fp16 bf16 la frontieră — teste 4190+; doc comp-logic + logic-query-exec"
+    status: pending
 isProject: false
 ---
 
@@ -179,7 +191,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate                                |
 | **(completed)**          | Decizie luată / implementată                                                          |
 | **1+a … 1+v**            | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan)       |
-| **2+a … 2+j**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2j) |
+| **2+a … 2+l**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2l) |
 | ✅                        | Backlog **promovat / livrat** (fază completed)                                        |
 | ❌                        | Backlog **respins** definitiv                                                         |
 | 🟠✗                      | Backlog **închis** — alternativa nu se face; livrat altfel                            |
@@ -1378,7 +1390,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-> **Backlog post-MVP (**`1+a` **…** `1+v`**):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (**`2+a` **…** `2+j`**):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2j).
+> **Backlog post-MVP (**`1+a` **…** `1+v`**):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (**`2+a` **…** `2+l`**):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2l).
 
 ---
 
@@ -1427,6 +1439,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 36a** `true/0`, `fail/0`                         | —                                                                                                                     | **(completed)**   |
 | **Faza 37** Liste avansate Prolog (**2+e**)             | **F37a✅ F37b✅ F37c✅** — D279–D296 confirmed | **(completed)** |
 | **Faza 38** DCG Prolog (`phrase//`) (**2+i**)           | **F38a✅ F38b✅** — D297–D304 confirmed — [Faza 38](#faza-38--dcg-prolog-phrase-2i--completed) | **(completed)** |
+| **Faza 39** Formate numerice la frontieră (**2+k**)    | **F39a→F39c** — `number/<format>`; **D305–D315✅** — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--ready-to-implement) | **(ready-to-implement)** |
 
 
 ---
@@ -6616,6 +6629,7 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | ~~**Builtins listă** member/append~~           | ~~**2+d**~~ → **F27**                                       |
 | **Faza 37** liste avansate (**2+e**)           | **F37a✅ F37b✅ F37c✅** — D279–D296 **confirmed** | **(completed)** |
 | **Faza 38** DCG **`phrase//`** (**2+i**)       | **F38a✅ F38b✅** — D297–D304 **confirmed** — [Faza 38](#faza-38--dcg-prolog-phrase-2i--completed) | **(completed)** |
+| **Faza 39** **`number/<format>`** (**2+k**)    | **D305–D315✅** — extinde **F25**; [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--ready-to-implement) | **(ready-to-implement)** |
 | **Lazy streams / I/O** (**2+j**)               | **2+j** **(deferred)** — out of scope **F37c** (D296); promovat din F37c     |
 | ~~**Builtins listă supl.**~~                   | ~~**2+g**~~ → **F35a…F35j** (catalog complet)               |
 | `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
@@ -6672,9 +6686,9 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 
 ---
 
-## Backlog faze amânate (2+a … 2+j)
+## Backlog faze amânate (2+a … 2+l)
 
-Tabel master **2+a … 2+j** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+Tabel master **2+a … 2+l** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 
 | Stare | ID          | Subiect                     | Detaliu                                                                                                        | Fază draft | Legat de                        |
@@ -6689,9 +6703,11 @@ Tabel master **2+a … 2+j** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+h**~~ | Builtins random (integer)   | **Promovat → Faza 34** — `random_between/3`, `set_random/1`, `randomSeed:`; vezi [Faza 34](#faza-34--builtins-random-integer-2h--completed) | **F34**    | F30 D203, Monopoly doc v2       |
 | ✅     | ~~**2+i**~~ | DCG Prolog                  | **Promovat → Faza 38** — **F38a✅ F38b✅** `phrase/2,3` — [Faza 38](#faza-38--dcg-prolog-phrase-2i--completed) | **F38**    | D290, D297–D304, F37a **(completed)** |
 | ⏳     | **2+j**     | Lazy streams / I/O          | `lazy_read_lines`, lazy pe stream/file/wire, `lazy_findall`, engines — **out of scope F37c** (D296); promovat din **[F37c](#f37c--lazy-4121-post-f37b--d289-c)** | —          | D296, F37c, F22               |
+| ⏳     | **2+k**     | Formate numerice logic wire | **`number/<format>`** — F39a→c; **`number` fără `/` = legacy**; [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--ready-to-implement) **(ready)** | **F39**    | F25, D305–D315✅, tagged builtins |
+| ⏳     | **2+l**     | Logic numeric post-F39      | Amânat din **D314** — packed `number list` cu `/format`; float în Prolog; `atom_number/2`; `df` | **F39d+**  | F39, D314                       |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · **2+k → F39** (ready) · **2+l** (post-F39) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -9219,9 +9235,297 @@ inline [logic] .digits:
 | D303 | Teste **4141+** legacy+wave; split F38a/F38b (A) |
 | D304 | Out of scope: wire DCG, `call_dcg`, `{}` SWI full, `//2+` MVP (A) |
 
-**Următor pas implementare:** **2+j** (lazy streams/I/O) sau faze amânate **2+a** / **2+b** / **2+f**.
+**Următor pas implementare:** **[Faza 39](#faza-39--formate-numerice-la-frontieră-2k--ready-to-implement)** (`number/<format>`) · apoi **2+j** / **2+a** / **2+b** / **2+f**.
 
 ### Legături
 
-- Tabel backlog: [2+i](#2i--faza-38-dcg-prolog)
-- D290 confirmed: DCG → aici, nu F37
+- Tabel backlog: [2+i](#2i--faza-38-dcg-prolog) · [2+k](#2k--formate-numerice-la-frontieră-faza-39)
+- D290 confirmed: DCG → F38, nu F37
+- Formate wire: reutilizează tagged builtins (`q4p4`, `fp16`, `sX`) — [builtin-tagged-index.md](../v0_3_2/doc/builtin-tagged-index.md)
+
+---
+
+## Faza 39 — Formate numerice la frontieră **`number/<format>`** **2+k** **(ready-to-implement)**
+
+> **Backlog:** **2+k** — promovat din discuție design 2026-08-25 (formate `q4p4`, `fp16`, `s32` pe frontieră logic, fără keyword `float` separat).  
+> **Extinde:** [Faza 25](#decizii-faza-25--liste-tipate-pe-wire--binding-explicit-2c-d182-completed) (D182–D199 — `text|number|bool [list]`), [Faza 33](#faza-33--mutation-each-expansion-completed) (`each`), [D14](#d14--tipuri-la-frontieră-completed-a--number--bool--text-mvp) (tip la pin).  
+> **Nu extinde:** [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) (`is/2` rămâne integer în corpul Prolog la MVP F39).  
+> **Status:** **ready-to-implement** — **D305–D315✅** confirmed 2026-08-25; următor: **F39a**.
+
+### Problemă (stare azi post-F38)
+
+| Topic | Comportament azi |
+| ----- | ---------------- |
+| Binding `number` / `number list` | ✅ F25 — trei suprafețe (mutation, program block, query) |
+| Decode scalar `number` | **Unsigned** — `parseInt(bits, 2)` pe **toți biții wire-ului** |
+| Lățime implicită | **Wire width** (8wire→8b, 32wire→32b); pin comp default **64** înainte de assign |
+| Signed (`s32`, …) | ❌ — nu există |
+| Fixed (`q4p4`, `qXpY`) | ❌ în logic; există pe **tagged builtins** |
+| Float wire (`fp16`, `bf16`) | ❌ în logic |
+| KB Prolog | `{ kind: 'number', value: int }` — **fără float** în termeni |
+| `number list` packed scalar | **16 biți/celulă** fix (nu urmează element width wire) |
+
+**Motiv fază:** LogTScript are deja formate numerice pe wire (`q4p4`, `fp16`, `s8`, …); logic folosește doar **unsigned pe lățimea wire-ului**. Jocuri / senzori / fixed-point necesită **codec explicit** la frontieră, aliniat cu restul limbajului.
+
+### Scope (D305–D315)
+
+| Livrabil | Subfază | Descriere |
+| -------- | ------- | --------- |
+| **Sintaxă `number/<format>`** | F39a | Extinde gramatica F25: `number [/ format] [list] [each] wire` |
+| **Default `number`** | F39a | Echivalent **`number/u<W>`** — `W` = lățime element wire/pin (sau 64 pin comp neasignat) |
+| **Unsigned explicit** | F39a | `u8` `u16` `u32` `u64` `uX` (parametric, ca tagged builtins) |
+| **Signed** | F39a | `s8` `s16` `s32` `s64` `sX` — two's complement decode/encode |
+| **Fixed-point** | F39b | `q4p4` `q8p8` `qXpY` — reutilizează codec interpreter |
+| **IEEE half** | F39c | `fp16` `bf16` — decode/encode la frontieră |
+| **Liste + each** | F39a–c | `number/s32 list`, `number/q4p4 list each M` — același format per celulă |
+| **Validare lățime format** | F39a | `formatWidth` trebuie să coincidă cu lățimea wire/pin (element width pe vector) — altfel **eroare elaborare** (D315) |
+| **Backward compat** | F39a | `number`, `number list`, `X=number` — comportament identic cu azi (= `u<W>`) |
+| **Doc** | F39a–c | `comp-logic.md`, `logic-query-exec.md`, `logic-value-types.md`, `logic-runtime.md` |
+| **Teste 4160+** | F39a–c | legacy+wave |
+
+**Out of scope F39 (D314):** literale float în Prolog (`1.5`); `float/1`; `is/2` pe reale; `atom_number/2`; format `df`; infer format din lățime fără `/` (păstrăm explicit ca la D196); **packed scalar `number list`** rămâne **16 biți/celulă** fix (vezi D314).
+
+### Sintaxă canonică (țintă)
+
+Extinde vocabularul F25 — **un singur keyword scalar numeric: `number`** (fără `float` la suprafață).
+
+```text
+bindType   := number [/ numberFormat] | text | bool
+numberFormat := u8 | u16 | u32 | u64 | uX
+              | s8 | s16 | s32 | s64 | sX
+              | q4p4 | q8p8 | q<N>p<M>    ; parametric qXpY
+              | fp16 | bf16
+listMod    := list [each]
+```
+
+| Suprafață | Exemplu |
+| --------- | ------- |
+| **Program block** | `Score is number/q4p4 scorePin` · `Delta is number/s32 deltaWire` |
+| **Query input** | `T = number/fp16 sensorIn` |
+| **Query output hint** | `T = number/s32` (fără wire) |
+| **Mutation** | `+ reading(box, number/fp16 list sensors)` |
+| **Each (F33)** | `number/q4p4 list each matrixWire` |
+
+**Default:**
+
+| Scrii | Semnificație internă |
+| ----- | -------------------- |
+| `number` pe `16wire` | `number/u16` — unsigned, 16 biți |
+| `number` pe `32wire` | `number/u32` |
+| `number list` pe `16wire[4]` | `number/u16 list` — 16 biți per element |
+| `X is number myX` (pin comp, neasignat) | `number/u64` (ca azi) |
+
+### Valoare în KB după decode (D307)
+
+| Format frontieră | Valoare logică în KB (MVP F39) |
+| ---------------- | ------------------------------ |
+| `u*` / `s*` | `{ kind: 'number', value: int }` — integer Prolog |
+| `q4p4`, `qXpY` | `{ kind: 'number', value: int }` — **raw fixed-point** (biți întregi); conversie „umană” în reguli dacă e nevoie |
+| `fp16`, `bf16` | `{ kind: 'number', value: int }` — **raw IEEE bits** ca integer (MVP); documentat; fără kind `float` în KB |
+
+**Notă:** formatul (`numberFormat`) se păstrează în **metadata binding** (pin, query hint, mutation wire ref) pentru encode înapoi; **nu** în termenul Prolog din KB.
+
+### Subfaze
+
+| Subfază | Livrabil | Teste (draft) |
+| ------- | -------- | ------------- |
+| **F39a** | Parse `number/<fmt>`; `logicPinToInputValue` / encode cu format; `u<W>` default; signed `s*`; regresie `number` simplu | **4160+** |
+| **F39b** | `q4p4`, `q8p8`, `qXpY` — bridge la codec numeric existent | **4175+** |
+| **F39c** | `fp16`, `bf16`; liste + each cu format; doc complet | **4190+** |
+
+### Decizii **(D305–D315✅ confirmed 2026-08-25)**
+
+#### D305 — Keyword unic `number` **(confirmed: A — fără `float` la frontieră)**
+
+| Opțiune | Formă | Pro | Contra |
+| ------- | ----- | --- | -------- |
+| **A — `number/<format>` ✓** | `number/fp16`, `number/s32`, `number/q4p4` | Extinde F25; un vocabular; `fp16` e format, nu kind | `number/fp16` „sună” ca int |
+| **B — `float/<format>` + `number/<format>`** | split la binding | Clar conceptual pentru IEEE | Dublă gramatică; `float/q4p4` ciudat |
+
+**Decizie:** **A** — user 2026-08-25.
+
+#### D306 — Default `number` = `number/u<W>` **(confirmed: A)**
+
+`W` = lățimea în biți a wire-ului sursă (sau element width pentru vector); pin comp `number` neasignat = **64** (neschimbat).
+
+#### D307 — Stocare KB **(confirmed: A — int în termen; format la frontieră)**
+
+Format doar în AST binding / pin metadata; KB rămâne `kind: 'number'`.
+
+#### D308 — Signed MVP **(confirmed: A — s8…s64 + sX)**
+
+Two's complement simetric cu `logicNumberToBits` la encode.
+
+#### D309 — Fixed-point **(confirmed: A — reutilizează tagged codec)**
+
+Nu reimplementa qXpY în logic-engine — apel shared din interpreter / modul numeric.
+
+#### D310 — fp16/bf16 **(confirmed: A — raw bits în KB la MVP)**
+
+Evită float în unificare/`is/2`; encode/decode round-trip pe wire.
+
+#### D311 — Suprafețe **(confirmed: A — aceleași trei ca F25)**
+
+Mutation, program block, query input/output — plus `each` (F33).
+
+#### D312 — Backward compat **(confirmed: A)**
+
+`number` fără `/` = comportament actual (unsigned pe lățime wire).
+
+#### D313 — Teste **(confirmed: A — 4160+ legacy+wave)**
+
+Split F39a/b/c ca F38.
+
+#### D314 — Out of scope F39 **(confirmed: A)**
+
+| Topic | În F39? | Notă |
+| ----- | ------- | ---- |
+| Literale float Prolog (`1.5`) | ❌ | fază viitoare |
+| `float/1`, `is/2` pe reale | ❌ | F26 rămâne integer |
+| `atom_number/2` | ❌ | fază viitoare |
+| Format `df` | ❌ | — |
+| Infer format din lățime (fără `/`) | ❌ | ca D196 — explicit obligatoriu |
+| **Packed scalar `number list` → 16 bit fix** | ❌ **neschimbat** | vezi explicație mai jos |
+
+**D314 — packed `number list` (explicație):**
+
+La **`number list`** există **două moduri** (F25):
+
+| Wire | Lățime per element azi |
+| ---- | ---------------------- |
+| **Vector** `16wire[4]` | **element width** wire-ului (16 pe `16wire`) |
+| **Scalar packed** (wire lat **fără** `[N]`, ex. `32wire packedIn`) | **16 biți fix** per slot — hardcodat în engine (`logicListPackedElementWidth`) |
+
+**Ce NU face F39:** nu schimbă regula packed scalar — rămâne **împărțire la 16 biți/celulă**, indiferent dacă scrii `number/s32 list` sau `number/u8 list` pe un wire packed non-vector.
+
+**Exemplu azi:**
+```logts
+Vals = number list packedIn   ; packedIn = 32wire (fără [N])
+; → 2 elemente × 16 biți, NU 4 × 8 biți
+```
+
+**Ce FACE F39 pentru liste:** pe **vector** (`8wire[N]`, `16wire[N]`, …), `number/s32 list` / `number/q4p4 list` aplică formatul **per celulă** (element width + codec). Packed scalar rămâne 16 fix până la o **sub-decizie sau fază mică** (ex. F39d sau amend D314).
+
+**Motiv amânare:** comportament vechi F25 + teste existente; schimbarea ar putea rupe scripturi care se bazează pe 16 bit/slot packed.
+
+#### D315 — Mismatch format vs lățime wire **(confirmed: A — eroare elaborare)**
+
+| Opțiune | Comportament | Pro | Contra |
+| ------- | ------------ | --- | ------ |
+| **A — eroare elaborare ✓** | `number/u8` pe `32wire` → **fail** la elaborare | Aliniat cu LogTScript: LHS/RHS **bit-width mismatch** → error (`Bit-width mismatch: …`) | User trebuie să aleagă format corect sau wire potrivit |
+| **B — low W biți** | decode/encode pe low W biți | Permisiv | Ascunde bug-uri de design; inconsistent cu restul limbajului |
+| **C — pad/trunchiere** | reguli implicite | Flexibil | Surprize la round-trip |
+
+**Decizie:** **A** — user 2026-08-25.
+
+**Regulă:** la bind elaboration, `formatWidth(format)` trebuie să fie **egal** cu lățimea wire-ului țintă (sau **element width** pe vector `Wwire[N]`). Dacă `formatWidth ≠ wireWidth` → eroare elaborare (mesaj în familia `Bit-width mismatch` / `number format width … does not match wire …`).
+
+**Exemple:**
+
+| Binding | Wire | Rezultat |
+| ------- | ---- | -------- |
+| `number/u8` | `8wire` | ✅ OK |
+| `number/u8` | `32wire` | ❌ elaboration error |
+| `number` (implicit `u32`) | `32wire` | ✅ OK |
+| `number/s32 list` | `32wire[4]` | ✅ OK (32 = element width) |
+| `number/u8 list` | `32wire[4]` | ❌ elaboration error |
+
+**Teste F39a:** include caz negativ `number/u8` pe `32wire` în **4160+**.
+
+### Exemplu țintă
+
+```logts
+inline [logic] .sensors:
+
+    reading(room1, 15360)
+
+    query ok:
+        reading(room1, T),
+        T =:= 15360,
+        show(ok)
+
+:
+
+comp [logic] .sensorLogic:
+    on: 1
+    .sensors {
+        T is number/q4p4 tempPin
+    }
+:
+
+16wire tempIn = ...   ; q4p4 raw pe wire
+
+.sensorLogic:{
+    tempPin = tempIn
+    query = ok
+    set = trigger
+}
+```
+
+```logts
+; query inline — signed
+1wire ok = .world:query(
+    { between(-5, 5, X) },
+    X = number/s32 deltaIn
+)
+```
+
+### Sketch implementare
+
+| Layer | Schimbare |
+| ----- | --------- |
+| `logic-assembler.js` | `parseMutationTerm`, `parseLogicProgramBlock`, query bindings — `number` + optional `/format` |
+| `parser.js` | `.world:query` bindings — același pattern |
+| `logic-engine.js` | `logicPinToInputValue(bits, bindType, numberFormat)`; `logicTermToWireValue(..., format)`; list codec per-format element width |
+| `components/logic.js` | Pin metadata `numberFormat`; pin width rules cu format |
+| `interpreter.js` | Pass format la decode/encode; bridge `qXpY`/`fp16` |
+| **Shared** | Extrage sau apelează funcții existente tagged builtins / NFORMAT |
+| **Teste** | 4160+; migrate câteva F25 să folosească explicit `number/u8` |
+| **Doc EN** | Tabele format; default `u<W>`; exemple `logts-play` |
+
+**Estimare:** medie — parse pe 3 suprafețe + codec matrix; F39a mică; F39b/c depind de reuse numeric core.
+
+### Rezumat decizii F39 **(D305–D315✅)**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D305** | Keyword frontieră | **A** — doar `number/<format>` |
+| **D306** | Default | **A** — `number` = `number/u<W>` |
+| **D307** | KB | **A** — int în termen; format la binding |
+| **D308** | Signed | **A** — `s8`…`s64`, `sX` |
+| **D309** | Fixed | **A** — reuse codec `qXpY` |
+| **D310** | fp16/bf16 | **A** — raw bits MVP |
+| **D311** | Suprafețe | **A** — F25 + each |
+| **D312** | Compat | **A** — `number` simplu neschimbat |
+| **D313** | Teste | **A** — **4160+** legacy+wave |
+| **D314** | Out of scope | **A** — float Prolog, `atom_number`, `df`; **packed list 16 fix neschimbat** |
+| **D315** | Format vs wire width | **A** — **eroare elaborare** dacă `formatWidth ≠ wireWidth` |
+
+**Următor pas implementare:** **F39a** — parse `number/<format>` + `u<W>` default + signed decode/encode + teste **4160+**.
+
+#### **2+k** ⏳ → **Faza 39** (formate numerice la frontieră)
+
+**Promovat 2026-08-25** — vezi [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--ready-to-implement).
+
+**Ce este:** extensie **F25** — același `text` / `number` / `bool`, dar `number` poate specifica **codec wire** (`/u32`, `/s32`, `/q4p4`, `/fp16`, …).
+
+**Nu este:** float în engine Prolog; `is/2` pe reale; înlocuirea tagged builtins din expresii wire.
+
+**Compat:** `number` fără `/` = comportament F25 neschimbat (D312).
+
+#### **2+l** ⏳ — Logic numeric post-F39 (amânat din **D314**)
+
+**Promovat:** 2026-08-25 — itemi scoși din scope **F39a–c**, după livrarea **2+k**.
+
+| Item amânat | Detaliu |
+| ----------- | ------- |
+| **Packed scalar `number/<fmt> list`** | Azi `number list` pe wire packed (fără `[N]`) = **16 biți/celulă** fix; `number/u8 list` pe packed **nu** schimbă slot size în F39 |
+| **Float în Prolog** | Literale `1.5`, `float/1`, `is/2` pe reale, unificare IEEE |
+| **`atom_number/2`** | Atom ↔ număr parse/format |
+| **Format `df`** | Decimal float wire format (dacă intră în logic) |
+
+**Candidat fază:** **F39d+** sau fază separată mică după F39c.
+
+**Legat de:** [D314](#d314--out-of-scope-f39-confirmed-a) · [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--ready-to-implement).
+
+**Decizii F39 complete:** **D305–D315✅** — gata de implementare **F39a** (`number` simplu = legacy; KB = int; q4p4/fp16 raw în termen la MVP; mismatch width = error).

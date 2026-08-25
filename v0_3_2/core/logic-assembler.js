@@ -598,6 +598,20 @@ class LogicParser {
   parseMutationTerm() {
     if (this.at('ID') && LOGIC_MUTATION_BIND_TYPES.has(this.peek().value)) {
       const bindType = this.advance().value;
+      let numberFormat = null;
+      if (bindType === 'number' && this.at('SYM') && this.peek().value === '/') {
+        this.advance();
+        if (!this.at('ID')) {
+          logicError('expected number format after /', this.peek().line);
+        }
+        if (typeof parseLogicNumberFormatToken !== 'function') {
+          logicError('logic-number-formats is not loaded', this.peek().line);
+        }
+        numberFormat = parseLogicNumberFormatToken(
+          this.advance().value,
+          'mutation wire ref',
+        );
+      }
       let listFlag = false;
       if (this.at('ID') && this.peek().value === 'list') {
         this.advance();
@@ -615,7 +629,7 @@ class LogicParser {
         );
       }
       const wireName = this.advance().value;
-      return { kind: 'wireRef', bindType, listFlag, eachFlag, wireName };
+      return { kind: 'wireRef', bindType, numberFormat, listFlag, eachFlag, wireName };
     }
     return this.parseTerm();
   }
@@ -1311,12 +1325,27 @@ function parseLogicProgramBlock(bodyRaw) {
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line || line.startsWith(';')) continue;
-    const m = line.match(/^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/);
+    const m = line.match(
+      /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)(?:\/(u(?:8|16|32|64|X)|s(?:8|16|32|64|X)))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/,
+    );
     if (!m) {
-      throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type [list] pin')`);
+      throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type [/format] [list] pin')`);
     }
     const listFlag = /\blist\b/.test(line);
-    bindings.push({ logicVar: m[1], bindType: m[2], listFlag, pinName: m[3] });
+    let numberFormat = null;
+    if (m[2] === 'number' && m[3]) {
+      if (typeof parseLogicNumberFormatToken !== 'function') {
+        throw new Error('logic-number-formats is not loaded');
+      }
+      numberFormat = parseLogicNumberFormatToken(m[3], `program block pin '${m[4]}'`);
+    }
+    bindings.push({
+      logicVar: m[1],
+      bindType: m[2],
+      numberFormat,
+      listFlag,
+      pinName: m[4],
+    });
   }
   return bindings;
 }

@@ -28135,7 +28135,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 |-------|---------|
 | **Syntax** | \`.module:query({ goals }, Var=wire, maxDepth=\\\\N, maxSolutions=\\\\N;policy)\` |
 | **Goals** | Prolog body in \`{ }\` — comma = AND, \`\\+\`, \`=:=\`, etc. |
-| **Inputs** | Optional \`, Var=text wire\`, \`Var=number wire\`, \`Var=bool wire\`, or \`Var=<type> list wire\` |
+| **Inputs** | Optional \`, Var=text wire\`, \`Var=number wire\`, \`Var=number/<format> wire\`, \`Var=bool wire\`, or \`Var=<type> list wire\` |
 | **Output hints** | Scalar/matrix with free vars: \`, Var=text\` (no wire) — **required**; width alone does not infer type |
 | **Limits** | Optional \`, maxDepth=\\\\N\`, \`, maxSolutions=\\\\N\` (decimal literals; default **256** / **64**) |
 | **Column select** | **\`;sel(i)\`** → vector one column; **\`;sel(i,j)\`** → matrix two columns (0-based **argument** indices) |
@@ -28217,7 +28217,10 @@ Every query binding after the goal block **must** name a decode type. Width alon
 | Form | Meaning |
 |------|---------|
 | \`X=text carWire\` | Wire → ASCII atom (stop at \`\\0\`; empty / all-zero → error on text) |
-| \`N=number scoreIn\` | Wire → unsigned integer |
+| \`N=number scoreIn\` | Wire → unsigned integer (same as \`number/u<W>\` where \`W\` = wire width) |
+| \`N=number/s8 sensorIn\` | Wire → signed integer (two's complement, format width must match wire) |
+| \`N=number/u32 valIn\` | Wire → unsigned integer with explicit width |
+| \`L=number/s16 list vecIn\` | Vector wire → list of signed integers (one per cell) |
 | \`F=bool flag\` | 1-bit wire → 0/1 |
 | \`Nodes=text list routeIn\` | Vector or packed scalar → Prolog list of atoms |
 | \`Vals=number list packedIn\` | Packed list of integers (16 bits per element on vector wires) |
@@ -28236,7 +28239,7 @@ The engine flattens the first solution list into consecutive cells (ASCII per at
 | Type | Vector wire | Scalar packed wire |
 |------|-------------|-------------------|
 | **\`text list\`** | One atom per cell (\`8wire[N]\` → N atoms) | Total bits ÷ 8 slots |
-| **\`number list\`** | One integer per cell (cell width = element width) | Total bits ÷ 16 slots |
+| **\`number list\`** | One integer per cell (cell width = element width); use **\`number/s16 list\`** etc. for signed cells | Total bits ÷ 16 slots |
 | **\`bool list\`** | One bit per cell | Total bits = element count |
 
 | Rule | Behaviour |
@@ -28248,6 +28251,36 @@ The engine flattens the first solution list into consecutive cells (ASCII per at
 
 **Legacy vs wave:** success paths produce identical wire values. Runtime errors are reported the same way as other inline queries (legacy stores \`lastReportedError\`; wave may throw on assignment — same message text).
 
+### Numeric formats (\`number/<format>\`)
+
+Append **\`/<format>\`** after **\`number\`** on inputs, output hints, program-block pins, and mutation wire refs. **F39a** supports unsigned and signed integer codecs:
+
+| Format | Meaning |
+|--------|---------|
+| **\`u8\`**, **\`u16\`**, **\`u32\`**, **\`u64\`** | Unsigned fixed width |
+| **\`s8\`**, **\`s16\`**, **\`s32\`**, **\`s64\`** | Signed two's complement |
+| **\`uX\`**, **\`sX\`** | Parametric — width = wire width |
+
+**\`number\`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for \`number/s16 list\` on \`16wire[N]\`); mismatch → elaboration error (\`number format width … does not match wire width …\`).
+
+\`\`\`logts-play
+inline [logic] .temps:
+
+    expect(-3)
+
+    query check:
+        expect(T)
+
+:
+
+8wire tempIn = 11111101
+
+1wire ok = .temps:query({ expect(T) }, T=number/s8 tempIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`**.
+
+---
 ---
 
 ## Examples
@@ -29641,10 +29674,70 @@ On **\`comp [logic]\`** pins and **\`.world:query\`**, **\`text\`**, **\`number\
 | Wire hint | Role |
 |-----------|------|
 | **\`Var=text wire\`** | Wire bits → ASCII atom; atom → wire on output |
-| **\`Var=number wire\`** | Wire bits → integer; integer → wire on output |
+| **\`Var=number wire\`** | Wire bits → unsigned integer; integer → wire on output |
+| **\`Var=number/<format> wire\`** | Explicit codec — \`u8\`…\`u64\`, \`s8\`…\`s64\`, or parametric \`uX\` / \`sX\` (width = wire width) |
 | **\`Var=bool wire\`** | 1 bit ↔ 0/1 (packed bool lists on vector wires — see [logic-query-exec.md](logic-query-exec.md)) |
 
+**\`number\`** without a slash keeps the same unsigned behaviour as before. **\`number/s8\`**, **\`number/u32\`**, and similar forms select signed or unsigned two's-complement decode/encode at the boundary. The format width must match the wire width (or vector element width for \`number/s16 list\` on \`16wire[N]\`); otherwise elaboration reports a width mismatch error.
+
 Facts in the inline KB remain **atoms** and **numbers**; conversion happens at the pin boundary.
+
+### Signed \`number/s8\` query input
+
+\`\`\`logts-play
+inline [logic] .temps:
+
+    expect(-3)
+
+    query check:
+        expect(T)
+
+:
+
+8wire tempIn = 11111101
+
+1wire ok = .temps:query({ expect(T) }, T=number/s8 tempIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — wire \`11111101\` decodes as **−3** (8-bit two's complement).
+
+### Explicit unsigned \`number/u32\`
+
+\`\`\`logts-play
+inline [logic] .vals:
+
+    expect(100)
+
+    query check:
+        expect(N)
+
+:
+
+32wire valIn = 00000000000000000000000001100100
+
+1wire ok = .vals:query({ expect(N) }, N=number/u32 valIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`**.
+
+### Explicit format list on a vector wire
+
+\`\`\`logts-play
+inline [logic] .batch:
+
+    row(1, [1, 2])
+
+    query check:
+        row(1, L)
+
+:
+
+16wire[2] vecIn = 0000000000000001 + 0000000000000010
+
+1wire ok = .batch:query({ row(1, L) }, L=number/u16 list vecIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — each 16-bit cell uses the \`u16\` codec.
 
 ---
 
