@@ -45630,7 +45630,7 @@ comp [logic] .storeLogic:
     runF39aWidthMismatchError(h, session, true);
   }, { propagation: 'wave' });
 
-  reg(4172, 'logic', 'F39a unsupported format q4p4', function(h, session) {
+  reg(4172, 'logic', 'F39c fp16 rejected at logic boundary', function(h, session) {
     const src = `inline [logic] .x:
 
     query q:
@@ -45638,13 +45638,190 @@ comp [logic] .storeLogic:
 
 :
 
-8wire w = 0
+16wire w = 0000000000000000
 
-1wire ok = .x:query({ true }, T=number/q4p4 w)`;
+1wire ok = .x:query({ true }, T=number/fp16 w)`;
     h.assertThrows('unsupported format', function() {
       session.run(src);
-    }, 'unsupported number format');
+    }, 'IEEE half formats');
   });
+
+  function runF39bQ4p4QueryInput(h, session) {
+    const src = `inline [logic] .fixed:
+
+    expect(24)
+
+    query q:
+        expect(T)
+
+:
+
+8wire tempIn = 00011000
+
+1wire ok = .fixed:query({ expect(T) }, T=number/q4p4 tempIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4175, 'logic', 'F39b number/q4p4 raw query input (legacy)', runF39bQ4p4QueryInput);
+  reg(4176, 'logic', 'F39b number/q4p4 raw query input (wave)', runF39bQ4p4QueryInput, { propagation: 'wave' });
+
+  function runF39bQ8p8QueryInput(h, session) {
+    const src = `inline [logic] .fixed:
+
+    expect(320)
+
+    query q:
+        expect(T)
+
+:
+
+16wire valIn = 0000000101000000
+
+1wire ok = .fixed:query({ expect(T) }, T=number/q8p8 valIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4177, 'logic', 'F39b number/q8p8 raw query input (legacy)', runF39bQ8p8QueryInput);
+  reg(4178, 'logic', 'F39b number/q8p8 raw query input (wave)', runF39bQ8p8QueryInput, { propagation: 'wave' });
+
+  function runF39bQ6p2Parametric(h, session) {
+    const src = `inline [logic] .fixed:
+
+    expect(6)
+
+    query q:
+        expect(T)
+
+:
+
+8wire valIn = 00000110
+
+1wire ok = .fixed:query({ expect(T) }, T=number/q6p2 valIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4179, 'logic', 'F39b number/q6p2 parametric (legacy)', runF39bQ6p2Parametric);
+  reg(4180, 'logic', 'F39b number/q6p2 parametric (wave)', runF39bQ6p2Parametric, { propagation: 'wave' });
+
+  function runF39bCompPinQ4p4(h, session) {
+    const src = `inline [logic] .data:
+
+    sample(24)
+
+    query q:
+        sample(V)
+
+:
+
+comp [logic] .dataLogic:
+    on: 1
+
+    .data {
+        V is number/q4p4 valPin
+    }
+
+:
+
+8wire valIn = 00011000
+1wire ok = 0
+1wire trigger = 1
+
+.dataLogic:{
+    valPin = valIn
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4181, 'logic', 'F39b comp pin number/q4p4 (legacy)', runF39bCompPinQ4p4);
+  reg(4182, 'logic', 'F39b comp pin number/q4p4 (wave)', runF39bCompPinQ4p4, { propagation: 'wave' });
+
+  function runF39bMutationQ4p4(h, session) {
+    const src = `inline [logic] .store:
+
+    reading(Id, Val)
+
+:
+
+8wire sensorIn = 00011000
+
+comp [logic] .storeLogic:
+    on: 1
+    .store { }
+:
+
+1wire trigger = 1
+
+.storeLogic:{
+    logic {
+        + reading(1, number/q4p4 sensorIn)
+    }
+    set = trigger
+}
+
+1wire ok = .store:query({ reading(1, V) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4183, 'logic', 'F39b mutation number/q4p4 wire (legacy)', runF39bMutationQ4p4);
+  reg(4184, 'logic', 'F39b mutation number/q4p4 wire (wave)', runF39bMutationQ4p4, { propagation: 'wave' });
+
+  function runF39bQ4p4ListVector(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [24, 8])
+
+    query q:
+        row(1, L)
+
+:
+
+8wire[2] vecIn = 00011000 + 00001000
+
+1wire ok = .batch:query({ row(1, L) }, L=number/q4p4 list vecIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4185, 'logic', 'F39b number/q4p4 list vector (legacy)', runF39bQ4p4ListVector);
+  reg(4186, 'logic', 'F39b number/q4p4 list vector (wave)', runF39bQ4p4ListVector, { propagation: 'wave' });
+
+  function runF39bFixedWidthMismatch(h, session, isWave) {
+    const src = `inline [logic] .x:
+
+    expect(0)
+
+    query q:
+        expect(T)
+
+:
+
+8wire narrowIn = 00000000
+
+1wire ok = .x:query({ expect(T) }, T=number/q8p8 narrowIn)`;
+    if (isWave) {
+      h.assertThrows('width mismatch', function() {
+        session.run(src);
+      }, 'does not match wire width');
+    } else {
+      session.run(src);
+      const err = session.interp && session.interp.lastReportedError;
+      h.assert('width mismatch', err && /does not match wire width/.test(err.message) ? '1' : '0', '1');
+    }
+  }
+
+  reg(4187, 'logic', 'F39b q8p8 on 8wire width mismatch (legacy)', function(h, session) {
+    runF39bFixedWidthMismatch(h, session, false);
+  });
+  reg(4188, 'logic', 'F39b q8p8 on 8wire width mismatch (wave)', function(h, session) {
+    runF39bFixedWidthMismatch(h, session, true);
+  }, { propagation: 'wave' });
 
   function runF39aNumberLegacyRegression(h, session) {
     const src = `inline [logic] .scores:

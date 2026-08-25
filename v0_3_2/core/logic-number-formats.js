@@ -1,29 +1,62 @@
 /**
- * Logic wire boundary numeric formats — F39a: number/<format> (u*, s*, uX, sX).
+ * Logic wire boundary numeric formats — F39a (u*, s*) + F39b (q4p4, q8p8, qXpY).
  */
 (function (global) {
   'use strict';
 
   const F39A_FORMAT_RE = /^(u(?:8|16|32|64|X)|s(?:8|16|32|64|X))$/;
+  const F39C_FORMAT_RE = /^(fp16|bf16)$/;
+
+  function logicQModeSpec(format) {
+    const NF = global.LogTScriptNumericFormats;
+    if (!NF || typeof NF.qModeSpec !== 'function') return null;
+    return NF.qModeSpec(format);
+  }
+
+  function logicIsFixedPointFormat(format) {
+    return logicQModeSpec(format) != null;
+  }
 
   function parseLogicNumberFormatToken(name, ctxLabel) {
     const tok = name == null ? '' : String(name);
-    if (!F39A_FORMAT_RE.test(tok)) {
-      const where = ctxLabel ? `${ctxLabel}: ` : '';
-      throw new Error(`${where}unsupported number format '${tok}' (F39a: u8–u64, s8–s64, uX, sX)`);
+    const where = ctxLabel ? `${ctxLabel}: ` : '';
+    if (F39A_FORMAT_RE.test(tok)) return tok;
+    if (logicQModeSpec(tok)) {
+      const spec = logicQModeSpec(tok);
+      const NF = global.LogTScriptNumericFormats;
+      const maxW = NF && NF.MAX_FORMAT_WIDTH != null ? NF.MAX_FORMAT_WIDTH : 64;
+      if (spec.width < 1 || spec.width > maxW) {
+        throw new Error(`${where}number format '${tok}' width must be 1..${maxW}`);
+      }
+      return tok;
     }
-    return tok;
+    if (F39C_FORMAT_RE.test(tok)) {
+      throw new Error(
+        `${where}unsupported number format '${tok}' (IEEE half formats are not supported at logic wire boundary yet)`,
+      );
+    }
+    throw new Error(
+      `${where}unsupported number format '${tok}' (use u8–u64, s8–s64, uX, sX, q4p4, q8p8, or qXpY)`,
+    );
   }
 
   function logicNumberFormatBitWidth(format, wireWidth) {
     if (!format) return wireWidth;
     if (format === 'uX' || format === 'sX') return wireWidth;
+    const qspec = logicQModeSpec(format);
+    if (qspec) return qspec.width;
     const m = /^[us](\d+)$/.exec(format);
     return m ? parseInt(m[1], 10) : wireWidth;
   }
 
   function logicIsSignedNumberFormat(format) {
-    return format != null && String(format)[0] === 's';
+    if (format == null) return false;
+    if (String(format)[0] === 's') return true;
+    return logicIsFixedPointFormat(format);
+  }
+
+  function logicUsesSignedRawCodec(format) {
+    return logicIsSignedNumberFormat(format);
   }
 
   function signedBinToInt(bits) {
@@ -73,7 +106,7 @@
       if (isNaN(n)) n = 0;
       return n;
     }
-    if (logicIsSignedNumberFormat(numberFormat)) {
+    if (logicUsesSignedRawCodec(numberFormat)) {
       return signedBinToInt(bits);
     }
     let n = parseInt(bits, 2);
@@ -88,7 +121,7 @@
       if (v < 0) v = (1 << width) + v;
       return (v >>> 0).toString(2).padStart(width, '0').slice(-width);
     }
-    if (logicIsSignedNumberFormat(numberFormat)) {
+    if (logicUsesSignedRawCodec(numberFormat)) {
       return signedIntToBin(n, width);
     }
     return unsignedIntToBin(n, width);
@@ -135,6 +168,9 @@
     parseLogicNumberFormatToken,
     logicNumberFormatBitWidth,
     logicIsSignedNumberFormat,
+    logicIsFixedPointFormat,
+    logicUsesSignedRawCodec,
+    logicQModeSpec,
     logicDecodeNumberBits,
     logicEncodeNumberValue,
     logicBindTargetBitWidth,

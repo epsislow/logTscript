@@ -1326,7 +1326,7 @@ function parseLogicProgramBlock(bodyRaw) {
     const line = rawLine.trim();
     if (!line || line.startsWith(';')) continue;
     const m = line.match(
-      /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)(?:\/(u(?:8|16|32|64|X)|s(?:8|16|32|64|X)))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/,
+      /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)(?:\/([A-Za-z0-9]+))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/,
     );
     if (!m) {
       throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type [/format] [list] pin')`);

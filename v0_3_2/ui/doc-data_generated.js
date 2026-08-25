@@ -28220,7 +28220,8 @@ Every query binding after the goal block **must** name a decode type. Width alon
 | \`N=number scoreIn\` | Wire → unsigned integer (same as \`number/u<W>\` where \`W\` = wire width) |
 | \`N=number/s8 sensorIn\` | Wire → signed integer (two's complement, format width must match wire) |
 | \`N=number/u32 valIn\` | Wire → unsigned integer with explicit width |
-| \`L=number/s16 list vecIn\` | Vector wire → list of signed integers (one per cell) |
+| \`N=number/q4p4 valIn\` | Wire → raw fixed-point integer (same bits as \`; q4p4\`) |
+| \`L=number/q4p4 list vecIn\` | Vector wire → list of raw fixed-point integers per cell |
 | \`F=bool flag\` | 1-bit wire → 0/1 |
 | \`Nodes=text list routeIn\` | Vector or packed scalar → Prolog list of atoms |
 | \`Vals=number list packedIn\` | Packed list of integers (16 bits per element on vector wires) |
@@ -28253,15 +28254,18 @@ The engine flattens the first solution list into consecutive cells (ASCII per at
 
 ### Numeric formats (\`number/<format>\`)
 
-Append **\`/<format>\`** after **\`number\`** on inputs, output hints, program-block pins, and mutation wire refs. **F39a** supports unsigned and signed integer codecs:
+Append **\`/<format>\`** after **\`number\`** on inputs, output hints, program-block pins, and mutation wire refs.
 
 | Format | Meaning |
 |--------|---------|
 | **\`u8\`**, **\`u16\`**, **\`u32\`**, **\`u64\`** | Unsigned fixed width |
 | **\`s8\`**, **\`s16\`**, **\`s32\`**, **\`s64\`** | Signed two's complement |
 | **\`uX\`**, **\`sX\`** | Parametric — width = wire width |
+| **\`q4p4\`**, **\`q8p8\`**, **\`qXpY\`** | Fixed-point — same raw signed integer in KB as on wire (e.g. \`24\` for \`00011000\` on \`q4p4\`, human value 1.5) |
 
-**\`number\`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for \`number/s16 list\` on \`16wire[N]\`); mismatch → elaboration error (\`number format width … does not match wire width …\`).
+**\`number\`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for \`number/q4p4 list\` on \`8wire[N]\`); mismatch → elaboration error (\`number format width … does not match wire width …\`).
+
+#### Signed integer example
 
 \`\`\`logts-play
 inline [logic] .temps:
@@ -28280,7 +28284,27 @@ inline [logic] .temps:
 
 **Load & Run:** **\`ok = 1\`**.
 
----
+#### Fixed-point \`q4p4\` example
+
+Wire bits use the same encoding as tagged builtins (\`; q4p4\`). The logic KB stores the **raw signed integer** (not the human fractional value).
+
+\`\`\`logts-play
+inline [logic] .fixed:
+
+    expect(24)
+
+    query check:
+        expect(T)
+
+:
+
+8wire tempIn = 00011000
+
+1wire ok = .fixed:query({ expect(T) }, T=number/q4p4 tempIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — \`00011000\` is raw **24** (\`1.5\` in q4p4 arithmetic).
+
 ---
 
 ## Examples
@@ -29675,7 +29699,7 @@ On **\`comp [logic]\`** pins and **\`.world:query\`**, **\`text\`**, **\`number\
 |-----------|------|
 | **\`Var=text wire\`** | Wire bits → ASCII atom; atom → wire on output |
 | **\`Var=number wire\`** | Wire bits → unsigned integer; integer → wire on output |
-| **\`Var=number/<format> wire\`** | Explicit codec — \`u8\`…\`u64\`, \`s8\`…\`s64\`, or parametric \`uX\` / \`sX\` (width = wire width) |
+| **\`Var=number/<format> wire\`** | Explicit codec — \`u8\`…\`u64\`, \`s8\`…\`s64\`, \`uX\` / \`sX\`, or fixed-point \`q4p4\`, \`q8p8\`, \`qXpY\` |
 | **\`Var=bool wire\`** | 1 bit ↔ 0/1 (packed bool lists on vector wires — see [logic-query-exec.md](logic-query-exec.md)) |
 
 **\`number\`** without a slash keeps the same unsigned behaviour as before. **\`number/s8\`**, **\`number/u32\`**, and similar forms select signed or unsigned two's-complement decode/encode at the boundary. The format width must match the wire width (or vector element width for \`number/s16 list\` on \`16wire[N]\`); otherwise elaboration reports a width mismatch error.
@@ -29738,6 +29762,27 @@ inline [logic] .batch:
 \`\`\`
 
 **Load & Run:** **\`ok = 1\`** — each 16-bit cell uses the \`u16\` codec.
+
+### Fixed-point \`number/q4p4\`
+
+Same wire encoding as LogTScript \`; q4p4\` builtins. The KB holds the **raw signed integer** from the wire (not the human fractional value).
+
+\`\`\`logts-play
+inline [logic] .fixed:
+
+    expect(24)
+
+    query check:
+        expect(T)
+
+:
+
+8wire tempIn = 00011000
+
+1wire ok = .fixed:query({ expect(T) }, T=number/q4p4 tempIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — \`00011000\` decodes to raw **24** (represents **1.5** in q4p4 fixed-point math).
 
 ---
 
