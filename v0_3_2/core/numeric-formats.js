@@ -1,5 +1,5 @@
 /**
- * Fixed-point (q4p4, q8p8) and float16 (fp16, bf16) call/display tags for built-ins.
+ * Fixed-point (q4p4, q8p8) and IEEE float (fp16, bf16, f32, f64) call/display tags for built-ins.
  */
 (function (global) {
   'use strict';
@@ -10,13 +10,17 @@
     'ARGMAX', 'ARGMIN',
   ]);
 
-  const FORMAT_TAG_NAMES = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
+  const FORMAT_TAG_NAMES = new Set(['q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64']);
+
+  function isIeeeFloatMode(mode) {
+    return mode === 'fp16' || mode === 'bf16' || mode === 'f32' || mode === 'f64';
+  }
 
   const NFORMAT_DST_PREFIX = 'to_';
 
-  /** Recognize an NFORMAT format name: signed, sX, uX, q4p4/q8p8/qXpY, fp16, bf16. Returns canonical mode or null. */
+  /** Recognize an NFORMAT format name: signed, sX, uX, q4p4/q8p8/qXpY, fp16, bf16, f32, f64. Returns canonical mode or null. */
   function parseNformatFormatName(name, fail, role) {
-    if (name === 'signed' || name === 'fp16' || name === 'bf16') return name;
+    if (name === 'signed' || name === 'fp16' || name === 'bf16' || name === 'f32' || name === 'f64') return name;
     if (/^s\d+$/.test(name)) {
       const w = parseInt(name.slice(1), 10);
       if (w < 1 || w > MAX_FORMAT_WIDTH) {
@@ -76,10 +80,10 @@
       fail('NFORMAT: \'vector\' and \'matrix\' are mutually exclusive');
     }
     if (!src) {
-      fail('NFORMAT: requires source format tag (signed, sX, uX, q4p4/qXpY, fp16, bf16)');
+      fail('NFORMAT: requires source format tag (signed, sX, uX, q4p4/qXpY, fp16, bf16, f32, f64)');
     }
     if (!dst) {
-      fail('NFORMAT: requires destination tag (to_signed, to_sX, to_uX, to_qXpY, to_fp16, to_bf16)');
+      fail('NFORMAT: requires destination tag (to_signed, to_sX, to_uX, to_qXpY, to_fp16, to_bf16, to_f32, to_f64)');
     }
     if (src === dst) {
       fail(`NFORMAT: source and destination format '${src}' are the same`);
@@ -111,7 +115,7 @@
 
   function encodeNformatValue(value, dstMode, resultWidth) {
     if (Number.isNaN(value)) {
-      if (dstMode === 'fp16' || dstMode === 'bf16') {
+      if (isIeeeFloatMode(dstMode)) {
         return encodeFromFloat(NaN, dstMode);
       }
       return '0'.repeat(resultWidth);
@@ -148,13 +152,14 @@
   }
 
   function floatConvertStatus(realValue, rawResult, dstMode) {
-    const resultFin = decodeToFloat(rawResult, dstMode, 16);
+    const fw = getFormatModeWidth(dstMode);
+    const resultFin = decodeToFloat(rawResult, dstMode, fw);
     const nan = Number.isNaN(realValue) || Number.isNaN(resultFin);
     const overflow = !nan && Number.isFinite(realValue)
       && (resultFin === Infinity || resultFin === -Infinity);
     let inexact = false;
     if (!nan && Number.isFinite(resultFin)) {
-      const roundtrip = decodeToFloat(encodeFromFloat(resultFin, dstMode), dstMode, 16);
+      const roundtrip = decodeToFloat(encodeFromFloat(resultFin, dstMode), dstMode, fw);
       inexact = realValue !== roundtrip;
     }
     const underflow = !nan && !overflow && resultFin === 0
@@ -163,7 +168,7 @@
   }
 
   function convertFormatStatus(srcMode, dstMode, realValue, rawResult, resultWidth) {
-    if (srcMode === 'fp16' || srcMode === 'bf16') {
+    if (isIeeeFloatMode(srcMode)) {
       if (Number.isNaN(realValue)) {
         return buildStatus({ nan: true });
       }
@@ -177,7 +182,7 @@
     if (isUnsignedWidthMode(dstMode)) {
       return unsignedConvertStatus(realValue, rawResult, resultWidth);
     }
-    if (dstMode === 'fp16' || dstMode === 'bf16') {
+    if (isIeeeFloatMode(dstMode)) {
       return floatConvertStatus(realValue, rawResult, dstMode);
     }
     return buildStatus({});
@@ -190,7 +195,7 @@
     assertNformatSrcWidth(srcMode, width);
     const resultWidth = dstMode === 'signed' ? width : getFormatModeWidth(dstMode);
     const realValue = decodeNformatValue(bits, width, srcMode);
-    if ((srcMode === 'fp16' || srcMode === 'bf16') && Number.isNaN(realValue)) {
+    if (isIeeeFloatMode(srcMode) && Number.isNaN(realValue)) {
       const result = encodeNformatValue(NaN, dstMode, resultWidth);
       return { result, status: buildStatus({ nan: true }) };
     }
@@ -241,7 +246,8 @@
       && (resultFin === Infinity || resultFin === -Infinity);
     let inexact = false;
     if (!nan && Number.isFinite(resultFin)) {
-      const roundtrip = decodeToFloat(encodeFromFloat(resultFin, mode), mode, 16);
+      const fw = getFormatModeWidth(mode);
+      const roundtrip = decodeToFloat(encodeFromFloat(resultFin, mode), mode, fw);
       inexact = resultFin !== roundtrip;
     }
     const underflow = !nan && !overflow && resultFin === 0
@@ -312,6 +318,12 @@
     if (mode === 'fp16' || mode === 'bf16') {
       return { kind: 'float', width: 16, tagSuffix: mode };
     }
+    if (mode === 'f32') {
+      return { kind: 'float', width: 32, tagSuffix: 'f32' };
+    }
+    if (mode === 'f64') {
+      return { kind: 'float', width: 64, tagSuffix: 'f64' };
+    }
     if (isSignedWidthMode(mode)) {
       const w = signedWidthFromMode(mode);
       return { kind: 'signed', width: w, tagSuffix: mode };
@@ -347,7 +359,7 @@
   }
 
   function rejectsFloatRshift(mode, opName) {
-    if (mode === 'fp16' || mode === 'bf16') {
+    if (isIeeeFloatMode(mode)) {
       throw new Error(`${opName}: does not accept tag '${mode}'`);
     }
   }
@@ -387,9 +399,10 @@
       }
       return;
     }
-    if (mode === 'bf16' || mode === 'fp16') {
-      if (width !== 16) {
-        throw new Error(`${opName}: ; ${mode} requires 16-bit operands, got ${width}`);
+    if (isIeeeFloatMode(mode)) {
+      const fw = getFormatModeWidth(mode);
+      if (width !== fw) {
+        throw new Error(`${opName}: ; ${mode} requires ${fw}-bit operands, got ${width}`);
       }
     }
   }
@@ -476,6 +489,40 @@
     return (view.getUint32(0) >> 16) & 0xffff;
   }
 
+  function fp32ToFloat(bits) {
+    const buf = new ArrayBuffer(4);
+    const view = new DataView(buf);
+    view.setUint32(0, bits >>> 0, false);
+    return view.getFloat32(0, false);
+  }
+
+  function floatToFp32(num) {
+    const buf = new ArrayBuffer(4);
+    const view = new DataView(buf);
+    view.setFloat32(0, num, false);
+    return view.getUint32(0, false);
+  }
+
+  function fp64ToFloat(bits) {
+    const buf = new ArrayBuffer(8);
+    const view = new DataView(buf);
+    const b = typeof bits === 'bigint' ? bits : BigInt(bits);
+    const hi = Number((b >> 32n) & 0xffffffffn);
+    const lo = Number(b & 0xffffffffn);
+    view.setUint32(0, hi, false);
+    view.setUint32(4, lo, false);
+    return view.getFloat64(0, false);
+  }
+
+  function floatToFp64(num) {
+    const buf = new ArrayBuffer(8);
+    const view = new DataView(buf);
+    view.setFloat64(0, num, false);
+    const hi = view.getUint32(0, false);
+    const lo = view.getUint32(4, false);
+    return (BigInt(hi) << 32n) | BigInt(lo);
+  }
+
   function binToUint16(binStr, width) {
     const w = width || String(binStr).length;
     return parseInt(String(binStr).padStart(w, '0'), 2) & 0xffff;
@@ -485,14 +532,49 @@
     return (bits & 0xffff).toString(2).padStart(width || 16, '0');
   }
 
+  function binToUint32(binStr, width) {
+    const w = width || 32;
+    const padded = String(binStr).padStart(w, '0').slice(-w);
+    return parseInt(padded, 2) >>> 0;
+  }
+
+  function uint32ToBin(bits, width) {
+    const w = width || 32;
+    return (bits >>> 0).toString(2).padStart(w, '0').slice(-w);
+  }
+
+  function binToUint64(binStr, width) {
+    const w = width || 64;
+    const padded = String(binStr).padStart(w, '0').slice(-w);
+    return BigInt('0b' + padded);
+  }
+
+  function uint64ToBin(bits, width) {
+    const w = width || 64;
+    const v = typeof bits === 'bigint' ? bits : BigInt(bits);
+    return v.toString(2).padStart(w, '0').slice(-w);
+  }
+
   function decodeToFloat(binStr, mode, width) {
-    const bits = binToUint16(binStr, width);
-    return mode === 'bf16' ? bf16ToFloat(bits) : fp16ToFloat(bits);
+    if (mode === 'bf16' || mode === 'fp16') {
+      const bits = binToUint16(binStr, width);
+      return mode === 'bf16' ? bf16ToFloat(bits) : fp16ToFloat(bits);
+    }
+    if (mode === 'f32') {
+      return fp32ToFloat(binToUint32(binStr, width));
+    }
+    if (mode === 'f64') {
+      return fp64ToFloat(binToUint64(binStr, width));
+    }
+    throw new Error(`Unknown float format: ${mode}`);
   }
 
   function encodeFromFloat(value, mode) {
-    const bits = mode === 'bf16' ? floatToBf16(value) : floatToFp16(value);
-    return uint16ToBin(bits, 16);
+    if (mode === 'bf16') return uint16ToBin(floatToBf16(value), 16);
+    if (mode === 'fp16') return uint16ToBin(floatToFp16(value), 16);
+    if (mode === 'f32') return uint32ToBin(floatToFp32(value), 32);
+    if (mode === 'f64') return uint64ToBin(floatToFp64(value), 64);
+    throw new Error(`Unknown float format: ${mode}`);
   }
 
   function floatFlag(aFin, bFin, resultFin) {
@@ -596,8 +678,9 @@
       if (va === vb) return 0;
       return va > vb ? 1 : -1;
     }
-    const fa = decodeToFloat(a, mode, 16);
-    const fb = decodeToFloat(b, mode, 16);
+    const w = getFormatModeWidth(mode);
+    const fa = decodeToFloat(a, mode, w);
+    const fb = decodeToFloat(b, mode, w);
     if (fa === fb) return 0;
     return fa > fb ? 1 : -1;
   }
@@ -808,7 +891,8 @@
   }
 
   function formatFloatDisplay(binStr, mode) {
-    const f = decodeToFloat(binStr, mode, 16);
+    const w = getFormatModeWidth(mode);
+    const f = decodeToFloat(binStr, mode, w);
     if (Number.isNaN(f)) return 'nan';
     if (f === Infinity) return 'inf';
     if (f === -Infinity) return '-inf';
@@ -821,7 +905,7 @@
       assertFormatWidth(mode, bitWidth || String(binStr).length, 'show');
       return formatFixedDisplay(binStr, mode);
     }
-    if (mode === 'bf16' || mode === 'fp16') {
+    if (isIeeeFloatMode(mode)) {
       assertFormatWidth(mode, bitWidth || String(binStr).length, 'show');
       return formatFloatDisplay(binStr, mode);
     }
@@ -898,6 +982,8 @@
     const q = qModeSpec(mode);
     if (q) return q.width;
     if (mode === 'fp16' || mode === 'bf16') return 16;
+    if (mode === 'f32') return 32;
+    if (mode === 'f64') return 64;
     if (isSignedWidthMode(mode)) return signedWidthFromMode(mode);
     if (isUnsignedWidthMode(mode)) return unsignedWidthFromMode(mode);
     return null;
@@ -920,6 +1006,12 @@
     }
     if (mode === 'fp16' || mode === 'bf16') {
       return { kind: 'float', elementW: 16, tagSuffix: mode, signed: true, formatMode: mode };
+    }
+    if (mode === 'f32') {
+      return { kind: 'float', elementW: 32, tagSuffix: 'f32', signed: true, formatMode: 'f32' };
+    }
+    if (mode === 'f64') {
+      return { kind: 'float', elementW: 64, tagSuffix: 'f64', signed: true, formatMode: 'f64' };
     }
     return parseLiteralTag(mode);
   }

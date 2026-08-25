@@ -12,7 +12,7 @@
   const SHOW_OCT_DIGIT_BITS = 3;
   const SHOW_B32_DIGIT_BITS = 5;
 
-  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'oct', 'b32hex', 'b32c', 'q4p4', 'q8p8', 'bf16', 'fp16']);
+  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'oct', 'b32hex', 'b32c', 'q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64']);
   const ELEMENT_MODE_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
   const MODIFIER_TAGS = new Set(['signed', 'hexWide', 'multiline']);
 
@@ -462,7 +462,7 @@
     const hasB32c = tags.includes('b32c');
     let numericFormat = null;
     for (const t of tags) {
-      if (['q4p4', 'q8p8', 'bf16', 'fp16'].includes(t)) numericFormat = t;
+      if (['q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64'].includes(t)) numericFormat = t;
       else if (/^q\d+p\d+$/.test(t)) numericFormat = t;
       else if (/^s\d+$/.test(t)) numericFormat = t;
       else if (/^u\d+$/.test(t)) numericFormat = t;

@@ -3017,41 +3017,41 @@ reg(327, 'doc', 'All gates AND NAND NOR NXOR XOR', function(h, session) {
 
 reg(328, 'doc', 'BUILTIN_DOC — ADD signature', function(h, session) {
   const lines = Interpreter.getDocLines('ADD', new Map());
-  h.assert('ADD 10 signatures', String(lines.length), '10');
+  h.assert('ADD 12 signatures', String(lines.length), '12');
   h.assert('ADD unsigned', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('ADD signed', lines[1], 'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
   h.assert('ADD q4p4', lines[2], 'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status');
-  h.assert('ADD vector', lines[6], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('ADD matrix', lines[8], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('ADD vector', lines[8], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('ADD matrix', lines[10], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUBTRACT', new Map());
-  h.assert('SUBTRACT 10 signatures', String(lines.length), '10');
+  h.assert('SUBTRACT 12 signatures', String(lines.length), '12');
   h.assert('SUBTRACT unsigned', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('SUBTRACT signed', lines[1], 'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
   h.assert('SUBTRACT q4p4', lines[2], 'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status');
-  h.assert('SUBTRACT vector', lines[6], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('SUBTRACT matrix', lines[8], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUBTRACT vector', lines[8], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUBTRACT matrix', lines[10], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
   const lines = Interpreter.getDocLines('MULTIPLY', new Map());
-  h.assert('MULTIPLY 10 signatures', String(lines.length), '10');
+  h.assert('MULTIPLY 12 signatures', String(lines.length), '12');
   h.assert('MULTIPLY unsigned', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
   h.assert('MULTIPLY signed', lines[1], 'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over');
   h.assert('MULTIPLY q4p4', lines[2], 'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over, 4bit status');
-  h.assert('MULTIPLY vector', lines[6], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('MULTIPLY matrix', lines[8], 'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('MULTIPLY vector', lines[8], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('MULTIPLY matrix', lines[10], 'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(331, 'doc', 'BUILTIN_DOC — DIVIDE signature', function(h, session) {
   const lines = Interpreter.getDocLines('DIVIDE', new Map());
-  h.assert('DIVIDE 10 signatures', String(lines.length), '10');
+  h.assert('DIVIDE 12 signatures', String(lines.length), '12');
   h.assert('DIVIDE unsigned', lines[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
   h.assert('DIVIDE signed', lines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
-  h.assert('DIVIDE vector', lines[6], 'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('DIVIDE matrix', lines[8], 'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('DIVIDE vector', lines[8], 'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('DIVIDE matrix', lines[10], 'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', function(h, session) {
@@ -14261,16 +14261,16 @@ reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, ses
 
 reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUM', new Map());
-  h.assert('SUM 14 signatures', String(lines.length), '14');
+  h.assert('SUM 16 signatures', String(lines.length), '16');
   h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
   h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
   h.assert('SUM q4p4', lines[2], 'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over, 4bit status');
-  h.assert('SUM vector', lines[6], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('SUM signed vector', lines[7], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
-  h.assert('SUM matrix', lines[8], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
-  h.assert('SUM signed matrix', lines[9], 'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]');
-  h.assert('SUM row', lines[10], 'SUM(Wbit[n,m] m ; row) -> Wbit[n], Wbit[n]');
-  h.assert('SUM col', lines[11], 'SUM(Wbit[n,m] m ; col) -> Wbit[m], Wbit[m]');
+  h.assert('SUM vector', lines[8], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUM signed vector', lines[9], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUM matrix', lines[10], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUM signed matrix', lines[11], 'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUM row', lines[12], 'SUM(Wbit[n,m] m ; row) -> Wbit[n], Wbit[n]');
+  h.assert('SUM col', lines[13], 'SUM(Wbit[n,m] m ; col) -> Wbit[m], Wbit[m]');
 });
 
 reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
@@ -15500,11 +15500,11 @@ reg(1798, 'builtin-signed', 'DOT — signed vs unsigned', function(h, session) {
 
 reg(1799, 'doc', 'BUILTIN_DOC — DOT signed signature', function(h, session) {
   const lines = Interpreter.getDocLines('DOT', new Map());
-  h.assert('DOT 8 signatures', String(lines.length), '8');
+  h.assert('DOT 10 signatures', String(lines.length), '10');
   h.assert('DOT signed', lines[1], 'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over');
   h.assert('DOT q4p4', lines[2], 'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over, 4bit status');
-  h.assert('DOT matmul', lines[6], 'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over');
-  h.assert('DOT matmul signed', lines[7], 'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over');
+  h.assert('DOT matmul', lines[8], 'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over');
+  h.assert('DOT matmul signed', lines[9], 'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over');
 });
 
 reg(1800, 'builtin-signed', 'SUM — signed vs unsigned', function(h, session) {
@@ -15628,14 +15628,14 @@ reg(1811, 'builtin-vector', 'SUM(vectorA, vectorB; vector) — wave mode', funct
 reg(1812, 'builtin-vector', 'doc(MIN/MAX) vector signatures', function(h, session) {
   const minLines = Interpreter.getDocLines('MIN', new Map());
   const maxLines = Interpreter.getDocLines('MAX', new Map());
-  h.assert('MIN 14 signatures', String(minLines.length), '14');
-  h.assert('MAX 14 signatures', String(maxLines.length), '14');
-  h.assert('MIN vector', minLines[6], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
-  h.assert('MAX vector signed', maxLines[7], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
-  h.assert('MIN matrix', minLines[8], 'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]');
-  h.assert('MAX matrix signed', maxLines[9], 'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]');
-  h.assert('MIN row', minLines[10], 'MIN(Wbit[n,m] m ; row) -> Wbit[n]');
-  h.assert('MAX col', maxLines[11], 'MAX(Wbit[n,m] m ; col) -> Wbit[m]');
+  h.assert('MIN 16 signatures', String(minLines.length), '16');
+  h.assert('MAX 16 signatures', String(maxLines.length), '16');
+  h.assert('MIN vector', minLines[8], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
+  h.assert('MAX vector signed', maxLines[9], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
+  h.assert('MIN matrix', minLines[10], 'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]');
+  h.assert('MAX matrix signed', maxLines[11], 'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]');
+  h.assert('MIN row', minLines[12], 'MIN(Wbit[n,m] m ; row) -> Wbit[n]');
+  h.assert('MAX col', maxLines[13], 'MAX(Wbit[n,m] m ; col) -> Wbit[m]');
 });
 
 reg(1813, 'builtin-vector', 'ADD implicit vs explicit ; vector', function(h, session) {
@@ -15724,13 +15724,13 @@ reg(1822, 'builtin-vector', 'doc(ADD/SUBTRACT/CLAMP) vector signatures', functio
   const addLines = Interpreter.getDocLines('ADD', new Map());
   const subLines = Interpreter.getDocLines('SUBTRACT', new Map());
   const clampLines = Interpreter.getDocLines('CLAMP', new Map());
-  h.assert('ADD 10 signatures', String(addLines.length), '10');
-  h.assert('SUBTRACT 10 signatures', String(subLines.length), '10');
-  h.assert('CLAMP 10 signatures', String(clampLines.length), '10');
-  h.assert('ADD vector', addLines[6], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('CLAMP vector signed', clampLines[7], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
-  h.assert('ADD matrix', addLines[8], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
-  h.assert('SUBTRACT matrix signed', subLines[9], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('ADD 12 signatures', String(addLines.length), '12');
+  h.assert('SUBTRACT 12 signatures', String(subLines.length), '12');
+  h.assert('CLAMP 12 signatures', String(clampLines.length), '12');
+  h.assert('ADD vector', addLines[8], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('CLAMP vector signed', clampLines[9], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
+  h.assert('ADD matrix', addLines[10], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUBTRACT matrix signed', subLines[11], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(1823, 'builtin-vector', 'MULTIPLY(vectorA, vectorB; vector) per index', function(h, session) {
@@ -15842,9 +15842,9 @@ reg(1833, 'builtin-vector', 'doc(MULTIPLY/MAC/DIVIDE) vector signatures', functi
   const mulLines = Interpreter.getDocLines('MULTIPLY', new Map());
   const macLines = Interpreter.getDocLines('MAC', new Map());
   const divLines = Interpreter.getDocLines('DIVIDE', new Map());
-  h.assert('MAC vector over', macLines[6], 'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]');
+  h.assert('MAC vector over', macLines[8], 'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]');
   h.assert('DIVIDE signed', divLines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
-  h.assert('MULTIPLY vector signed', mulLines[7], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]');
+  h.assert('MULTIPLY vector signed', mulLines[9], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]');
 });
 
 reg(1834, 'builtin-vector', 'GT(vectorA, vectorB; vector)', function(h, session) {
@@ -16000,8 +16000,8 @@ reg(1850, 'builtin-vector', 'doc(GT/LT/EQ/LSHIFT) vector signatures', function(h
   const ltLines = Interpreter.getDocLines('LT', new Map());
   const eqLines = Interpreter.getDocLines('EQ', new Map());
   const lsLines = Interpreter.getDocLines('LSHIFT', new Map());
-  h.assert('GT vector', gtLines[6], 'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
-  h.assert('LT vector signed', ltLines[7], 'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]');
+  h.assert('GT vector', gtLines[8], 'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('LT vector signed', ltLines[9], 'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]');
   h.assert('EQ vector', eqLines[2], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
   h.assert('LSHIFT vector', lsLines[2], 'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]');
 });
@@ -17975,13 +17975,13 @@ reg(2037, 'builtin-nformat', 'NFORMAT missing destination tag', function(h, sess
 
 reg(2038, 'builtin-nformat', 'BUILTIN_DOC NFORMAT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('NFORMAT', new Map());
-  h.assert('count', String(lines.length), '24');
+  h.assert('count', String(lines.length), '33');
   h.assert('signed to_q4p4', lines[0], 'NFORMAT(Xbit a; signed to_q4p4) -> 8bit result, 4bit status');
-  h.assert('q4p4 to_fp16', lines[6], 'NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status');
-  h.assert('vector', lines[20], 'NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status');
-  h.assert('matrix', lines[21], 'NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status');
-  h.assert('sX', lines[22], 'NFORMAT(Xbit a; sX to_<dst>) -> Wdst result, 4bit status');
-  h.assert('qXpY', lines[23], 'NFORMAT((X+Y)bit a; qXpY to_<dst>) -> Wdst result, 4bit status');
+  h.assert('q4p4 to_fp16', lines[8], 'NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status');
+  h.assert('vector', lines[29], 'NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status');
+  h.assert('matrix', lines[30], 'NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status');
+  h.assert('sX', lines[31], 'NFORMAT(Xbit a; sX to_<dst>) -> Wdst result, 4bit status');
+  h.assert('qXpY', lines[32], 'NFORMAT((X+Y)bit a; qXpY to_<dst>) -> Wdst result, 4bit status');
 });
 
 reg(2044, 'builtin-nformat', 'NFORMAT s8 to_fp16 scalar', function(h, session) {
@@ -47009,6 +47009,660 @@ comp [logic] .batchLogic:
 
   reg(4306, 'logic', 'F40e float/fp16 list packed query output (legacy)', runF40eFloatFp16ListQueryOutput);
   reg(4307, 'logic', 'F40e float/fp16 list packed query output (wave)', runF40eFloatFp16ListQueryOutput, { propagation: 'wave' });
+
+  // --- F41: IEEE f32/f64 nativ LogTScript (D327–D331) ---
+
+  const F32_1_0 = '00111111100000000000000000000000';
+  const F32_1_5 = '00111111110000000000000000000000';
+  const F32_2_0 = '01000000000000000000000000000000';
+  const F32_3_0 = '01000000010000000000000000000000';
+  const F32_7_0 = '01000000111000000000000000000000';
+  const F64_1_0 = '0011111111110000000000000000000000000000000000000000000000000000';
+  const F64_1_5 = '0011111111111000000000000000000000000000000000000000000000000000';
+  const F64_2_0 = '0100000000000000000000000000000000000000000000000000000000000000';
+  const F64_3_0 = '0100000000001000000000000000000000000000000000000000000000000000';
+
+  reg(4310, 'builtin-numeric-formats', 'F41a ADD — f32 1.0+2.0=3.0', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_0 + '\n' +
+      '32wire b = ' + F32_2_0 + '\n' +
+      '32wire s, 4wire st = ADD(a, b; f32)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 's'), F32_3_0);
+    h.assert('clean status', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4311, 'builtin-numeric-formats', 'F41a ADD — f64 1.0+2.0=3.0', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_1_0 + '\n' +
+      '64wire b = ' + F64_2_0 + '\n' +
+      '64wire s, 4wire st = ADD(a, b; f64)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 's'), F64_3_0);
+    h.assert('clean status', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4312, 'builtin-numeric-formats', 'F41a ADD — f32 wrong width error', function(h, session) {
+    const r = session.run('8wire a = 00011000\n8wire b = 00001000\n8wire s, 1wire f = ADD(a, b; f32)');
+    const err = r.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('width error', String(err.includes('32-bit operands')), 'true');
+  });
+
+  reg(4313, 'builtin-numeric-formats', 'F41a ADD — f64 wrong width error', function(h, session) {
+    const r = session.run('32wire a = ' + F32_1_0 + '\n32wire b = ' + F32_2_0 + '\n32wire s, 1wire f = ADD(a, b; f64)');
+    const err = r.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('width error', String(err.includes('64-bit')), 'true');
+  });
+
+  reg(4314, 'builtin-numeric-formats', 'F41a SUBTRACT — f32 3.0-1.0=2.0', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_3_0 + '\n' +
+      '32wire b = ' + F32_1_0 + '\n' +
+      '32wire s, 4wire st = SUBTRACT(a, b; f32)'
+    );
+    h.assert('result 2.0', session.getWire(interp, 's'), F32_2_0);
+    h.assert('clean status', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4315, 'builtin-numeric-formats', 'F41a SUBTRACT — f64 3.0-1.0=2.0', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_3_0 + '\n' +
+      '64wire b = ' + F64_1_0 + '\n' +
+      '64wire s, 4wire st = SUBTRACT(a, b; f64)'
+    );
+    h.assert('result 2.0', session.getWire(interp, 's'), F64_2_0);
+    h.assert('clean status', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4316, 'builtin-numeric-formats', 'F41a MULTIPLY — f32 1.5×2.0=3.0', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_5 + '\n' +
+      '32wire b = ' + F32_2_0 + '\n' +
+      '32wire r, 32wire o, 4wire st = MULTIPLY(a, b; f32)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 'r'), F32_3_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4317, 'builtin-numeric-formats', 'F41a MULTIPLY — f64 1.5×2.0=3.0', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_1_5 + '\n' +
+      '64wire b = ' + F64_2_0 + '\n' +
+      '64wire r, 64wire o, 4wire st = MULTIPLY(a, b; f64)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 'r'), F64_3_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4318, 'builtin-numeric-formats', 'F41a DIVIDE — f32 3.0/1.5=2.0', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_3_0 + '\n' +
+      '32wire b = ' + F32_1_5 + '\n' +
+      '32wire q, 32wire m, 4wire st = DIVIDE(a, b; f32)'
+    );
+    h.assert('quotient 2.0', session.getWire(interp, 'q'), F32_2_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4319, 'builtin-numeric-formats', 'F41a MAC — f32 acc+1.0×2.0', function(h, session) {
+    const { interp } = session.run(
+      '32wire acc = ' + F32_1_0 + '\n' +
+      '32wire a = ' + F32_1_0 + '\n' +
+      '32wire b = ' + F32_2_0 + '\n' +
+      '32wire r, 33wire o, 4wire st = MAC(acc, a, b; f32)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 'r'), F32_3_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4320, 'builtin-numeric-formats', 'F41a DOT — f32 vector', function(h, session) {
+    const { interp } = session.run(
+      '32wire[2] a = ' + F32_1_0 + ' + ' + F32_2_0 + '\n' +
+      '32wire[2] b = ' + F32_1_0 + ' + ' + F32_1_0 + '\n' +
+      '32wire dot, 64wire over, 4wire st = DOT(a, b; f32)'
+    );
+    h.assert('dot 3.0', session.getWire(interp, 'dot'), F32_3_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4321, 'builtin-numeric-formats', 'F41a SUM — f32 two elements', function(h, session) {
+    const { interp } = session.run(
+      '32wire[2] v = ' + F32_1_0 + ' + ' + F32_2_0 + '\n' +
+      '32wire total, 32wire over, 4wire st = SUM(v; f32)'
+    );
+    h.assert('sum 3.0', session.getWire(interp, 'total'), F32_3_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4322, 'builtin-numeric-formats', 'F41a GT — f32 2.0 > 1.0', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_2_0 + '\n' +
+      '32wire b = ' + F32_1_0 + '\n' +
+      '1wire gt = GT(a, b; f32)'
+    );
+    h.assert('gt true', session.getWire(interp, 'gt'), '1');
+  });
+
+  reg(4323, 'builtin-numeric-formats', 'F41a LT — f64 1.0 < 2.0', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_1_0 + '\n' +
+      '64wire b = ' + F64_2_0 + '\n' +
+      '1wire lt = LT(a, b; f64)'
+    );
+    h.assert('lt true', session.getWire(interp, 'lt'), '1');
+  });
+
+  reg(4324, 'builtin-numeric-formats', 'F41a RSHIFT — f32 tag rejected', function(h, session) {
+    const r = session.run('32wire x = ' + F32_1_0 + '\n32wire y = RSHIFT(x, 1; f32)');
+    const err = r.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('rejected', String(err.includes('f32')), 'true');
+  });
+
+  reg(4325, 'builtin-numeric-formats', 'F41b show — f32 display tag 1.5', function(h, session) {
+    const { out } = session.run('32wire w = ' + F32_1_5 + '\nshow(w; f32)');
+    h.assert('shows 1.5', String(out.some(l => /w \(32wire\) = \\1\.5;f32/.test(l))), 'true');
+  });
+
+  reg(4326, 'builtin-numeric-formats', 'F41b show — f64 display tag 1.5', function(h, session) {
+    const { out } = session.run('64wire w = ' + F64_1_5 + '\nshow(w; f64)');
+    h.assert('shows 1.5', String(out.some(l => /w \(64wire\) = \\1\.5;f64/.test(l))), 'true');
+  });
+
+  reg(4327, 'builtin-numeric-formats', 'F41b show — f32 1.0', function(h, session) {
+    const { out } = session.run('32wire w = ' + F32_1_0 + '\nshow(w; f32)');
+    h.assert('shows 1', String(out.some(l => /w \(32wire\) = \\1;f32/.test(l))), 'true');
+  });
+
+  reg(4328, 'builtin-numeric-formats', 'F41b show — f64 3.0', function(h, session) {
+    const { out } = session.run('64wire w = ' + F64_3_0 + '\nshow(w; f64)');
+    h.assert('shows 3', String(out.some(l => /w \(64wire\) = \\3;f64/.test(l))), 'true');
+  });
+
+  reg(4329, 'builtin-numeric-formats', 'F41b peek — f32 display tag', function(h, session) {
+    const { out } = session.run('32wire w = ' + F32_1_5 + '\npeek(w; f32)');
+    h.assert('peek 1.5', String(out.some(l => /w \(32wire\) = \\1\.5;f32/.test(l))), 'true');
+  });
+
+  reg(4330, 'builtin-numeric-formats', 'F41b show — f32 vector grouped', function(h, session) {
+    const { out } = session.run('32wire[2] v = ' + F32_1_0 + ' + ' + F32_2_0 + '\nshow(v; f32)');
+    h.assert('grouped', String(out.some(l => /v = \\1 \\2;f32/.test(l))), 'true');
+  });
+
+  reg(4331, 'builtin-numeric-formats', 'F41b show — f64 NaN', function(h, session) {
+    const { out } = session.run('64wire w = 0111111111111000000000000000000000000000000000000000000000000000\nshow(w; f64)');
+    h.assert('shows nan', String(out.some(l => /\\nan;f64/.test(l))), 'true');
+  });
+
+  reg(4332, 'builtin-numeric-formats', 'F41b show — f32 inf', function(h, session) {
+    const { out } = session.run('32wire w = 01111111100000000000000000000000\nshow(w; f32)');
+    h.assert('shows inf', String(out.some(l => /\\inf;f32/.test(l))), 'true');
+  });
+
+  reg(4333, 'builtin-numeric-formats', 'F41b show — f32 -0', function(h, session) {
+    const { out } = session.run('32wire w = 10000000000000000000000000000000\nshow(w; f32)');
+    h.assert('shows -0', String(out.some(l => /\\-0;f32/.test(l))), 'true');
+  });
+
+  reg(4334, 'builtin-numeric-formats', 'F41b show — f64 vector grouped', function(h, session) {
+    const { out } = session.run('64wire[2] v = ' + F64_1_0 + ' + ' + F64_2_0 + '\nshow(v; f64)');
+    h.assert('grouped', String(out.some(l => /v = \\1 \\2;f64/.test(l))), 'true');
+  });
+
+  reg(4335, 'builtin-numeric-formats', 'F41b peek — f64 display tag', function(h, session) {
+    const { out } = session.run('64wire w = ' + F64_3_0 + '\npeek(w; f64)');
+    h.assert('peek 3', String(out.some(l => /w \(64wire\) = \\3;f64/.test(l))), 'true');
+  });
+
+  reg(4336, 'builtin-numeric-formats', 'F41b show f32 mutual exclusive with hex', function(h, session) {
+    h.assertThrows('mutually exclusive', () => session.parse('show(w; f32 hex)'));
+  });
+
+  reg(4337, 'builtin-numeric-formats', 'F41b show — f32 narrow wire raw bits', function(h, session) {
+    const { out } = session.run('16wire w = 0011110000000000\nshow(w; f32)');
+    h.assert('raw bits', String(out.some(l => /w \(16wire\) = 0011110000000000/.test(l))), 'true');
+  });
+
+  reg(4338, 'builtin-numeric-formats', 'F41b show — f64 on 32wire raw bits', function(h, session) {
+    const { out } = session.run('32wire w = ' + F32_1_0 + '\nshow(w; f64)');
+    h.assert('raw bits', String(out.some(l => /w \(32wire\) = 00111111100000000000000000000000/.test(l))), 'true');
+  });
+
+  reg(4339, 'builtin-numeric-formats', 'F41b show — f32 after ADD', function(h, session) {
+    const { out } = session.run(
+      '32wire a = ' + F32_1_0 + '\n' +
+      '32wire b = ' + F32_2_0 + '\n' +
+      '32wire s, 4wire st = ADD(a, b; f32)\n' +
+      'show(s; f32)'
+    );
+    h.assert('shows 3', String(out.some(l => /s \(32wire\) = \\3;f32/.test(l))), 'true');
+  });
+
+  reg(4340, 'builtin-nformat', 'F41c NFORMAT q4p4 to_f32 exact', function(h, session) {
+    const { interp } = session.run(
+      '8wire a = \\7;q4p4\n' +
+      '32wire r, 4wire st = NFORMAT(a; q4p4 to_f32)'
+    );
+    h.assert('result 7.0 f32', session.getWire(interp, 'r'), F32_7_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4341, 'builtin-nformat', 'F41c NFORMAT signed to_f64', function(h, session) {
+    const { interp } = session.run(
+      '8wire a = \\42;s8\n' +
+      '64wire r, 4wire st = NFORMAT(a; signed to_f64)'
+    );
+    h.assert('64 bits', String(session.getWire(interp, 'r').length), '64');
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4342, 'builtin-nformat', 'F41c NFORMAT f32 to_fp16 truncate', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_5 + '\n' +
+      '16wire r, 4wire st = NFORMAT(a; f32 to_fp16)'
+    );
+    h.assert('fp16 1.5', session.getWire(interp, 'r'), '0011111000000000');
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4343, 'builtin-nformat', 'F41c NFORMAT fp16 to_f32 widen', function(h, session) {
+    const { interp } = session.run(
+      '16wire a = 0011111000000000\n' +
+      '32wire r, 4wire st = NFORMAT(a; fp16 to_f32)'
+    );
+    h.assert('f32 1.5', session.getWire(interp, 'r'), F32_1_5);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4344, 'builtin-nformat', 'F41c NFORMAT f64 to_f32', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_1_5 + '\n' +
+      '32wire r, 4wire st = NFORMAT(a; f64 to_f32)'
+    );
+    h.assert('f32 1.5', session.getWire(interp, 'r'), F32_1_5);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4345, 'builtin-nformat', 'F41c NFORMAT f32 to_q4p4', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_0 + '\n' +
+      '8wire r, 4wire st = NFORMAT(a; f32 to_q4p4)'
+    );
+    h.assert('q4p4 1.0', session.getWire(interp, 'r'), '00010000');
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4346, 'builtin-nformat', 'F41c NFORMAT f32 NaN to_q4p4', function(h, session) {
+    const { interp } = session.run(
+      '32wire nan = 01111111110000000000000000000000\n' +
+      '8wire r, 4wire st = NFORMAT(nan; f32 to_q4p4)'
+    );
+    h.assert('nan status', session.getWire(interp, 'st'), '0001');
+  });
+
+  reg(4347, 'builtin-nformat', 'F41c NFORMAT f32 wrong width error', function(h, session) {
+    const r = session.run('16wire a = 0011110000000000\n32wire r, 4wire st = NFORMAT(a; f32 to_fp16)');
+    const err = r.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('width error', String(err.includes('32-bit')), 'true');
+  });
+
+  reg(4348, 'builtin-nformat', 'F41c NFORMAT vector f32 to_fp16', function(h, session) {
+    const { interp } = session.run(
+      '32wire[2] v = ' + F32_1_0 + ' + ' + F32_2_0 + '\n' +
+      '16wire[2] r, 4wire[2] st = NFORMAT(v; f32 to_fp16 vector)'
+    );
+    h.assert('elem0 fp16 1.0', session.getWire(interp, 'r').slice(0, 16), '0011110000000000');
+    h.assert('elem1 fp16 2.0', session.getWire(interp, 'r').slice(16, 32), '0100000000000000');
+  });
+
+  reg(4349, 'builtin-nformat', 'F41c NFORMAT matrix q4p4 to_f32', function(h, session) {
+    const { interp } = session.run(
+      '8wire[2,2] m = 00010000 + 00100000 + 00011000 + 00001000\n' +
+      '32wire[2,2] r, 4wire[2,2] st = NFORMAT(m; q4p4 to_f32 matrix)'
+    );
+    h.assert('cell00 f32 1.0', session.getWire(interp, 'r').slice(0, 32), F32_1_0);
+    h.assert('status00 clean', session.getWire(interp, 'st').slice(0, 4), '0000');
+  });
+
+  reg(4350, 'builtin-nformat', 'F41c NFORMAT f64 to_signed', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_1_0 + '\n' +
+      '64wire r, 4wire st = NFORMAT(a; f64 to_signed)'
+    );
+    h.assert('64 bits', String(session.getWire(interp, 'r').length), '64');
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4351, 'builtin-nformat', 'F41c NFORMAT q8p8 to_f64', function(h, session) {
+    const { interp } = session.run(
+      '16wire a = 0000000001111000\n' +
+      '64wire r, 4wire st = NFORMAT(a; q8p8 to_f64)'
+    );
+    h.assert('64 bits', String(session.getWire(interp, 'r').length), '64');
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4352, 'builtin-nformat', 'F41c NFORMAT f32 to_bf16', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_0 + '\n' +
+      '16wire r, 4wire st = NFORMAT(a; f32 to_bf16)'
+    );
+    h.assert('16 bits', String(session.getWire(interp, 'r').length), '16');
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4353, 'builtin-nformat', 'F41c NFORMAT duplicate dst rejected', function(h, session) {
+    const r = session.run('32wire a = ' + F32_1_0 + '\n32wire r, 4wire st = NFORMAT(a; f32 to_f32 to_fp16)');
+    const err = r.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('duplicate dst', String(err.includes('duplicate destination')), 'true');
+  });
+
+  reg(4354, 'builtin-nformat', 'F41c NFORMAT f32 to_f64 widen', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_5 + '\n' +
+      '64wire r, 4wire st = NFORMAT(a; f32 to_f64)'
+    );
+    h.assert('f64 1.5', session.getWire(interp, 'r'), F64_1_5);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4355, 'builtin-numeric-formats', 'F41d MIN/MAX — f32 ordering', function(h, session) {
+    const { interp } = session.run(
+      '32wire loV = ' + F32_1_0 + '\n' +
+      '32wire hiV = ' + F32_2_0 + '\n' +
+      '32wire lo = MIN(loV, hiV; f32)\n' +
+      '32wire hi = MAX(loV, hiV; f32)'
+    );
+    h.assert('min 1.0', session.getWire(interp, 'lo'), F32_1_0);
+    h.assert('max 2.0', session.getWire(interp, 'hi'), F32_2_0);
+  });
+
+  reg(4356, 'builtin-numeric-formats', 'F41d CLAMP — f32', function(h, session) {
+    const { interp } = session.run(
+      '32wire x = ' + F32_3_0 + '\n' +
+      '32wire lo = ' + F32_1_0 + '\n' +
+      '32wire hi = ' + F32_2_0 + '\n' +
+      '32wire y = CLAMP(x, lo, hi; f32)'
+    );
+    h.assert('clamped 2.0', session.getWire(interp, 'y'), F32_2_0);
+  });
+
+  reg(4357, 'builtin-numeric-formats', 'F41d ABS — f32', function(h, session) {
+    const { interp } = session.run(
+      '32wire x = 11000000000000000000000000000000\n' +
+      '32wire a, 4wire st = ABS(x; f32)'
+    );
+    h.assert('abs 2.0', session.getWire(interp, 'a'), F32_2_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4358, 'builtin-numeric-formats', 'F41d CLAMP — f64', function(h, session) {
+    const { interp } = session.run(
+      '64wire x = ' + F64_3_0 + '\n' +
+      '64wire lo = ' + F64_1_0 + '\n' +
+      '64wire hi = ' + F64_2_0 + '\n' +
+      '64wire y = CLAMP(x, lo, hi; f64)'
+    );
+    h.assert('clamped 2.0', session.getWire(interp, 'y'), F64_2_0);
+  });
+
+  reg(4359, 'builtin-numeric-formats', 'F41d ABS — f64', function(h, session) {
+    const { interp } = session.run(
+      '64wire x = 1100000000000000000000000000000000000000000000000000000000000000\n' +
+      '64wire a, 4wire st = ABS(x; f64)'
+    );
+    h.assert('abs 2.0', session.getWire(interp, 'a'), F64_2_0);
+    h.assert('status clean', session.getWire(interp, 'st'), '0000');
+  });
+
+  reg(4360, 'builtin-numeric-formats', 'F41d ADD(vector) — f32 per element', function(h, session) {
+    const { interp } = session.run(
+      '32wire[2] a = ' + F32_1_0 + ' + ' + F32_1_5 + '\n' +
+      '32wire[2] b = ' + F32_1_0 + ' + ' + F32_1_5 + '\n' +
+      '32wire[2] r, 4wire[2] st = ADD(a, b; vector f32)'
+    );
+    h.assert('elem0 2.0', session.getWire(interp, 'r').slice(0, 32), F32_2_0);
+    h.assert('elem1 3.0', session.getWire(interp, 'r').slice(32, 64), F32_3_0);
+  });
+
+  reg(4361, 'builtin-numeric-formats', 'F41d DIVIDE — f64', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_3_0 + '\n' +
+      '64wire b = ' + F64_1_5 + '\n' +
+      '64wire q, 64wire m, 4wire st = DIVIDE(a, b; f64)'
+    );
+    h.assert('quotient 2.0', session.getWire(interp, 'q'), F64_2_0);
+  });
+
+  reg(4362, 'builtin-numeric-formats', 'F41d MAC — f64', function(h, session) {
+    const { interp } = session.run(
+      '64wire acc = ' + F64_1_0 + '\n' +
+      '64wire a = ' + F64_1_0 + '\n' +
+      '64wire b = ' + F64_2_0 + '\n' +
+      '64wire r, 65wire o, 4wire st = MAC(acc, a, b; f64)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 'r'), F64_3_0);
+  });
+
+  reg(4363, 'builtin-numeric-formats', 'F41d DOT — f64 vector', function(h, session) {
+    const { interp } = session.run(
+      '64wire[2] a = ' + F64_1_0 + ' + ' + F64_2_0 + '\n' +
+      '64wire[2] b = ' + F64_1_0 + ' + ' + F64_1_0 + '\n' +
+      '64wire dot, 128wire over, 4wire st = DOT(a, b; f64)'
+    );
+    h.assert('dot 3.0', session.getWire(interp, 'dot'), F64_3_0);
+  });
+
+  reg(4364, 'builtin-numeric-formats', 'F41d SUM — f64', function(h, session) {
+    const { interp } = session.run(
+      '64wire[2] v = ' + F64_1_0 + ' + ' + F64_2_0 + '\n' +
+      '64wire total, 64wire over, 4wire st = SUM(v; f64)'
+    );
+    h.assert('sum 3.0', session.getWire(interp, 'total'), F64_3_0);
+  });
+
+  reg(4365, 'builtin-numeric-formats', 'F41d GT — f64', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_2_0 + '\n' +
+      '64wire b = ' + F64_1_0 + '\n' +
+      '1wire gt = GT(a, b; f64)'
+    );
+    h.assert('gt true', session.getWire(interp, 'gt'), '1');
+  });
+
+  reg(4366, 'builtin-numeric-formats', 'F41d LT — f32', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_0 + '\n' +
+      '32wire b = ' + F32_2_0 + '\n' +
+      '1wire lt = LT(a, b; f32)'
+    );
+    h.assert('lt true', session.getWire(interp, 'lt'), '1');
+  });
+
+  reg(4367, 'builtin-numeric-formats', 'F41d MIN/MAX — f64 ordering', function(h, session) {
+    const { interp } = session.run(
+      '64wire loV = ' + F64_1_0 + '\n' +
+      '64wire hiV = ' + F64_2_0 + '\n' +
+      '64wire lo = MIN(loV, hiV; f64)\n' +
+      '64wire hi = MAX(loV, hiV; f64)'
+    );
+    h.assert('min 1.0', session.getWire(interp, 'lo'), F64_1_0);
+    h.assert('max 2.0', session.getWire(interp, 'hi'), F64_2_0);
+  });
+
+  reg(4368, 'builtin-numeric-formats', 'F41d RSHIFT — f64 tag rejected', function(h, session) {
+    const r = session.run('64wire x = ' + F64_1_0 + '\n64wire y = RSHIFT(x, 1; f64)');
+    const err = r.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('rejected', String(err.includes('f64')), 'true');
+  });
+
+  reg(4369, 'builtin-numeric-formats', 'F41d MULTIPLY — f64 2.0×1.5=3.0', function(h, session) {
+    const { interp } = session.run(
+      '64wire a = ' + F64_2_0 + '\n' +
+      '64wire b = ' + F64_1_5 + '\n' +
+      '64wire r, 64wire o, 4wire st = MULTIPLY(a, b; f64)'
+    );
+    h.assert('result 3.0', session.getWire(interp, 'r'), F64_3_0);
+  });
+
+  function runF41eLogicF32Query(h, session) {
+    const src = `inline [logic] .vals:
+
+    expect(1.5)
+
+    query check:
+        expect(T)
+
+:
+
+32wire sensorIn = ${F32_1_5}
+
+1wire ok = .vals:query({ expect(T) }, T=float/f32 sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4370, 'logic', 'F41e float/f32 query input (legacy)', runF41eLogicF32Query);
+  reg(4371, 'logic', 'F41e float/f32 query input (wave)', runF41eLogicF32Query, { propagation: 'wave' });
+
+  function runF41eLogicF64Query(h, session) {
+    const src = `inline [logic] .vals:
+
+    expect(1.5)
+
+    query check:
+        expect(T)
+
+:
+
+64wire sensorIn = ${F64_1_5}
+
+1wire ok = .vals:query({ expect(T) }, T=float/f64 sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4372, 'logic', 'F41e float/f64 query input (legacy)', runF41eLogicF64Query);
+  reg(4373, 'logic', 'F41e float/f64 query input (wave)', runF41eLogicF64Query, { propagation: 'wave' });
+
+  function runF41eShowAfterLogic(h, session) {
+    const src = `inline [logic] .vals:
+
+    expect(1.5)
+
+    query check:
+        expect(T)
+
+:
+
+32wire sensorIn = ${F32_1_5}
+
+1wire ok = .vals:query({ expect(T) }, T=float sensorIn)`;
+    const { out, interp } = session.run(src + '\nshow(sensorIn; f32)');
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('show 1.5', String(out.some(l => /sensorIn \(32wire\) = \\1\.5;f32/.test(l))), 'true');
+  }
+
+  reg(4374, 'logic', 'F41e logic→wire show f32 round-trip (legacy)', runF41eShowAfterLogic);
+  reg(4375, 'logic', 'F41e logic→wire show f32 round-trip (wave)', runF41eShowAfterLogic, { propagation: 'wave' });
+
+  function runF41eCompPinF32(h, session) {
+    const src = `inline [logic] .data:
+
+    sample(1.5)
+
+    query q:
+        sample(V)
+
+:
+
+comp [logic] .dataLogic:
+    on: 1
+
+    .data {
+        V is float/f32 valPin
+    }
+
+:
+
+32wire valIn = ${F32_1_5}
+1wire ok = 0
+1wire trigger = 1
+
+.dataLogic:{
+    valPin = valIn
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4376, 'logic', 'F41e comp pin float/f32 (legacy)', runF41eCompPinF32);
+  reg(4377, 'logic', 'F41e comp pin float/f32 (wave)', runF41eCompPinF32, { propagation: 'wave' });
+
+  function runF41eFloatListF32Output(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query check:
+        row(1, L)
+
+:
+
+64wire packedOut = 0000000000000000000000000000000000000000000000000000000000000000
+
+64wire packedFlat = .batch:query({ row(1, L) }, L=float list)`;
+    const { interp } = session.run(src);
+    const out = session.getWire(interp, 'packedFlat');
+    h.assert('64 bits', String(out.length), '64');
+    h.assert('f32 1.0', out.slice(0, 32), F32_1_0);
+    h.assert('f32 2.0', out.slice(32, 64), F32_2_0);
+  }
+
+  reg(4378, 'logic', 'F41e float list f32 output matches show bits (legacy)', runF41eFloatListF32Output);
+  reg(4379, 'logic', 'F41e float list f32 output matches show bits (wave)', runF41eFloatListF32Output, { propagation: 'wave' });
+
+  reg(4380, 'builtin-numeric-formats', 'F41e ADD f32 bits match logic wire', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_0 + '\n' +
+      '32wire b = ' + F32_2_0 + '\n' +
+      '32wire s, 4wire st = ADD(a, b; f32)'
+    );
+    h.assert('logic-compatible 3.0', session.getWire(interp, 's'), F32_3_0);
+  });
+
+  reg(4381, 'builtin-numeric-formats', 'F41e NFORMAT f32→fp16→f32 round-trip', function(h, session) {
+    const { interp } = session.run(
+      '32wire a = ' + F32_1_5 + '\n' +
+      '16wire h, 4wire st1 = NFORMAT(a; f32 to_fp16)\n' +
+      '32wire back, 4wire st2 = NFORMAT(h; fp16 to_f32)'
+    );
+    h.assert('round-trip 1.5', session.getWire(interp, 'back'), F32_1_5);
+  });
+
+  reg(4382, 'logic', 'F41e float/X 32wire default f32 (legacy)', runF41eLogicF32Query);
+  reg(4383, 'logic', 'F41e float/X 32wire default f32 (wave)', runF41eLogicF32Query, { propagation: 'wave' });
+
+  reg(4384, 'builtin-nformat', 'F41e NFORMAT q4p4 to_f32 show round-trip', function(h, session) {
+    const { out, interp } = session.run(
+      '8wire a = \\7;q4p4\n' +
+      '32wire r, 4wire st = NFORMAT(a; q4p4 to_f32)\n' +
+      'show(r; f32)'
+    );
+    h.assert('f32 7.0 bits', session.getWire(interp, 'r'), F32_7_0);
+    h.assert('show 7', String(out.some(l => /r \(32wire\) = \\7;f32/.test(l))), 'true');
+  });
+
+  reg(4385, 'builtin-numeric-formats', 'F41e show f64 after NFORMAT widen', function(h, session) {
+    const { out, interp } = session.run(
+      '32wire a = ' + F32_1_5 + '\n' +
+      '64wire r, 4wire st = NFORMAT(a; f32 to_f64)\n' +
+      'show(r; f64)'
+    );
+    h.assert('f64 1.5', session.getWire(interp, 'r'), F64_1_5);
+    h.assert('show 1.5', String(out.some(l => /r \(64wire\) = \\1\.5;f64/.test(l))), 'true');
+  });
 
   window.LogTScriptTestSuite.finalize();
 })();

@@ -60,41 +60,6 @@
     return format;
   }
 
-  function binToFloat32(bits) {
-    const padded = String(bits).padStart(32, '0').slice(-32);
-    const buf = new ArrayBuffer(4);
-    const view = new DataView(buf);
-    view.setUint32(0, parseInt(padded, 2), false);
-    return view.getFloat32(0, false);
-  }
-
-  function float32ToBin(value) {
-    const buf = new ArrayBuffer(4);
-    const view = new DataView(buf);
-    view.setFloat32(0, value, false);
-    return view.getUint32(0).toString(2).padStart(32, '0');
-  }
-
-  function binToFloat64(bits) {
-    const padded = String(bits).padStart(64, '0').slice(-64);
-    const hi = parseInt(padded.slice(0, 32), 2);
-    const lo = parseInt(padded.slice(32), 2);
-    const buf = new ArrayBuffer(8);
-    const view = new DataView(buf);
-    view.setUint32(0, hi, false);
-    view.setUint32(4, lo, false);
-    return view.getFloat64(0, false);
-  }
-
-  function float64ToBin(value) {
-    const buf = new ArrayBuffer(8);
-    const view = new DataView(buf);
-    view.setFloat64(0, value, false);
-    const hi = view.getUint32(0, false);
-    const lo = view.getUint32(4, false);
-    return hi.toString(2).padStart(32, '0') + lo.toString(2).padStart(32, '0');
-  }
-
   function logicDecodeFloatBits(bits, floatFormat) {
     const width = bits.length;
     const format = logicResolveFloatFormat(floatFormat, width);
@@ -105,8 +70,6 @@
       }
       return NF.fixedRawToNumber(bits, format);
     }
-    if (format === 'f32') return binToFloat32(bits);
-    if (format === 'f64') return binToFloat64(bits);
     if (!NF || typeof NF.decodeToFloat !== 'function') {
       throw new Error('LogTScriptNumericFormats is not loaded');
     }
@@ -122,8 +85,6 @@
       }
       return NF.fixedNumberToRaw(v, format);
     }
-    if (format === 'f32') return float32ToBin(v).slice(-width).padStart(width, '0');
-    if (format === 'f64') return float64ToBin(v).slice(-width).padStart(width, '0');
     if (!NF || typeof NF.encodeFromFloat !== 'function') {
       throw new Error('LogTScriptNumericFormats is not loaded');
     }

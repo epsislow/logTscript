@@ -552,6 +552,19 @@ inline [logic] .batch:
 
 **Load & Run:** **`packedFlat`** holds two IEEE **`f32`** cells (`1.0`, then `2.0`). Use **`float/fp16 list`** or **`float/f64 list`** when you need 16- or 64-bit packed slots instead.
 
+### Native `show(w; f32)` — same bits as logic decode
+
+Wire bits from logic **`float/f32`** or **`float/X`** on a **`32wire`** match tagged builtins and **`show(; f32)`**:
+
+```logts-play
+32wire sensorIn = 00111111110000000000000000000000
+show(sensorIn; f32)
+```
+
+**Load & Run:** output shows `\1.5;f32` — the same IEEE single the logic KB would decode as `1.5`.
+
+For **64-bit** wires use **`show(w; f64)`** with **`float/f64`** or **`float/X`** on **`64wire`**.
+
 ---
 
 ## Query success and `1wire`

@@ -99,21 +99,21 @@ function isNumericFormatDisplayTag(tagName) {
   return isParametricFormatDisplayTag(tagName);
 }
 
-const NUMERIC_FORMAT_DISPLAY_TAGS = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
+const NUMERIC_FORMAT_DISPLAY_TAGS = new Set(['q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64']);
 const SHOW_PEEK_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
   'oct', 'b32hex', 'b32c',
-  'q4p4', 'q8p8', 'bf16', 'fp16',
+  'q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64',
   'elAll', 'elNonZero', 'compact', 'elRange', 'elLast', 'maxWidth', 'multiline',
   'asm',
 ]);
 const PROBE_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
   'oct', 'b32hex', 'b32c',
-  'q4p4', 'q8p8', 'bf16', 'fp16',
+  'q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64',
   'maxWidth', 'multiline', 'level',
 ]);
-const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'oct', 'b32hex', 'b32c', 'q4p4', 'q8p8', 'bf16', 'fp16']);
+const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'oct', 'b32hex', 'b32c', 'q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64']);
 const DISPLAY_ELEMENT_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
 const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth', 'level']);
 const WATCH_DISPLAY_TAGS = new Set(['level']);
@@ -1540,7 +1540,7 @@ parseDebugDisplayTags(allowedTags) {
   if (hasFormatB32c) formatCount++;
   if (numericFormatTags.length) formatCount += numericFormatTags.length;
   if (formatCount > 1) {
-    throw Error(`Display format tags (dec, hex, bin, ascii, oct, b32hex, b32c, q4p4, q8p8, bf16, fp16, sX, uX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`Display format tags (dec, hex, bin, ascii, oct, b32hex, b32c, q4p4, q8p8, bf16, fp16, f32, f64, sX, uX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.some((t) => /^s\d+$/.test(t))) {
     throw Error(`Display tags signed and fixed signed width (sX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);

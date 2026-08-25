@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41** (2+n) f32/f64 nativ LogTScript — **D327+** ready; amânat **2+m** is/2 extins; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; amânat **2+m** is/2 extins; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -199,22 +199,22 @@ todos:
     status: completed
   - id: logic-ieee-2n
     content: "Faza 41 (2+n): f32/f64 nativ LogTScript — show, NFORMAT, builtins; codec unificat cu logic — D327+"
-    status: pending
+    status: completed
   - id: logic-ieee-41a
     content: "F41a: codec f32/f64 în numeric-formats.js; logic-float-formats delegă — teste 4310+"
-    status: pending
+    status: completed
   - id: logic-ieee-41b
     content: "F41b: show/peek ; f32 / ; f64 — debug-display-format + parser tags — teste 4325+"
-    status: pending
+    status: completed
   - id: logic-ieee-41c
     content: "F41c: NFORMAT to_f32 / to_f64 / from f32|f64 — teste 4340+"
-    status: pending
+    status: completed
   - id: logic-ieee-41d
     content: "F41d: builtins ADD/MULTIPLY/… pe 32wire/64wire cu ; f32|; f64 — teste 4355+"
-    status: pending
+    status: completed
   - id: logic-ieee-41e
     content: "F41e: doc EN (number-conversion, doc-function, logic-value-types cross-ref) + round-trip logic↔wire — teste 4370+"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -1480,7 +1480,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 38** DCG Prolog (`phrase//`) (**2+i**)           | **F38a✅ F38b✅** — D297–D304 confirmed — [Faza 38](#faza-38--dcg-prolog-phrase-2i--completed) | **(completed)** |
 | **Faza 39** Formate numerice la frontieră (**2+k**)    | **F39a→F39c✅** — `number/<format>` int; **D305–D315✅** — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) | **(completed)** |
 | **Faza 40** Float Prolog + frontieră (**2+l**)        | **F40a→F40e✅** — [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) | **(completed)** |
-| **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--ready-to-implement) | **(ready-to-implement)** |
+| **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
 
 
 ---
@@ -9556,15 +9556,17 @@ comp [logic] .sensorLogic:
 
 **Compat:** `number` fără `/` = comportament F25 neschimbat (D312).
 
-#### **2+l** ✅ → **F40** (D316–D317✅ confirmed 2026-08-25)
+#### **2+l** ✅ → **F40✅** (D316–D326 confirmed 2026-08-25)
 
-**Promovat:** 2026-08-25 — itemi scoși din scope **F39a–c**; **F39 livrat**; următor pas **Faza 40**.
+**Livrat** — secțiune: [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed). Teste **4210–4307**; **3441/3441**.
 
-Secțiune completă: [Faza 40 — Float Prolog + frontieră `float/<format>`](#faza-40--float-prolog--frontieră-floatformat-2l--ready-to-implement).
+#### **2+n** ⏳ → **F41** (D327–D331 confirmed 2026-08-25)
 
-**Legat de:** [D314](#d314--out-of-scope-f39-confirmed-a) · [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed).
+**Promovat:** 2026-08-25 — user: `f32`/`f64` nativ LogTScript (show, NFORMAT, builtins); codec unificat cu logic.
 
-**Decizii F39 complete:** **D305–D315✅**. **Decizii F40:** **D316–D319✅** — gata de **F40a**.
+Secțiune completă: [Faza 41 — IEEE f32/f64 nativ LogTScript](#faza-41--ieee-f32f64-nativ-logtscript-2n--ready-to-implement).
+
+**Legat de:** [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) (`fp16`) · [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (frontieră logic `f32`/`f64` azi).
 
 #### **2+m** ⏳ — `is/2` float extins (post-**F40c**)
 
@@ -9797,11 +9799,11 @@ Neschimbat — livrare F40d.
 
 ---
 
-## Faza 41 — IEEE **f32/f64** nativ LogTScript **2+n** **(ready-to-implement)**
+## Faza 41 — IEEE **f32/f64** nativ LogTScript **2+n** **(completed)**
 
 > **Backlog:** **2+n** — promovat 2026-08-25 după **F40✅** (user: conversie fire↔logic naturală).  
-> **Extinde:** [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) (`fp16`/`bf16` în `numeric-formats.js`), [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (`f32`/`f64` doar la frontieră logic azi).  
-> **Status:** **ready-to-implement** — decizii **D327–D331** confirmed 2026-08-25.
+> **Extinde:** [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) (`fp16`/`bf16` în `numeric-formats.js`), [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (`f32`/`f64` la frontieră logic).  
+> **Status:** **✅ completed** 2026-08-25 — decizii **D327–D331** confirmed; teste **4310–4385**; **3517/3517** suite.
 
 ### Problemă (stare azi post-F40)
 

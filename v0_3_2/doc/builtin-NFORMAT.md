@@ -49,6 +49,8 @@ Exactly **one source** tag and **one destination** tag (`to_*`). Source and dest
 | `qXpY` | exactly **X+Y** (≤64) | Signed fixed-point Q{X}.{Y} |
 | `fp16` | **16** | IEEE 754 half |
 | `bf16` | **16** | Brain float 16 |
+| `f32` | **32** | IEEE 754 single |
+| `f64` | **64** | IEEE 754 double |
 
 | Destination tag | Result width |
 |-----------------|--------------|
@@ -60,6 +62,8 @@ Exactly **one source** tag and **one destination** tag (`to_*`). Source and dest
 | `to_qXpY` | **X+Y** |
 | `to_fp16` | **16** |
 | `to_bf16` | **16** |
+| `to_f32` | **32** |
+| `to_f64` | **64** |
 
 **`signed`** uses the operand width adaptively; **`sX`** / **`uX`** fix the width (`; sX` / `; uX` validates the operand is exactly X bits). The same applies to `to_signed` / `to_sX` / `to_uX` for the result.
 
@@ -138,6 +142,28 @@ show(st)
 ```
 
 Per-cell conversion; `status` is `4wire[2,2]` (4 bits per cell).
+
+### `q4p4` → `f32`
+
+```logts-play
+8wire a = \7;q4p4
+32wire r, 4wire st = NFORMAT(a; q4p4 to_f32)
+show(r; f32)
+show(st)
+```
+
+`7.0` in Q4.4 converts exactly to IEEE single; `st = 0000`.
+
+### `f32` → `fp16` (truncate to half)
+
+```logts-play
+32wire a = 00111111110000000000000000000000
+16wire r, 4wire st = NFORMAT(a; f32 to_fp16)
+show(r; fp16)
+show(st)
+```
+
+**Load & Run:** `1.5` f32 → fp16 half; status `0000`.
 
 ### Parametrized `sX` / `qXpY`
 

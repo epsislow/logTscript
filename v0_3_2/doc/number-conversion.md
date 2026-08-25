@@ -190,6 +190,58 @@ doc(ISDIGIT)
 
 ---
 
+## IEEE float (`f32` / `f64`)
+
+Native **32-bit** and **64-bit** IEEE 754 tags for `show`, tagged builtins (`ADD`, `MULTIPLY`, …), and `NFORMAT`. Same wire encoding as logic **`float/f32`** and **`float/f64`** at the logic frontier — see [logic-value-types.md](logic-value-types.md).
+
+| Tag | Wire width | Example human value |
+|-----|------------|---------------------|
+| `f32` | **32** | `1.5` |
+| `f64` | **64** | `1.5` |
+
+### `show(w; f32)` — inspect a 32-bit IEEE wire
+
+```logts-play
+32wire sensor = 00111111110000000000000000000000
+show(sensor; f32)
+```
+
+**Load & Run:** displays `\1.5;f32` — the decoded single-precision value.
+
+### `ADD` with `; f32`
+
+```logts-play
+32wire a = 00111111100000000000000000000000
+32wire b = 01000000000000000000000000000000
+32wire sum, 4wire st = ADD(a, b; f32)
+show(sum; f32)
+show(st)
+```
+
+**Load & Run:** `1.0 + 2.0 = 3.0`; status `0000`.
+
+### `NFORMAT` — fixed point to IEEE single
+
+```logts-play
+8wire q = \7;q4p4
+32wire r, 4wire st = NFORMAT(q; q4p4 to_f32)
+show(r; f32)
+show(st)
+```
+
+**Load & Run:** Q4.4 `7.0` → IEEE `f32` `7.0`; status `0000`.
+
+### `show(w; f64)` — 64-bit double
+
+```logts-play
+64wire reading = 0011111111111000000000000000000000000000000000000000000000000000
+show(reading; f64)
+```
+
+**Load & Run:** displays `\1.5;f64`.
+
+---
+
 ## See also
 
 - [arithmetic.md](arithmetic.md) — `ADD`, `MAC`, `GT`, `CLAMP`, …

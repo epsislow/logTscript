@@ -7993,6 +7993,8 @@ Exactly **one source** tag and **one destination** tag (\`to_*\`). Source and de
 | \`qXpY\` | exactly **X+Y** (≤64) | Signed fixed-point Q{X}.{Y} |
 | \`fp16\` | **16** | IEEE 754 half |
 | \`bf16\` | **16** | Brain float 16 |
+| \`f32\` | **32** | IEEE 754 single |
+| \`f64\` | **64** | IEEE 754 double |
 
 | Destination tag | Result width |
 |-----------------|--------------|
@@ -8004,6 +8006,8 @@ Exactly **one source** tag and **one destination** tag (\`to_*\`). Source and de
 | \`to_qXpY\` | **X+Y** |
 | \`to_fp16\` | **16** |
 | \`to_bf16\` | **16** |
+| \`to_f32\` | **32** |
+| \`to_f64\` | **64** |
 
 **\`signed\`** uses the operand width adaptively; **\`sX\`** / **\`uX\`** fix the width (\`; sX\` / \`; uX\` validates the operand is exactly X bits). The same applies to \`to_signed\` / \`to_sX\` / \`to_uX\` for the result.
 
@@ -8082,6 +8086,28 @@ show(st)
 \`\`\`
 
 Per-cell conversion; \`status\` is \`4wire[2,2]\` (4 bits per cell).
+
+### \`q4p4\` → \`f32\`
+
+\`\`\`logts-play
+8wire a = \\7;q4p4
+32wire r, 4wire st = NFORMAT(a; q4p4 to_f32)
+show(r; f32)
+show(st)
+\`\`\`
+
+\`7.0\` in Q4.4 converts exactly to IEEE single; \`st = 0000\`.
+
+### \`f32\` → \`fp16\` (truncate to half)
+
+\`\`\`logts-play
+32wire a = 00111111110000000000000000000000
+16wire r, 4wire st = NFORMAT(a; f32 to_fp16)
+show(r; fp16)
+show(st)
+\`\`\`
+
+**Load & Run:** \`1.5\` f32 → fp16 half; status \`0000\`.
 
 ### Parametrized \`sX\` / \`qXpY\`
 
@@ -30079,6 +30105,19 @@ inline [logic] .batch:
 
 **Load & Run:** **\`packedFlat\`** holds two IEEE **\`f32\`** cells (\`1.0\`, then \`2.0\`). Use **\`float/fp16 list\`** or **\`float/f64 list\`** when you need 16- or 64-bit packed slots instead.
 
+### Native \`show(w; f32)\` — same bits as logic decode
+
+Wire bits from logic **\`float/f32\`** or **\`float/X\`** on a **\`32wire\`** match tagged builtins and **\`show(; f32)\`**:
+
+\`\`\`logts-play
+32wire sensorIn = 00111111110000000000000000000000
+show(sensorIn; f32)
+\`\`\`
+
+**Load & Run:** output shows \`\\1.5;f32\` — the same IEEE single the logic KB would decode as \`1.5\`.
+
+For **64-bit** wires use **\`show(w; f64)\`** with **\`float/f64\`** or **\`float/X\`** on **\`64wire\`**.
+
 ---
 
 ## Query success and \`1wire\`
@@ -35735,6 +35774,58 @@ doc(N2N16S)
 doc(N16S2N)
 doc(ISDIGIT)
 \`\`\`
+
+---
+
+## IEEE float (\`f32\` / \`f64\`)
+
+Native **32-bit** and **64-bit** IEEE 754 tags for \`show\`, tagged builtins (\`ADD\`, \`MULTIPLY\`, …), and \`NFORMAT\`. Same wire encoding as logic **\`float/f32\`** and **\`float/f64\`** at the logic frontier — see [logic-value-types.md](logic-value-types.md).
+
+| Tag | Wire width | Example human value |
+|-----|------------|---------------------|
+| \`f32\` | **32** | \`1.5\` |
+| \`f64\` | **64** | \`1.5\` |
+
+### \`show(w; f32)\` — inspect a 32-bit IEEE wire
+
+\`\`\`logts-play
+32wire sensor = 00111111110000000000000000000000
+show(sensor; f32)
+\`\`\`
+
+**Load & Run:** displays \`\\1.5;f32\` — the decoded single-precision value.
+
+### \`ADD\` with \`; f32\`
+
+\`\`\`logts-play
+32wire a = 00111111100000000000000000000000
+32wire b = 01000000000000000000000000000000
+32wire sum, 4wire st = ADD(a, b; f32)
+show(sum; f32)
+show(st)
+\`\`\`
+
+**Load & Run:** \`1.0 + 2.0 = 3.0\`; status \`0000\`.
+
+### \`NFORMAT\` — fixed point to IEEE single
+
+\`\`\`logts-play
+8wire q = \\7;q4p4
+32wire r, 4wire st = NFORMAT(q; q4p4 to_f32)
+show(r; f32)
+show(st)
+\`\`\`
+
+**Load & Run:** Q4.4 \`7.0\` → IEEE \`f32\` \`7.0\`; status \`0000\`.
+
+### \`show(w; f64)\` — 64-bit double
+
+\`\`\`logts-play
+64wire reading = 0011111111111000000000000000000000000000000000000000000000000000
+show(reading; f64)
+\`\`\`
+
+**Load & Run:** displays \`\\1.5;f64\`.
 
 ---
 
