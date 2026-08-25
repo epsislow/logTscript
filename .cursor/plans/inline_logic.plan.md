@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; amânat **2+m** is/2 extins; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42** (2+m) is/2 extins + random float — ready; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -188,8 +188,23 @@ todos:
   - id: logic-float-40c
     content: "F40c: is/2 pe reale MVP (+ - * /, int→float) — teste 4250+; restul → 2+m"
     status: completed
-  - id: logic-float-2m
-    content: "Faza amânată 2+m: is/2 float extins (**, mod, funcții, call/is meta-call)"
+  - id: logic-is-2m
+    content: "Faza 42 (2+m): is/2 extins + random float — D332+ — ready-to-implement post-F41"
+    status: pending
+  - id: logic-is-42a
+    content: "F42a: operatori ** mod rem // în is/2 (int + float) — tokenizer + parser + logicEvalNumeric — teste 4386+"
+    status: pending
+  - id: logic-is-42b
+    content: "F42b: funcții unare abs sqrt floor ceiling round truncate în expr is — teste 4401+"
+    status: pending
+  - id: logic-is-42c
+    content: "F42c: min/max binare în expr is — teste 4416+"
+    status: pending
+  - id: logic-is-42d
+    content: "F42d: call(is/2) meta-call (D157 deferred) — teste 4431+"
+    status: pending
+  - id: logic-is-42e
+    content: "F42e: random_between pe float + doc is/2 extins + verify suite — teste 4446+"
     status: pending
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
@@ -1481,6 +1496,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 39** Formate numerice la frontieră (**2+k**)    | **F39a→F39c✅** — `number/<format>` int; **D305–D315✅** — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) | **(completed)** |
 | **Faza 40** Float Prolog + frontieră (**2+l**)        | **F40a→F40e✅** — [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) | **(completed)** |
 | **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
+| **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e** — [Faza 42](#faza-42--is2-extins--random-float-2m--ready) | **(ready-to-implement)** |
 
 
 ---
@@ -6746,11 +6762,11 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ⏳     | **2+j**     | Lazy streams / I/O          | `lazy_read_lines`, lazy pe stream/file/wire, `lazy_findall`, engines — **out of scope F37c** (D296); promovat din **[F37c](#f37c--lazy-4121-post-f37b--d289-c)** | —          | D296, F37c, F22               |
 | ✅     | ~~**2+k**~~ | Formate numerice logic wire | **`number/<format>`** int — F39a→c✅ — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) | **F39**    | F25, D305–D315✅, tagged builtins |
 | ✅     | ~~**2+l**~~ | Logic numeric post-F39      | **Promovat → Faza 40✅** — float Prolog + `float/<format>`; `number/fp16|q*` → eroare | **F40**    | F39, D314, D316–D326✅          |
-| ⏳     | **2+n**     | IEEE f32/f64 nativ LogTScript | **`show(; f32)`**, **NFORMAT**, **ADD/MULTIPLY/…** pe `32wire`/`64wire`; codec partajat cu logic — conversie fire↔logic naturală | **F41**    | F40, F39 fp16, D327+            |
-| ⏳     | **2+m**     | `is/2` float extins         | Post-**F40c** — `**`, `mod`, `rem`, `abs`, `min`/`max`, `floor`/`ceiling`/`round`, `call(is/2)` meta-call; eventual `random` float | **F42?**   | F26 D157, F40c, D318            |
+| ✅     | ~~**2+n**~~ | IEEE f32/f64 nativ LogTScript | **Livrat → Faza 41✅** — `show(; f32/f64)`, NFORMAT, builtins; codec unificat logic↔wire; teste **4310–4385** | **F41**    | F40, F39 fp16, D327+ **(completed)** |
+| ⏳     | **2+m**     | `is/2` float extins         | **Promovat → Faza 42** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float** | **F42**    | F26 D157, F40c, F41, D318 **(ready)** |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · **2+n → F41** (ready) · **2+m** (post-F40c) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · **2+m → F42** (ready) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -9560,30 +9576,19 @@ comp [logic] .sensorLogic:
 
 **Livrat** — secțiune: [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed). Teste **4210–4307**; **3441/3441**.
 
-#### **2+n** ⏳ → **F41** (D327–D331 confirmed 2026-08-25)
+#### **2+n** ✅ → **F41** (D327–D331 confirmed; livrat 2026-08-25)
 
 **Promovat:** 2026-08-25 — user: `f32`/`f64` nativ LogTScript (show, NFORMAT, builtins); codec unificat cu logic.
 
-Secțiune completă: [Faza 41 — IEEE f32/f64 nativ LogTScript](#faza-41--ieee-f32f64-nativ-logtscript-2n--ready-to-implement).
+**Livrat** — secțiune: [Faza 41 — IEEE f32/f64 nativ LogTScript](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed). Teste **4310–4385**; **3517/3517**.
 
-**Legat de:** [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) (`fp16`) · [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (frontieră logic `f32`/`f64` azi).
+#### **2+m** ⏳ → **Faza 42** **(ready-to-implement)**
 
-#### **2+m** ⏳ — `is/2` float extins (post-**F40c**)
+**Promovat:** 2026-08-25 — restul aritmeticii float scoasă din scope **F40c** (D318). **Renumerotat F42** 2026-08-25 post-**F41✅**.
 
-**Promovat:** 2026-08-25 — restul aritmeticii float scoasă din scope **F40c** (D318).
+**Livrabile:** secțiune completă — [Faza 42 — `is/2` extins + random float](#faza-42--is2-extins--random-float-2m--ready). Subfaze **F42a→F42e**; teste draft **4386–4460**.
 
-| Item amânat | Detaliu |
-| ----------- | ------- |
-| **`**`, `mod`, `rem`, `//`** | Operatori integer + float în `is/2` |
-| **Funcții unare** | `abs`, `sign`, `floor`, `ceiling`, `round`, `truncate` |
-| **Agregate simple în expr** | `min`, `max` (dacă intră în gramatica `is`) |
-| **`call(is/2)` meta-call** | Deferred din **F26** D157 |
-| **`random` float** | Extinde **F34** (`random_between` pe reale) — opțional |
-| **Trig / `sqrt`** | Doar dacă cerință explicită |
-
-**Candidat fază:** **F42** — după **F41** (codec IEEE comun).
-
-**Legat de:** [D318](#d318--is2-pe-reale-confirmed-a--mvp-în-f40c-extins-în-2m) · [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed).
+**Legat de:** [D318](#d318--is2-pe-reale-confirmed-a--mvp-în-f40c-extins-în-2m) · [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) · [Faza 34](#faza-34--builtins-random-integer-2h--completed) (random int).
 
 ---
 
@@ -9693,10 +9698,10 @@ listMod    := list [each]
 | ------------- | ------------------------------------------------------------- |
 | `+` `-` `*` `/` pe float | `**` (putere) |
 | promovare int→float în expresie mixtă | `mod`, `rem`, `//` |
-| LHS var / ground ca F26 (D154) | `abs`, `min`, `max`, `floor`, `ceiling`, `round`, `truncate` |
+| LHS var / ground ca F26 (D154) | `abs`, **`sqrt`**, `min`, `max`, `floor`, `ceiling`, `round`, `truncate` |
 | fail la /0, RHS neevaluabil | `call(is/2)` meta-call (deferred din **F26** D157) |
 | | `random` pe float (extinde **F34** integer) |
-| | funcții trig / `sqrt` (dacă e nevoie) |
+| | funcții trig / `log` / `exp` (fază separată) |
 
 **Regulă mix int/float:** dacă expresia conține cel puțin un float, rezultatul e float; altfel int (F26 neschimbat).
 
@@ -9928,3 +9933,79 @@ Adaugă **`to_f32`**, **`to_f64`**; surse **`f32`**, **`f64`** în `parseNformat
 **Nu este:** tip „float wire” separat — firele rămân **`Nwire` bit vectors**; tag-ul e la **`show`/builtins/NFORMAT** și la **logic bind**.
 
 **Compat:** `fp16`/`bf16`/`q*` neschimbat; **F40** frontieră logic neschimbată ca API — doar implementare codec comună (fără breaking).
+
+---
+
+## Faza 42 — `is/2` extins + **random float** **2+m** **(ready-to-implement)**
+
+> **Backlog:** **2+m** — promovat 2026-08-25 post-**F40c** (D318); renumerotat **F42** post-**F41✅**.  
+> **Extinde:** [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) (`is/2` int), [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (**F40c** float MVP), [Faza 34](#faza-34--builtins-random-integer-2h--completed) (`random_between/3` int).  
+> **Status:** **ready-to-implement** — dependențe îndeplinite; **fără cod încă**.
+
+### Problemă (stare azi post-F41)
+
+| Topic | Comportament azi |
+| ----- | ---------------- |
+| **`is/2` MVP** | ✅ F40c — `+ - * /`, promovare int→float, `/0` fail, int `/` trunc |
+| **Operatori extinși** | ❌ `**`, `mod`, `rem`, `//` — tokenizer + parser + eval lipsesc |
+| **Funcții în expr** | ❌ `abs`, `floor`, `ceiling`, `round`, `truncate`, `min`, `max` |
+| **`call(is/2)`** | ❌ deferred din **F26** D157 |
+| **`random_between/3`** | ✅ F34 — **doar integer**; float low/high/out → fail |
+| **Gramatică expr** | `parseMulExpr` — doar `*` `/`; fără nivel `**`; fără apel funcții în expr |
+
+**Motiv fază:** închide gap-ul Prolog-style pentru aritmetică umană (`1.5`, `min(A,B)`, `sqrt(X)`) și RNG pe reale, fără trig/`log`/notație științifică.
+
+### Scope (subfaze echilibrate — mirror F41)
+
+| Subfază | Livrabil | Fișiere principale | Teste (draft) |
+| ------- | -------- | ------------------ | ------------- |
+| **F42a** | Operatori **`**`**, **`mod`**, **`rem`**, **`//`** în RHS `is/2` — int + float; precedență: `**` > `*``/``//` > `+``-` > `mod``rem`; `/0`, `//0`, `mod 0` → fail | `logic-assembler.js` (tokenizer `**`, `//`; parser nivele); `logic-engine.js` (`logicEvalNumeric`) | **4386–4400** |
+| **F42b** | Funcții unare în expr: **`abs`**, **`sqrt`**, **`floor`**, **`ceiling`**, **`round`**, **`truncate`** — formă `fn(Arg)`; int/float; rezultat float dacă operand float; **`sqrt`** pe int negativ sau NaN → fail | parser (`parseTermPrimary` / apel în expr); `logicEvalNumeric` + kind `call`/`func` | **4401–4415** |
+| **F42c** | **`min`/`max`** binare în expr — `min(A, B)`, `max(A, B)`; promovare int→float ca la `+` | idem F42b | **4416–4430** |
+| **F42d** | **`call(is/2)` meta-call** — `call(is(X, Y))` echivalent `X is Y` (D157); head `is/2` rămâne rezervat | `logic-engine.js` (`_solveCall` / intercept) | **4431–4445** |
+| **F42e** | **`random_between(L, H, Out)` pe float** — același RNG F34; interval `[L,H]` inclusiv pe reale; `set_random/1` neschimbat (seed int); doc EN + regression F40c/F34 | `logic-engine.js` (`_solveRandomBetween`, `logicRandomFloatBetween`); `logic-builtins.md`, `inline-logic.md` | **4446–4460** |
+
+**Pattern teste:** legacy + wave ca F40c/F41; ultimul ID F41 = **4385** → F42 pornește la **4386**.
+
+### Sintaxă țintă (draft)
+
+```text
+X is 2 ** 3                    ; 8 (int)
+Y is 1.5 ** 2.0               ; 2.25 (float)
+Q is 7 // 2                   ; 3 (int trunc division)
+R is 7.0 mod 3.0              ; 1.0 (float mod — semantics TBD în D332)
+Z is abs(-1.5)                ; 1.5
+D is sqrt(9)                  ; 3 (int perfect square)
+E is sqrt(2.0)                ; ~1.414… (float)
+W is min(A, B)                ; promovare mixed
+call(is(T, 10 + 5))           ; meta-call
+random_between(0.0, 1.0, F)   ; float out (F42e)
+```
+
+### Semantici de confirmat (decizii draft **D332+**)
+
+| Topic | Propunere MVP |
+| ----- | ------------- |
+| **`mod` vs `rem`** | SWI-style: `mod` semn divisor; `rem` semn dividend; pe float = `Math.fmod` / trunc variant — de confirmat la implementare |
+| **`//`** | Integer-only (fail dacă operand float?) **sau** trunc ca int chiar cu float ground — de confirmat |
+| **`random_between` float** | Inclusiv capete; același impure slot F34; mixed int/float → promote la float |
+| **`sqrt`** | `Math.sqrt`; operand int negativ → fail; rezultat float dacă operand float sau rădăcină neîntreagă (ex. `sqrt(2)` → float) — de confirmat la D332 |
+| **`sign`** | Out of scope F42 (opțional) |
+
+### Out of scope F42
+
+- Trig (`sin`, `cos`, …), **`log`/`exp`** — fază separată dacă e nevoie
+- Notație științifică `1e10` în literale logic
+- `random` pe wire IEEE packed — doar valori KB `number`/`float`
+- Literale float în sursa LogTScript non-logic
+
+### Fișiere atinse (checklist implementare — **nu început**)
+
+| Fișier | F42a–d | F42e |
+| ------ | ------ | ---- |
+| `v0_3_2/core/logic-assembler.js` | tokenizer + gramatică expr | — |
+| `v0_3_2/core/logic-engine.js` | `logicEvalNumeric`, eventual `call` | `_solveRandomBetween` |
+| `v0_3_2/tests/test_suite.js` | 4386+ | 4446+ |
+| `v0_3_2/doc/logic-builtins.md`, `inline-logic.md` | secțiune `is/2` extins | `random_between` float |
+
+**Verify țintă post-livrare:** `node node/_gen_test_manifest.js` → `node node/_run_test_suite_node.js -q` → doc verify (pattern F41).
