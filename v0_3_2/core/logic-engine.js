@@ -410,6 +410,18 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'setof' && g0.arity === 3) {
       return this._solveSetof(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'string_to_list' && g0.arity === 2) {
+      return this._solveStringToList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'string_to_codes' && g0.arity === 2) {
+      return this._solveStringToCodes(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'atom_chars' && g0.arity === 2) {
+      return this._solveAtomChars(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'atom_codes' && g0.arity === 2) {
+      return this._solveAtomCodes(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call' && g0.predicate === 'true' && g0.arity === 0) {
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
@@ -723,6 +735,50 @@ class LogicEngine {
     if (built === false) return false;
     const trail = env.trailLength();
     if (!logicUnify(closed, built, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return cont();
+  }
+
+  _solveStringToList(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    return this._solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, 'string_chars');
+  }
+
+  _solveStringToCodes(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    return this._solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, 'string_codes');
+  }
+
+  _solveAtomChars(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    return this._solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, 'atom_chars');
+  }
+
+  _solveAtomCodes(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    return this._solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, 'atom_codes');
+  }
+
+  _solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, mode) {
+    const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    const ad = logicDeref(atomTerm, env);
+    const ld = logicDeref(listTerm, env);
+    if (ad.kind === 'var' && ld.kind === 'var') return false;
+    const trail = env.trailLength();
+    let ok = false;
+    if (ad.kind === 'atom') {
+      const built = mode === 'string_codes' || mode === 'atom_codes'
+        ? logicAtomToCodesListTerm(ad, this.table)
+        : logicAtomToCharListTerm(ad, this.table);
+      if (built === false) return false;
+      ok = logicUnify(listTerm, built, env, this.table);
+    } else if (ld.kind === 'list') {
+      if (!logicListIsGroundClosed(ld, env)) return false;
+      const built = logicGroundListToAtomTerm(ld, env, this.table, mode);
+      if (built === false) return false;
+      ok = logicUnify(atomTerm, built, env, this.table);
+    } else {
+      return false;
+    }
+    if (!ok) {
       env.undo(trail);
       return false;
     }
@@ -2151,6 +2207,63 @@ function logicBuildAnonList(n) {
     head: { kind: 'var', name: '_' },
     tail: logicBuildAnonList(n - 1),
   };
+}
+
+function logicAtomToCharListTerm(atom, table) {
+  const name = logicAtomDisplayName(atom, table);
+  if (name == null) return false;
+  const elems = [];
+  for (let i = 0; i < name.length; i++) {
+    elems.push(logicInternTerm({ kind: 'atom', name: name.charAt(i) }, table));
+  }
+  return logicArrayToList(elems);
+}
+
+function logicAtomToCodesListTerm(atom, table) {
+  const name = logicAtomDisplayName(atom, table);
+  if (name == null) return false;
+  const elems = [];
+  for (let i = 0; i < name.length; i++) {
+    const code = name.charCodeAt(i);
+    if (!Number.isFinite(code) || code < 0) return false;
+    elems.push({ kind: 'number', value: code });
+  }
+  return logicArrayToList(elems);
+}
+
+function logicGroundCharListToAtomName(listD, env, table) {
+  const arr = logicGroundListToArray(listD, env);
+  if (arr == null) return false;
+  let s = '';
+  for (const t of arr) {
+    if (t.kind !== 'atom') return false;
+    const ch = logicAtomDisplayName(t, table);
+    if (!ch || ch.length !== 1) return false;
+    s += ch;
+  }
+  return s;
+}
+
+function logicGroundCodesListToAtomName(listD, env) {
+  const arr = logicGroundListToArray(listD, env);
+  if (arr == null) return false;
+  let s = '';
+  for (const t of arr) {
+    if (t.kind !== 'number' || !Number.isInteger(t.value) || t.value < 0) return false;
+    s += String.fromCharCode(t.value);
+  }
+  return s;
+}
+
+function logicGroundListToAtomTerm(listD, env, table, mode) {
+  const useStringFlag = mode === 'string_chars' || mode === 'string_codes';
+  const name = (mode === 'string_codes' || mode === 'atom_codes')
+    ? logicGroundCodesListToAtomName(listD, env)
+    : logicGroundCharListToAtomName(listD, env, table);
+  if (name === false) return false;
+  const atom = { kind: 'atom', name };
+  if (useStringFlag) atom.logicTraceAsString = true;
+  return logicInternTerm(atom, table);
 }
 
 function logicGroundListToArray(listD, env) {

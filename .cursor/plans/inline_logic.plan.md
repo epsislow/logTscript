@@ -147,10 +147,13 @@ todos:
     content: "F37a: dif-list L-H + append/2 dif-list + unificare — teste 4081+"
     status: completed
   - id: logic-char-list-37b
-    content: "F37b: string_to_list/codes, atom_chars/codes — teste 41xx+ (fără unificare automată)"
-    status: pending
+    content: "F37b: string_to_list/codes, atom_chars/codes — teste 4095+"
+    status: completed
   - id: logic-lazy-list-37c
-    content: "F37c: lazy lists — teste 42xx+ (opțional / amânat la confirmare D279)"
+    content: "F37c: lazy_list/2 (hibrid B+A), between/3 — teste 4121+; D293–D296 confirmed"
+    status: pending
+  - id: logic-lazy-streams-2j
+    content: "Faza amânată 2+j: lazy streams/I/O — promovat din F37c D296 (out of scope F37c)"
     status: pending
   - id: logic-dcg-2i
     content: "Faza 38 (2+i): DCG — rule//, phrase/2, phrase/3 — după F37a; D290 out of scope F37"
@@ -170,7 +173,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate                                |
 | **(completed)**          | Decizie luată / implementată                                                          |
 | **1+a … 1+v**            | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan)       |
-| **2+a … 2+i**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2i) |
+| **2+a … 2+j**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2j) |
 | ✅                        | Backlog **promovat / livrat** (fază completed)                                        |
 | ❌                        | Backlog **respins** definitiv                                                         |
 | 🟠✗                      | Backlog **închis** — alternativa nu se face; livrat altfel                            |
@@ -1369,7 +1372,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 
 ---
 
-> **Backlog post-MVP (**`1+a` **…** `1+v`**):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (**`2+a` **…** `2+i`**):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2i).
+> **Backlog post-MVP (**`1+a` **…** `1+v`**):** tabel complet — [Backlog post-MVP](#backlog-post-mvp). **Faze amânate (**`2+a` **…** `2+j`**):** — [Backlog faze amânate](#backlog-faze-amânate-2a--2j).
 
 ---
 
@@ -1416,7 +1419,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 34** Builtins random integer (**2+h**)           | D211–D216, D261–D266 — `random_between/3`, `set_random/1`, `randomSeed:` comp; fără float                              | **(completed)**        |
 | **Faza 35** Builtins listă suplimentare (**2+g**)       | **F35a…F35j** — catalog complet 2+g în 10 subfaze echilibrate (~2–4 zile/subfază)                                     | **(completed)** |
 | **Faza 36a** `true/0`, `fail/0`                         | —                                                                                                                     | **(completed)**   |
-| **Faza 37** Liste avansate Prolog (**2+e**)             | **F37a…F37c** — dif-list, char-list builtins, lazy; **D279–D292 confirmed** (F37c lazy post-F37b)                  | **(ready — F37a next)** |
+| **Faza 37** Liste avansate Prolog (**2+e**)             | **F37a✅ F37b✅ F37c** — lazy + `between/3`; **D293–D296 confirmed** 2026-08-25 · **F37c next**                  | **(ready-to-implement)** |
 | **Faza 38** DCG Prolog (`phrase//`) (**2+i**)           | Draft — `rule//`, `phrase/2`, `phrase/3`; **depinde F37a** (dif-list); promovat din D290-B                        | **(deferred)**          |
 
 
@@ -6605,8 +6608,9 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 | **F20b** scope blocks                          | **2+a** **(deferred)**                                      |
 | **F20c** reguli import relative                | **2+b** **(deferred)**                                      |
 | ~~**Builtins listă** member/append~~           | ~~**2+d**~~ → **F27**                                       |
-| **Faza 37** liste avansate (**2+e**)           | **F37a…F37c** — D279–D292 **confirmed**; **F37a next** |
-| **Faza 38** DCG **`phrase//`** (**2+i**)       | **2+i** **(deferred)** — D290-B; după F37a dif-list     |
+| **Faza 37** liste avansate (**2+e**)           | **F37a✅ F37b✅ F37c** — D293–D296 **confirmed**; **F37c next** |
+| **Faza 38** DCG **`phrase//`** (**2+i**)       | **2+i** **(deferred)** — D290-B; D297+ la promovare; după F37a dif-list     |
+| **Lazy streams / I/O** (**2+j**)               | **2+j** **(deferred)** — out of scope **F37c** (D296); promovat din F37c     |
 | ~~**Builtins listă supl.**~~                   | ~~**2+g**~~ → **F35a…F35j** (catalog complet)               |
 | `use` **/** `use once`                         | **Faza 15** **(completed)**                                 |
 | Constraint `#K (line L)` trace                 | **1+v** **(pause)**                                         |
@@ -6621,10 +6625,10 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 ## Ordine recomandată
 
 1. ~~Faza 0~~ → ~~Faza 36a~~ **(completed)**
-2. **Faza 37** — liste avansate **2+e** — **F37a** first (dif-list), apoi **F37b** (char-list), **F37c** lazy la confirmare
+2. **Faza 37** — **F37c** lazy + `between/3` (D293–D296 confirmed)
 3. **Faza 30** — doc tutorial **mini-monopoly** (`doc/mini-monopoly-logic.md`) — doc-only, parallel
 4. Apoi backlog **1+p**, **1+s**, **1+o**, …
-5. Apoi faze amânate **2+a**, **2+b**, **2+f**, **2+i** (DCG → F38) · ~~**2+g**~~ → **F35** · ~~**2+e**~~ → **F37**
+5. Apoi faze amânate **2+a**, **2+b**, **2+f**, **2+i** (DCG → F38), **2+j** (lazy streams → post-F37c) · ~~**2+g**~~ → **F35** · ~~**2+e**~~ → **F37**
 
 ---
 
@@ -6662,9 +6666,9 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 
 ---
 
-## Backlog faze amânate (2+a … 2+i)
+## Backlog faze amânate (2+a … 2+j)
 
-Tabel master **2+a … 2+i** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+Tabel master **2+a … 2+j** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 
 | Stare | ID          | Subiect                     | Detaliu                                                                                                        | Fază draft | Legat de                        |
@@ -6678,9 +6682,10 @@ Tabel master **2+a … 2+i** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+g**~~ | Builtins listă suplimentare | **Promovat → Faza 35** — catalog complet **F35a…F35j** (10 subfaze); vezi [Faza 35](#faza-35--builtins-listă-suplimentare-2g) | **F35**    | **2+d**, **F27**, F22–F23       |
 | ✅     | ~~**2+h**~~ | Builtins random (integer)   | **Promovat → Faza 34** — `random_between/3`, `set_random/1`, `randomSeed:`; vezi [Faza 34](#faza-34--builtins-random-integer-2h--completed) | **F34**    | F30 D203, Monopoly doc v2       |
 | ⏳     | **2+i**     | DCG Prolog                  | `rule//`, `phrase/2`, `phrase/3` — gramatici dif-list; **nu** în F37 (D290-B) → **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** | **F38**    | D290, F37a                      |
+| ⏳     | **2+j**     | Lazy streams / I/O          | `lazy_read_lines`, lazy pe stream/file/wire, `lazy_findall`, engines — **out of scope F37c** (D296); promovat din **[F37c](#f37c--lazy-4121-post-f37b--d289-c)** | —          | D296, F37c, F22               |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34** · ~~**2+g**~~ **→ F35** · ~~**2+e**~~ **→ F37 (următoarea)** · **F37a** first · **2+i** (DCG) **după F37a** · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34** · ~~**2+g**~~ **→ F35** · ~~**2+e**~~ **→ F37** · **F37c** next · **2+i** (DCG) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -6706,9 +6711,9 @@ Reguli noi declarate sub prefix importat + referințe relative în body (`carSiz
 
 Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2`. **F22** livrează termeni + reguli user (exemple doc); `nth0`**/**`nth1` → **F23** **(completed)**. User 2026-08-21: scope extins cu `length`, `reverse`, `sort`.
 
-#### ~~**2+e**~~ → **Faza 37** (liste avansate) **(confirmed — F37a next)**
+#### ~~**2+e**~~ → **Faza 37** (liste avansate) **(F37a✅ F37b✅ — F37c next)**
 
-**Promovat 2026-08-25** — vezi [Faza 37](#faza-37--liste-avansate-prolog-2e--ready--f37a-next). **D279–D292 confirmed** 2026-08-25. Implementare **F37a → F37b → F37c** (lazy post-F37b).
+**Promovat 2026-08-25** — vezi [Faza 37](#faza-37--liste-avansate-prolog-2e--f37c-next). **D279–D296 confirmed** (D293–D296 user 2026-08-25). **F37a✅ F37b✅** livrate; **F37c** următor.
 
 **Ce este:** fază pentru **model de listă avansat** în engine — **nu** catalog builtin ca F35. Vezi și [D136 — explicație](#d136--out-of-scope-explicație).
 
@@ -6746,7 +6751,7 @@ Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`,
 
 **Dependență:** **F37a** (dif-list `L-H`) — obligatoriu înainte de F38.
 
-**Scope draft (la promovare — decizii D293+):**
+**Scope draft (la promovare — decizii D297+):**
 
 | Livrabil | Descriere |
 | -------- | --------- |
@@ -6784,7 +6789,29 @@ inline [logic] .grammar:
 1wire ok = .grammar:query({ parse123 })
 ```
 
-**Status:** ⏳ backlog **2+i** — **fără decizii D293+ încă**; secțiune completă la promovare (ca F37).
+**Status:** ⏳ backlog **2+i** — **fără decizii D297+ încă**; secțiune completă la promovare (ca F37).
+
+#### **2+j** ⏳ — Lazy streams / I/O (post-F37c)
+
+**Amânat** — promovat în backlog la confirmarea **D296** (out of scope **F37c**).
+
+**Sursă:** **[F37c](#f37c--lazy-4121-post-f37b--d289-c)** — F37c livrează `lazy_list/2` + `between/3` în memorie; **nu** include surse externe de stream.
+
+**Ce este (draft):** lazy lists legate de **I/O** și **generatoare avansate** — inspirație SWI `library(lazy_lists)`:
+
+| Livrabil draft | Descriere |
+| -------------- | --------- |
+| `lazy_read_lines/3` | stream → listă lazy de linii |
+| `lazy_read_terms/3` | stream → listă lazy de termeni |
+| Lazy pe **wire** / protocol | listă lazy din biți / pachete (legat **2+c** F25) |
+| `lazy_findall/3` | soluții ca listă lazy (engines) |
+| Integrare eager extinsă | `maplist`/`sort` pe lazy infinit — cu avertismente SWI-style |
+
+**Dependență:** **F37c** (`lazy_list/2`, model D293) — obligatoriu înainte de **2+j**.
+
+**Nu confunda cu:** **Faza 35** (builtins listă `numlist`, `member`, …) — alt scope; **2+j** vine din **F37c**, nu din F35.
+
+**Status:** ⏳ backlog **2+j** — fără decizii **D297+** încă (numerotare partajată cu F38 la promovare; F38 = DCG, **2+j** = streams).
 
 #### **2+g** ✅ → **Faza 35** (builtins listă suplimentare)
 
@@ -8366,33 +8393,35 @@ comp [logic] .mapLogic:
 
 ---
 
-## Faza 37 — Liste avansate Prolog (**2+e**) **(ready — F37a next)**
+## Faza 37 — Liste avansate Prolog (**2+e**) **(F37c next)**
 
 > **Promovat:** 2026-08-25 — **2+e** → fază normală **F37** cu **3 subfaze** (**F37a…F37c**).  
-> **Decizii:** **D279–D292 confirmed** user 2026-08-25.  
+> **Decizii:** **D279–D296 confirmed** (D293–D296 user 2026-08-25).  
+> **Livrat:** **F37a✅** dif-list · **F37b✅** char/codes · **F37c** lazy + `between/3` — **următor pas implementare**.  
 > **Extinde:** [Faza 22](#faza-22--liste-prolog-completed) (cons + unificare), [Faza 27](#faza-27--builtins-listă--doc-logic-builtinsmd-completed) (`append/3`), [D136](#d136--out-of-scope-explicație).  
-> **Nu include:** DCG / `phrase//` (→ **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** / **2+i**, D290-B), unificare automată `"abc" = [97,98,99]` (D286-B), `append/3` schimbat.
+> **Nu include:** DCG / `phrase//` (→ **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** / **2+i**, D290-B), lazy streams/I/O (→ **[2+j](#2j--lazy-streams--io-post-f37c)** / D296), unificare automată `"abc" = [97,98,99]` (D286-B), `append/3` schimbat.
 
-### Problemă (stare azi post-F36a)
+### Problemă (stare azi post-F37b)
 
 | Topic | Comportament azi |
 | ----- | ---------------- |
 | Liste cons `[H\|T]` | ✅ F22 — un capăt deschis (tail variabil) |
 | `append/3` | ✅ F27 — concatenare clasică |
-| Notație dif-list `L-H` | ❌ — parser/engine nu cunosc perechea start–gaură |
-| `append/2` dif-list | ❌ — planat aici, distinct de `append/3` |
-| String ↔ listă caractere/coduri | ❌ — `"..."` = atom literal (F21); fără `string_to_list/2` |
+| Notație dif-list `L-H` | ✅ F37a — `dif_list(Front, Hole)`, `append/2` |
+| `append/2` dif-list | ✅ F37a |
+| String ↔ listă caractere/coduri | ✅ F37b — `string_to_*`, `atom_*` |
 | Lazy list | ❌ — toate elementele există ca cons la unificare |
+| `between/3` | ❌ — `numlist/3` materializează tot |
 
 **Scop F37:** infrastructură Prolog avansată pentru liste — dif-list + builtins explicit char/codes + (opțional) lazy.
 
 ### Subfaze propuse
 
-| Subfază | Livrabil | Estimare |
-| ------- | -------- | -------- |
-| **F37a** | Dif-list `Front-Hole`, unificare, `append/2`, `show` | ~3–5 zile |
-| **F37b** | `string_to_list/2`, `string_to_codes/2`, `atom_chars/2`, `atom_codes/2` | ~2–3 zile |
-| **F37c** | Lazy lists (`lazy_list/2` SWI-style) | ~4–7 zile · **post-F37b** (D289-C confirmed; feature dorit, nu blocker F37a/b) |
+| Subfază | Livrabil | Status |
+| ------- | -------- | ------ |
+| **F37a** | Dif-list `Front-Hole`, unificare, `append/2`, `show` | ✅ **completed** |
+| **F37b** | `string_to_list/2`, `string_to_codes/2`, `atom_chars/2`, `atom_codes/2` | ✅ **completed** |
+| **F37c** | `lazy_list/2` (hibrid D293), `between/3`, integrare `member/2` | **(ready-to-implement)** |
 
 ### Rezumat decizii **(confirmed user 2026-08-25)**
 
@@ -8411,7 +8440,11 @@ comp [logic] .mapLogic:
 | **D289** | **Lazy list model** | ✅ **C** — **F37c după F37b**; `lazy_list/2` SWI-style când promovăm F37c | **(confirmed)** |
 | **D290** | **DCG `phrase//`** | ✅ **B** — out of scope F37 → backlog **[2+i](#2i--faza-38-dcg-prolog)** / **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** | **(confirmed)** |
 | **D291** | **Head rezervat** | ✅ **A** — builtin call only (ca F27/F35) | **(confirmed)** |
-| **D292** | **Teste & livrare** | ✅ **A** — **4081+** F37a; **4101+** F37b; **4121+** F37c; doc EN per subfază | **(confirmed)** |
+| **D292** | **Teste & livrare** | ✅ **A** — **4081+** F37a; **4095+** F37b; **4121+** F37c; doc EN per subfază | **(confirmed)** |
+| **D293** | **Lazy list model** | ✅ **D** — **hibrid B+A** (goal-template + regulă generator) | **(confirmed 2026-08-25)** |
+| **D294** | **`between/3`** | ✅ **A** — în **F37c**, integer `[Low, High]` închis, SWI basic | **(confirmed 2026-08-25)** |
+| **D295** | **Integrare lazy** | ✅ **A** — `member/2` da; `length/2` pe prefix; eager (`sort`, `maplist`, …) → fail clar | **(confirmed 2026-08-25)** |
+| **D296** | **Out of scope F37c** | ✅ **A** — DCG → **F38**; lazy streams/I/O → backlog **[2+j](#2j--lazy-streams--io-post-f37c)** | **(confirmed 2026-08-25)** |
 
 ---
 
@@ -8672,7 +8705,7 @@ inline [logic] .chars:
 
 **Decizie:** **C** — **F37c** nu intră în primul release F37; rămâne **planificat explicit** (nu „poate nu facem niciodată”). User 2026-08-25: lazy lists **vor fi necesare** la un moment dat — **nu** legate de zaruri/Monopoly; cazuri generale (stream pe demand, liste mari fără materializare upfront).
 
-**La promovare F37c:** `lazy_list(+Goal, -List)` SWI-style (D289-A ca implementare, livrat în subfaza F37c).
+**La promovare F37c:** `lazy_list(+Goal, -List)` — model **D293** (hibrid B+A); plus **`between/3`** (D294).
 
 **Prolog SWI (referință):**
 
@@ -8681,7 +8714,66 @@ inline [logic] .chars:
 X = 1 ; X = 2 ; X = 3.
 ```
 
-**La noi azi:** `between/3` nu există; `numlist/3` (F35d) materializează tot.
+**La noi azi:** `between/3` nu există; `numlist/3` (F35d) materializează tot. **F37c** adaugă ambele.
+
+---
+
+### D293 — Lazy list model **(confirmed: D — hibrid B+A)**
+
+| Opțiune | Model | Pro | Contra |
+| ------- | ----- | --- | ------ |
+| **A — regulă generator** | `lazy_list(gen, Xs)` + `gen(Slice, Tail) <- …` | Extensibil, SWI-like callback | Necesită apel predicat cu 2 args |
+| **B — goal-template** | `lazy_list(Xs, between(L, H, X))` | Ergonomic, exemplu plan direct | Whitelist pattern-uri goal |
+| **C — doar `between/3`** | fără `lazy_list/2` general | Simplu | Nu e lazy list generală |
+| **D — hibrid B+A ✓** | ambele forme de mai sus | Prolog-like + ergonomic pentru cazuri comune | Două căi de creare — documentare clară |
+
+**Decizie:** **D** — **hibrid B+A** (user 2026-08-25, nedecis între A și B singure).
+
+**Semantica țintă (ambele forme):**
+
+1. **Goal-template (B):** `lazy_list(List, between(Low, High, X))` — sugar peste generator numeric intern.
+2. **Regulă generator (A):** `lazy_list(Next, List)` unde `Next` e atom de predicat definit ca `next(Slice, Tail) <- Body` — apelat repetat ca `call(Next, Slice, Tail)`; `Slice\Tail` = următorul chunk (listă proprie; `Tail = []` la EOF).
+
+**Term intern:** `kind: 'lazy_list'` cu referință generator + stare materializare (choice points la extindere).
+
+**Opțional F37c:** `lazy_list_materialize/1` — listă închisă ground.
+
+---
+
+### D294 — `between/3` **(confirmed: A — în F37c)**
+
+| Opțiune | Scope | Recomandare |
+| ------- | ----- | ----------- |
+| **A — SWI basic ✓** | `between(+Low, +High, ?Value)` — integers, `Low =< Value =< High`, backtracking crescător | **da** |
+| **B — cu step** | `between/4` sau step opțional | post-F37c |
+| **C — `inf` ca High** | interval infinit | post-F37c / **2+j** |
+
+**Decizie:** **A** — în **F37c**, alături de `lazy_list/2`. `Low > High` → fail; non-integer → fail.
+
+---
+
+### D295 — Integrare lazy cu predicate existente **(confirmed: A)**
+
+| Predicate | F37c |
+| --------- | ---- |
+| `member/2` | ✅ — materializează la mers, backtracking pe stream |
+| `length/2` | ✅ — lungime **prefix materializat** sau fail dacă infinit și cerut closed |
+| `append/3`, `sort/2`, `maplist/2`, `findall/3`, … | ❌ — **fail** cu mesaj clar pe term `lazy_list` (eager pe infinit = pericol SWI) |
+| `show/N` | prefix materializat + marker dacă rest lazy (ex. `\|lazy\|`) |
+| unificare `Lazy = [a,b,c]` | fail până la materializare completă (`lazy_list_materialize/1`) |
+
+---
+
+### D296 — Out of scope F37c **(confirmed: A)**
+
+| Topic | Unde |
+| ----- | ---- |
+| DCG `rule//`, `-->`, `phrase/2`, `phrase/3` | **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** / **2+i** (D290) |
+| Lazy streams / file / wire / `lazy_findall` | Backlog **[2+j](#2j--lazy-streams--io-post-f37c)** — promovat din F37c |
+| `maplist`/`sort` pe lazy infinit | **2+j** sau niciodată (documentat ca anti-pattern) |
+| `between/4`, `inf` High | post-F37c |
+
+**Decizie:** **A** — F37c = **lazy în memorie** + **`between/3`**; restul → backlog explicit **2+j** (nu F35 — F35 e builtins listă materializate).
 
 ---
 
@@ -8693,7 +8785,7 @@ X = 1 ; X = 2 ; X = 3.
 | **B — doar primitiv dif-list ✓** | F37a pregătește terenul | **da** |
 | **C — DCG minimal** | doar `phrase/2` fără `//` | Jumătate măsură, tot mult |
 
-**Decizie:** **B** — F37 livrează **dif-list + append/2**; DCG → backlog **[2+i](#2i--faza-38-dcg-prolog)** promovat ca **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** (draft, decizii D293+ la implementare).
+**Decizie:** **B** — F37 livrează **dif-list + append/2**; DCG → backlog **[2+i](#2i--faza-38-dcg-prolog)** promovat ca **[Faza 38](#faza-38--dcg-prolog-phrase-2i--deferred)** (draft, decizii **D297+** la implementare).
 
 ---
 
@@ -8731,31 +8823,38 @@ Ca F27/F35: user **nu** poate defini `append/2` (dif-list), `string_to_list/2`, 
 | 4107 | `atom_chars(Word, [t,o,y,o,t,a])` → `toyota` (invers) |
 | 4108 | `atom_codes(Word, [72, 105])` → atom (invers) |
 
-#### F37c — lazy (4121+, post-F37b — D289-C)
+#### F37c — lazy + `between/3` (4121+, post-F37b — D289-C, D293–D296)
 
 | ID | Scenariu |
 | -- | -------- |
-| 4121 | `lazy_list` materializare parțială |
-| 4122 | backtracking pe stream |
-| 4123 | regresie F37a/b |
+| 4121 | `between(1, 3, X)` backtracking (unit) |
+| 4122 | `between(3, 1, X)` fail; `between(1, 3, 2)` ground ok |
+| 4123 | `lazy_list(Xs, between(1, 3, X))` + `member(Y, Xs)` — goal-template (legacy+wave) |
+| 4124 | `lazy_list(gen, Xs)` + regulă `gen(Slice, Tail)` custom (legacy+wave) |
+| 4125 | materializare parțială + `show` prefix |
+| 4126 | backtracking pe stream (re-satisfy) |
+| 4127 | `length(Lazy, N)` pe prefix materializat |
+| 4128 | `sort(Lazy, _)` / `maplist(_, Lazy, _)` → fail clar |
+| 4129 | regresie F37a/b (`append/3`, `member/2` pe liste normale) |
+| 4130 | reserved head `lazy_list/2`, `between/3` |
 
 ### Fișiere țintă
 
 | Fișier | Schimbare |
 | ------ | --------- |
 | `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | Operator `-` term; reserved `dif_list`; heads F37b |
-| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | Unificare `dif_list`; `_solveAppend2`; char builtins; (F37c lazy) |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `lazy_list/2`, `between/3`, `member/2` pe lazy; (opț.) `lazy_list_materialize/1` |
 | `[logic-builtins.md](../v0_3_2/doc/logic-builtins.md)` | Secțiuni EN + `logts-play` |
 | `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | Prolog lists extins; dif-list vs cons |
 | `tests/test_suite.js` | **4081+** legacy+wave |
 
 ### Livrabile F37 (umbrella)
 
-- [ ] **F37a** — dif-list + `append/2` + unificare + show
-- [ ] **F37b** — 4 builtins char/codes
-- [ ] **F37c** — lazy (`lazy_list/2`) — **planificat post-F37b** (D289-C)
-- [ ] Doc EN + verify per subfază
-- [ ] Actualizare [2+e scope](#2e--faza-37-liste-avansate-confirmed--f37a-next) → completed la livrare
+- [x] **F37a** — dif-list + `append/2` + unificare + show
+- [x] **F37b** — 4 builtins char/codes
+- [ ] **F37c** — `lazy_list/2` (hibrid D293) + `between/3` (D294) — **ready-to-implement**
+- [ ] Doc EN + verify per subfază F37c
+- [ ] Actualizare [2+e scope](#2e--faza-37-liste-avansate-confirmed--f37a-next) → completed la livrare F37c
 
 ### Estimare totală
 
@@ -8763,14 +8862,15 @@ Medie–mare: **~1–2 săptămâni** (F37a+b); **+1 săptămână** dacă inclu
 
 ### Decizii F37 — status
 
-**D279–D292 confirmed** user 2026-08-25. **Următor pas:** implementare **F37a** (dif-list + `append/2`).
+**D279–D296 confirmed** (D293–D296 user 2026-08-25). **Următor pas:** implementare **F37c** (`lazy_list/2` + `between/3`).
 
 | Confirmat | Decizie |
 | --------- | ------- |
-| D279–D285 | Dif-list model complet (A) |
-| D286–D288 | Char/codes explicit, bidirecțional (B + A + A) |
-| D289 | Lazy **F37c după F37b** — pe roadmap, nu legat de zaruri |
-| D290–D292 | Fără DCG în F37 → **2+i / F38**; heads rezervate; teste 4081+ / 4101+ / 4121+ |
+| D279–D285 | Dif-list model complet (A) — **F37a livrat** |
+| D286–D288 | Char/codes explicit, bidirecțional (B + A + A) — **F37b livrat** |
+| D289 | Lazy **F37c după F37b** — model implementare → **D293** |
+| D290–D292 | Fără DCG în F37 → **2+i / F38**; heads rezervate; teste 4081+ / 4095+ / 4121+ |
+| D293–D296 | Hibrid lazy B+A; `between/3`; integrare `member/2`; streams → **2+j** |
 
 ---
 
@@ -8779,7 +8879,7 @@ Medie–mare: **~1–2 săptămâni** (F37a+b); **+1 săptămână** dacă inclu
 > **Backlog:** **2+i** — promovat din **D290-B** (DCG out of scope F37).  
 > **Dependență:** **[F37a](#f37a)** dif-list (`L-H`, `append/2`) — obligatoriu.  
 > **Extinde:** [Faza 22](#faza-22--liste-prolog-completed), [Faza 37](#faza-37--liste-avansate-prolog-2e--ready--f37a-next).  
-> **Status:** ⏳ **deferred** — fără decizii **D293+** încă; secțiune completă la promovare (după F37a livrat).
+> **Status:** ⏳ **deferred** — fără decizii **D297+** încă; secțiune completă la promovare (după F37a livrat).
 
 ### Problemă (de ce nu e în F37)
 
@@ -8810,7 +8910,7 @@ După **F37a** (dif-list) — **înainte sau paralel** cu F37b/F37c, la nevoie D
 
 ### Decizii
 
-**D293+** — de draft la promovare (ca D279 pentru F37).
+**D297+** — de draft la promovare (ca D279 pentru F37). **Notă:** D293–D296 sunt rezervate pentru **F37c** lazy.
 
 ### Legături
 

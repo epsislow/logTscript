@@ -44834,5 +44834,199 @@ comp [logic] .worldLogic:
   reg(4093, 'logic', 'show dif-list closed (legacy)', runLogicDifListShowClosed);
   reg(4094, 'logic', 'show dif-list closed (wave)', runLogicDifListShowClosed, { propagation: 'wave' });
 
+  reg(4095, 'logic', 'string_to_list/2 forward', function(h) {
+    const prog = parseLogicBody('query q: string_to_list("ab", L)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    let cur = sols[0].L;
+    const chars = [];
+    while (cur && cur.kind === 'list' && !cur.nil) {
+      chars.push(cur.head.name);
+      cur = cur.tail;
+    }
+    h.assert('chars', chars.join(''), 'ab');
+  });
+
+  reg(4096, 'logic', 'string_to_codes/2 forward', function(h) {
+    const prog = parseLogicBody('query q: string_to_codes("Hi", Cs)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    let cur = sols[0].Cs;
+    const codes = [];
+    while (cur && cur.kind === 'list' && !cur.nil) {
+      codes.push(String(cur.head.value));
+      cur = cur.tail;
+    }
+    h.assert('codes', codes.join(','), '72,105');
+  });
+
+  reg(4097, 'logic', 'atom_chars/2 reverse to atom', function(h) {
+    const prog = parseLogicBody('query q: atom_chars(Word, [t, o, y, o, t, a])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('word', sols[0].Word.name, 'toyota');
+  });
+
+  reg(4098, 'logic', 'atom_codes/2 reverse to atom', function(h) {
+    const prog = parseLogicBody('query q: atom_codes(Word, [104, 105])');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('word', sols[0].Word.name, 'hi');
+  });
+
+  reg(4099, 'logic', 'no auto unify string and char list', function(h) {
+    const prog = parseLogicBody('query q: "ab" = [a, b]');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4100, 'logic', 'string_to_list/2 reserved head', function(h) {
+    h.assertThrows(
+      'reserved string_to_list',
+      () => parseLogicBody('string_to_list(S, L) <- S = L'),
+      "'string_to_list/2' is reserved",
+    );
+  });
+
+  function runLogicAtomCharsHello(h, session) {
+    const src = `inline [logic] .chars:
+
+    query q:
+        atom_chars(hello, Chars),
+        show(Chars)
+
+:
+
+comp [logic] .charsLogic:
+    on: 1
+    .chars { }
+:
+
+1wire trigger = 1
+
+.charsLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('chars', String(session.outIncludes(interp, '[h, e, l, l, o]')), 'true');
+  }
+
+  reg(4101, 'logic', 'atom_chars/2 forward hello (legacy)', runLogicAtomCharsHello);
+  reg(4102, 'logic', 'atom_chars/2 forward hello (wave)', runLogicAtomCharsHello, { propagation: 'wave' });
+
+  function runLogicStringToListReverse(h, session) {
+    const src = `inline [logic] .chars:
+
+    query build:
+        string_to_list(Word, [t, o, y, o, t, a]),
+        show(Word)
+
+:
+
+comp [logic] .charsLogic:
+    on: 1
+    .chars { }
+:
+
+1wire trigger = 1
+
+.charsLogic:{
+    query = build
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('word', String(session.outIncludes(interp, 'toyota')), 'true');
+  }
+
+  reg(4103, 'logic', 'string_to_list/2 reverse toyota (legacy)', runLogicStringToListReverse);
+  reg(4104, 'logic', 'string_to_list/2 reverse toyota (wave)', runLogicStringToListReverse, { propagation: 'wave' });
+
+  function runLogicAtomCodesHi(h, session) {
+    const src = `inline [logic] .chars:
+
+    query codes:
+        atom_codes(hi, Cs),
+        show(Cs)
+
+:
+
+comp [logic] .charsLogic:
+    on: 1
+    .chars { }
+:
+
+1wire trigger = 1
+
+.charsLogic:{
+    query = codes
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('codes', String(session.outIncludes(interp, '[104, 105]')), 'true');
+  }
+
+  reg(4105, 'logic', 'atom_codes/2 forward hi (legacy)', runLogicAtomCodesHi);
+  reg(4106, 'logic', 'atom_codes/2 forward hi (wave)', runLogicAtomCodesHi, { propagation: 'wave' });
+
+  function runLogicStringToCodesRoundTrip(h, session) {
+    const src = `inline [logic] .chars:
+
+    query round:
+        string_to_codes("Go", Cs),
+        string_to_codes(Word, Cs),
+        show(Word)
+
+:
+
+comp [logic] .charsLogic:
+    on: 1
+    .chars { }
+:
+
+1wire trigger = 1
+
+.charsLogic:{
+    query = round
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('word', String(session.outIncludes(interp, 'Go')), 'true');
+  }
+
+  reg(4107, 'logic', 'string_to_codes/2 round-trip (legacy)', runLogicStringToCodesRoundTrip);
+  reg(4108, 'logic', 'string_to_codes/2 round-trip (wave)', runLogicStringToCodesRoundTrip, { propagation: 'wave' });
+
+  function runLogicCharListMemberRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        member(X, [a, b, c]),
+        show(X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('a', String(session.outIncludes(interp, 'a')), 'true');
+  }
+
+  reg(4109, 'logic', 'F37b member regression (legacy)', runLogicCharListMemberRegression);
+  reg(4110, 'logic', 'F37b member regression (wave)', runLogicCharListMemberRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -50,6 +50,10 @@ const LOGIC_BUILTIN_BAGOF_PRED = 'bagof';
 const LOGIC_BUILTIN_SETOF_PRED = 'setof';
 const LOGIC_BUILTIN_TRUE_PRED = 'true';
 const LOGIC_BUILTIN_FAIL_PRED = 'fail';
+const LOGIC_BUILTIN_STRING_TO_LIST_PRED = 'string_to_list';
+const LOGIC_BUILTIN_STRING_TO_CODES_PRED = 'string_to_codes';
+const LOGIC_BUILTIN_ATOM_CHARS_PRED = 'atom_chars';
+const LOGIC_BUILTIN_ATOM_CODES_PRED = 'atom_codes';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
@@ -106,6 +110,10 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_SETOF_PRED]: [3],
   [LOGIC_BUILTIN_TRUE_PRED]: [0],
   [LOGIC_BUILTIN_FAIL_PRED]: [0],
+  [LOGIC_BUILTIN_STRING_TO_LIST_PRED]: [2],
+  [LOGIC_BUILTIN_STRING_TO_CODES_PRED]: [2],
+  [LOGIC_BUILTIN_ATOM_CHARS_PRED]: [2],
+  [LOGIC_BUILTIN_ATOM_CODES_PRED]: [2],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
@@ -721,6 +729,12 @@ function logicReservedHeadError(predicate, arity) {
   }
   if (predicate === LOGIC_BUILTIN_FAIL_PRED && arity === 0) {
     return "'fail/0' is reserved — cannot define fail as fact or rule head";
+  }
+  if ((predicate === LOGIC_BUILTIN_STRING_TO_LIST_PRED
+      || predicate === LOGIC_BUILTIN_STRING_TO_CODES_PRED
+      || predicate === LOGIC_BUILTIN_ATOM_CHARS_PRED
+      || predicate === LOGIC_BUILTIN_ATOM_CODES_PRED) && arity === 2) {
+    return `'${predicate}/${arity}' is reserved — cannot define ${predicate} as fact or rule head`;
   }
   return `'${predicate}' is reserved`;
 }

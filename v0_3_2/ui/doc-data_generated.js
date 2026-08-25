@@ -20594,7 +20594,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
-| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`append/2\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`** — [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`append/2\`**, **\`string_to_list/2\`**, **\`string_to_codes/2\`**, **\`atom_chars/2\`**, **\`atom_codes/2\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`** — [logic-builtins.md](logic-builtins.md) |
 | **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
 | **Value kinds** | **\`atom\`**, **\`number\`**, **\`list\`**, **\`compound\`**; type tests **\`atom/1\`** … **\`compound/1\`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
@@ -24270,6 +24270,10 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`member/2\`** | 2 | yes | no | List membership with backtracking |
 | **\`append/3\`** | 3 | yes | no | Concatenate or decompose lists |
 | **\`append/2\`** | 2 | yes | no | Close a **difference list** \`Front-Hole\` to a ground list |
+| **\`string_to_list/2\`** | 2 | yes | no | Atom or string literal ↔ list of one-character atoms |
+| **\`string_to_codes/2\`** | 2 | yes | no | Atom or string literal ↔ list of character codes (integers) |
+| **\`atom_chars/2\`** | 2 | yes | no | Atom ↔ list of one-character atoms |
+| **\`atom_codes/2\`** | 2 | yes | no | Atom ↔ list of character codes (integers) |
 | **\`length/2\`** | 2 | yes | no | List length; generative when **\`N\`** is ground |
 | **\`reverse/2\`** | 2 | yes | no | Reverse list order (bidirectional) |
 | **\`last/2\`** | 2 | yes | no | Last element of a non-empty ground list |
@@ -24765,12 +24769,22 @@ inline [logic] .dl:
 
 :
 
-1wire ok = .dl:query({ open })
+comp [logic] .dlLogic:
+    on: 1
+    .dl { }
+:
+
+1wire trigger = 1
+
+.dlLogic:{
+    query = open
+    set = trigger
+}
 \`\`\`
 
 **Load & Run** prints an open form such as **\`[north, east|Rest]-Rest\`** while **\`Rest\`** is still free.
 
-### Example — \`append/2\` with \`.world:query\`
+### Example — \`append/2\` with closed difference list
 
 \`\`\`logts-play
 inline [logic] .dl:
@@ -24783,10 +24797,176 @@ inline [logic] .dl:
 
 :
 
-1wire ok = .dl:query({ close })
+comp [logic] .dlLogic:
+    on: 1
+    .dl { }
+:
+
+1wire trigger = 1
+
+.dlLogic:{
+    query = close
+    set = trigger
+}
 \`\`\`
 
 **Load & Run** prints **\`[a, b]\`**.
+
+---
+
+## Character and code conversion
+
+These builtins convert between **atoms** (including **\`"..."\` string literals**) and lists. Conversion is **explicit** — **\`"ab" = [a, b]\`** does **not** unify; use a builtin instead.
+
+| Builtin | List element type | Typical use |
+|---------|-------------------|-------------|
+| **\`string_to_list/2\`** | one-character **atoms** | **\`"Hello"\`** ↔ **\`[H, e, l, l, o]\`** |
+| **\`string_to_codes/2\`** | **integers** (character codes) | **\`"Hi"\`** ↔ **\`[72, 105]\`** |
+| **\`atom_chars/2\`** | one-character **atoms** | **\`hello\`** ↔ **\`[h, e, l, l, o]\`** |
+| **\`atom_codes/2\`** | **integers** | **\`hi\`** ↔ **\`[104, 105]\`** |
+
+All four are **bidirectional** when one argument is a variable and the other is ground. Both arguments cannot be variables. Open or partial lists fail.
+
+**\`string_to_*\`** is intended for **\`"..."\` literals** (stored as atoms with string display). **\`atom_*\`** works with any atom name, including lowercase identifiers such as **\`toyota\`**.
+
+### Example — \`string_to_list/2\` and \`string_to_codes/2\`
+
+\`\`\`logts-play
+inline [logic] .text:
+
+    query chars:
+        string_to_list("ab", Chars),
+        show(Chars)
+
+    query codes:
+        string_to_codes("Hi", Cs),
+        show(Cs)
+
+:
+
+comp [logic] .textLogic:
+    on: 1
+    .text { }
+:
+
+1wire trigger = 1
+
+.textLogic:{
+    query = chars
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[a, b]\`**. Use **Load**, set **\`query = codes\`**, **Load & Run** to print **\`[72, 105]\`**.
+
+### Example — build an atom from a character list
+
+\`\`\`logts-play
+inline [logic] .brand:
+
+    query make:
+        atom_chars(Word, [t, o, y, o, t, a]),
+        show(Word)
+
+:
+
+comp [logic] .brandLogic:
+    on: 1
+    .brand { }
+:
+
+1wire trigger = 1
+
+.brandLogic:{
+    query = make
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`toyota\`**.
+
+### Example — \`atom_codes/2\` round-trip
+
+\`\`\`logts-play
+inline [logic] .codes:
+
+    query round:
+        atom_codes(hi, Cs),
+        show(Cs)
+
+    query back:
+        atom_codes(Word, [104, 105]),
+        show(Word)
+
+:
+
+comp [logic] .codesLogic:
+    on: 1
+    .codes { }
+:
+
+1wire trigger = 1
+
+.codesLogic:{
+    query = round
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[104, 105]\`**. Switch to **\`query = back\`** to print **\`hi\`**.
+
+### Example — reverse with \`string_to_list/2\`
+
+\`\`\`logts-play
+inline [logic] .text:
+
+    query word:
+        string_to_list(Word, [g, o]),
+        show(Word)
+
+:
+
+comp [logic] .textLogic:
+    on: 1
+    .text { }
+:
+
+1wire trigger = 1
+
+.textLogic:{
+    query = word
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`"go"\`** (a string literal atom).
+
+### Example — \`string_to_codes/2\` round-trip
+
+\`\`\`logts-play
+inline [logic] .text:
+
+    query round:
+        string_to_codes("Go", Cs),
+        string_to_codes(Word, Cs),
+        show(Word)
+
+:
+
+comp [logic] .textLogic:
+    on: 1
+    .text { }
+:
+
+1wire trigger = 1
+
+.textLogic:{
+    query = round
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`"Go"\`** after decoding the code list.
 
 ---
 
