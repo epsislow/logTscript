@@ -26,6 +26,7 @@ function logicInternTerm(term, table) {
   }
   if (term.kind === 'var') return { kind: 'var', name: term.name };
   if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'float') return { kind: 'float', value: term.value };
   if (term.kind === 'compound') {
     return {
       kind: 'compound',
@@ -298,6 +299,9 @@ class LogicEngine {
     }
     if (g0.kind === 'call' && g0.predicate === 'number' && g0.arity === 1) {
       return this._solveTypePred(g0.args[0], 'number', rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'float' && g0.arity === 1) {
+      return this._solveTypePred(g0.args[0], 'float', rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call' && g0.predicate === 'list' && g0.arity === 1) {
       return this._solveTypePred(g0.args[0], 'list', rest, env, depth, onSuccess, onDepthExceeded);
@@ -2297,6 +2301,7 @@ function logicUnify(t1, t2, env, table) {
   }
   if (b.kind === 'var') return logicUnify(b, a, env, table);
   if (a.kind === 'number' && b.kind === 'number') return a.value === b.value;
+  if (a.kind === 'float' && b.kind === 'float') return Object.is(a.value, b.value);
   if (a.kind === 'atom' && b.kind === 'atom') return a.id === b.id;
   if (a.kind === 'compound' && b.kind === 'compound') {
     if (a.predicate !== b.predicate || a.arity !== b.arity) return false;
@@ -2789,6 +2794,7 @@ function logicCloneTerm(term) {
   if (!term) return term;
   if (term.kind === 'var') return { kind: 'var', name: term.name };
   if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'float') return { kind: 'float', value: term.value };
   if (term.kind === 'atom') {
     const r = { kind: 'atom', name: term.name };
     if (term.id != null) r.id = term.id;
@@ -3100,17 +3106,30 @@ function logicUnifyExpr(left, right, env, table) {
   return logicUnify(left, right, env, table);
 }
 
+function logicEvalCmpOperand(term, env, table) {
+  const d = logicDeref(term, env);
+  if (d.kind === 'number') return { tag: 'number', value: d.value };
+  if (d.kind === 'float') return { tag: 'float', value: d.value };
+  if (d.kind === 'arith') {
+    const v = logicEvalNumber(d, env, table);
+    if (v != null) return { tag: 'number', value: v };
+    return null;
+  }
+  return null;
+}
+
 function logicEvalCmp(goal, env, table) {
-  const ln = logicEvalNumber(goal.left, env, table);
-  const rn = logicEvalNumber(goal.right, env, table);
-  if (ln == null || rn == null) return false;
+  const ln = logicEvalCmpOperand(goal.left, env, table);
+  const rn = logicEvalCmpOperand(goal.right, env, table);
+  if (!ln || !rn) return false;
+  if (ln.tag !== rn.tag) return false;
   switch (goal.op) {
-    case '>=': return ln >= rn;
-    case '=<': return ln <= rn;
-    case '>': return ln > rn;
-    case '<': return ln < rn;
-    case '=:=': return ln === rn;
-    case '=\\=': return ln !== rn;
+    case '>=': return ln.value >= rn.value;
+    case '=<': return ln.value <= rn.value;
+    case '>': return ln.value > rn.value;
+    case '<': return ln.value < rn.value;
+    case '=:=': return Object.is(ln.value, rn.value);
+    case '=\\=': return !Object.is(ln.value, rn.value);
     default: return false;
   }
 }
@@ -3118,6 +3137,7 @@ function logicEvalCmp(goal, env, table) {
 function logicResolveTerm(term, env, table) {
   const d = logicDeref(term, env);
   if (d.kind === 'number') return { kind: 'number', value: d.value };
+  if (d.kind === 'float') return { kind: 'float', value: d.value };
   if (d.kind === 'atom') {
     const r = { kind: 'atom', name: logicAtomDisplayName(d, table) };
     if (d.logicTraceAsString) r.logicTraceAsString = true;
@@ -3419,6 +3439,7 @@ function logicGroundTermKey(term) {
   if (!term) return '';
   if (term.kind === 'atom') return `a:${term.name != null ? term.name : ''}`;
   if (term.kind === 'number') return `n:${term.value}`;
+  if (term.kind === 'float') return `f:${term.value}`;
   if (term.kind === 'var') return `v:${term.name}`;
   if (term.kind === 'compound') {
     const args = (term.args || []).map(logicGroundTermKey).join('\1');
@@ -3617,6 +3638,11 @@ function logicFormatShowTerm(term, env, table) {
   if (!d) return '?';
   if (d.kind === 'var') return d.name != null ? String(d.name) : '?';
   if (d.kind === 'number') return String(d.value);
+  if (d.kind === 'float') {
+    const s = String(d.value);
+    if (s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
+    return `${s}.0`;
+  }
   if (d.kind === 'atom') {
     const name = d.name != null ? String(d.name) : (d.id != null && table ? table.name(d.id) : '');
     return name;
@@ -3955,14 +3981,19 @@ function executeLogicGoals(mergedDef, goals, inputEnv, options) {
   };
 }
 
-function logicListPackedElementWidth(bindType) {
+function logicListPackedElementWidth(bindType, numberFormat) {
   if (bindType === 'bool') return 1;
   if (bindType === 'text') return 8;
   if (bindType === 'number') return 16;
+  if (bindType === 'float') {
+    const packedFn = typeof logicPackedFloatListElementWidth === 'function'
+      ? logicPackedFloatListElementWidth : null;
+    return packedFn ? packedFn(numberFormat) : 32;
+  }
   return 8;
 }
 
-function logicResolveListWireLayout(totalBits, bindType, vectorShape) {
+function logicResolveListWireLayout(totalBits, bindType, vectorShape, numberFormat) {
   if (vectorShape && vectorShape.kind === 'vector') {
     return {
       mode: 'vector',
@@ -3973,12 +4004,15 @@ function logicResolveListWireLayout(totalBits, bindType, vectorShape) {
   if (vectorShape && vectorShape.kind === 'matrix') {
     throw Error(`${bindType} list expects a vector wire`);
   }
-  const ew = logicListPackedElementWidth(bindType);
+  const ew = logicListPackedElementWidth(bindType, numberFormat);
   if (bindType === 'text' && totalBits % 8 !== 0) {
     throw Error('text list expects vector or width multiple of 8');
   }
   if (bindType === 'number' && totalBits % 16 !== 0) {
     throw Error('number list expects vector or width multiple of 16');
+  }
+  if (bindType === 'float' && totalBits % ew !== 0) {
+    throw Error(`float list expects vector or width multiple of ${ew}`);
   }
   return {
     mode: 'scalar',
@@ -3990,7 +4024,7 @@ function logicResolveListWireLayout(totalBits, bindType, vectorShape) {
 function logicIsListSlotFill(cellBits, bindType, fillBits) {
   if (!cellBits || cellBits.length === 0) return true;
   if (bindType === 'bool') return false;
-  if (bindType === 'text' || bindType === 'number') {
+  if (bindType === 'text' || bindType === 'number' || bindType === 'float') {
     return cellBits === fillBits || /^0+$/.test(cellBits);
   }
   return false;
@@ -4035,6 +4069,13 @@ function logicDecodeListSlot(cellBits, bindType, numberFormat) {
     if (isNaN(n)) n = 0;
     return { kind: 'number', value: n };
   }
+  if (bindType === 'float') {
+    if (/^0+$/.test(cellBits)) return null;
+    const decodeFn = typeof logicDecodeFloatBits === 'function' ? logicDecodeFloatBits : null;
+    let v = decodeFn ? decodeFn(cellBits, numberFormat) : parseFloat(cellBits, 2);
+    if (v == null || isNaN(v)) v = 0;
+    return { kind: 'float', value: v };
+  }
   return null;
 }
 
@@ -4073,6 +4114,7 @@ function logicCloneMutationTerm(term) {
     return out;
   }
   if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'float') return { kind: 'float', value: term.value };
   if (term.kind === 'var') return { kind: 'var', name: term.name };
   return term;
 }
@@ -4159,10 +4201,17 @@ function logicExpandMutationEachOps(items, ctx) {
 }
 
 function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape, numberFormat) {
-  const layout = logicResolveListWireLayout(bits.length, bindType, vectorShape);
-  const listFmt = typeof logicEffectiveListNumberFormat === 'function'
-    ? logicEffectiveListNumberFormat(numberFormat, vectorShape)
-    : (vectorShape && vectorShape.kind === 'vector' ? numberFormat : null);
+  const layout = logicResolveListWireLayout(bits.length, bindType, vectorShape, numberFormat);
+  let listFmt = null;
+  if (bindType === 'float') {
+    listFmt = typeof logicEffectiveListFloatFormat === 'function'
+      ? logicEffectiveListFloatFormat(numberFormat, vectorShape)
+      : (vectorShape && vectorShape.kind === 'vector' ? numberFormat : numberFormat);
+  } else {
+    listFmt = typeof logicEffectiveListNumberFormat === 'function'
+      ? logicEffectiveListNumberFormat(numberFormat, vectorShape)
+      : (vectorShape && vectorShape.kind === 'vector' ? numberFormat : null);
+  }
   const elements = [];
   for (let i = 0; i < layout.slotCount; i++) {
     const cell = bits.substr(i * layout.elementWidth, layout.elementWidth);
@@ -4197,6 +4246,7 @@ function logicListBindTypeFromTerm(term) {
   while (cur && cur.kind === 'list' && !cur.nil) {
     const h = cur.head;
     if (h && h.kind === 'number') return 'number';
+    if (h && h.kind === 'float') return 'float';
     if (h && h.kind === 'atom') return 'text';
     cur = cur.tail;
   }
@@ -4227,9 +4277,13 @@ function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scal
       throw Error(`query output requires explicit type for '${packVars[0]}'`);
     }
     if (hint.listFlag && solutions && solutions.length > 0) {
-      const listFmt = typeof logicEffectiveListNumberFormat === 'function'
-        ? logicEffectiveListNumberFormat(hint.numberFormat, shape)
-        : hint.numberFormat;
+      const listFmt = hint.bindType === 'float'
+        ? (typeof logicEffectiveListFloatFormat === 'function'
+          ? logicEffectiveListFloatFormat(hint.numberFormat, shape)
+          : hint.numberFormat)
+        : (typeof logicEffectiveListNumberFormat === 'function'
+          ? logicEffectiveListNumberFormat(hint.numberFormat, shape)
+          : hint.numberFormat);
       return logicEncodeListToVectorBits(
         solutions[0][packVars[0]], hint.bindType, shape.count, shape.ew, fillBits, listFmt,
       );
@@ -4261,10 +4315,14 @@ function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scal
     const w = scalarWidth || (shape && shape.ew) || 8;
     const term = solutions[0][packVars[0]];
     if (hint.listFlag) {
-      const layout = logicResolveListWireLayout(w, hint.bindType, shape);
-      const listFmt = typeof logicEffectiveListNumberFormat === 'function'
-        ? logicEffectiveListNumberFormat(hint.numberFormat, shape)
-        : hint.numberFormat;
+      const layout = logicResolveListWireLayout(w, hint.bindType, shape, hint.numberFormat);
+      const listFmt = hint.bindType === 'float'
+        ? (typeof logicEffectiveListFloatFormat === 'function'
+          ? logicEffectiveListFloatFormat(hint.numberFormat, shape)
+          : hint.numberFormat)
+        : (typeof logicEffectiveListNumberFormat === 'function'
+          ? logicEffectiveListNumberFormat(hint.numberFormat, shape)
+          : hint.numberFormat);
       return logicEncodeListToVectorBits(
         term, hint.bindType, layout.slotCount, layout.elementWidth, fillBits, listFmt,
       );
@@ -4298,10 +4356,14 @@ function logicNumberToBits(n, width) {
   return (v >>> 0).toString(2).padStart(width, '0').slice(-width);
 }
 
-function logicEncodeSolutionTerm(term, elementWidth, numberFormat) {
+function logicEncodeSolutionTerm(term, elementWidth, numberFormat, bindType) {
   if (!term) return '0'.repeat(elementWidth);
   if (term.kind === 'number') {
     const encFn = typeof logicEncodeNumberValue === 'function' ? logicEncodeNumberValue : null;
+    return encFn ? encFn(term.value, elementWidth, numberFormat) : logicNumberToBits(term.value, elementWidth);
+  }
+  if (term.kind === 'float') {
+    const encFn = typeof logicEncodeFloatValue === 'function' ? logicEncodeFloatValue : null;
     return encFn ? encFn(term.value, elementWidth, numberFormat) : logicNumberToBits(term.value, elementWidth);
   }
   if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, elementWidth);
@@ -4396,6 +4458,14 @@ function logicTermToWireValue(term, width, bindType, numberFormat) {
     if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, width);
     return '0'.repeat(width);
   }
+  if (bindType === 'float') {
+    if (term.kind === 'float') {
+      const encFn = typeof logicEncodeFloatValue === 'function' ? logicEncodeFloatValue : null;
+      return encFn ? encFn(term.value, width, numberFormat) : logicNumberToBits(term.value, width);
+    }
+    if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, width);
+    return '0'.repeat(width);
+  }
   return '0'.repeat(width);
 }
 
@@ -4413,6 +4483,12 @@ function logicPinToInputValue(bits, bindType, numberFormat) {
     }
     if (!s) return { kind: 'atom', name: '' };
     return { kind: 'atom', name: s };
+  }
+  if (bindType === 'float') {
+    const decodeFn = typeof logicDecodeFloatBits === 'function' ? logicDecodeFloatBits : null;
+    let v = decodeFn ? decodeFn(bits, numberFormat) : 0;
+    if (v == null || isNaN(v)) v = 0;
+    return { kind: 'float', value: v };
   }
   const decodeFn = typeof logicDecodeNumberBits === 'function' ? logicDecodeNumberBits : null;
   let n = decodeFn ? decodeFn(bits, numberFormat) : parseInt(bits, 2);

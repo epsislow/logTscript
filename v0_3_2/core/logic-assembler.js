@@ -1,7 +1,7 @@
 /* ================= LOGIC ASSEMBLER (inline [logic]) ================= */
 
 const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as']);
-const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number']);
+const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number', 'float']);
 const LOGIC_BUILTIN_SHOW_PRED = 'show';
 const LOGIC_BUILTIN_NTH0_PRED = 'nth0';
 const LOGIC_BUILTIN_NTH1_PRED = 'nth1';
@@ -13,6 +13,7 @@ const LOGIC_BUILTIN_REVERSE_PRED = 'reverse';
 const LOGIC_BUILTIN_SORT_PRED = 'sort';
 const LOGIC_BUILTIN_ATOM_PRED = 'atom';
 const LOGIC_BUILTIN_NUMBER_PRED = 'number';
+const LOGIC_BUILTIN_FLOAT_PRED = 'float';
 const LOGIC_BUILTIN_LIST_PRED = 'list';
 const LOGIC_BUILTIN_COMPOUND_PRED = 'compound';
 const LOGIC_BUILTIN_RANDOM_BETWEEN_PRED = 'random_between';
@@ -61,6 +62,7 @@ const LOGIC_BUILTIN_LAZY_LIST_MATERIALIZE_PRED = 'lazy_list_materialize';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
   LOGIC_BUILTIN_ATOM_PRED,
   LOGIC_BUILTIN_NUMBER_PRED,
+  LOGIC_BUILTIN_FLOAT_PRED,
   LOGIC_BUILTIN_LIST_PRED,
   LOGIC_BUILTIN_COMPOUND_PRED,
 ]);
@@ -77,6 +79,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_SORT_PRED]: [2],
   [LOGIC_BUILTIN_ATOM_PRED]: [1],
   [LOGIC_BUILTIN_NUMBER_PRED]: [1],
+  [LOGIC_BUILTIN_FLOAT_PRED]: [1],
   [LOGIC_BUILTIN_LIST_PRED]: [1],
   [LOGIC_BUILTIN_COMPOUND_PRED]: [1],
   [LOGIC_BUILTIN_RANDOM_BETWEEN_PRED]: [3],
@@ -162,7 +165,16 @@ function logicTokenize(src) {
     if (ch === '|' ) { tokens.push({ type: 'PIPE', value: '|', line: startLine }); i++; continue; }
     if (ch === '(' ) { tokens.push({ type: 'LP', value: '(', line: startLine }); i++; continue; }
     if (ch === ')' ) { tokens.push({ type: 'RP', value: ')', line: startLine }); i++; continue; }
-    if (ch === '.' ) { tokens.push({ type: 'DOT', value: '.', line: startLine }); i++; continue; }
+    if (ch === '.' && i + 1 < src.length && /[0-9]/.test(src[i + 1])) {
+      i++;
+      let frac = '';
+      while (i < src.length && /[0-9]/.test(src[i])) frac += src[i++];
+      const v = parseFloat(`0.${frac}`);
+      if (isNaN(v)) logicError('invalid float literal', startLine);
+      tokens.push({ type: 'FLOAT', value: v, line: startLine });
+      continue;
+    }
+    if (ch === '.') { tokens.push({ type: 'DOT', value: '.', line: startLine }); i++; continue; }
     if (ch === ':' ) { tokens.push({ type: 'COLON', value: ':', line: startLine }); i++; continue; }
     if (ch === '\\' && src[i + 1] === '+') {
       tokens.push({ type: 'NOT', value: '\\+', line: startLine }); i += 2; continue;
@@ -181,8 +193,8 @@ function logicTokenize(src) {
     if (ch === '<' && src[i + 1] === '-') {
       tokens.push({ type: 'ARROW', value: '<-', line: startLine }); i += 2; continue;
     }
-    if (ch === '=' && src[i + 1] === ':') {
-      tokens.push({ type: 'CMP', value: '=:=', line: startLine }); i += 2; continue;
+    if (ch === '=' && src[i + 1] === ':' && src[i + 2] === '=') {
+      tokens.push({ type: 'CMP', value: '=:=', line: startLine }); i += 3; continue;
     }
     if (ch === '=' && src[i + 1] === '<') {
       tokens.push({ type: 'CMP', value: '=<', line: startLine }); i += 2; continue;
@@ -217,11 +229,24 @@ function logicTokenize(src) {
       tokens.push({ type: 'STRING', value: s, line: startLine });
       continue;
     }
-    if (/[0-9]/.test(ch) || (ch === '-' && i + 1 < src.length && /[0-9]/.test(src[i + 1]))) {
-      let n = '';
-      if (ch === '-') { n += '-'; i++; }
-      while (i < src.length && /[0-9]/.test(src[i])) n += src[i++];
-      tokens.push({ type: 'NUMBER', value: parseInt(n, 10), line: startLine });
+    if (/[0-9]/.test(ch) || (ch === '-' && i + 1 < src.length && (/[0-9]/.test(src[i + 1]) || src[i + 1] === '.'))) {
+      let negative = false;
+      if (ch === '-') { negative = true; i++; }
+      let intPart = '';
+      while (i < src.length && /[0-9]/.test(src[i])) intPart += src[i++];
+      if (i < src.length && src[i] === '.' && i + 1 < src.length && /[0-9]/.test(src[i + 1])) {
+        i++;
+        let fracPart = '';
+        while (i < src.length && /[0-9]/.test(src[i])) fracPart += src[i++];
+        const text = `${negative ? '-' : ''}${intPart || '0'}.${fracPart}`;
+        const v = parseFloat(text);
+        if (isNaN(v)) logicError('invalid float literal', startLine);
+        tokens.push({ type: 'FLOAT', value: v, line: startLine });
+        continue;
+      }
+      if (!intPart.length) logicError('invalid number literal', startLine);
+      const v = parseInt((negative ? '-' : '') + intPart, 10);
+      tokens.push({ type: 'NUMBER', value: v, line: startLine });
       continue;
     }
     if (/[A-Za-z_]/.test(ch)) {
@@ -521,7 +546,14 @@ class LogicParser {
       if (this.at('NUMBER')) {
         return { kind: 'number', value: -this.advance().value };
       }
+      if (this.at('FLOAT')) {
+        return { kind: 'float', value: -this.advance().value };
+      }
       logicError('expected number after unary -', this.peek().line);
+    }
+    if (this.at('FLOAT')) {
+      const v = this.advance().value;
+      return { kind: 'float', value: v };
     }
     if (this.at('NUMBER')) {
       const v = this.advance().value;
@@ -603,18 +635,23 @@ class LogicParser {
     if (this.at('ID') && LOGIC_MUTATION_BIND_TYPES.has(this.peek().value)) {
       const bindType = this.advance().value;
       let numberFormat = null;
-      if (bindType === 'number' && this.logicAtSlashToken()) {
+      if ((bindType === 'number' || bindType === 'float') && this.logicAtSlashToken()) {
         this.advance();
         if (!this.at('ID')) {
-          logicError('expected number format after /', this.peek().line);
+          logicError(`expected ${bindType} format after /`, this.peek().line);
         }
-        if (typeof parseLogicNumberFormatToken !== 'function') {
-          logicError('logic-number-formats is not loaded', this.peek().line);
+        const fmtName = this.advance().value;
+        if (bindType === 'number') {
+          if (typeof parseLogicNumberFormatToken !== 'function') {
+            logicError('logic-number-formats is not loaded', this.peek().line);
+          }
+          numberFormat = parseLogicNumberFormatToken(fmtName, 'mutation wire ref');
+        } else {
+          if (typeof parseLogicFloatFormatToken !== 'function') {
+            logicError('logic-float-formats is not loaded', this.peek().line);
+          }
+          numberFormat = parseLogicFloatFormatToken(fmtName, 'mutation wire ref');
         }
-        numberFormat = parseLogicNumberFormatToken(
-          this.advance().value,
-          'mutation wire ref',
-        );
       }
       let listFlag = false;
       if (this.at('ID') && this.peek().value === 'list') {
@@ -681,6 +718,7 @@ function logicCloneTerm(term) {
     return r;
   }
   if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'float') return { kind: 'float', value: term.value };
   if (term.kind === 'compound') {
     return {
       kind: 'compound',
@@ -1330,18 +1368,25 @@ function parseLogicProgramBlock(bodyRaw) {
     const line = rawLine.trim();
     if (!line || line.startsWith(';')) continue;
     const m = line.match(
-      /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text)(?:\/([A-Za-z0-9]+))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/,
+      /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text|float)(?:\/([A-Za-z0-9]+))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/,
     );
     if (!m) {
       throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type [/format] [list] pin')`);
     }
     const listFlag = /\blist\b/.test(line);
     let numberFormat = null;
-    if (m[2] === 'number' && m[3]) {
-      if (typeof parseLogicNumberFormatToken !== 'function') {
-        throw new Error('logic-number-formats is not loaded');
+    if (m[3]) {
+      if (m[2] === 'number') {
+        if (typeof parseLogicNumberFormatToken !== 'function') {
+          throw new Error('logic-number-formats is not loaded');
+        }
+        numberFormat = parseLogicNumberFormatToken(m[3], `program block pin '${m[4]}'`);
+      } else if (m[2] === 'float') {
+        if (typeof parseLogicFloatFormatToken !== 'function') {
+          throw new Error('logic-float-formats is not loaded');
+        }
+        numberFormat = parseLogicFloatFormatToken(m[3], `program block pin '${m[4]}'`);
       }
-      numberFormat = parseLogicNumberFormatToken(m[3], `program block pin '${m[4]}'`);
     }
     bindings.push({
       logicVar: m[1],
@@ -1633,11 +1678,20 @@ function logicFormatGoal(g) {
   return '';
 }
 
+function logicFormatFloatLiteral(v) {
+  if (v == null || isNaN(v)) return '0.0';
+  if (!Number.isFinite(v)) return String(v);
+  const s = String(v);
+  if (s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
+  return `${s}.0`;
+}
+
 function logicFormatTerm(t) {
   if (!t) return '';
   if (t.kind === 'var') return t.name;
   if (t.kind === 'atom') return t.name;
   if (t.kind === 'number') return String(t.value);
+  if (t.kind === 'float') return logicFormatFloatLiteral(t.value);
   if (t.kind === 'list') return logicFormatListTermStatic(t);
   if (t.kind === 'compound') return logicFormatCompound(t);
   if (t.kind === 'arith') return `${logicFormatTerm(t.left)} ${t.op} ${logicFormatTerm(t.right)}`;

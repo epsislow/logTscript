@@ -1,6 +1,6 @@
 # Logic values and type predicates
 
-LogTScript logic stores **four kinds of values** in the knowledge base: **atom**, **number**, **list**, and **compound**. Built-in type predicates **`atom/1`**, **`number/1`**, **`list/1`**, and **`compound/1`** test the kind of the term currently bound to a variable — they **filter** candidates; they do **not** generate values.
+LogTScript logic stores **five kinds of values** in the knowledge base: **atom**, **number**, **float**, **list**, and **compound**. Built-in type predicates **`atom/1`**, **`number/1`**, **`float/1`**, **`list/1`**, and **`compound/1`** test the kind of the term currently bound to a variable — they **filter** candidates; they do **not** generate values.
 
 Wire pins use **`text`**, **`number`**, and **`bool`** as **encoding hints** at the component boundary — those are **not** separate logic kinds. See [Wire boundary](#wire-boundary-text--number--bool) and [logic-query-exec.md](logic-query-exec.md).
 
@@ -14,8 +14,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 
 | Topic | Summary |
 |-------|---------|
-| **Logic kinds** | `atom`, `number`, `list`, `compound` |
-| **Type predicates** | `atom(X)`, `number(X)`, `list(X)`, `compound(X)` — reserved, arity 1 |
+| **Logic kinds** | `atom`, `number`, `float`, `list`, `compound` |
+| **Type predicates** | `atom(X)`, `number(X)`, `float(X)`, `list(X)`, `compound(X)` — reserved, arity 1 |
 | **Filters** | Predicate succeeds only when `X` is already bound to a matching kind |
 | **Quoted text** | `"hello"` is an **atom** (same kind as `hello`) |
 | **Wire `text`** | ASCII encode/decode on pins — not a KB kind |
@@ -24,12 +24,13 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 
 ---
 
-## The four logic kinds
+## The five logic kinds
 
 | Kind | Examples | Notes |
 |------|----------|-------|
 | **atom** | `john`, `red`, `"hello"` | Lowercase symbols and double-quoted string literals |
-| **number** | `15`, `-4`, `2020` | Integers only; use `is/2` for arithmetic |
+| **number** | `15`, `-4`, `2020` | Integers only; use `is/2` for integer arithmetic |
+| **float** | `1.5`, `-0.25`, `.5` | IEEE values stored as floating-point; distinct from integers |
 | **list** | `[]`, `[a, b, c]`, `[H \| T]` | Prolog-style lists (F22) |
 | **compound** | `person(john, 25)`, `edge(from(a), to(b))` | Named functor + fixed arity |
 
@@ -79,6 +80,7 @@ Type predicates are ordinary goals. They succeed when the argument is bound to a
 |-----------|-------------------|
 | `atom(X)` | An atom (quoted or unquoted) |
 | `number(X)` | An integer |
+| `float(X)` | A floating-point literal value |
 | `list(X)` | A list (including `[]`) |
 | `compound(X)` | A compound term (not a list) |
 
@@ -127,6 +129,84 @@ comp [logic] .worldLogic:
 ```
 
 **Load** the script, set **`query = atomValues`**, **Load & Run** — prints `hello`, `red` (order follows discovery). Switch to **`numericValues`** → `10`; **`listValues`** → `[1, 2, 3]`; **`compoundValues`** → `person(john, 25)`.
+
+---
+
+## Float literals
+
+Floating-point values use decimal syntax: `1.5`, `-0.25`, or `.5` (leading zero optional). They are a **separate kind** from integers — `1` and `1.0` do **not** unify.
+
+```logts-play
+inline [logic] .samples:
+
+    sample(1.5)
+    sample(42)
+    sample(.75)
+
+    query floats:
+        sample(X),
+        float(X),
+        show(X)
+
+    query ints:
+        sample(X),
+        number(X),
+        show(X)
+
+:
+
+1wire trigger = 1
+
+comp [logic] .sampleLogic:
+    on: 1
+    .samples { }
+:
+
+.sampleLogic:{
+    query = floats
+    set = trigger
+}
+```
+
+**Load & Run:** two lines — `1.5` and `.75`. Switch **`query = ints`** → prints `42` only.
+
+### Integer vs float comparison
+
+`number/1` succeeds only on integers; `float/1` only on floats. Comparisons treat the kinds separately:
+
+```logts-play
+inline [logic] .mix:
+
+    query sameFloat:
+        1.5 =:= 1.5
+
+    query diffKind:
+        1 =:= 1.0
+
+:
+
+1wire okFloat = .mix:query({ 1.5 =:= 1.5 })
+1wire okDiff = .mix:query({ 1 =:= 1.0 })
+```
+
+**Load & Run:** **`okFloat = 1`**, **`okDiff = 0`** — `1` and `1.0` are different kinds.
+
+### Float in lists and compounds
+
+```logts-play
+inline [logic] .batch:
+
+    row([1.5, 2.0, .5])
+
+    query check:
+        row(L)
+
+:
+
+1wire ok = .batch:query({ row(L) })
+```
+
+**Load & Run:** **`ok = 1`**.
 
 ---
 
@@ -295,20 +375,24 @@ comp [logic] .worldLogic:
 
 ---
 
-## Wire boundary — text / number / bool
+## Wire boundary — text / number / float / bool
 
-On **`comp [logic]`** pins and **`.world:query`**, **`text`**, **`number`**, and **`bool`** describe **how bits on a wire map to logic terms** — not kinds stored in the KB.
+On **`comp [logic]`** pins and **`.world:query`**, **`text`**, **`number`**, **`float`**, and **`bool`** describe **how bits on a wire map to logic terms** — not kinds stored in the KB.
 
 | Wire hint | Role |
 |-----------|------|
 | **`Var=text wire`** | Wire bits → ASCII atom; atom → wire on output |
 | **`Var=number wire`** | Wire bits → unsigned integer; integer → wire on output |
-| **`Var=number/<format> wire`** | Explicit codec — `u8`…`u64`, `s8`…`s64`, `uX` / `sX`, fixed-point `q4p4`, `q8p8`, `qXpY`, or IEEE half `fp16`, `bf16` |
+| **`Var=number/<format> wire`** | Integer codec — `u8`…`u64`, `s8`…`s64`, `uX` / `sX` only |
+| **`Var=float wire`** | Wire bits → IEEE float (`float/X` — `fp16` on 16-bit, `f32` on 32-bit, `f64` on 64-bit) |
+| **`Var=float/<format> wire`** | Explicit float codec — `q4p4`, `q8p8`, `qXpY`, `fp16`, `bf16`, `f32`, `f64` |
 | **`Var=bool wire`** | 1 bit ↔ 0/1 (packed bool lists on vector wires — see [logic-query-exec.md](logic-query-exec.md)) |
 
-**`number`** without a slash keeps the same unsigned behaviour as before. **`number/s8`**, **`number/u32`**, and similar forms select signed or unsigned two's-complement decode/encode at the boundary. The format width must match the wire width (or vector element width for `number/s16 list` on `16wire[N]`); otherwise elaboration reports a width mismatch error.
+**`number`** without a slash keeps unsigned behaviour. **`number/s8`**, **`number/u32`**, and similar forms select signed or unsigned two's-complement decode/encode. **`number/fp16`**, **`number/q4p4`**, and other fractional formats are rejected — use **`float/fp16`**, **`float/q4p4`**, etc.
 
-Facts in the inline KB remain **atoms** and **numbers**; conversion happens at the pin boundary.
+**`float`** without a slash uses **`float/X`**: wire element width selects the codec (16 → `fp16`, 32 → `f32`, 64 → `f64`). Packed **`float list`** on a scalar wire uses **32-bit** cells by default (`f32`); use **`float/fp16 list`** for 16-bit packed cells.
+
+Facts in the inline KB use **atoms**, **integers**, and **float literals**; conversion happens at the pin boundary.
 
 ### Signed `number/s8` query input
 
@@ -367,14 +451,14 @@ inline [logic] .batch:
 
 **Load & Run:** **`ok = 1`** — each 16-bit cell uses the `u16` codec.
 
-### Fixed-point `number/q4p4`
+### Fixed-point `float/q4p4`
 
-Same wire encoding as LogTScript `; q4p4` builtins. The KB holds the **raw signed integer** from the wire (not the human fractional value).
+Same wire encoding as LogTScript `; q4p4` builtins. The KB holds the **human fractional value** as a float term (e.g. `1.5`).
 
 ```logts-play
 inline [logic] .fixed:
 
-    expect(24)
+    expect(1.5)
 
     query check:
         expect(T)
@@ -383,19 +467,19 @@ inline [logic] .fixed:
 
 8wire tempIn = 00011000
 
-1wire ok = .fixed:query({ expect(T) }, T=number/q4p4 tempIn)
+1wire ok = .fixed:query({ expect(T) }, T=float/q4p4 tempIn)
 ```
 
-**Load & Run:** **`ok = 1`** — `00011000` decodes to raw **24** (represents **1.5** in q4p4 fixed-point math).
+**Load & Run:** **`ok = 1`** — `00011000` decodes to **`1.5`** in the KB.
 
-### IEEE half `number/fp16`
+### IEEE half `float/fp16`
 
-Same wire encoding as LogTScript `; fp16` builtins. The KB holds the **raw 16-bit IEEE pattern** as an unsigned integer (not a float term).
+Same wire encoding as LogTScript `; fp16` builtins. The KB holds the **decoded IEEE value** as a float term (e.g. `1.0`).
 
 ```logts-play
 inline [logic] .half:
 
-    expect(15360)
+    expect(1.0)
 
     query check:
         expect(T)
@@ -404,10 +488,48 @@ inline [logic] .half:
 
 16wire sensorIn = 0011110000000000
 
-1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)
+1wire ok = .half:query({ expect(T) }, T=float/fp16 sensorIn)
 ```
 
-**Load & Run:** **`ok = 1`** — `0011110000000000` decodes to raw **15360** (represents **1.0** in fp16 arithmetic). Use **`number/bf16`** the same way on `16wire` with bfloat16 bit patterns.
+**Load & Run:** **`ok = 1`** — `0011110000000000` decodes to **`1.0`**. Use **`float/bf16`** the same way on `16wire` with bfloat16 bit patterns.
+
+### Default `float` on `32wire` (`float/X` → `f32`)
+
+```logts-play
+inline [logic] .vals:
+
+    expect(1.5)
+
+    query check:
+        expect(T)
+
+:
+
+32wire sensorIn = 00111111110000000000000000000000
+
+1wire ok = .vals:query({ expect(T) }, T=float sensorIn)
+```
+
+**Load & Run:** **`ok = 1`** — no slash needed; 32-bit wire implies **`f32`** decode.
+
+### Packed `float list` (default 32-bit cells)
+
+```logts-play
+inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query check:
+        row(1, L)
+
+:
+
+32wire packed = 0011110000000000 + 0100000000000000
+
+1wire ok = .batch:query({ row(1, L) }, L=float/fp16 list packed)
+```
+
+**Load & Run:** **`ok = 1`** — two fp16 values in a 32-bit packed wire.
 
 ---
 
@@ -463,7 +585,7 @@ Inside the KB, **`Z`** is still a **number term** when bound from `carInfo/4`; t
 
 ## Reserved names
 
-You cannot define **`atom/1`**, **`number/1`**, **`list/1`**, or **`compound/1`** as fact, rule, or constraint heads — same rule as **`member/2`** and **`is/2`**.
+You cannot define **`atom/1`**, **`number/1`**, **`float/1`**, **`list/1`**, or **`compound/1`** as fact, rule, or constraint heads — same rule as **`member/2`** and **`is/2`**.
 
 ---
 

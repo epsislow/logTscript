@@ -438,7 +438,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           ? 1
           : b.bindType === 'text'
             ? LogicComponent.TEXT_PIN_MIN_BITS
-            : b.bindType === 'number'
+            : (b.bindType === 'number' || b.bindType === 'float')
               ? LogicComponent.NUMBER_PIN_DEFAULT_BITS
               : 8,
       };
@@ -590,6 +590,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       this._writeNumberPinStorage(pin, value, ctx);
       return true;
     }
+    if (pin.bindType === 'float') {
+      this._writeNumberPinStorage(pin, value, ctx);
+      return true;
+    }
     let v = value || '0'.repeat(pin.bits);
     if (v.length < pin.bits) v = v.padStart(pin.bits, '0');
     else if (v.length > pin.bits) v = v.slice(-pin.bits);
@@ -630,30 +634,35 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       if (pin.listFlag) {
         if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
         pin.bits = bits.length;
-        if (pin.bindType === 'number' && pin.numberFormat && bits.length > 0) {
-          const fw = typeof logicNumberFormatBitWidth === 'function'
-            ? logicNumberFormatBitWidth(pin.numberFormat, bits.length)
+        if ((pin.bindType === 'number' || pin.bindType === 'float') && pin.numberFormat && bits.length > 0) {
+          const fmtWidthFn = pin.bindType === 'float'
+            ? logicFloatFormatBitWidth
+            : logicNumberFormatBitWidth;
+          const validateFn = pin.bindType === 'float'
+            ? logicValidateFloatFormatWidth
+            : logicValidateNumberFormatWidth;
+          const fw = typeof fmtWidthFn === 'function'
+            ? fmtWidthFn(pin.numberFormat, bits.length)
             : null;
           if (fw != null && bits.length > fw && bits.length % fw === 0) {
-            if (typeof logicValidateNumberFormatWidth === 'function') {
-              logicValidateNumberFormatWidth(
-                pin.numberFormat, fw, `logic pin '${pinName}'`,
-              );
+            if (typeof validateFn === 'function') {
+              validateFn(pin.numberFormat, fw, `logic pin '${pinName}'`);
             }
-          } else if (typeof logicValidateNumberFormatWidth === 'function') {
-            logicValidateNumberFormatWidth(
-              pin.numberFormat, bits.length, `logic pin '${pinName}'`,
-            );
+          } else if (typeof validateFn === 'function') {
+            validateFn(pin.numberFormat, bits.length, `logic pin '${pinName}'`);
           }
         }
       } else if (pin.bindType === 'text') {
         bits = this._writeTextPinStorage(pin, bits, ctx);
-      } else if (pin.bindType === 'number') {
+      } else if (pin.bindType === 'number' || pin.bindType === 'float') {
         bits = this._writeNumberPinStorage(pin, bits, ctx);
-        if (pin.numberFormat && typeof logicValidateNumberFormatWidth === 'function') {
-          logicValidateNumberFormatWidth(
-            pin.numberFormat, bits.length, `logic pin '${pinName}'`,
-          );
+        if (pin.numberFormat) {
+          const validateFn = pin.bindType === 'float'
+            ? logicValidateFloatFormatWidth
+            : logicValidateNumberFormatWidth;
+          if (typeof validateFn === 'function') {
+            validateFn(pin.numberFormat, bits.length, `logic pin '${pinName}'`);
+          }
         }
       } else {
         if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
@@ -671,7 +680,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
             }
             return logicWireBitsToListTerm(
               bits, pin.bindType,
-              '0'.repeat(pin.bindType === 'bool' ? 1 : pin.bindType === 'number' ? 16 : 8),
+              '0'.repeat(pin.bindType === 'bool' ? 1 : (pin.bindType === 'number' || pin.bindType === 'float') ? 16 : 8),
               wireShape,
               pin.numberFormat,
             );

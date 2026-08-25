@@ -1363,7 +1363,7 @@ parseLogicQueryModifiers() {
 }
 
 parseLogicQueryBindingAfterEq(bindName) {
-  const LOGIC_BIND_TYPES = new Set(['text', 'number', 'bool']);
+  const LOGIC_BIND_TYPES = new Set(['text', 'number', 'bool', 'float']);
   const LOGIC_QUERY_OPTS = new Set(['maxDepth', 'maxSolutions']);
   if (LOGIC_QUERY_OPTS.has(bindName)) {
     return { kind: 'option', name: bindName, expr: this.expr() };
@@ -1372,7 +1372,7 @@ parseLogicQueryBindingAfterEq(bindName) {
     throw Error(`Logic query: unknown option or invalid variable '${bindName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (this.c.type !== 'ID' || !LOGIC_BIND_TYPES.has(this.c.value)) {
-    throw Error(`query binding requires explicit type (text, number, bool, or … list) for '${bindName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`query binding requires explicit type (text, number, float, bool, or … list) for '${bindName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   const bindType = this.c.value;
   this.eat('ID');
@@ -1386,6 +1386,19 @@ parseLogicQueryBindingAfterEq(bindName) {
       throw new Error('logic-number-formats is not loaded');
     }
     numberFormat = parseLogicNumberFormatToken(
+      this.c.value,
+      `query binding for '${bindName}'`,
+    );
+    this.eat('ID');
+  } else if (bindType === 'float' && this.c.type === 'SYM' && this.c.value === '/') {
+    this.eat('SYM', '/');
+    if (this.c.type !== 'ID') {
+      throw Error(`expected float format after '/' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (typeof parseLogicFloatFormatToken !== 'function') {
+      throw new Error('logic-float-formats is not loaded');
+    }
+    numberFormat = parseLogicFloatFormatToken(
       this.c.value,
       `query binding for '${bindName}'`,
     );

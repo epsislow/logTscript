@@ -70,6 +70,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`fail/0`** | 0 | yes | no | Always fails (Prolog-style) |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
+| **`float/1`** | 1 | yes | no | Type test — argument is a float |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
 | **`compound/1`** | 1 | yes | no | Type test — argument is a compound (not a list) |
 | **`random_between/3`** | 3 | yes | yes (RNG) | Uniform random integer in `[Low, High]` inclusive |

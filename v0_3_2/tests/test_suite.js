@@ -45646,7 +45646,7 @@ comp [logic] .storeLogic:
 
 8wire narrowIn = 00000000
 
-1wire ok = .x:query({ expect(T) }, T=number/fp16 narrowIn)`;
+1wire ok = .x:query({ expect(T) }, T=float/fp16 narrowIn)`;
     if (isWave) {
       h.assertThrows('width mismatch', function() {
         session.run(src);
@@ -45661,7 +45661,7 @@ comp [logic] .storeLogic:
   function runF39bQ4p4QueryInput(h, session) {
     const src = `inline [logic] .fixed:
 
-    expect(24)
+    expect(1.5)
 
     query q:
         expect(T)
@@ -45670,18 +45670,18 @@ comp [logic] .storeLogic:
 
 8wire tempIn = 00011000
 
-1wire ok = .fixed:query({ expect(T) }, T=number/q4p4 tempIn)`;
+1wire ok = .fixed:query({ expect(T) }, T=float/q4p4 tempIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4175, 'logic', 'F39b number/q4p4 raw query input (legacy)', runF39bQ4p4QueryInput);
-  reg(4176, 'logic', 'F39b number/q4p4 raw query input (wave)', runF39bQ4p4QueryInput, { propagation: 'wave' });
+  reg(4175, 'logic', 'F40b float/q4p4 query input (legacy)', runF39bQ4p4QueryInput);
+  reg(4176, 'logic', 'F40b float/q4p4 query input (wave)', runF39bQ4p4QueryInput, { propagation: 'wave' });
 
   function runF39bQ8p8QueryInput(h, session) {
     const src = `inline [logic] .fixed:
 
-    expect(320)
+    expect(1.25)
 
     query q:
         expect(T)
@@ -45690,18 +45690,18 @@ comp [logic] .storeLogic:
 
 16wire valIn = 0000000101000000
 
-1wire ok = .fixed:query({ expect(T) }, T=number/q8p8 valIn)`;
+1wire ok = .fixed:query({ expect(T) }, T=float/q8p8 valIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4177, 'logic', 'F39b number/q8p8 raw query input (legacy)', runF39bQ8p8QueryInput);
-  reg(4178, 'logic', 'F39b number/q8p8 raw query input (wave)', runF39bQ8p8QueryInput, { propagation: 'wave' });
+  reg(4177, 'logic', 'F40b float/q8p8 query input (legacy)', runF39bQ8p8QueryInput);
+  reg(4178, 'logic', 'F40b float/q8p8 query input (wave)', runF39bQ8p8QueryInput, { propagation: 'wave' });
 
   function runF39bQ6p2Parametric(h, session) {
     const src = `inline [logic] .fixed:
 
-    expect(6)
+    expect(1.5)
 
     query q:
         expect(T)
@@ -45710,18 +45710,18 @@ comp [logic] .storeLogic:
 
 8wire valIn = 00000110
 
-1wire ok = .fixed:query({ expect(T) }, T=number/q6p2 valIn)`;
+1wire ok = .fixed:query({ expect(T) }, T=float/q6p2 valIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4179, 'logic', 'F39b number/q6p2 parametric (legacy)', runF39bQ6p2Parametric);
-  reg(4180, 'logic', 'F39b number/q6p2 parametric (wave)', runF39bQ6p2Parametric, { propagation: 'wave' });
+  reg(4179, 'logic', 'F40b float/q6p2 parametric (legacy)', runF39bQ6p2Parametric);
+  reg(4180, 'logic', 'F40b float/q6p2 parametric (wave)', runF39bQ6p2Parametric, { propagation: 'wave' });
 
   function runF39bCompPinQ4p4(h, session) {
     const src = `inline [logic] .data:
 
-    sample(24)
+    sample(1.5)
 
     query q:
         sample(V)
@@ -45732,7 +45732,7 @@ comp [logic] .dataLogic:
     on: 1
 
     .data {
-        V is number/q4p4 valPin
+        V is float/q4p4 valPin
     }
 
 :
@@ -45750,8 +45750,8 @@ comp [logic] .dataLogic:
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4181, 'logic', 'F39b comp pin number/q4p4 (legacy)', runF39bCompPinQ4p4);
-  reg(4182, 'logic', 'F39b comp pin number/q4p4 (wave)', runF39bCompPinQ4p4, { propagation: 'wave' });
+  reg(4181, 'logic', 'F40b comp pin float/q4p4 (legacy)', runF39bCompPinQ4p4);
+  reg(4182, 'logic', 'F40b comp pin float/q4p4 (wave)', runF39bCompPinQ4p4, { propagation: 'wave' });
 
   function runF39bMutationQ4p4(h, session) {
     const src = `inline [logic] .store:
@@ -45771,7 +45771,7 @@ comp [logic] .storeLogic:
 
 .storeLogic:{
     logic {
-        + reading(1, number/q4p4 sensorIn)
+        + reading(1, float/q4p4 sensorIn)
     }
     set = trigger
 }
@@ -45781,13 +45781,13 @@ comp [logic] .storeLogic:
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4183, 'logic', 'F39b mutation number/q4p4 wire (legacy)', runF39bMutationQ4p4);
-  reg(4184, 'logic', 'F39b mutation number/q4p4 wire (wave)', runF39bMutationQ4p4, { propagation: 'wave' });
+  reg(4183, 'logic', 'F40b mutation float/q4p4 wire (legacy)', runF39bMutationQ4p4);
+  reg(4184, 'logic', 'F40b mutation float/q4p4 wire (wave)', runF39bMutationQ4p4, { propagation: 'wave' });
 
   function runF39bQ4p4ListVector(h, session) {
     const src = `inline [logic] .batch:
 
-    row(1, [24, 8])
+    row(1, [1.5, 0.5])
 
     query q:
         row(1, L)
@@ -45796,13 +45796,13 @@ comp [logic] .storeLogic:
 
 8wire[2] vecIn = 00011000 + 00001000
 
-1wire ok = .batch:query({ row(1, L) }, L=number/q4p4 list vecIn)`;
+1wire ok = .batch:query({ row(1, L) }, L=float/q4p4 list vecIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4185, 'logic', 'F39b number/q4p4 list vector (legacy)', runF39bQ4p4ListVector);
-  reg(4186, 'logic', 'F39b number/q4p4 list vector (wave)', runF39bQ4p4ListVector, { propagation: 'wave' });
+  reg(4185, 'logic', 'F40b float/q4p4 list vector (legacy)', runF39bQ4p4ListVector);
+  reg(4186, 'logic', 'F40b float/q4p4 list vector (wave)', runF39bQ4p4ListVector, { propagation: 'wave' });
 
   function runF39bFixedWidthMismatch(h, session, isWave) {
     const src = `inline [logic] .x:
@@ -45816,7 +45816,7 @@ comp [logic] .storeLogic:
 
 8wire narrowIn = 00000000
 
-1wire ok = .x:query({ expect(T) }, T=number/q8p8 narrowIn)`;
+1wire ok = .x:query({ expect(T) }, T=float/q8p8 narrowIn)`;
     if (isWave) {
       h.assertThrows('width mismatch', function() {
         session.run(src);
@@ -45842,7 +45842,7 @@ comp [logic] .storeLogic:
   function runF39cFp16QueryInput(h, session) {
     const src = `inline [logic] .half:
 
-    expect(15360)
+    expect(1.0)
 
     query q:
         expect(T)
@@ -45851,18 +45851,18 @@ comp [logic] .storeLogic:
 
 16wire sensorIn = 0011110000000000
 
-1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)`;
+1wire ok = .half:query({ expect(T) }, T=float/fp16 sensorIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4190, 'logic', 'F39c number/fp16 raw query input (legacy)', runF39cFp16QueryInput);
-  reg(4191, 'logic', 'F39c number/fp16 raw query input (wave)', runF39cFp16QueryInput, { propagation: 'wave' });
+  reg(4190, 'logic', 'F40b float/fp16 query input (legacy)', runF39cFp16QueryInput);
+  reg(4191, 'logic', 'F40b float/fp16 query input (wave)', runF39cFp16QueryInput, { propagation: 'wave' });
 
   function runF39cBf16QueryInput(h, session) {
     const src = `inline [logic] .half:
 
-    expect(16256)
+    expect(1.0)
 
     query q:
         expect(T)
@@ -45871,18 +45871,18 @@ comp [logic] .storeLogic:
 
 16wire sensorIn = 0011111110000000
 
-1wire ok = .half:query({ expect(T) }, T=number/bf16 sensorIn)`;
+1wire ok = .half:query({ expect(T) }, T=float/bf16 sensorIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4192, 'logic', 'F39c number/bf16 raw query input (legacy)', runF39cBf16QueryInput);
-  reg(4193, 'logic', 'F39c number/bf16 raw query input (wave)', runF39cBf16QueryInput, { propagation: 'wave' });
+  reg(4192, 'logic', 'F40b float/bf16 query input (legacy)', runF39cBf16QueryInput);
+  reg(4193, 'logic', 'F40b float/bf16 query input (wave)', runF39cBf16QueryInput, { propagation: 'wave' });
 
   function runF39cCompPinFp16(h, session) {
     const src = `inline [logic] .data:
 
-    sample(15360)
+    sample(1.0)
 
     query q:
         sample(V)
@@ -45893,7 +45893,7 @@ comp [logic] .dataLogic:
     on: 1
 
     .data {
-        V is number/fp16 valPin
+        V is float/fp16 valPin
     }
 
 :
@@ -45911,8 +45911,8 @@ comp [logic] .dataLogic:
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4194, 'logic', 'F39c comp pin number/fp16 (legacy)', runF39cCompPinFp16);
-  reg(4195, 'logic', 'F39c comp pin number/fp16 (wave)', runF39cCompPinFp16, { propagation: 'wave' });
+  reg(4194, 'logic', 'F40b comp pin float/fp16 (legacy)', runF39cCompPinFp16);
+  reg(4195, 'logic', 'F40b comp pin float/fp16 (wave)', runF39cCompPinFp16, { propagation: 'wave' });
 
   function runF39cMutationFp16(h, session) {
     const src = `inline [logic] .store:
@@ -45920,7 +45920,7 @@ comp [logic] .dataLogic:
     reading(Id, Val)
 
     query hasReading:
-        reading(1, 15360)
+        reading(1, 1.0)
 
 :
 
@@ -45937,7 +45937,7 @@ comp [logic] .storeLogic:
 
 .storeLogic:{
     logic {
-        + reading(1, number/fp16 sensorIn)
+        + reading(1, float/fp16 sensorIn)
     }
     hasReading >= ok
     mutationFailed >= failed
@@ -45948,13 +45948,13 @@ comp [logic] .storeLogic:
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4196, 'logic', 'F39c mutation number/fp16 wire (legacy)', runF39cMutationFp16);
-  reg(4197, 'logic', 'F39c mutation number/fp16 wire (wave)', runF39cMutationFp16, { propagation: 'wave' });
+  reg(4196, 'logic', 'F40b mutation float/fp16 wire (legacy)', runF39cMutationFp16);
+  reg(4197, 'logic', 'F40b mutation float/fp16 wire (wave)', runF39cMutationFp16, { propagation: 'wave' });
 
   function runF39cFp16ListVector(h, session) {
     const src = `inline [logic] .batch:
 
-    row(1, [15360, 16384])
+    row(1, [1.0, 2.0])
 
     query q:
         row(1, L)
@@ -45963,13 +45963,13 @@ comp [logic] .storeLogic:
 
 16wire[2] vecIn = 0011110000000000 + 0100000000000000
 
-1wire ok = .batch:query({ row(1, L) }, L=number/fp16 list vecIn)`;
+1wire ok = .batch:query({ row(1, L) }, L=float/fp16 list vecIn)`;
     const { interp } = session.run(src);
     h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
   }
 
-  reg(4198, 'logic', 'F39c number/fp16 list vector (legacy)', runF39cFp16ListVector);
-  reg(4199, 'logic', 'F39c number/fp16 list vector (wave)', runF39cFp16ListVector, { propagation: 'wave' });
+  reg(4198, 'logic', 'F40b float/fp16 list vector (legacy)', runF39cFp16ListVector);
+  reg(4199, 'logic', 'F40b float/fp16 list vector (wave)', runF39cFp16ListVector, { propagation: 'wave' });
 
   function runF39cEachScalarFp16(h, session) {
     const src = `inline [logic] .pairs:
@@ -45999,7 +45999,7 @@ comp [logic] .pairLogic:
 
 .pairLogic:{
     logic {
-        + pair(text each owners, number/fp16 each valVec)
+        + pair(text each owners, float/fp16 each valVec)
     }
     qa >= okA
     qb >= okB
@@ -46014,8 +46014,8 @@ comp [logic] .pairLogic:
     h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
   }
 
-  reg(4200, 'logic', 'F39c number/fp16 each scalar vector (legacy)', runF39cEachScalarFp16);
-  reg(4201, 'logic', 'F39c number/fp16 each scalar vector (wave)', runF39cEachScalarFp16, { propagation: 'wave' });
+  reg(4200, 'logic', 'F40b float/fp16 each scalar vector (legacy)', runF39cEachScalarFp16);
+  reg(4201, 'logic', 'F40b float/fp16 each scalar vector (wave)', runF39cEachScalarFp16, { propagation: 'wave' });
 
   function runF39cEachListFp16Matrix(h, session) {
     const src = `inline [logic] .fleet:
@@ -46045,7 +46045,7 @@ comp [logic] .fleetLogic:
 
 .fleetLogic:{
     logic {
-        + car(text each owners, number/fp16 list each matrix)
+        + car(text each owners, float/fp16 list each matrix)
     }
     qa >= okA
     qb >= okB
@@ -46060,8 +46060,8 @@ comp [logic] .fleetLogic:
     h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
   }
 
-  reg(4202, 'logic', 'F39c number/fp16 list each matrix (legacy)', runF39cEachListFp16Matrix);
-  reg(4203, 'logic', 'F39c number/fp16 list each matrix (wave)', runF39cEachListFp16Matrix, { propagation: 'wave' });
+  reg(4202, 'logic', 'F40b float/fp16 list each matrix (legacy)', runF39cEachListFp16Matrix);
+  reg(4203, 'logic', 'F40b float/fp16 list each matrix (wave)', runF39cEachListFp16Matrix, { propagation: 'wave' });
 
   function runF39aNumberLegacyRegression(h, session) {
     const src = `inline [logic] .scores:
@@ -46082,6 +46082,359 @@ comp [logic] .fleetLogic:
 
   reg(4173, 'logic', 'F39a number without slash regression (legacy)', runF39aNumberLegacyRegression);
   reg(4174, 'logic', 'F39a number without slash regression (wave)', runF39aNumberLegacyRegression, { propagation: 'wave' });
+
+  function runF40aFloatLiteralFact(h, session) {
+    const src = `inline [logic] .vals:
+
+    threshold(1.5)
+    threshold(-0.25)
+    threshold(.5)
+
+    query q1:
+        threshold(1.5)
+    query q2:
+        threshold(-0.25)
+    query q3:
+        threshold(.5)
+
+:
+
+1wire ok1 = .vals:query({ threshold(1.5) })
+1wire ok2 = .vals:query({ threshold(-0.25) })
+1wire ok3 = .vals:query({ threshold(.5) })`;
+    const { interp } = session.run(src);
+    h.assert('ok1', interp.getWireEffectiveValue('ok1'), '1');
+    h.assert('ok2', interp.getWireEffectiveValue('ok2'), '1');
+    h.assert('ok3', interp.getWireEffectiveValue('ok3'), '1');
+  }
+
+  reg(4210, 'logic', 'F40a float literals in facts (legacy)', runF40aFloatLiteralFact);
+  reg(4211, 'logic', 'F40a float literals in facts (wave)', runF40aFloatLiteralFact, { propagation: 'wave' });
+
+  function runF40aFloatTypePred(h, session) {
+    const src = `inline [logic] .samples:
+
+    sample(1.5)
+    sample(42)
+    sample(.75)
+    sample("text")
+
+    query floats:
+        sample(X),
+        float(X),
+        show(X)
+
+    query ints:
+        sample(X),
+        number(X),
+        show(X)
+
+:
+
+1wire trigger = 1
+
+comp [logic] .sampleLogic:
+    on: 1
+    .samples { }
+:
+
+.sampleLogic:{
+    query = floats
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('trigger', interp.getWireEffectiveValue('trigger'), '1');
+  }
+
+  reg(4212, 'logic', 'F40a float/1 filters float values (legacy)', runF40aFloatTypePred);
+  reg(4213, 'logic', 'F40a float/1 filters float values (wave)', runF40aFloatTypePred, { propagation: 'wave' });
+
+  function runF40aNumberRejectsFloat(h, session) {
+    const src = `inline [logic] .samples:
+
+    sample(1.5)
+    sample(10)
+
+    query ints:
+        sample(X),
+        number(X)
+
+:
+
+1wire ok = .samples:query({ sample(X), number(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4214, 'logic', 'F40a number/1 rejects float (legacy)', runF40aNumberRejectsFloat);
+  reg(4215, 'logic', 'F40a number/1 rejects float (wave)', runF40aNumberRejectsFloat, { propagation: 'wave' });
+
+  function runF40aFloatUnify(h, session) {
+    const src = `inline [logic] .eq:
+
+    expect(1.5)
+
+    query q:
+        expect(1.5)
+
+:
+
+1wire ok = .eq:query({ expect(1.5) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4216, 'logic', 'F40a float unify in query (legacy)', runF40aFloatUnify);
+  reg(4217, 'logic', 'F40a float unify in query (wave)', runF40aFloatUnify, { propagation: 'wave' });
+
+  function runF40aIntFloatMismatch(h, session) {
+    const src = `inline [logic] .mix:
+
+    query q:
+        1 = 1.0
+
+:
+
+1wire ok = .mix:query({ 1 = 1.0 })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(4218, 'logic', 'F40a int and float do not unify (legacy)', runF40aIntFloatMismatch);
+  reg(4219, 'logic', 'F40a int and float do not unify (wave)', runF40aIntFloatMismatch, { propagation: 'wave' });
+
+  function runF40aFloatCmp(h, session) {
+    const src = `inline [logic] .cmp:
+
+    query eq:
+        1.5 =:= 1.5
+    query ne:
+        1.5 =\\= 2.0
+    query mix:
+        1 =:= 1.0
+
+:
+
+1wire okEq = .cmp:query({ 1.5 =:= 1.5 })
+1wire okNe = .cmp:query({ 1.5 =\\= 2.0 })
+1wire okMix = .cmp:query({ 1 =:= 1.0 })`;
+    const { interp } = session.run(src);
+    h.assert('okEq', interp.getWireEffectiveValue('okEq'), '1');
+    h.assert('okNe', interp.getWireEffectiveValue('okNe'), '1');
+    h.assert('okMix', interp.getWireEffectiveValue('okMix'), '0');
+  }
+
+  reg(4220, 'logic', 'F40a float =:= and int/float mismatch (legacy)', runF40aFloatCmp);
+  reg(4221, 'logic', 'F40a float =:= and int/float mismatch (wave)', runF40aFloatCmp, { propagation: 'wave' });
+
+  function runF40aFloatList(h, session) {
+    const src = `inline [logic] .batch:
+
+    row([1.5, 2.0, .5])
+
+    query q:
+        row(L)
+
+:
+
+1wire ok = .batch:query({ row(L) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4222, 'logic', 'F40a float list in compound (legacy)', runF40aFloatList);
+  reg(4223, 'logic', 'F40a float list in compound (wave)', runF40aFloatList, { propagation: 'wave' });
+
+  function runF40aFloatHeadReserved(h, session) {
+    const src = `inline [logic] .bad:
+
+    float(1.5)
+
+:`;
+    h.assertThrows('reserved', function() {
+      session.run(src);
+    }, "float/1' is reserved");
+  }
+
+  reg(4224, 'logic', 'F40a float/1 head reserved (legacy)', runF40aFloatHeadReserved);
+  reg(4225, 'logic', 'F40a float/1 head reserved (wave)', runF40aFloatHeadReserved, { propagation: 'wave' });
+
+  function runF40bNumberQRejected(h, session) {
+    const src = `inline [logic] .x:
+
+    expect(0)
+
+    query q:
+        expect(T)
+
+:
+
+8wire tempIn = 00011000
+
+1wire ok = .x:query({ expect(T) }, T=number/q4p4 tempIn)`;
+    h.assertThrows('rejected', function() {
+      session.run(src);
+    }, 'not an integer format');
+  }
+
+  reg(4230, 'logic', 'F40b number/q4p4 rejected (legacy)', runF40bNumberQRejected);
+  reg(4231, 'logic', 'F40b number/q4p4 rejected (wave)', runF40bNumberQRejected, { propagation: 'wave' });
+
+  function runF40bNumberFp16Rejected(h, session) {
+    const src = `inline [logic] .x:
+
+    expect(0)
+
+    query q:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .x:query({ expect(T) }, T=number/fp16 sensorIn)`;
+    h.assertThrows('rejected', function() {
+      session.run(src);
+    }, 'not an integer format');
+  }
+
+  reg(4232, 'logic', 'F40b number/fp16 rejected (legacy)', runF40bNumberFp16Rejected);
+  reg(4233, 'logic', 'F40b number/fp16 rejected (wave)', runF40bNumberFp16Rejected, { propagation: 'wave' });
+
+  function runF40bFloatX32(h, session) {
+    const src = `inline [logic] .vals:
+
+    expect(1.5)
+
+    query q:
+        expect(T)
+
+:
+
+32wire sensorIn = 00111111110000000000000000000000
+
+1wire ok = .vals:query({ expect(T) }, T=float sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4234, 'logic', 'F40b float/X f32 on 32wire (legacy)', runF40bFloatX32);
+  reg(4235, 'logic', 'F40b float/X f32 on 32wire (wave)', runF40bFloatX32, { propagation: 'wave' });
+
+  function runF40bFloatDefaultFp16(h, session) {
+    const src = `inline [logic] .half:
+
+    expect(1.0)
+
+    query q:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .half:query({ expect(T) }, T=float sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4236, 'logic', 'F40b float/X fp16 on 16wire (legacy)', runF40bFloatDefaultFp16);
+  reg(4237, 'logic', 'F40b float/X fp16 on 16wire (wave)', runF40bFloatDefaultFp16, { propagation: 'wave' });
+
+  function runF40bFloatPackedList(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0, 3.0, 4.0])
+
+    query q:
+        row(1, L)
+
+:
+
+128wire packed = 00111111100000000000000000000000 + 01000000000000000000000000000000 + 01000000010000000000000000000000 + 01000000100000000000000000000000
+
+1wire ok = .batch:query({ row(1, L) }, L=float list packed)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4238, 'logic', 'F40b float list packed f32 (legacy)', runF40bFloatPackedList);
+  reg(4239, 'logic', 'F40b float list packed f32 (wave)', runF40bFloatPackedList, { propagation: 'wave' });
+
+  function runF40bFloatF64(h, session) {
+    const src = `inline [logic] .vals:
+
+    expect(1.5)
+
+    query q:
+        expect(T)
+
+:
+
+64wire sensorIn = 0011111111111000000000000000000000000000000000000000000000000000
+
+1wire ok = .vals:query({ expect(T) }, T=float/f64 sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4240, 'logic', 'F40b float/f64 query input (legacy)', runF40bFloatF64);
+  reg(4241, 'logic', 'F40b float/f64 query input (wave)', runF40bFloatF64, { propagation: 'wave' });
+
+  function runF40bCompPinFloatDefault(h, session) {
+    const src = `inline [logic] .data:
+
+    sample(1.0)
+
+    query q:
+        sample(V)
+
+:
+
+comp [logic] .dataLogic:
+    on: 1
+
+    .data {
+        V is float valPin
+    }
+
+:
+
+16wire valIn = 0011110000000000
+1wire ok = 0
+1wire trigger = 1
+
+.dataLogic:{
+    valPin = valIn
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4242, 'logic', 'F40b comp pin float/X fp16 (legacy)', runF40bCompPinFloatDefault);
+  reg(4243, 'logic', 'F40b comp pin float/X fp16 (wave)', runF40bCompPinFloatDefault, { propagation: 'wave' });
+
+  function runF40bFloatFp16ListPacked(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query q:
+        row(1, L)
+
+:
+
+32wire packed = 0011110000000000 + 0100000000000000
+
+1wire ok = .batch:query({ row(1, L) }, L=float/fp16 list packed)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4244, 'logic', 'F40b float/fp16 list packed (legacy)', runF40bFloatFp16ListPacked);
+  reg(4245, 'logic', 'F40b float/fp16 list packed (wave)', runF40bFloatFp16ListPacked, { propagation: 'wave' });
 
   window.LogTScriptTestSuite.finalize();
 })();

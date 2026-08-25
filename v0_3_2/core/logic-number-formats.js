@@ -1,11 +1,12 @@
 /**
- * Logic wire boundary numeric formats — F39a (u*, s*) + F39b (q*) + F39c (fp16, bf16).
+ * Logic wire boundary integer formats — F39a (u*, s*). Fractional/IEEE formats use float/* (F40b).
  */
 (function (global) {
   'use strict';
 
   const F39A_FORMAT_RE = /^(u(?:8|16|32|64|X)|s(?:8|16|32|64|X))$/;
   const F39C_FORMAT_RE = /^(fp16|bf16)$/;
+  const F39B_Q_FORMAT_RE = /^q\d+p\d+$/;
 
   function logicQModeSpec(format) {
     const NF = global.LogTScriptNumericFormats;
@@ -25,18 +26,14 @@
     const tok = name == null ? '' : String(name);
     const where = ctxLabel ? `${ctxLabel}: ` : '';
     if (F39A_FORMAT_RE.test(tok)) return tok;
-    if (logicQModeSpec(tok)) {
-      const spec = logicQModeSpec(tok);
-      const NF = global.LogTScriptNumericFormats;
-      const maxW = NF && NF.MAX_FORMAT_WIDTH != null ? NF.MAX_FORMAT_WIDTH : 64;
-      if (spec.width < 1 || spec.width > maxW) {
-        throw new Error(`${where}number format '${tok}' width must be 1..${maxW}`);
-      }
-      return tok;
+    if (logicQModeSpec(tok) || F39B_Q_FORMAT_RE.test(tok)) {
+      throw new Error(`${where}number format '${tok}' is not an integer format (use float/${tok})`);
     }
-    if (F39C_FORMAT_RE.test(tok)) return tok;
+    if (F39C_FORMAT_RE.test(tok)) {
+      throw new Error(`${where}number format '${tok}' is not an integer format (use float/${tok})`);
+    }
     throw new Error(
-      `${where}unsupported number format '${tok}' (use u8–u64, s8–s64, uX, sX, q4p4, q8p8, qXpY, fp16, or bf16)`,
+      `${where}unsupported number format '${tok}' (use u8–u64, s8–s64, uX, or sX)`,
     );
   }
 
@@ -153,7 +150,14 @@
   }
 
   function logicValidateBindAgainstWire(bindType, numberFormat, listFlag, wire, ctx, ctxLabel, eachScalarFlag) {
-    if (bindType !== 'number' || !numberFormat || !wire || !ctx) return;
+    if (!wire || !ctx) return;
+    if (bindType === 'float') {
+      const floatFn = typeof global.logicValidateFloatBindAgainstWire === 'function'
+        ? global.logicValidateFloatBindAgainstWire : null;
+      if (floatFn) floatFn(numberFormat, listFlag, wire, ctx, ctxLabel, eachScalarFlag);
+      return;
+    }
+    if (bindType !== 'number' || !numberFormat) return;
     const w = logicBindTargetBitWidth(wire, ctx, listFlag, eachScalarFlag);
     logicValidateNumberFormatWidth(numberFormat, w, ctxLabel);
   }

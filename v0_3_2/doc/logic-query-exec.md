@@ -97,11 +97,13 @@ Every query binding after the goal block **must** name a decode type. Width alon
 | `N=number scoreIn` | Wire → unsigned integer (same as `number/u<W>` where `W` = wire width) |
 | `N=number/s8 sensorIn` | Wire → signed integer (two's complement, format width must match wire) |
 | `N=number/u32 valIn` | Wire → unsigned integer with explicit width |
-| `N=number/q4p4 valIn` | Wire → raw fixed-point integer (same bits as `; q4p4`) |
-| `N=number/fp16 sensorIn` | Wire → raw IEEE half bits as unsigned integer (e.g. `15360` for `0011110000000000`, human value 1.0) |
-| `N=number/bf16 sensorIn` | Wire → raw bfloat16 bits as unsigned integer |
-| `L=number/q4p4 list vecIn` | Vector wire → list of raw fixed-point integers per cell |
-| `L=number/fp16 list vecIn` | Vector wire → list of raw IEEE half bit patterns per 16-bit cell |
+| `T=float/q4p4 valIn` | Wire → human fixed-point value as float term (e.g. `1.5`) |
+| `T=float/fp16 sensorIn` | Wire → IEEE half decoded to float (e.g. `1.0` for `0011110000000000`) |
+| `T=float/bf16 sensorIn` | Wire → bfloat16 decoded to float |
+| `T=float sensorIn` | `float/X` — `f32` on `32wire`, `fp16` on `16wire`, `f64` on `64wire` |
+| `L=float/q4p4 list vecIn` | Vector wire → list of float values per cell |
+| `L=float/fp16 list vecIn` | Vector wire → list of fp16-decoded floats per 16-bit cell |
+| `L=float list packedIn` | Packed scalar → list of floats (32-bit `f32` cells by default) |
 | `F=bool flag` | 1-bit wire → 0/1 |
 | `Nodes=text list routeIn` | Vector or packed scalar → Prolog list of atoms |
 | `Vals=number list packedIn` | Packed list of integers (16 bits per element on vector wires) |
@@ -121,6 +123,7 @@ The engine flattens the first solution list into consecutive cells (ASCII per at
 |------|-------------|-------------------|
 | **`text list`** | One atom per cell (`8wire[N]` → N atoms) | Total bits ÷ 8 slots |
 | **`number list`** | One integer per cell (cell width = element width); use **`number/s16 list`** etc. for signed cells | Total bits ÷ 16 slots |
+| **`float list`** | One float per cell; default **`f32`** on packed scalar wires | Total bits ÷ 32 slots (or ÷ format width when explicit) |
 | **`bool list`** | One bit per cell | Total bits = element count |
 
 | Rule | Behaviour |
@@ -132,19 +135,23 @@ The engine flattens the first solution list into consecutive cells (ASCII per at
 
 **Legacy vs wave:** success paths produce identical wire values. Runtime errors are reported the same way as other inline queries (legacy stores `lastReportedError`; wave may throw on assignment — same message text).
 
-### Numeric formats (`number/<format>`)
+### Numeric formats
 
-Append **`/<format>`** after **`number`** on inputs, output hints, program-block pins, and mutation wire refs.
+**Integer formats** — append **`/<format>`** after **`number`** (`u8`…`u64`, `s8`…`s64`, `uX`, `sX`). Fractional or IEEE formats on **`number`** are rejected (`number format 'fp16' is not an integer format (use float/fp16)`).
 
-| Format | Meaning |
-|--------|---------|
-| **`u8`**, **`u16`**, **`u32`**, **`u64`** | Unsigned fixed width |
-| **`s8`**, **`s16`**, **`s32`**, **`s64`** | Signed two's complement |
-| **`uX`**, **`sX`** | Parametric — width = wire width |
-| **`q4p4`**, **`q8p8`**, **`qXpY`** | Fixed-point — same raw signed integer in KB as on wire (e.g. `24` for `00011000` on `q4p4`, human value 1.5) |
-| **`fp16`**, **`bf16`** | IEEE half — raw 16-bit pattern as unsigned integer in KB (e.g. `15360` for fp16 `0011110000000000`, human value 1.0) |
+**Float formats** — append **`/<format>`** after **`float`**, or omit the slash for **`float/X`** (parametric by wire width).
 
-**`number`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for `number/q4p4 list` on `8wire[N]` or `number/fp16 list` on `16wire[N]`); mismatch → elaboration error (`number format width … does not match wire width …`).
+| Format | Bind type | Meaning |
+|--------|-----------|---------|
+| **`u8`**, **`u16`**, **`u32`**, **`u64`** | `number` | Unsigned fixed width |
+| **`s8`**, **`s16`**, **`s32`**, **`s64`** | `number` | Signed two's complement |
+| **`uX`**, **`sX`** | `number` | Parametric — width = wire width |
+| **`q4p4`**, **`q8p8`**, **`qXpY`** | `float` | Fixed-point → float value in KB (e.g. `1.5`) |
+| **`fp16`**, **`bf16`** | `float` | IEEE half → float value in KB |
+| **`f32`**, **`f64`** | `float` | IEEE single / double → float value in KB |
+| *(omit slash)* | `float` | **`float/X`** — `fp16` / `f32` / `f64` from element width |
+
+**`number`** without a slash is unchanged (unsigned on the full wire width). Integer format width must equal wire width (or vector element width). **`float`** packed list on a scalar wire defaults to **32-bit** cells; use **`float/fp16 list`** for 16-bit packed cells.
 
 #### Signed integer example
 
@@ -165,14 +172,14 @@ inline [logic] .temps:
 
 **Load & Run:** **`ok = 1`**.
 
-#### Fixed-point `q4p4` example
+#### Fixed-point `float/q4p4` example
 
-Wire bits use the same encoding as tagged builtins (`; q4p4`). The logic KB stores the **raw signed integer** (not the human fractional value).
+Wire bits use the same encoding as tagged builtins (`; q4p4`). The logic KB stores the **decoded fractional value** as a float term.
 
 ```logts-play
 inline [logic] .fixed:
 
-    expect(24)
+    expect(1.5)
 
     query check:
         expect(T)
@@ -181,19 +188,19 @@ inline [logic] .fixed:
 
 8wire tempIn = 00011000
 
-1wire ok = .fixed:query({ expect(T) }, T=number/q4p4 tempIn)
+1wire ok = .fixed:query({ expect(T) }, T=float/q4p4 tempIn)
 ```
 
-**Load & Run:** **`ok = 1`** — `00011000` is raw **24** (`1.5` in q4p4 arithmetic).
+**Load & Run:** **`ok = 1`** — `00011000` decodes to **`1.5`**.
 
-#### IEEE half `fp16` example
+#### IEEE half `float/fp16` example
 
-Wire bits use the same encoding as tagged builtins (`; fp16`). The logic KB stores the **raw 16-bit pattern** as an unsigned integer (not a floating-point Prolog value).
+Wire bits use the same encoding as tagged builtins (`; fp16`). The logic KB stores the **decoded IEEE value** as a float term.
 
 ```logts-play
 inline [logic] .half:
 
-    expect(15360)
+    expect(1.0)
 
     query check:
         expect(T)
@@ -202,14 +209,14 @@ inline [logic] .half:
 
 16wire sensorIn = 0011110000000000
 
-1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)
+1wire ok = .half:query({ expect(T) }, T=float/fp16 sensorIn)
 ```
 
-**Load & Run:** **`ok = 1`** — `0011110000000000` is raw **15360** (`1.0` in fp16 arithmetic).
+**Load & Run:** **`ok = 1`** — `0011110000000000` decodes to **`1.0`**.
 
-#### `each` with format
+#### `each` with float format
 
-`number/fp16 each valVec` on a `16wire[N]` vector decodes each cell with the same codec. `number/fp16 list each matrix` on a `16wire[R,C]` matrix decodes each row as a list of fp16 raw integers.
+`float/fp16 each valVec` on a `16wire[N]` vector decodes each cell to a float. `float/fp16 list each matrix` on a `16wire[R,C]` matrix decodes each row as a list of floats.
 
 ---
 

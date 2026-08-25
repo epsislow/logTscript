@@ -1773,7 +1773,7 @@ class Interpreter {
         fillBits = fillFn ? fillFn(wire, this) : '0'.repeat(wireShape.ew || 8);
       } else {
         fillBits = '0'.repeat(bind.listFlag
-          ? (bind.bindType === 'bool' ? 1 : bind.bindType === 'number' ? 16 : 8)
+          ? (bind.bindType === 'bool' ? 1 : bind.bindType === 'number' ? 16 : bind.bindType === 'float' ? 32 : 8)
           : 8);
       }
       if (bind.listFlag) {
