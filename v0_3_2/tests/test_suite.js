@@ -44682,5 +44682,157 @@ comp [logic] .worldLogic:
   reg(4079, 'logic', 'F36a member regression (legacy)', runF36aMemberRegression);
   reg(4080, 'logic', 'F36a member regression (wave)', runF36aMemberRegression, { propagation: 'wave' });
 
+  reg(4081, 'logic', 'dif-list parse L-H term', function(h) {
+    const prog = parseLogicBody('query q: DL = [a, b | H] - H');
+    const goal = logicQueryGoals(prog.queries[0])[0];
+    h.assert('unify goal', String(goal && goal.kind === 'unify'), 'true');
+    h.assert('dif_list rhs', String(goal.right && goal.right.kind === 'dif_list'), 'true');
+    h.assert('front list', String(goal.right.front && goal.right.front.kind === 'list'), 'true');
+    h.assert('hole var', String(goal.right.hole && goal.right.hole.kind === 'var'), 'true');
+    h.assert('hole name', goal.right.hole.name, 'H');
+  });
+
+  reg(4082, 'logic', 'dif-list unify same hole var', function(h) {
+    const prog = parseLogicBody('query q: [a, b | H] - H = [a, b | H] - H');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+  });
+
+  function runLogicDifListAppendEmpty(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        DL = [a, b | H] - H,
+        H = [],
+        append(DL, Closed),
+        show(Closed)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('closed', String(session.outIncludes(interp, '[a, b]')), 'true');
+  }
+
+  reg(4083, 'logic', 'append/2 dif-list close empty hole (legacy)', runLogicDifListAppendEmpty);
+  reg(4084, 'logic', 'append/2 dif-list close empty hole (wave)', runLogicDifListAppendEmpty, { propagation: 'wave' });
+
+  function runLogicDifListIncremental(h, session) {
+    const src = `inline [logic] .world:
+
+    query sentence:
+        DL = [i, like, mon | H] - H,
+        H = [poly, board | T],
+        T = [],
+        append(DL, Closed),
+        show(Closed)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = sentence
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('sentence', String(session.outIncludes(interp, '[i, like, mon, poly, board]')), 'true');
+  }
+
+  reg(4085, 'logic', 'append/2 incremental dif-list build (legacy)', runLogicDifListIncremental);
+  reg(4086, 'logic', 'append/2 incremental dif-list build (wave)', runLogicDifListIncremental, { propagation: 'wave' });
+
+  function runLogicAppend3Regression(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        append([a, b], [c], L3),
+        show(L3)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('append3', String(session.outIncludes(interp, '[a, b, c]')), 'true');
+  }
+
+  reg(4087, 'logic', 'append/3 regression after append/2 (legacy)', runLogicAppend3Regression);
+  reg(4088, 'logic', 'append/3 regression after append/2 (wave)', runLogicAppend3Regression, { propagation: 'wave' });
+
+  reg(4089, 'logic', 'dif-list occurs-check fails', function(h) {
+    const prog = parseLogicBody('query q: X = [X | _] - H');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4090, 'logic', 'append/2 reserved as rule head', function(h) {
+    h.assertThrows(
+      'reserved append/2',
+      () => parseLogicBody('append(DL, L) <- DL = L'),
+      "'append/2' is reserved",
+    );
+  });
+
+  function runLogicDifListShowOpen(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        DL = [a, b | H] - H,
+        show(DL)
+
+:
+
+1wire ok = .world:query({ DL = [a, b | H] - H, show(DL) })`;
+    const { interp } = session.run(src);
+    h.assert('open dl', String(session.outIncludes(interp, '[a, b|H]-H') || session.outIncludes(interp, '[a, b|H]')), 'true');
+  }
+
+  reg(4091, 'logic', 'show dif-list open (legacy)', runLogicDifListShowOpen);
+  reg(4092, 'logic', 'show dif-list open (wave)', runLogicDifListShowOpen, { propagation: 'wave' });
+
+  function runLogicDifListShowClosed(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        DL = [x, y | H] - H,
+        H = [],
+        show(DL)
+
+:
+
+1wire ok = .world:query({ DL = [x, y | H] - H, H = [], show(DL) })`;
+    const { interp } = session.run(src);
+    h.assert('closed', String(session.outIncludes(interp, '[x, y]')), 'true');
+  }
+
+  reg(4093, 'logic', 'show dif-list closed (legacy)', runLogicDifListShowClosed);
+  reg(4094, 'logic', 'show dif-list closed (wave)', runLogicDifListShowClosed, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

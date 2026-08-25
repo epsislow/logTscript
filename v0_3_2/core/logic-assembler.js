@@ -63,7 +63,7 @@ const LOGIC_BUILTIN_RESERVED_HEADS = new Set([
 ]);
 const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_MEMBER_PRED]: [2],
-  [LOGIC_BUILTIN_APPEND_PRED]: [3],
+  [LOGIC_BUILTIN_APPEND_PRED]: [2, 3],
   [LOGIC_BUILTIN_LENGTH_PRED]: [2],
   [LOGIC_BUILTIN_REVERSE_PRED]: [2],
   [LOGIC_BUILTIN_SORT_PRED]: [2],
@@ -364,6 +364,9 @@ class LogicParser {
     if (left.kind === 'list') {
       logicError('bare list term is not a goal — use = or call a predicate', this.peek().line);
     }
+    if (left.kind === 'dif_list') {
+      logicError('bare dif-list term is not a goal — use = or call a predicate', this.peek().line);
+    }
     logicError('invalid body goal', this.peek().line);
   }
 
@@ -408,6 +411,16 @@ class LogicParser {
   }
 
   parseTerm() {
+    const node = this.parseTermPrimary();
+    if (this.at('OP', '-') && logicTermAllowsDifListSuffix(node)) {
+      this.advance();
+      const hole = this.parseTermPrimary();
+      return { kind: 'dif_list', front: node, hole };
+    }
+    return node;
+  }
+
+  parseTermPrimary() {
     if (this.at('LBRACKET')) {
       return this.parseList();
     }
@@ -564,6 +577,11 @@ function logicValidateListElementCount(count, line) {
   }
 }
 
+function logicTermAllowsDifListSuffix(term) {
+  if (!term) return false;
+  return term.kind === 'list' || term.kind === 'var' || term.kind === 'dif_list';
+}
+
 function logicIsReservedPredicateHead(head) {
   if (!head || head.kind !== 'compound') return false;
   if (LOGIC_BUILTIN_RESERVED_HEADS.has(head.predicate)) return true;
@@ -584,8 +602,8 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_MEMBER_PRED && arity === 2) {
     return "'member/2' is reserved — cannot define member as fact or rule head";
   }
-  if (predicate === LOGIC_BUILTIN_APPEND_PRED && arity === 3) {
-    return "'append/3' is reserved — cannot define append as fact or rule head";
+  if (predicate === LOGIC_BUILTIN_APPEND_PRED && (arity === 2 || arity === 3)) {
+    return `'append/${arity}' is reserved — cannot define append as fact or rule head`;
   }
   if (predicate === LOGIC_BUILTIN_LENGTH_PRED && arity === 2) {
     return "'length/2' is reserved — cannot define length as fact or rule head";
@@ -874,6 +892,9 @@ function logicListFreeVarsInGoal(goal) {
         walkTerm(t.head);
         walkTerm(t.tail);
       }
+    } else if (t.kind === 'dif_list') {
+      walkTerm(t.front);
+      walkTerm(t.hole);
     } else if (t.kind === 'arith') {
       walkTerm(t.left); walkTerm(t.right);
     }

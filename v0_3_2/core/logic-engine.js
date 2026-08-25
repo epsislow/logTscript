@@ -42,6 +42,13 @@ function logicInternTerm(term, table) {
       tail: logicInternTerm(term.tail, table),
     };
   }
+  if (term.kind === 'dif_list') {
+    return {
+      kind: 'dif_list',
+      front: logicInternTerm(term.front, table),
+      hole: logicInternTerm(term.hole, table),
+    };
+  }
   if (term.kind === 'arith') {
     return {
       kind: 'arith',
@@ -270,6 +277,9 @@ class LogicEngine {
     }
     if (g0.kind === 'call' && g0.predicate === 'member' && g0.arity === 2) {
       return this._solveMember(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'append' && g0.arity === 2) {
+      return this._solveAppend2(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call' && g0.predicate === 'append' && g0.arity === 3) {
       return this._solveAppend(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
@@ -692,6 +702,31 @@ class LogicEngine {
     env.undo(trail);
     if (this._memberWalk(elem, ld.tail, cont, env)) any = true;
     return any;
+  }
+
+  _solveAppend2(difList, closed, rest, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    const dl = logicDeref(difList, env);
+    if (dl.kind === 'var') {
+      const cd = logicDeref(closed, env);
+      if (cd.kind !== 'list' && !logicListIsNil(cd)) return false;
+      const trail = env.trailLength();
+      const bound = { kind: 'dif_list', front: cd, hole: { kind: 'list', nil: true } };
+      if (!logicUnify(difList, bound, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+      return cont();
+    }
+    if (dl.kind !== 'dif_list') return false;
+    const built = logicDifListClose(dl.front, dl.hole, env);
+    if (built === false) return false;
+    const trail = env.trailLength();
+    if (!logicUnify(closed, built, env, this.table)) {
+      env.undo(trail);
+      return false;
+    }
+    return cont();
   }
 
   _solveAppend(l1, l2, l3, rest, env, depth, onSuccess, onDepthExceeded) {
@@ -1737,6 +1772,9 @@ function logicRenameApartClause(clause, idRef) {
       if (t.nil) return { kind: 'list', nil: true };
       return { kind: 'list', head: walkTerm(t.head), tail: walkTerm(t.tail) };
     }
+    if (t.kind === 'dif_list') {
+      return { kind: 'dif_list', front: walkTerm(t.front), hole: walkTerm(t.hole) };
+    }
     if (t.kind === 'arith') {
       return { kind: 'arith', op: t.op, left: walkTerm(t.left), right: walkTerm(t.right) };
     }
@@ -1919,6 +1957,17 @@ function logicUnify(t1, t2, env, table) {
     }
     return true;
   }
+  if (a.kind === 'dif_list' && b.kind === 'dif_list') {
+    if (!logicUnify(a.front, b.front, env, table)) return false;
+    return logicUnify(a.hole, b.hole, env, table);
+  }
+  if (a.kind === 'dif_list' && b.kind === 'var') {
+    if (b.name === '_') return true;
+    if (logicOccurs(b.name, a, env)) return false;
+    env.bind(b.name, a);
+    return true;
+  }
+  if (b.kind === 'dif_list' && a.kind === 'var') return logicUnify(b, a, env, table);
   if (logicListIsNil(a) && logicListIsNil(b)) return true;
   if (logicListIsNil(a) && b.kind === 'var') {
     if (b.name === '_') return true;
@@ -1947,6 +1996,9 @@ function logicOccurs(name, term, env) {
   const d = logicDeref(term, env);
   if (d.kind === 'var') return d.name === name;
   if (d.kind === 'compound') return d.args.some((a) => logicOccurs(name, a, env));
+  if (d.kind === 'dif_list') {
+    return logicOccurs(name, d.front, env) || logicOccurs(name, d.hole, env);
+  }
   if (d.kind === 'list') {
     if (d.nil) return false;
     return logicOccurs(name, d.head, env) || logicOccurs(name, d.tail, env);
@@ -1958,12 +2010,62 @@ function logicListIsNil(term) {
   return term && term.kind === 'list' && term.nil === true;
 }
 
+function logicVarHoleEqual(tailRef, hole, env) {
+  if (!tailRef || !hole || tailRef.kind !== 'var' || hole.kind !== 'var') return false;
+  if (tailRef.name === '_' || hole.name === '_') return false;
+  const td = logicDeref(tailRef, env);
+  const hd = logicDeref(hole, env);
+  if (td.kind === 'var' && hd.kind === 'var') return td.name === hd.name;
+  return false;
+}
+
+function logicAppendListHeads(heads, suffix) {
+  let result = suffix;
+  for (let i = heads.length - 1; i >= 0; i--) {
+    result = { kind: 'list', head: heads[i], tail: result };
+  }
+  return result;
+}
+
+function logicDifListClose(front, hole, env) {
+  const heads = [];
+  let cur = front;
+  while (true) {
+    const cd = logicDeref(cur, env);
+    if (logicListIsNil(cd)) {
+      return logicAppendListHeads(heads, logicDeref(hole, env));
+    }
+    if (cd.kind === 'list' && !cd.nil) {
+      if (cur.tail && cur.tail.kind === 'var' && hole.kind === 'var'
+          && cur.tail.name === hole.name && cur.tail.name !== '_') {
+        heads.push(logicDeref(cd.head, env));
+        return logicAppendListHeads(heads, logicDeref(hole, env));
+      }
+      heads.push(logicDeref(cd.head, env));
+      cur = cur.tail;
+      continue;
+    }
+    if (cd.kind === 'var' && hole.kind === 'var' && cd.name === hole.name) {
+      return logicAppendListHeads(heads, logicDeref(hole, env));
+    }
+    return false;
+  }
+}
+
+function logicDifListIsClosed(difTerm, env) {
+  const d = logicDeref(difTerm, env);
+  if (d.kind !== 'dif_list') return false;
+  const hv = logicDeref(d.hole, env);
+  return logicListIsNil(hv);
+}
+
 function logicTermTypeRank(term) {
   if (!term) return -1;
   if (term.kind === 'number') return 0;
   if (term.kind === 'atom') return 1;
   if (term.kind === 'list') return 2;
-  if (term.kind === 'compound') return 3;
+  if (term.kind === 'dif_list') return 3;
+  if (term.kind === 'compound') return 4;
   return -1;
 }
 
@@ -1996,6 +2098,11 @@ function logicCompareTerms(a, b, env, table) {
     const hc = logicCompareTerms(da.head, db.head, env, table);
     if (hc !== 0) return hc;
     return logicCompareTerms(da.tail, db.tail, env, table);
+  }
+  if (da.kind === 'dif_list' && db.kind === 'dif_list') {
+    const fc = logicCompareTerms(da.front, db.front, env, table);
+    if (fc !== 0) return fc;
+    return logicCompareTerms(da.hole, db.hole, env, table);
   }
   if (da.kind === 'compound') {
     if (da.predicate !== db.predicate) {
@@ -2590,6 +2697,13 @@ function logicResolveTerm(term, env, table) {
       tail: logicResolveTerm(d.tail, env, table),
     };
   }
+  if (d.kind === 'dif_list') {
+    return {
+      kind: 'dif_list',
+      front: logicResolveTerm(d.front, env, table),
+      hole: logicResolveTerm(d.hole, env, table),
+    };
+  }
   return d;
 }
 
@@ -2611,6 +2725,9 @@ function logicCollectFreeVarsInGoal(goal) {
         walkTerm(t.head);
         walkTerm(t.tail);
       }
+    } else if (t.kind === 'dif_list') {
+      walkTerm(t.front);
+      walkTerm(t.hole);
     } else if (t.kind === 'arith') { walkTerm(t.left); walkTerm(t.right); }
   }
   function walkGoal(g) {
@@ -3065,7 +3182,21 @@ function logicFormatShowTerm(term, env, table) {
     return `${pred}(${args})`;
   }
   if (d.kind === 'list') return logicFormatListShow(d, env, table);
+  if (d.kind === 'dif_list') return logicFormatDifListShow(d, env, table);
   return '?';
+}
+
+function logicFormatDifListShow(term, env, table) {
+  const d = logicDeref(term, env);
+  if (d.kind !== 'dif_list') return logicFormatShowTerm(d, env, table);
+  if (logicDifListIsClosed(d, env)) {
+    const closed = logicDifListClose(d.front, d.hole, env);
+    if (closed !== false) return logicFormatListShow(closed, env, table);
+  }
+  const frontStr = logicFormatListShow(d.front, env, table);
+  const holeD = logicDeref(d.hole, env);
+  const holeStr = holeD.kind === 'var' ? holeD.name : logicFormatShowTerm(holeD, env, table);
+  return `${frontStr}-${holeStr}`;
 }
 
 function logicFormatListShow(term, env, table) {

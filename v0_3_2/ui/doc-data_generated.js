@@ -20594,7 +20594,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
-| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`** — [logic-builtins.md](logic-builtins.md) |
+| **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`append/2\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`** — [logic-builtins.md](logic-builtins.md) |
 | **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
 | **Value kinds** | **\`atom\`**, **\`number\`**, **\`list\`**, **\`compound\`**; type tests **\`atom/1\`** … **\`compound/1\`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
@@ -20644,7 +20644,7 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | \`\\+ Goal\` | \`\\+ Goal\` — negation as failure (same idea as Prolog) |
 | \`!\` | Cut — commit current clause (same idea as Prolog) |
 | \`is\` | Arithmetic evaluate-and-bind — **\`Left is Right\`** or **\`is(Left, Right)\`** (built-in) |
-| \`true\` / \`fail\` | Not built-in — use facts, \`\\+\`, or empty query failure |
+| \`true\` / \`fail\` | **\`true/0\`**, **\`fail/0\`** — reserved builtins ([logic-builtins.md](logic-builtins.md#true0-and-fail0)) |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
 | Quoted atoms \`'John'\` | Use **\`"John"\`** string literals (show labels) or lowercase atoms |
 | Arbitrary arity / DCG / modules | Single inline namespace + \`use\` merge |
@@ -20674,12 +20674,13 @@ Lists use the usual Prolog syntax inside logic terms (facts, rules, queries, **\
 | Literal | \`[red, green, blue]\` | Ground list (internally a cons chain) |
 | Head \\| tail | \`[H \\| T]\` | Cons cell — \`H\` is one element, \`T\` is the rest |
 | Mixed | \`[A, B \\| Rest]\` | Two or more heads, then tail |
+| Difference list | \`[A, B \\| H] - H\` | Open tail **\`H\`** — same variable at the hole; see **\`append/2\`** in [logic-builtins.md](logic-builtins.md) |
 
 **Unification** follows Prolog rules with an **occurs-check** ( cyclic terms such as \`X = [X | _]\` fail ). A bare list term cannot stand alone as a goal — bind it with \`=\` or pass it to a predicate.
 
-List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**) are documented in [logic-builtins.md](logic-builtins.md).
+List literals accept at most **1024** comma-separated elements. Built-in list predicates (**\`member/2\`**, **\`append/3\`**, **\`append/2\`** (difference lists), **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`**) are documented in [logic-builtins.md](logic-builtins.md).
 
-**\`show/N\`** prints ground lists as \`[a, b, c]\` and partial lists as \`[a, b|Rest]\` when the tail is still a variable.
+**\`show/N\`** prints ground lists as \`[a, b, c]\`, partial lists as \`[a, b|Rest]\`, and open difference lists as \`[a, b|H]-H\`.
 
 ### Example — unify a list pattern
 
@@ -21181,7 +21182,7 @@ inline [logic] .world:
 | **\`[_, X, _]\`** fixed slot | Supported |
 | **\`append/3\`**, **\`member/2\`**, **\`length/2\`**, … | Built-ins (reserved names) |
 | User **\`member/2\`** rule | **Not allowed** — use another name (\`userMember/2\`, …) |
-| **\`true\` / \`fail\`** goals | **Not built-in** — use facts, **\`\\+\`**, or empty body failure |
+| **\`true\` / \`fail\`** goals | **\`true/0\`**, **\`fail/0\`** — see [logic-builtins.md — \`true/0\` · \`fail/0\`](logic-builtins.md#true0-and-fail0) |
 | DCG **\`NonTerminal --> …\`** | **Not supported** |
 | Open / partial lists in **\`reverse/2\`**, **\`sort/2\`**, **\`length/2\`** count | **Fail** until the spine is ground |
 | Cyclic **\`X = [X\\|_]\`** | **Fails** (occurs-check) |
@@ -21759,6 +21760,24 @@ comp [logic] .worldLogic:
 \`\`\`
 
 **Load & Run** prints **\`total 15\`**. Run again with **\`query = unify\`** (use **Load**, change the query name, **Load & Run**) to see **\`struct +(N, 1)\`**-style output for **\`M = N + 1\`** when **\`N\`** is free — unification, not arithmetic.
+
+---
+
+## \`true/0\` and \`fail/0\`
+
+Reserved builtins — always succeed or always fail. Full reference: [logic-builtins.md — \`true/0\` · \`fail/0\`](logic-builtins.md#true0-and-fail0).
+
+| Goal | Effect |
+|------|--------|
+| **\`true\`** | Succeeds; body continues |
+| **\`fail\`** | Fails immediately |
+
+\`\`\`logts
+ok() <- true
+never(X) <- fail, member(X, [a])
+\`\`\`
+
+**\`\\+ fail\`** succeeds (useful sanity check). Prefer **\`true\`** over **\`X = X\`** for readability.
 
 ---
 
@@ -24246,9 +24265,11 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`count/2\`** | 2 | no¹ | no | Number of solutions to a goal |
 | **\`nth0/3\`** | 3 | yes | no | List element at **0-based** index |
 | **\`nth1/3\`** | 3 | yes | no | List element at **1-based** index |
+| **\`nth1/4\`** | 4 | yes | no | Element at **1-based** index + list suffix after it |
 | **\`is/2\`** | 2 | yes | no | Integer arithmetic (+ infix **\`M is Expr\`**) |
 | **\`member/2\`** | 2 | yes | no | List membership with backtracking |
 | **\`append/3\`** | 3 | yes | no | Concatenate or decompose lists |
+| **\`append/2\`** | 2 | yes | no | Close a **difference list** \`Front-Hole\` to a ground list |
 | **\`length/2\`** | 2 | yes | no | List length; generative when **\`N\`** is ground |
 | **\`reverse/2\`** | 2 | yes | no | Reverse list order (bidirectional) |
 | **\`last/2\`** | 2 | yes | no | Last element of a non-empty ground list |
@@ -24285,6 +24306,8 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`findall/3\`** | 3 | yes | no | Collect all template instances for a goal (**\`[]\`** if none) |
 | **\`bagof/3\`** | 3 | yes | no | Like findall, groups by existential goal vars; **fail** if none |
 | **\`setof/3\`** | 3 | yes | no | Like bagof, then unique + sorted list |
+| **\`true/0\`** | 0 | yes | no | Always succeeds (Prolog-style) |
+| **\`fail/0\`** | 0 | yes | no | Always fails (Prolog-style) |
 | **\`atom/1\`** | 1 | yes | no | Type test — argument is an atom |
 | **\`number/1\`** | 1 | yes | no | Type test — argument is an integer |
 | **\`list/1\`** | 1 | yes | no | Type test — argument is a list |
@@ -24298,7 +24321,7 @@ Type predicates filter bound terms — see [logic-value-types.md](logic-value-ty
 
 **Scope:** all builtins work in rule bodies, named queries, constraint bodies, **\`.world:query({ … })\`**, and **\`.world:check({ … })\`**.
 
-**Not in this table:** **\`!\`** (cut) and **\`\\+\`** (negation) are goal operators — see [inline-logic.md](inline-logic.md).
+**Not in this table:** **\`!\`** (cut) and **\`\\+\`** (negation) are goal operators — see [inline-logic.md](inline-logic.md). **\`true/0\`** and **\`fail/0\`** are zero-arity call builtins in the table above.
 
 ---
 
@@ -24464,6 +24487,75 @@ comp [logic] .rentsLogic:
 10
 \`\`\`
 
+### \`nth1/4\` — element and suffix
+
+**\`nth1(I, List, Elem, Rest)\`** — like **\`nth1/3\`**, but **\`Rest\`** is unified with the list **after** the element at **\`I\`** (1-based).
+
+| Call | Result |
+|------|--------|
+| \`nth1(1, [a, b, c], X, R)\` | \`X = a\`, \`R = [b, c]\` |
+| \`nth1(3, [a, b, c], X, R)\` | \`X = c\`, \`R = []\` |
+| \`nth1(4, [a, b, c], X, R)\` | **Fail** (out of range) |
+
+**\`I\`** may be a variable (backtracking). Open or partial lists **fail** when the spine is not ground enough to reach **\`I\`**.
+
+#### Example — split a route at the second step
+
+\`\`\`logts-play
+inline [logic] .route:
+
+    query split:
+        nth1(2, [start, path, end], Mid, Tail),
+        show(Mid),
+        show(Tail)
+
+:
+
+comp [logic] .routeLogic:
+    on: 1
+    .route { }
+:
+
+1wire trigger = 1
+
+.routeLogic:{
+    query = split
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`path\`** then **\`[end]\`**.
+
+#### Example — generative length + indexing
+
+Build a list of known length, then pin the first cell (see also [\`length/2\`](#length2)):
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        length(L, 3),
+        nth1(1, L, first, Rest),
+        first = red,
+        show(Rest)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints a two-cell suffix starting with anonymous variables (e.g. **\`[_, _]\`**).
+
 ---
 
 ## \`is/2\`
@@ -24608,6 +24700,93 @@ comp [logic] .worldLogic:
 \`\`\`
 
 **Load & Run** prints **\`[a, b, c, d]\`**. Use **Load**, switch to **\`query = split\`**, **Load & Run** to see decompositions such as **\`[] [x, y, z]\`** and **\`[x] [y, z]\`**.
+
+---
+
+## Difference lists (\`Front-Hole\`) and \`append/2\`
+
+A **difference list** pairs a list **front** with a **hole** variable — the open tail where more elements attach. Write it as **\`Front - Hole\`** (spaces around **\`-\`** are optional).
+
+| Form | Meaning |
+|------|---------|
+| \`[a, b \\| H] - H\` | Prefix **\`a\`**, **\`b\`**; **\`H\`** is the open tail (same variable at the hole) |
+| \`H = []\` | Close the hole with an empty suffix |
+| \`H = [c, d \\| T]\` | Attach suffix **\`[c, d]\`** at the hole |
+
+**\`append(DifList, Closed)\`** succeeds when **\`Closed\`** is the **closed** list obtained from **\`DifList\`** after the hole is bound (typically to **\`[]\`** or a suffix list).
+
+| Call | Result |
+|------|--------|
+| \`DL = [a, b \\| H] - H\`, \`H = []\`, \`append(DL, C)\` | \`C = [a, b]\` |
+| \`DL = [a \\| H] - H\`, \`H = [b, c \\| []]\`, \`append(DL, C)\` | \`C = [a, b, c]\` |
+| \`append(L3, L3)\` with \`L3\` a closed list var | Binds **\`L3-Hole\`** with **\`Hole = []\`** |
+
+**\`append/3\`** (above) is unchanged — ordinary list concatenation. **\`append/2\`** is only for difference lists.
+
+**Occurs-check:** cyclic terms such as **\`X = [X | _] - H\`** fail (no infinite lists).
+
+### Example — incremental build + close
+
+\`\`\`logts-play
+inline [logic] .builder:
+
+    query sentence:
+        DL = [i, like, mon | H] - H,
+        H = [poly, board | T],
+        T = [],
+        append(DL, Closed),
+        show(Closed)
+
+:
+
+comp [logic] .builderLogic:
+    on: 1
+    .builder { }
+:
+
+1wire trigger = 1
+
+.builderLogic:{
+    query = sentence
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`[i, like, mon, poly, board]\`**.
+
+### Example — open difference list in \`show\`
+
+\`\`\`logts-play
+inline [logic] .dl:
+
+    query open:
+        DL = [north, east | Rest] - Rest,
+        show(DL)
+
+:
+
+1wire ok = .dl:query({ open })
+\`\`\`
+
+**Load & Run** prints an open form such as **\`[north, east|Rest]-Rest\`** while **\`Rest\`** is still free.
+
+### Example — \`append/2\` with \`.world:query\`
+
+\`\`\`logts-play
+inline [logic] .dl:
+
+    query close:
+        DL = [a, b | H] - H,
+        H = [],
+        append(DL, Closed),
+        show(Closed)
+
+:
+
+1wire ok = .dl:query({ close })
+\`\`\`
+
+**Load & Run** prints **\`[a, b]\`**.
 
 ---
 
@@ -26089,6 +26268,84 @@ comp [logic] .scoresLogic:
 \`\`\`
 
 **Load & Run** prints **\`[alice, bob, carol]\`**.
+
+---
+
+## \`true/0\` and \`fail/0\`
+
+Prolog-style **control goals** with no arguments.
+
+| Builtin | Behaviour |
+|---------|-----------|
+| **\`true\`** | Always **succeeds** — continues to the next goal in the body |
+| **\`fail\`** | Always **fails** — the current path stops (no solutions through this branch) |
+
+**Reserved heads:** you cannot define **\`true/0\`** or **\`fail/0\`** as fact, rule, or constraint heads.
+
+**Notes:**
+
+- Replaces the old idiom **\`X = X\`** for a trivial success goal.
+- **\`\\+ fail\`** succeeds (negation as failure over a goal that never succeeds).
+- Other arities named **\`true\`** or **\`fail\`** (e.g. **\`true(X)\`**) are **not** builtins — they remain ordinary user predicates if you define them.
+
+### Example — \`true\` in a rule body
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    always_ok() <- true
+
+    query check:
+        always_ok(),
+        member(C, [red, green]),
+        show(C)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = check
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`red\`** then **\`green\`**.
+
+### Example — \`fail\` blocks a branch
+
+\`\`\`logts-play
+inline [logic] .gate:
+
+    query blocked:
+        fail,
+        show("never")
+
+    query open:
+        true,
+        show("ok")
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = open
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`ok\`**. Switch to **\`query = blocked\`** — no output (query fails).
 
 ---
 

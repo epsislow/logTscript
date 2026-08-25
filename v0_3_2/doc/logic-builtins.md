@@ -20,6 +20,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`is/2`** | 2 | yes | no | Integer arithmetic (+ infix **`M is Expr`**) |
 | **`member/2`** | 2 | yes | no | List membership with backtracking |
 | **`append/3`** | 3 | yes | no | Concatenate or decompose lists |
+| **`append/2`** | 2 | yes | no | Close a **difference list** `Front-Hole` to a ground list |
 | **`length/2`** | 2 | yes | no | List length; generative when **`N`** is ground |
 | **`reverse/2`** | 2 | yes | no | Reverse list order (bidirectional) |
 | **`last/2`** | 2 | yes | no | Last element of a non-empty ground list |
@@ -450,6 +451,93 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints **`[a, b, c, d]`**. Use **Load**, switch to **`query = split`**, **Load & Run** to see decompositions such as **`[] [x, y, z]`** and **`[x] [y, z]`**.
+
+---
+
+## Difference lists (`Front-Hole`) and `append/2`
+
+A **difference list** pairs a list **front** with a **hole** variable — the open tail where more elements attach. Write it as **`Front - Hole`** (spaces around **`-`** are optional).
+
+| Form | Meaning |
+|------|---------|
+| `[a, b \| H] - H` | Prefix **`a`**, **`b`**; **`H`** is the open tail (same variable at the hole) |
+| `H = []` | Close the hole with an empty suffix |
+| `H = [c, d \| T]` | Attach suffix **`[c, d]`** at the hole |
+
+**`append(DifList, Closed)`** succeeds when **`Closed`** is the **closed** list obtained from **`DifList`** after the hole is bound (typically to **`[]`** or a suffix list).
+
+| Call | Result |
+|------|--------|
+| `DL = [a, b \| H] - H`, `H = []`, `append(DL, C)` | `C = [a, b]` |
+| `DL = [a \| H] - H`, `H = [b, c \| []]`, `append(DL, C)` | `C = [a, b, c]` |
+| `append(L3, L3)` with `L3` a closed list var | Binds **`L3-Hole`** with **`Hole = []`** |
+
+**`append/3`** (above) is unchanged — ordinary list concatenation. **`append/2`** is only for difference lists.
+
+**Occurs-check:** cyclic terms such as **`X = [X | _] - H`** fail (no infinite lists).
+
+### Example — incremental build + close
+
+```logts-play
+inline [logic] .builder:
+
+    query sentence:
+        DL = [i, like, mon | H] - H,
+        H = [poly, board | T],
+        T = [],
+        append(DL, Closed),
+        show(Closed)
+
+:
+
+comp [logic] .builderLogic:
+    on: 1
+    .builder { }
+:
+
+1wire trigger = 1
+
+.builderLogic:{
+    query = sentence
+    set = trigger
+}
+```
+
+**Load & Run** prints **`[i, like, mon, poly, board]`**.
+
+### Example — open difference list in `show`
+
+```logts-play
+inline [logic] .dl:
+
+    query open:
+        DL = [north, east | Rest] - Rest,
+        show(DL)
+
+:
+
+1wire ok = .dl:query({ open })
+```
+
+**Load & Run** prints an open form such as **`[north, east|Rest]-Rest`** while **`Rest`** is still free.
+
+### Example — `append/2` with `.world:query`
+
+```logts-play
+inline [logic] .dl:
+
+    query close:
+        DL = [a, b | H] - H,
+        H = [],
+        append(DL, Closed),
+        show(Closed)
+
+:
+
+1wire ok = .dl:query({ close })
+```
+
+**Load & Run** prints **`[a, b]`**.
 
 ---
 
