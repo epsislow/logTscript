@@ -45338,5 +45338,140 @@ comp [logic] .grammarLogic:
     );
   });
 
+  function runLogicPhrase2Parse(h, session) {
+    const src = `inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query parseClosed:
+        phrase(digits([1, 2, 3]), [1, 2, 3]),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parseClosed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', String(session.outIncludes(interp, 'ok')), 'true');
+  }
+
+  reg(4149, 'logic', 'phrase/2 parse closed list (legacy)', runLogicPhrase2Parse);
+  reg(4150, 'logic', 'phrase/2 parse closed list (wave)', runLogicPhrase2Parse, { propagation: 'wave' });
+
+  function runLogicPhrase2Generate(h, session) {
+    const src = `inline [logic] .grammar:
+
+    abc --> [a, b, c]
+
+    query generate:
+        phrase(abc, Xs),
+        show(Xs)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = generate
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('generated', String(session.outIncludes(interp, '[a, b, c]')), 'true');
+  }
+
+  reg(4151, 'logic', 'phrase/2 generate //0 grammar (legacy)', runLogicPhrase2Generate);
+  reg(4152, 'logic', 'phrase/2 generate //0 grammar (wave)', runLogicPhrase2Generate, { propagation: 'wave' });
+
+  function runLogicPhrase3PartialRest(h, session) {
+    const src = `inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query partial:
+        phrase(digits([1]), [1, 2, 3], Rest),
+        show(Rest)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = partial
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('rest', String(session.outIncludes(interp, '[2, 3]')), 'true');
+  }
+
+  reg(4153, 'logic', 'phrase/3 partial rest (legacy)', runLogicPhrase3PartialRest);
+  reg(4154, 'logic', 'phrase/3 partial rest (wave)', runLogicPhrase3PartialRest, { propagation: 'wave' });
+
+  function runLogicPhrase3DifList(h, session) {
+    const src = `inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query difList:
+        phrase(digits([1, 2]), [1, 2 | R] - R, []),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = difList
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', String(session.outIncludes(interp, 'ok')), 'true');
+  }
+
+  reg(4155, 'logic', 'phrase/3 dif-list input (legacy)', runLogicPhrase3DifList);
+  reg(4156, 'logic', 'phrase/3 dif-list input (wave)', runLogicPhrase3DifList, { propagation: 'wave' });
+
+  reg(4157, 'logic', 'reserved phrase/2 head', function(h) {
+    h.assertThrows(
+      'reserved phrase/2',
+      () => parseLogicBody('phrase(G, L) <- G = L'),
+      "'phrase/2' is reserved",
+    );
+  });
+
+  reg(4158, 'logic', 'reserved phrase/3 head', function(h) {
+    h.assertThrows(
+      'reserved phrase/3',
+      () => parseLogicBody('phrase(G, L, R) <- G = L'),
+      "'phrase/3' is reserved",
+    );
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

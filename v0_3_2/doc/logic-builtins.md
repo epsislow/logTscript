@@ -26,6 +26,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`atom_chars/2`** | 2 | yes | no | Atom ↔ list of one-character atoms |
 | **`atom_codes/2`** | 2 | yes | no | Atom ↔ list of character codes (integers) |
 | **`between/3`** | 3 | yes | no | Integer range with backtracking (`Low` … `High` inclusive) |
+| **`phrase/2`** | 2 | yes | no | Run a DCG non-terminal on a **closed** list (parse or generate) |
+| **`phrase/3`** | 3 | yes | no | Run a DCG non-terminal with explicit **rest**; supports dif-list input |
 | **`lazy_list/2`** | 2 | yes | no | Lazy list from `between/3` template or a 2-arg generator rule |
 | **`lazy_list_materialize/1`** | 1 | yes | no | Convert a lazy list to a ground cons list |
 | **`length/2`** | 2 | yes | no | List length; generative when **`N`** is ground |
@@ -721,6 +723,52 @@ comp [logic] .textLogic:
 ```
 
 **Load & Run** prints **`"Go"`** after decoding the code list.
+
+---
+
+## DCG — `phrase/2` and `phrase/3`
+
+**`phrase(Goal, List)`** and **`phrase(Goal, List, Rest)`** invoke **Definite Clause Grammar** rules compiled from **`-->`** necks in `inline [logic]`. They are the usual way to **parse** or **generate** token lists.
+
+| Form | Role |
+|------|------|
+| **`phrase(Goal, List)`** | Equivalent to **`phrase(Goal, List, [])`** — closed input or output list |
+| **`phrase(Goal, List, Rest)`** | **`Goal`**: DCG non-terminal (**atom** for //0, **compound** for //1). **`List`**: start position. **`Rest`**: unconsumed suffix (empty when fully consumed). |
+
+When **`List`** is a **difference list** **`Front - Hole`**, **`Rest`** unifies with **`Hole`** and parsing starts from **`Front`**.
+
+Both builtins are **bidirectional**. Heads **`phrase/2`** and **`phrase/3`** are **reserved** — you cannot define your own clauses with those names.
+
+Full syntax, expansion, and runnable examples: **[logic-dcg.md](logic-dcg.md)**.
+
+### Example — `phrase/2` parse
+
+```logts-play
+inline [logic] .grammar:
+
+    digits([D | Ds]) --> [D], { between(0, 9, D) }, digits(Ds)
+    digits([])       --> []
+
+    query parse:
+        phrase(digits([1, 2, 3]), [1, 2, 3]),
+        show(ok)
+
+:
+
+comp [logic] .grammarLogic:
+    on: 1
+    .grammar { }
+:
+
+1wire trigger = 1
+
+.grammarLogic:{
+    query = parse
+    set = trigger
+}
+```
+
+**Load & Run** prints **`ok`**.
 
 ---
 

@@ -425,6 +425,12 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'between' && g0.arity === 3) {
       return this._solveBetween(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'phrase' && g0.arity === 2) {
+      return this._solvePhrase2(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'phrase' && g0.arity === 3) {
+      return this._solvePhrase3(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call' && g0.predicate === 'lazy_list' && g0.arity === 2) {
       return this._solveLazyList(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -721,6 +727,37 @@ class LogicEngine {
       return any;
     }
     return false;
+  }
+
+  _solvePhrase2(goalTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const nilRest = { kind: 'list', nil: true };
+    return this._solvePhrase3(goalTerm, listTerm, nilRest, rest, env, depth, onSuccess, onDepthExceeded);
+  }
+
+  _solvePhrase3(goalTerm, listTerm, restTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const goalD = logicDeref(goalTerm, env);
+    const spec = logicPhraseSpecFromTerm(goalD, this.table);
+    if (!spec) return false;
+
+    let s0 = listTerm;
+    const listD = logicDeref(listTerm, env);
+    if (listD.kind === 'dif_list') {
+      s0 = listD.front;
+      const trail = env.trailLength();
+      if (!logicUnify(restTerm, listD.hole, env, this.table)) {
+        env.undo(trail);
+        return false;
+      }
+    }
+
+    const callArgs = spec.args.concat([s0, restTerm]);
+    const callGoal = {
+      kind: 'call',
+      predicate: spec.predicate,
+      arity: callArgs.length,
+      args: callArgs,
+    };
+    return this._solveCall(callGoal, rest, env, depth, onSuccess, onDepthExceeded);
   }
 
   _solveLazyList(listTerm, sourceTerm, rest, env, depth, onSuccess, onDepthExceeded) {
@@ -2729,6 +2766,22 @@ function logicGoalFromCallableTerm(term) {
     };
   }
   if (term.kind === 'call') return term;
+  return null;
+}
+
+function logicPhraseSpecFromTerm(term, table) {
+  if (!term) return null;
+  if (term.kind === 'atom') {
+    const name = logicAtomDisplayName(term, table);
+    if (!name) return null;
+    return { predicate: name, args: [] };
+  }
+  if (term.kind === 'compound') {
+    return {
+      predicate: term.predicate,
+      args: term.args || [],
+    };
+  }
   return null;
 }
 

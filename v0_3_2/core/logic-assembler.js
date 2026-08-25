@@ -55,6 +55,7 @@ const LOGIC_BUILTIN_STRING_TO_CODES_PRED = 'string_to_codes';
 const LOGIC_BUILTIN_ATOM_CHARS_PRED = 'atom_chars';
 const LOGIC_BUILTIN_ATOM_CODES_PRED = 'atom_codes';
 const LOGIC_BUILTIN_BETWEEN_PRED = 'between';
+const LOGIC_BUILTIN_PHRASE_PRED = 'phrase';
 const LOGIC_BUILTIN_LAZY_LIST_PRED = 'lazy_list';
 const LOGIC_BUILTIN_LAZY_LIST_MATERIALIZE_PRED = 'lazy_list_materialize';
 const LOGIC_BUILTIN_TYPE_PREDS = new Set([
@@ -118,6 +119,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_ATOM_CHARS_PRED]: [2],
   [LOGIC_BUILTIN_ATOM_CODES_PRED]: [2],
   [LOGIC_BUILTIN_BETWEEN_PRED]: [3],
+  [LOGIC_BUILTIN_PHRASE_PRED]: [2, 3],
   [LOGIC_BUILTIN_LAZY_LIST_PRED]: [2],
   [LOGIC_BUILTIN_LAZY_LIST_MATERIALIZE_PRED]: [1],
 };
@@ -1067,6 +1069,9 @@ function logicReservedHeadError(predicate, arity) {
   }
   if (predicate === LOGIC_BUILTIN_BETWEEN_PRED && arity === 3) {
     return "'between/3' is reserved — cannot define between as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_PHRASE_PRED && (arity === 2 || arity === 3)) {
+    return `'phrase/${arity}' is reserved — cannot define phrase as fact or rule head`;
   }
   if (predicate === LOGIC_BUILTIN_LAZY_LIST_MATERIALIZE_PRED && arity === 1) {
     return "'lazy_list_materialize/1' is reserved — cannot define lazy_list_materialize as fact or rule head";
