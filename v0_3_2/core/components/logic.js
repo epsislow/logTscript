@@ -701,6 +701,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         validateFn(
           term.bindType, term.numberFormat, term.listFlag, wire, ctx,
           `logic ${compName}: mutation wire '${wireName}'`,
+          !!(term.eachFlag || term.eachIndex != null),
         );
       }
       const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;

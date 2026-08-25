@@ -1,5 +1,5 @@
 /**
- * Logic wire boundary numeric formats — F39a (u*, s*) + F39b (q4p4, q8p8, qXpY).
+ * Logic wire boundary numeric formats — F39a (u*, s*) + F39b (q*) + F39c (fp16, bf16).
  */
 (function (global) {
   'use strict';
@@ -17,6 +17,10 @@
     return logicQModeSpec(format) != null;
   }
 
+  function logicIsIeeeHalfFormat(format) {
+    return F39C_FORMAT_RE.test(format == null ? '' : String(format));
+  }
+
   function parseLogicNumberFormatToken(name, ctxLabel) {
     const tok = name == null ? '' : String(name);
     const where = ctxLabel ? `${ctxLabel}: ` : '';
@@ -30,19 +34,16 @@
       }
       return tok;
     }
-    if (F39C_FORMAT_RE.test(tok)) {
-      throw new Error(
-        `${where}unsupported number format '${tok}' (IEEE half formats are not supported at logic wire boundary yet)`,
-      );
-    }
+    if (F39C_FORMAT_RE.test(tok)) return tok;
     throw new Error(
-      `${where}unsupported number format '${tok}' (use u8–u64, s8–s64, uX, sX, q4p4, q8p8, or qXpY)`,
+      `${where}unsupported number format '${tok}' (use u8–u64, s8–s64, uX, sX, q4p4, q8p8, qXpY, fp16, or bf16)`,
     );
   }
 
   function logicNumberFormatBitWidth(format, wireWidth) {
     if (!format) return wireWidth;
     if (format === 'uX' || format === 'sX') return wireWidth;
+    if (logicIsIeeeHalfFormat(format)) return 16;
     const qspec = logicQModeSpec(format);
     if (qspec) return qspec.width;
     const m = /^[us](\d+)$/.exec(format);
@@ -127,12 +128,15 @@
     return unsignedIntToBin(n, width);
   }
 
-  function logicBindTargetBitWidth(wire, ctx, listFlag) {
+  function logicBindTargetBitWidth(wire, ctx, listFlag, eachScalarFlag) {
     const shapeFn = typeof global.logicWireShape === 'function' ? global.logicWireShape : null;
     const shape = wire && shapeFn ? shapeFn(wire, ctx) : null;
     if (listFlag) {
       if (shape && (shape.kind === 'vector' || shape.kind === 'matrix')) return shape.ew;
       return ctx.getBitWidth(wire.type);
+    }
+    if (eachScalarFlag && shape && (shape.kind === 'vector' || shape.kind === 'matrix')) {
+      return shape.ew;
     }
     return ctx.getBitWidth(wire.type);
   }
@@ -148,9 +152,9 @@
     }
   }
 
-  function logicValidateBindAgainstWire(bindType, numberFormat, listFlag, wire, ctx, ctxLabel) {
+  function logicValidateBindAgainstWire(bindType, numberFormat, listFlag, wire, ctx, ctxLabel, eachScalarFlag) {
     if (bindType !== 'number' || !numberFormat || !wire || !ctx) return;
-    const w = logicBindTargetBitWidth(wire, ctx, listFlag);
+    const w = logicBindTargetBitWidth(wire, ctx, listFlag, eachScalarFlag);
     logicValidateNumberFormatWidth(numberFormat, w, ctxLabel);
   }
 
@@ -169,6 +173,7 @@
     logicNumberFormatBitWidth,
     logicIsSignedNumberFormat,
     logicIsFixedPointFormat,
+    logicIsIeeeHalfFormat,
     logicUsesSignedRawCodec,
     logicQModeSpec,
     logicDecodeNumberBits,

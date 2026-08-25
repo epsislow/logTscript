@@ -95,6 +95,8 @@ comp [logic] .characterLogic:
 | Form | Meaning |
 |------|---------|
 | `X is number myX` | Logic var **X** ← unsigned binary; pin width from assign wire (default/max **64** bits) |
+| `V is number/fp16 valPin` | Logic var **V** ← raw IEEE half bits as integer; pin must be **16** bits wide |
+| `V is number/q4p4 valPin` | Logic var **V** ← raw fixed-point integer; format width must match pin width |
 | `Name is text myName` | ASCII text — pin width = assign wire width (multiple of 8, max **256** bits) |
 | `Alive is bool myAlive` | 1-bit boolean |
 | `Nodes is text list routePin` | List of atoms — pin width follows assign wire; decode skips fill cells |

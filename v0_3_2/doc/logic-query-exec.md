@@ -98,7 +98,10 @@ Every query binding after the goal block **must** name a decode type. Width alon
 | `N=number/s8 sensorIn` | Wire → signed integer (two's complement, format width must match wire) |
 | `N=number/u32 valIn` | Wire → unsigned integer with explicit width |
 | `N=number/q4p4 valIn` | Wire → raw fixed-point integer (same bits as `; q4p4`) |
+| `N=number/fp16 sensorIn` | Wire → raw IEEE half bits as unsigned integer (e.g. `15360` for `0011110000000000`, human value 1.0) |
+| `N=number/bf16 sensorIn` | Wire → raw bfloat16 bits as unsigned integer |
 | `L=number/q4p4 list vecIn` | Vector wire → list of raw fixed-point integers per cell |
+| `L=number/fp16 list vecIn` | Vector wire → list of raw IEEE half bit patterns per 16-bit cell |
 | `F=bool flag` | 1-bit wire → 0/1 |
 | `Nodes=text list routeIn` | Vector or packed scalar → Prolog list of atoms |
 | `Vals=number list packedIn` | Packed list of integers (16 bits per element on vector wires) |
@@ -139,8 +142,9 @@ Append **`/<format>`** after **`number`** on inputs, output hints, program-block
 | **`s8`**, **`s16`**, **`s32`**, **`s64`** | Signed two's complement |
 | **`uX`**, **`sX`** | Parametric — width = wire width |
 | **`q4p4`**, **`q8p8`**, **`qXpY`** | Fixed-point — same raw signed integer in KB as on wire (e.g. `24` for `00011000` on `q4p4`, human value 1.5) |
+| **`fp16`**, **`bf16`** | IEEE half — raw 16-bit pattern as unsigned integer in KB (e.g. `15360` for fp16 `0011110000000000`, human value 1.0) |
 
-**`number`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for `number/q4p4 list` on `8wire[N]`); mismatch → elaboration error (`number format width … does not match wire width …`).
+**`number`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for `number/q4p4 list` on `8wire[N]` or `number/fp16 list` on `16wire[N]`); mismatch → elaboration error (`number format width … does not match wire width …`).
 
 #### Signed integer example
 
@@ -181,6 +185,31 @@ inline [logic] .fixed:
 ```
 
 **Load & Run:** **`ok = 1`** — `00011000` is raw **24** (`1.5` in q4p4 arithmetic).
+
+#### IEEE half `fp16` example
+
+Wire bits use the same encoding as tagged builtins (`; fp16`). The logic KB stores the **raw 16-bit pattern** as an unsigned integer (not a floating-point Prolog value).
+
+```logts-play
+inline [logic] .half:
+
+    expect(15360)
+
+    query check:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)
+```
+
+**Load & Run:** **`ok = 1`** — `0011110000000000` is raw **15360** (`1.0` in fp16 arithmetic).
+
+#### `each` with format
+
+`number/fp16 each valVec` on a `16wire[N]` vector decodes each cell with the same codec. `number/fp16 list each matrix` on a `16wire[R,C]` matrix decodes each row as a list of fp16 raw integers.
 
 ---
 

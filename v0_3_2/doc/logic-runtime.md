@@ -172,6 +172,7 @@ Every argument must be **ground** (atom, number, or compound of ground terms). V
 | `+ inside(box1, X)` | **Transaction fails** — `mutationFailed = 1`, store unchanged |
 | `+ located(box1, text destWire)` | Success — wire decoded to atom before ground check |
 | `+ level(box1, number scoreIn)` | Success — wire decoded to integer |
+| `+ reading(1, number/fp16 sensorIn)` | Success — `16wire` decoded to raw IEEE half bits as integer |
 | `+ inside(box2, text missingWire)` | **Fails** — wire not found |
 
 ### Idempotent add (D43)

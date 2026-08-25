@@ -11422,6 +11422,8 @@ comp [logic] .characterLogic:
 | Form | Meaning |
 |------|---------|
 | \`X is number myX\` | Logic var **X** ← unsigned binary; pin width from assign wire (default/max **64** bits) |
+| \`V is number/fp16 valPin\` | Logic var **V** ← raw IEEE half bits as integer; pin must be **16** bits wide |
+| \`V is number/q4p4 valPin\` | Logic var **V** ← raw fixed-point integer; format width must match pin width |
 | \`Name is text myName\` | ASCII text — pin width = assign wire width (multiple of 8, max **256** bits) |
 | \`Alive is bool myAlive\` | 1-bit boolean |
 | \`Nodes is text list routePin\` | List of atoms — pin width follows assign wire; decode skips fill cells |
@@ -28221,7 +28223,10 @@ Every query binding after the goal block **must** name a decode type. Width alon
 | \`N=number/s8 sensorIn\` | Wire → signed integer (two's complement, format width must match wire) |
 | \`N=number/u32 valIn\` | Wire → unsigned integer with explicit width |
 | \`N=number/q4p4 valIn\` | Wire → raw fixed-point integer (same bits as \`; q4p4\`) |
+| \`N=number/fp16 sensorIn\` | Wire → raw IEEE half bits as unsigned integer (e.g. \`15360\` for \`0011110000000000\`, human value 1.0) |
+| \`N=number/bf16 sensorIn\` | Wire → raw bfloat16 bits as unsigned integer |
 | \`L=number/q4p4 list vecIn\` | Vector wire → list of raw fixed-point integers per cell |
+| \`L=number/fp16 list vecIn\` | Vector wire → list of raw IEEE half bit patterns per 16-bit cell |
 | \`F=bool flag\` | 1-bit wire → 0/1 |
 | \`Nodes=text list routeIn\` | Vector or packed scalar → Prolog list of atoms |
 | \`Vals=number list packedIn\` | Packed list of integers (16 bits per element on vector wires) |
@@ -28262,8 +28267,9 @@ Append **\`/<format>\`** after **\`number\`** on inputs, output hints, program-b
 | **\`s8\`**, **\`s16\`**, **\`s32\`**, **\`s64\`** | Signed two's complement |
 | **\`uX\`**, **\`sX\`** | Parametric — width = wire width |
 | **\`q4p4\`**, **\`q8p8\`**, **\`qXpY\`** | Fixed-point — same raw signed integer in KB as on wire (e.g. \`24\` for \`00011000\` on \`q4p4\`, human value 1.5) |
+| **\`fp16\`**, **\`bf16\`** | IEEE half — raw 16-bit pattern as unsigned integer in KB (e.g. \`15360\` for fp16 \`0011110000000000\`, human value 1.0) |
 
-**\`number\`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for \`number/q4p4 list\` on \`8wire[N]\`); mismatch → elaboration error (\`number format width … does not match wire width …\`).
+**\`number\`** without a slash is unchanged (unsigned on the full wire width). Format width must equal wire width (or vector element width for \`number/q4p4 list\` on \`8wire[N]\` or \`number/fp16 list\` on \`16wire[N]\`); mismatch → elaboration error (\`number format width … does not match wire width …\`).
 
 #### Signed integer example
 
@@ -28304,6 +28310,31 @@ inline [logic] .fixed:
 \`\`\`
 
 **Load & Run:** **\`ok = 1\`** — \`00011000\` is raw **24** (\`1.5\` in q4p4 arithmetic).
+
+#### IEEE half \`fp16\` example
+
+Wire bits use the same encoding as tagged builtins (\`; fp16\`). The logic KB stores the **raw 16-bit pattern** as an unsigned integer (not a floating-point Prolog value).
+
+\`\`\`logts-play
+inline [logic] .half:
+
+    expect(15360)
+
+    query check:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — \`0011110000000000\` is raw **15360** (\`1.0\` in fp16 arithmetic).
+
+#### \`each\` with format
+
+\`number/fp16 each valVec\` on a \`16wire[N]\` vector decodes each cell with the same codec. \`number/fp16 list each matrix\` on a \`16wire[R,C]\` matrix decodes each row as a list of fp16 raw integers.
 
 ---
 
@@ -28840,6 +28871,7 @@ Every argument must be **ground** (atom, number, or compound of ground terms). V
 | \`+ inside(box1, X)\` | **Transaction fails** — \`mutationFailed = 1\`, store unchanged |
 | \`+ located(box1, text destWire)\` | Success — wire decoded to atom before ground check |
 | \`+ level(box1, number scoreIn)\` | Success — wire decoded to integer |
+| \`+ reading(1, number/fp16 sensorIn)\` | Success — \`16wire\` decoded to raw IEEE half bits as integer |
 | \`+ inside(box2, text missingWire)\` | **Fails** — wire not found |
 
 ### Idempotent add (D43)
@@ -29699,7 +29731,7 @@ On **\`comp [logic]\`** pins and **\`.world:query\`**, **\`text\`**, **\`number\
 |-----------|------|
 | **\`Var=text wire\`** | Wire bits → ASCII atom; atom → wire on output |
 | **\`Var=number wire\`** | Wire bits → unsigned integer; integer → wire on output |
-| **\`Var=number/<format> wire\`** | Explicit codec — \`u8\`…\`u64\`, \`s8\`…\`s64\`, \`uX\` / \`sX\`, or fixed-point \`q4p4\`, \`q8p8\`, \`qXpY\` |
+| **\`Var=number/<format> wire\`** | Explicit codec — \`u8\`…\`u64\`, \`s8\`…\`s64\`, \`uX\` / \`sX\`, fixed-point \`q4p4\`, \`q8p8\`, \`qXpY\`, or IEEE half \`fp16\`, \`bf16\` |
 | **\`Var=bool wire\`** | 1 bit ↔ 0/1 (packed bool lists on vector wires — see [logic-query-exec.md](logic-query-exec.md)) |
 
 **\`number\`** without a slash keeps the same unsigned behaviour as before. **\`number/s8\`**, **\`number/u32\`**, and similar forms select signed or unsigned two's-complement decode/encode at the boundary. The format width must match the wire width (or vector element width for \`number/s16 list\` on \`16wire[N]\`); otherwise elaboration reports a width mismatch error.
@@ -29783,6 +29815,27 @@ inline [logic] .fixed:
 \`\`\`
 
 **Load & Run:** **\`ok = 1\`** — \`00011000\` decodes to raw **24** (represents **1.5** in q4p4 fixed-point math).
+
+### IEEE half \`number/fp16\`
+
+Same wire encoding as LogTScript \`; fp16\` builtins. The KB holds the **raw 16-bit IEEE pattern** as an unsigned integer (not a float term).
+
+\`\`\`logts-play
+inline [logic] .half:
+
+    expect(15360)
+
+    query check:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)
+\`\`\`
+
+**Load & Run:** **\`ok = 1\`** — \`0011110000000000\` decodes to raw **15360** (represents **1.0** in fp16 arithmetic). Use **\`number/bf16\`** the same way on \`16wire\` with bfloat16 bit patterns.
 
 ---
 

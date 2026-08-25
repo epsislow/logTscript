@@ -595,11 +595,15 @@ class LogicParser {
     logicError('expected , | or ] in list', this.peek().line);
   }
 
+  logicAtSlashToken() {
+    return (this.at('SYM') || this.at('OP')) && this.peek().value === '/';
+  }
+
   parseMutationTerm() {
     if (this.at('ID') && LOGIC_MUTATION_BIND_TYPES.has(this.peek().value)) {
       const bindType = this.advance().value;
       let numberFormat = null;
-      if (bindType === 'number' && this.at('SYM') && this.peek().value === '/') {
+      if (bindType === 'number' && this.logicAtSlashToken()) {
         this.advance();
         if (!this.at('ID')) {
           logicError('expected number format after /', this.peek().line);

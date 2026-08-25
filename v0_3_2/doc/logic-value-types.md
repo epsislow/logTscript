@@ -303,7 +303,7 @@ On **`comp [logic]`** pins and **`.world:query`**, **`text`**, **`number`**, and
 |-----------|------|
 | **`Var=text wire`** | Wire bits → ASCII atom; atom → wire on output |
 | **`Var=number wire`** | Wire bits → unsigned integer; integer → wire on output |
-| **`Var=number/<format> wire`** | Explicit codec — `u8`…`u64`, `s8`…`s64`, `uX` / `sX`, or fixed-point `q4p4`, `q8p8`, `qXpY` |
+| **`Var=number/<format> wire`** | Explicit codec — `u8`…`u64`, `s8`…`s64`, `uX` / `sX`, fixed-point `q4p4`, `q8p8`, `qXpY`, or IEEE half `fp16`, `bf16` |
 | **`Var=bool wire`** | 1 bit ↔ 0/1 (packed bool lists on vector wires — see [logic-query-exec.md](logic-query-exec.md)) |
 
 **`number`** without a slash keeps the same unsigned behaviour as before. **`number/s8`**, **`number/u32`**, and similar forms select signed or unsigned two's-complement decode/encode at the boundary. The format width must match the wire width (or vector element width for `number/s16 list` on `16wire[N]`); otherwise elaboration reports a width mismatch error.
@@ -387,6 +387,27 @@ inline [logic] .fixed:
 ```
 
 **Load & Run:** **`ok = 1`** — `00011000` decodes to raw **24** (represents **1.5** in q4p4 fixed-point math).
+
+### IEEE half `number/fp16`
+
+Same wire encoding as LogTScript `; fp16` builtins. The KB holds the **raw 16-bit IEEE pattern** as an unsigned integer (not a float term).
+
+```logts-play
+inline [logic] .half:
+
+    expect(15360)
+
+    query check:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)
+```
+
+**Load & Run:** **`ok = 1`** — `0011110000000000` decodes to raw **15360** (represents **1.0** in fp16 arithmetic). Use **`number/bf16`** the same way on `16wire` with bfloat16 bit patterns.
 
 ---
 

@@ -45630,21 +45630,33 @@ comp [logic] .storeLogic:
     runF39aWidthMismatchError(h, session, true);
   }, { propagation: 'wave' });
 
-  reg(4172, 'logic', 'F39c fp16 rejected at logic boundary', function(h, session) {
+  reg(4172, 'logic', 'F39c fp16 on 8wire width mismatch (legacy)', function(h, session) {
+    runF39cHalfWidthMismatch(h, session, false);
+  });
+
+  function runF39cHalfWidthMismatch(h, session, isWave) {
     const src = `inline [logic] .x:
 
+    expect(0)
+
     query q:
-        true
+        expect(T)
 
 :
 
-16wire w = 0000000000000000
+8wire narrowIn = 00000000
 
-1wire ok = .x:query({ true }, T=number/fp16 w)`;
-    h.assertThrows('unsupported format', function() {
+1wire ok = .x:query({ expect(T) }, T=number/fp16 narrowIn)`;
+    if (isWave) {
+      h.assertThrows('width mismatch', function() {
+        session.run(src);
+      }, 'does not match wire width');
+    } else {
       session.run(src);
-    }, 'IEEE half formats');
-  });
+      const err = session.interp && session.interp.lastReportedError;
+      h.assert('width mismatch', err && /does not match wire width/.test(err.message) ? '1' : '0', '1');
+    }
+  }
 
   function runF39bQ4p4QueryInput(h, session) {
     const src = `inline [logic] .fixed:
@@ -45822,6 +45834,234 @@ comp [logic] .storeLogic:
   reg(4188, 'logic', 'F39b q8p8 on 8wire width mismatch (wave)', function(h, session) {
     runF39bFixedWidthMismatch(h, session, true);
   }, { propagation: 'wave' });
+
+  reg(4189, 'logic', 'F39c fp16 on 8wire width mismatch (wave)', function(h, session) {
+    runF39cHalfWidthMismatch(h, session, true);
+  }, { propagation: 'wave' });
+
+  function runF39cFp16QueryInput(h, session) {
+    const src = `inline [logic] .half:
+
+    expect(15360)
+
+    query q:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+1wire ok = .half:query({ expect(T) }, T=number/fp16 sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4190, 'logic', 'F39c number/fp16 raw query input (legacy)', runF39cFp16QueryInput);
+  reg(4191, 'logic', 'F39c number/fp16 raw query input (wave)', runF39cFp16QueryInput, { propagation: 'wave' });
+
+  function runF39cBf16QueryInput(h, session) {
+    const src = `inline [logic] .half:
+
+    expect(16256)
+
+    query q:
+        expect(T)
+
+:
+
+16wire sensorIn = 0011111110000000
+
+1wire ok = .half:query({ expect(T) }, T=number/bf16 sensorIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4192, 'logic', 'F39c number/bf16 raw query input (legacy)', runF39cBf16QueryInput);
+  reg(4193, 'logic', 'F39c number/bf16 raw query input (wave)', runF39cBf16QueryInput, { propagation: 'wave' });
+
+  function runF39cCompPinFp16(h, session) {
+    const src = `inline [logic] .data:
+
+    sample(15360)
+
+    query q:
+        sample(V)
+
+:
+
+comp [logic] .dataLogic:
+    on: 1
+
+    .data {
+        V is number/fp16 valPin
+    }
+
+:
+
+16wire valIn = 0011110000000000
+1wire ok = 0
+1wire trigger = 1
+
+.dataLogic:{
+    valPin = valIn
+    q >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4194, 'logic', 'F39c comp pin number/fp16 (legacy)', runF39cCompPinFp16);
+  reg(4195, 'logic', 'F39c comp pin number/fp16 (wave)', runF39cCompPinFp16, { propagation: 'wave' });
+
+  function runF39cMutationFp16(h, session) {
+    const src = `inline [logic] .store:
+
+    reading(Id, Val)
+
+    query hasReading:
+        reading(1, 15360)
+
+:
+
+16wire sensorIn = 0011110000000000
+
+comp [logic] .storeLogic:
+    on: 1
+    .store { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.storeLogic:{
+    logic {
+        + reading(1, number/fp16 sensorIn)
+    }
+    hasReading >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4196, 'logic', 'F39c mutation number/fp16 wire (legacy)', runF39cMutationFp16);
+  reg(4197, 'logic', 'F39c mutation number/fp16 wire (wave)', runF39cMutationFp16, { propagation: 'wave' });
+
+  function runF39cFp16ListVector(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [15360, 16384])
+
+    query q:
+        row(1, L)
+
+:
+
+16wire[2] vecIn = 0011110000000000 + 0100000000000000
+
+1wire ok = .batch:query({ row(1, L) }, L=number/fp16 list vecIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4198, 'logic', 'F39c number/fp16 list vector (legacy)', runF39cFp16ListVector);
+  reg(4199, 'logic', 'F39c number/fp16 list vector (wave)', runF39cFp16ListVector, { propagation: 'wave' });
+
+  function runF39cEachScalarFp16(h, session) {
+    const src = `inline [logic] .pairs:
+
+    query qa:
+        pair(a, X)
+    query qb:
+        pair(b, X)
+    query qc:
+        pair(c, X)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+16wire[3] valVec = 0011110000000000 + 0011110000000000 + 0011110000000000
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+1wire okC = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, number/fp16 each valVec)
+    }
+    qa >= okA
+    qb >= okB
+    qc >= okC
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('okC', interp.getWireEffectiveValue('okC'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4200, 'logic', 'F39c number/fp16 each scalar vector (legacy)', runF39cEachScalarFp16);
+  reg(4201, 'logic', 'F39c number/fp16 each scalar vector (wave)', runF39cEachScalarFp16, { propagation: 'wave' });
+
+  function runF39cEachListFp16Matrix(h, session) {
+    const src = `inline [logic] .fleet:
+
+    query qa:
+        car(a, L)
+    query qb:
+        car(b, L)
+    query qc:
+        car(c, L)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+16wire[3,2] matrix = 0011110000000000 + 0100000000000000 + 0011110000000000 + 0100000000000000 + 0011110000000000 + 0100000000000000
+
+comp [logic] .fleetLogic:
+    on: 1
+    .fleet { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+1wire okC = 0
+
+.fleetLogic:{
+    logic {
+        + car(text each owners, number/fp16 list each matrix)
+    }
+    qa >= okA
+    qb >= okB
+    qc >= okC
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('okC', interp.getWireEffectiveValue('okC'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4202, 'logic', 'F39c number/fp16 list each matrix (legacy)', runF39cEachListFp16Matrix);
+  reg(4203, 'logic', 'F39c number/fp16 list each matrix (wave)', runF39cEachListFp16Matrix, { propagation: 'wave' });
 
   function runF39aNumberLegacyRegression(h, session) {
     const src = `inline [logic] .scores:
