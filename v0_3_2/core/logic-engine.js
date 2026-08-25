@@ -426,6 +426,9 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'atom_codes' && g0.arity === 2) {
       return this._solveAtomCodes(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'atom_number' && g0.arity === 2) {
+      return this._solveAtomNumber(g0.args[0], g0.args[1], rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call' && g0.predicate === 'between' && g0.arity === 3) {
       return this._solveBetween(g0.args[0], g0.args[1], g0.args[2], rest, env, depth, onSuccess, onDepthExceeded);
     }
@@ -511,15 +514,19 @@ class LogicEngine {
   }
 
   _solveIs(left, right, rest, env, depth, onSuccess, onDepthExceeded) {
-    const val = logicEvalNumber(right, env, this.table);
+    const val = logicEvalNumeric(right, env, this.table);
     if (val == null) return false;
     const ld = logicDeref(left, env);
     if (ld.kind === 'var') {
-      if (ld.name !== '_') env.bind(ld.name, { kind: 'number', value: val });
+      if (ld.name !== '_') env.bind(ld.name, { kind: val.kind, value: val.value });
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
-    if (ld.kind === 'number') {
-      if (ld.value !== val) return false;
+    if (ld.kind === val.kind) {
+      if (ld.kind === 'float') {
+        if (!Object.is(ld.value, val.value)) return false;
+      } else if (ld.value !== val.value) {
+        return false;
+      }
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     return false;
@@ -961,6 +968,32 @@ class LogicEngine {
 
   _solveAtomCodes(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded) {
     return this._solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, 'atom_codes');
+  }
+
+  _solveAtomNumber(atomTerm, numTerm, rest, env, depth, onSuccess, onDepthExceeded) {
+    const cont = () => this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    const ad = logicDeref(atomTerm, env);
+    const nd = logicDeref(numTerm, env);
+    if (ad.kind === 'var' && nd.kind === 'var') return false;
+    const trail = env.trailLength();
+    let ok = false;
+    if (ad.kind === 'atom') {
+      const parsed = logicParseAtomNumberString(logicAtomDisplayName(ad, this.table));
+      if (parsed === false) return false;
+      ok = logicUnify(numTerm, parsed, env, this.table);
+    } else if (nd.kind === 'number' || nd.kind === 'float') {
+      const name = logicFormatNumberToAtomString(nd);
+      if (name === false) return false;
+      const built = logicInternTerm({ kind: 'atom', name, logicTraceAsString: true }, this.table);
+      ok = logicUnify(atomTerm, built, env, this.table);
+    } else {
+      return false;
+    }
+    if (!ok) {
+      env.undo(trail);
+      return false;
+    }
+    return cont();
   }
 
   _solveAtomListCodec(atomTerm, listTerm, rest, env, depth, onSuccess, onDepthExceeded, mode) {
@@ -2574,6 +2607,36 @@ function logicGroundListToAtomTerm(listD, env, table, mode) {
   return logicInternTerm(atom, table);
 }
 
+function logicParseAtomNumberString(s) {
+  if (s == null || s === '') return false;
+  if (/[eE]/.test(s)) return false;
+  if (/^-?\d+$/.test(s)) {
+    const v = parseInt(s, 10);
+    if (!Number.isFinite(v) || !Number.isSafeInteger(v)) return false;
+    return { kind: 'number', value: v };
+  }
+  if (/^-?\.\d+$/.test(s) || /^-?\d+\.\d+$/.test(s)) {
+    const v = parseFloat(s);
+    if (!Number.isFinite(v)) return false;
+    return { kind: 'float', value: v };
+  }
+  return false;
+}
+
+function logicFormatNumberToAtomString(term) {
+  if (!term) return false;
+  if (term.kind === 'number') {
+    if (!Number.isInteger(term.value)) return false;
+    return String(term.value);
+  }
+  if (term.kind === 'float') {
+    const s = String(term.value);
+    if (s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
+    return `${s}.0`;
+  }
+  return false;
+}
+
 function logicGroundListToArray(listD, env) {
   const out = [];
   let cur = listD;
@@ -3080,23 +3143,39 @@ function logicConvlistResultFromTemplate(templateCopy, env, table) {
   return logicResolveTerm(args[idx], env, table);
 }
 
-function logicEvalNumber(term, env, table) {
+function logicEvalNumeric(term, env, table) {
   const d = logicDeref(term, env);
-  if (d.kind === 'number') return d.value;
+  if (d.kind === 'number') return { kind: 'number', value: d.value };
+  if (d.kind === 'float') return { kind: 'float', value: d.value };
   if (d.kind === 'arith') {
-    const l = logicEvalNumber(d.left, env, table);
-    const r = logicEvalNumber(d.right, env, table);
-    if (l == null || r == null) return null;
+    const l = logicEvalNumeric(d.left, env, table);
+    const r = logicEvalNumeric(d.right, env, table);
+    if (!l || !r) return null;
+    const outFloat = l.kind === 'float' || r.kind === 'float';
+    const lv = l.value;
+    const rv = r.value;
+    let result;
     switch (d.op) {
-      case '+': return l + r;
-      case '-': return l - r;
-      case '*': return l * r;
-      case '/': return r === 0 ? null : Math.trunc(l / r);
+      case '+': result = lv + rv; break;
+      case '-': result = lv - rv; break;
+      case '*': result = lv * rv; break;
+      case '/':
+        if (rv === 0) return null;
+        result = outFloat ? (lv / rv) : Math.trunc(lv / rv);
+        break;
       default: return null;
     }
+    if (outFloat) return { kind: 'float', value: result };
+    return { kind: 'number', value: result };
   }
   if (d.kind === 'var') return null;
   return null;
+}
+
+function logicEvalNumber(term, env, table) {
+  const r = logicEvalNumeric(term, env, table);
+  if (!r || r.kind === 'float') return null;
+  return r.value;
 }
 
 function logicUnifyExpr(left, right, env, table) {

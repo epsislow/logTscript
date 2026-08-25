@@ -46436,5 +46436,579 @@ comp [logic] .dataLogic:
   reg(4244, 'logic', 'F40b float/fp16 list packed (legacy)', runF40bFloatFp16ListPacked);
   reg(4245, 'logic', 'F40b float/fp16 list packed (wave)', runF40bFloatFp16ListPacked, { propagation: 'wave' });
 
+  function runF40cIsFloatAdd(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 1.5 + 2.0,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 1.5 + 2.0, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 3.5', String(session.outIncludes(interp, '3.5')), 'true');
+  }
+
+  reg(4250, 'logic', 'F40c is/2 float addition (legacy)', runF40cIsFloatAdd);
+  reg(4251, 'logic', 'F40c is/2 float addition (wave)', runF40cIsFloatAdd, { propagation: 'wave' });
+
+  function runF40cIsIntRegression(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 10 + 5,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 10 + 5, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 15', String(session.outIncludes(interp, '15')), 'true');
+  }
+
+  reg(4252, 'logic', 'F40c is/2 integer regression (legacy)', runF40cIsIntRegression);
+  reg(4253, 'logic', 'F40c is/2 integer regression (wave)', runF40cIsIntRegression, { propagation: 'wave' });
+
+  function runF40cIsMixedPromote(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 10 + 1.5,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 10 + 1.5, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 11.5', String(session.outIncludes(interp, '11.5')), 'true');
+  }
+
+  reg(4254, 'logic', 'F40c is/2 int+float promotes (legacy)', runF40cIsMixedPromote);
+  reg(4255, 'logic', 'F40c is/2 int+float promotes (wave)', runF40cIsMixedPromote, { propagation: 'wave' });
+
+  function runF40cIsIntDivTrunc(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 7 / 2,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 7 / 2, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 3', String(session.outIncludes(interp, '3')), 'true');
+  }
+
+  reg(4256, 'logic', 'F40c is/2 integer division truncates (legacy)', runF40cIsIntDivTrunc);
+  reg(4257, 'logic', 'F40c is/2 integer division truncates (wave)', runF40cIsIntDivTrunc, { propagation: 'wave' });
+
+  function runF40cIsFloatDiv(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 7.0 / 2.0,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 7.0 / 2.0, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 3.5', String(session.outIncludes(interp, '3.5')), 'true');
+  }
+
+  reg(4258, 'logic', 'F40c is/2 float division (legacy)', runF40cIsFloatDiv);
+  reg(4259, 'logic', 'F40c is/2 float division (wave)', runF40cIsFloatDiv, { propagation: 'wave' });
+
+  function runF40cIsDivZeroFail(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 1.5 / 0.0
+
+:
+
+1wire ok = .world:query({ X is 1.5 / 0.0 })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(4260, 'logic', 'F40c is/2 float divide by zero fails (legacy)', runF40cIsDivZeroFail);
+  reg(4261, 'logic', 'F40c is/2 float divide by zero fails (wave)', runF40cIsDivZeroFail, { propagation: 'wave' });
+
+  function runF40cIsGroundFloat(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        3.5 is 1.5 + 2.0
+
+:
+
+1wire ok = .world:query({ 3.5 is 1.5 + 2.0 })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4262, 'logic', 'F40c is/2 ground float LHS (legacy)', runF40cIsGroundFloat);
+  reg(4263, 'logic', 'F40c is/2 ground float LHS (wave)', runF40cIsGroundFloat, { propagation: 'wave' });
+
+  function runF40cIsKindMismatch(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        3 is 1.5 + 2.0
+
+:
+
+1wire ok = .world:query({ 3 is 1.5 + 2.0 })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(4264, 'logic', 'F40c is/2 int LHS float result fails (legacy)', runF40cIsKindMismatch);
+  reg(4265, 'logic', 'F40c is/2 int LHS float result fails (wave)', runF40cIsKindMismatch, { propagation: 'wave' });
+
+  function runF40cIsRuleFloat(h, session) {
+    const src = `inline [logic] .world:
+
+    scale(A, B) <- B is A * 2.0
+
+    query q:
+        scale(1.5, R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('shows 3', String(session.outIncludes(interp, '3')), 'true');
+  }
+
+  reg(4266, 'logic', 'F40c is/2 float in rule body (legacy)', runF40cIsRuleFloat);
+  reg(4267, 'logic', 'F40c is/2 float in rule body (wave)', runF40cIsRuleFloat, { propagation: 'wave' });
+
+  function runF40cIsMulSub(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 2.0 * 3.0 - 1.5,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 2.0 * 3.0 - 1.5, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 4.5', String(session.outIncludes(interp, '4.5')), 'true');
+  }
+
+  reg(4268, 'logic', 'F40c is/2 float mul and sub (legacy)', runF40cIsMulSub);
+  reg(4269, 'logic', 'F40c is/2 float mul and sub (wave)', runF40cIsMulSub, { propagation: 'wave' });
+
+  function runF40cIsPrecedence(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 10 + 5 * 2,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 10 + 5 * 2, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 20', String(session.outIncludes(interp, '20')), 'true');
+  }
+
+  reg(4270, 'logic', 'F40c is/2 operator precedence (legacy)', runF40cIsPrecedence);
+  reg(4271, 'logic', 'F40c is/2 operator precedence (wave)', runF40cIsPrecedence, { propagation: 'wave' });
+
+  reg(4272, 'logic', 'F40d atom_number/2 parse int (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("42", N)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('kind', sols[0].N.kind, 'number');
+    h.assert('value', String(sols[0].N.value), '42');
+  });
+  reg(4273, 'logic', 'F40d atom_number/2 parse int (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("42", N)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('kind', sols[0].N.kind, 'number');
+    h.assert('value', String(sols[0].N.value), '42');
+  }, { propagation: 'wave' });
+
+  reg(4274, 'logic', 'F40d atom_number/2 parse float (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("1.5", F)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('kind', sols[0].F.kind, 'float');
+    h.assert('value', String(sols[0].F.value), '1.5');
+  });
+  reg(4275, 'logic', 'F40d atom_number/2 parse float (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("1.5", F)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('kind', sols[0].F.kind, 'float');
+    h.assert('value', String(sols[0].F.value), '1.5');
+  }, { propagation: 'wave' });
+
+  reg(4276, 'logic', 'F40d atom_number/2 parse leading-dot float (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number(".5", F)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('kind', sols[0].F.kind, 'float');
+    h.assert('value', String(sols[0].F.value), '0.5');
+  });
+  reg(4277, 'logic', 'F40d atom_number/2 parse leading-dot float (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number(".5", F)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('kind', sols[0].F.kind, 'float');
+    h.assert('value', String(sols[0].F.value), '0.5');
+  }, { propagation: 'wave' });
+
+  reg(4278, 'logic', 'F40d atom_number/2 format int to atom (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number(A, 42)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('name', sols[0].A.name, '42');
+  });
+  reg(4279, 'logic', 'F40d atom_number/2 format int to atom (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number(A, 42)');
+    const eng = new LogicEngine([]);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('name', sols[0].A.name, '42');
+  }, { propagation: 'wave' });
+
+  function runF40dAtomNumberFormatFloat(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        atom_number(A, 1.5),
+        show(A)
+
+:
+
+1wire ok = .world:query({ atom_number(A, 1.5), show(A) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 1.5', String(session.outIncludes(interp, '1.5')), 'true');
+  }
+
+  reg(4280, 'logic', 'F40d atom_number/2 format float to atom (legacy)', runF40dAtomNumberFormatFloat);
+  reg(4281, 'logic', 'F40d atom_number/2 format float to atom (wave)', runF40dAtomNumberFormatFloat, { propagation: 'wave' });
+
+  reg(4282, 'logic', 'F40d atom_number/2 ground round-trip int (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("42", 42)');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  });
+  reg(4283, 'logic', 'F40d atom_number/2 ground round-trip int (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("42", 42)');
+    const eng = new LogicEngine([]);
+    h.assert('ok', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '1');
+  }, { propagation: 'wave' });
+
+  reg(4284, 'logic', 'F40d atom_number/2 invalid atom fails (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("abc", N)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+  reg(4285, 'logic', 'F40d atom_number/2 invalid atom fails (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("abc", N)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  }, { propagation: 'wave' });
+
+  reg(4286, 'logic', 'F40d atom_number/2 rejects scientific notation (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("1e10", N)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+  reg(4287, 'logic', 'F40d atom_number/2 rejects scientific notation (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("1e10", N)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  }, { propagation: 'wave' });
+
+  reg(4288, 'logic', 'F40d atom_number/2 int atom vs float fails (legacy)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("42", 1.5)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+  reg(4289, 'logic', 'F40d atom_number/2 int atom vs float fails (wave)', function(h) {
+    const prog = parseLogicBody('query q: atom_number("42", 1.5)');
+    const eng = new LogicEngine([]);
+    h.assert('fail', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  }, { propagation: 'wave' });
+
+  reg(4290, 'logic', 'F40d atom_number/2 reserved head (legacy)', function(h) {
+    h.assertThrows(
+      'reserved atom_number',
+      () => parseLogicBody('atom_number(A, N) <- A = N'),
+      "'atom_number/2' is reserved",
+    );
+  });
+  reg(4291, 'logic', 'F40d atom_number/2 reserved head (wave)', function(h) {
+    h.assertThrows(
+      'reserved atom_number',
+      () => parseLogicBody('atom_number(A, N) <- A = N'),
+      "'atom_number/2' is reserved",
+    );
+  }, { propagation: 'wave' });
+
+  function runF40eFloatListQueryOutput(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query q:
+        row(1, L)
+
+:
+
+64wire packedOut = 0000000000000000000000000000000000000000000000000000000000000000
+
+64wire packedFlat = .batch:query({ row(1, L) }, L=float list)`;
+    const { interp } = session.run(src);
+    const out = interp.getWireEffectiveValue('packedFlat');
+    h.assert('64 bits', String(out.length), '64');
+    h.assert('f32 1.0', out.slice(0, 32), '00111111100000000000000000000000');
+    h.assert('f32 2.0', out.slice(32, 64), '01000000000000000000000000000000');
+  }
+
+  reg(4292, 'logic', 'F40e float list packed f32 query output (legacy)', runF40eFloatListQueryOutput);
+  reg(4293, 'logic', 'F40e float list packed f32 query output (wave)', runF40eFloatListQueryOutput, { propagation: 'wave' });
+
+  function runF40eFloatListPinRoundTrip(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.5, 2.0])
+
+    query q:
+        row(1, L)
+
+:
+
+comp [logic] .batchLogic:
+    on: 1
+
+    .batch {
+        L is float list valPin
+    }
+
+:
+
+32wire[2] valIn = 00111111110000000000000000000000 + 01000000000000000000000000000000
+32wire[2] valOut = 0000000000000000000000000000000000000000000000000000000000000000
+1wire trigger = 1
+
+.batchLogic:{
+    valPin = valIn
+    q >= valOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const out = interp.getWireEffectiveValue('valOut');
+    h.assert('f32 1.5', out.slice(0, 32), '00111111110000000000000000000000');
+    h.assert('f32 2.0', out.slice(32, 64), '01000000000000000000000000000000');
+  }
+
+  reg(4294, 'logic', 'F40e float list vector pin round-trip (legacy)', runF40eFloatListPinRoundTrip);
+  reg(4295, 'logic', 'F40e float list vector pin round-trip (wave)', runF40eFloatListPinRoundTrip, { propagation: 'wave' });
+
+  function runF40eMutationFloatList(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query hasRow:
+        row(2, L)
+
+:
+
+16wire[2] vecIn = 0011110000000000 + 0100000000000000
+
+comp [logic] .batchLogic:
+    on: 1
+    .batch { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.batchLogic:{
+    logic {
+        + row(2, float/fp16 list vecIn)
+    }
+    hasRow >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4296, 'logic', 'F40e mutation float/fp16 list wire (legacy)', runF40eMutationFloatList);
+  reg(4297, 'logic', 'F40e mutation float/fp16 list wire (wave)', runF40eMutationFloatList, { propagation: 'wave' });
+
+  function runF40eFloatF64ListPacked(h, session) {
+    const src = `inline [logic] .vals:
+
+    pair(1, [1.5, 2.0])
+
+    query q:
+        pair(1, L)
+
+:
+
+128wire packed = 0011111111111000000000000000000000000000000000000000000000000000 + 0100000000000000000000000000000000000000000000000000000000000000
+
+1wire ok = .vals:query({ pair(1, L) }, L=float/f64 list packed)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4298, 'logic', 'F40e float/f64 list packed input (legacy)', runF40eFloatF64ListPacked);
+  reg(4299, 'logic', 'F40e float/f64 list packed input (wave)', runF40eFloatF64ListPacked, { propagation: 'wave' });
+
+  function runF40eFloatF64ListVector(h, session) {
+    const src = `inline [logic] .vals:
+
+    pair(1, [1.5, 2.0])
+
+    query q:
+        pair(1, L)
+
+:
+
+64wire[2] vecIn = 0011111111111000000000000000000000000000000000000000000000000000 + 0100000000000000000000000000000000000000000000000000000000000000
+
+1wire ok = .vals:query({ pair(1, L) }, L=float/f64 list vecIn)`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4300, 'logic', 'F40e float/f64 list vector input (legacy)', runF40eFloatF64ListVector);
+  reg(4301, 'logic', 'F40e float/f64 list vector input (wave)', runF40eFloatF64ListVector, { propagation: 'wave' });
+
+  function runF40eFloatListCompScalarRedirect(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query batchQ:
+        row(1, L)
+
+:
+
+comp [logic] .batchLogic:
+    on: 1
+
+    .batch {
+        L is float list valPin
+    }
+
+:
+
+32wire[2] valIn = 00111111100000000000000000000000 + 01000000000000000000000000000000
+1wire ok = 0
+1wire trigger = 1
+
+.batchLogic:{
+    valPin = valIn
+    batchQ >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4302, 'logic', 'F40e float list comp scalar redirect (legacy)', runF40eFloatListCompScalarRedirect);
+  reg(4303, 'logic', 'F40e float list comp scalar redirect (wave)', runF40eFloatListCompScalarRedirect, { propagation: 'wave' });
+
+  reg(4304, 'logic', 'F40e float list packed width error (legacy)', function(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0])
+
+    query q:
+        row(1, L)
+
+:
+
+30wire bad = ${'0'.repeat(30)}
+
+1wire ok = .batch:query({ row(1, L) }, L=float list bad)`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('width error', err && err.message.includes('float list expects') ? '1' : '0', '1');
+  });
+  reg(4305, 'logic', 'F40e float list packed width error (wave)', function(h, session) {
+    const src = `inline [logic] .batch:
+
+    query q:
+        row(1, L)
+
+:
+
+30wire bad = ${'0'.repeat(30)}
+
+1wire ok = .batch:query({ row(1, L) }, L=float list bad)`;
+    h.assertThrows('width', function() {
+      session.run(src);
+    }, 'float list expects');
+  }, { propagation: 'wave' });
+
+  function runF40eFloatFp16ListQueryOutput(h, session) {
+    const src = `inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query q:
+        row(1, L)
+
+:
+
+32wire packedOut = 00000000000000000000000000000000
+
+32wire packedFlat = .batch:query({ row(1, L) }, L=float/fp16 list)`;
+    const { interp } = session.run(src);
+    const out = interp.getWireEffectiveValue('packedFlat');
+    h.assert('32 bits', String(out.length), '32');
+    h.assert('fp16 1.0', out.slice(0, 16), '0011110000000000');
+    h.assert('fp16 2.0', out.slice(16, 32), '0100000000000000');
+  }
+
+  reg(4306, 'logic', 'F40e float/fp16 list packed query output (legacy)', runF40eFloatFp16ListQueryOutput);
+  reg(4307, 'logic', 'F40e float/fp16 list packed query output (wave)', runF40eFloatFp16ListQueryOutput, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

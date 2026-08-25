@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int frontieră; **F40** (2+l) float + `float/X` default — **D316–D319✅** ready; amânat **2+m** is/2 extins; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41** (2+n) f32/f64 nativ LogTScript — **D327+** ready; amânat **2+m** is/2 extins; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -178,7 +178,7 @@ todos:
     status: completed
   - id: logic-float-2l
     content: "Faza 40 (2+l): float în Prolog + float/<format> la frontieră — D316–D319✅"
-    status: pending
+    status: completed
   - id: logic-float-40a
     content: "F40a: kind float + literale 1.5 + float/1 + split number vs float la parse — teste 4210+"
     status: completed
@@ -187,15 +187,33 @@ todos:
     status: completed
   - id: logic-float-40c
     content: "F40c: is/2 pe reale MVP (+ - * /, int→float) — teste 4250+; restul → 2+m"
-    status: pending
+    status: completed
   - id: logic-float-2m
     content: "Faza amânată 2+m: is/2 float extins (**, mod, funcții, call/is meta-call)"
     status: pending
   - id: logic-float-40d
-    content: "F40d: atom_number/2 — teste 4270+"
-    status: pending
+    content: "F40d: atom_number/2 — teste 4272+"
+    status: completed
   - id: logic-float-40e
-    content: "F40e: float list packed (default f32/32-bit slot) + tag-uri f32/f64 frontieră — teste 4290+"
+    content: "F40e: float list packed (default f32/32-bit slot) + tag-uri f32/f64 frontieră — teste 4292+"
+    status: completed
+  - id: logic-ieee-2n
+    content: "Faza 41 (2+n): f32/f64 nativ LogTScript — show, NFORMAT, builtins; codec unificat cu logic — D327+"
+    status: pending
+  - id: logic-ieee-41a
+    content: "F41a: codec f32/f64 în numeric-formats.js; logic-float-formats delegă — teste 4310+"
+    status: pending
+  - id: logic-ieee-41b
+    content: "F41b: show/peek ; f32 / ; f64 — debug-display-format + parser tags — teste 4325+"
+    status: pending
+  - id: logic-ieee-41c
+    content: "F41c: NFORMAT to_f32 / to_f64 / from f32|f64 — teste 4340+"
+    status: pending
+  - id: logic-ieee-41d
+    content: "F41d: builtins ADD/MULTIPLY/… pe 32wire/64wire cu ; f32|; f64 — teste 4355+"
+    status: pending
+  - id: logic-ieee-41e
+    content: "F41e: doc EN (number-conversion, doc-function, logic-value-types cross-ref) + round-trip logic↔wire — teste 4370+"
     status: pending
 isProject: false
 ---
@@ -212,7 +230,7 @@ isProject: false
 | **(ready-to-implement)** | Faza poate începe după ce deciziile ei sunt confirmate                                |
 | **(completed)**          | Decizie luată / implementată                                                          |
 | **1+a … 1+v**            | Item backlog post-MVP — vezi [Backlog post-MVP](#backlog-post-mvp) (final plan)       |
-| **2+a … 2+m**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2m) |
+| **2+a … 2+n**            | Faze **amânate** post-F21 — vezi [Backlog faze amânate](#backlog-faze-amânate-2a--2n) |
 | ✅                        | Backlog **promovat / livrat** (fază completed)                                        |
 | ❌                        | Backlog **respins** definitiv                                                         |
 | 🟠✗                      | Backlog **închis** — alternativa nu se face; livrat altfel                            |
@@ -1461,7 +1479,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 37** Liste avansate Prolog (**2+e**)             | **F37a✅ F37b✅ F37c✅** — D279–D296 confirmed | **(completed)** |
 | **Faza 38** DCG Prolog (`phrase//`) (**2+i**)           | **F38a✅ F38b✅** — D297–D304 confirmed — [Faza 38](#faza-38--dcg-prolog-phrase-2i--completed) | **(completed)** |
 | **Faza 39** Formate numerice la frontieră (**2+k**)    | **F39a→F39c✅** — `number/<format>` int; **D305–D315✅** — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) | **(completed)** |
-| **Faza 40** Float Prolog + frontieră (**2+l**)        | **F40a→F40e** — kind `float`, `float/<format>`, `float/1`; **D316–D317✅** — [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--ready-to-implement) | **(ready-to-implement)** |
+| **Faza 40** Float Prolog + frontieră (**2+l**)        | **F40a→F40e✅** — [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) | **(completed)** |
+| **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--ready-to-implement) | **(ready-to-implement)** |
 
 
 ---
@@ -6708,9 +6727,9 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 
 ---
 
-## Backlog faze amânate (2+a … 2+m)
+## Backlog faze amânate (2+a … 2+n)
 
-Tabel master **2+a … 2+m** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
+Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distinct de backlog **1+x** (itemi MVP/post-MVP). **Stare:** ⏳ deschis · ✅ promovat/livrat (când devine Fază N).
 
 
 | Stare | ID          | Subiect                     | Detaliu                                                                                                        | Fază draft | Legat de                        |
@@ -6726,11 +6745,12 @@ Tabel master **2+a … 2+m** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+i**~~ | DCG Prolog                  | **Promovat → Faza 38** — **F38a✅ F38b✅** `phrase/2,3` — [Faza 38](#faza-38--dcg-prolog-phrase-2i--completed) | **F38**    | D290, D297–D304, F37a **(completed)** |
 | ⏳     | **2+j**     | Lazy streams / I/O          | `lazy_read_lines`, lazy pe stream/file/wire, `lazy_findall`, engines — **out of scope F37c** (D296); promovat din **[F37c](#f37c--lazy-4121-post-f37b--d289-c)** | —          | D296, F37c, F22               |
 | ✅     | ~~**2+k**~~ | Formate numerice logic wire | **`number/<format>`** int — F39a→c✅ — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) | **F39**    | F25, D305–D315✅, tagged builtins |
-| ✅     | ~~**2+l**~~ | Logic numeric post-F39      | **Promovat → Faza 40** — float Prolog + `float/<format>`; `number/fp16|q*` → eroare | **F40**    | F39, D314, D316–D317✅          |
-| ⏳     | **2+m**     | `is/2` float extins         | Post-**F40c** — `**`, `mod`, `rem`, `abs`, `min`/`max`, `floor`/`ceiling`/`round`, `call(is/2)` meta-call; eventual `random` float | **F41?**   | F26 D157, F40c, D318            |
+| ✅     | ~~**2+l**~~ | Logic numeric post-F39      | **Promovat → Faza 40✅** — float Prolog + `float/<format>`; `number/fp16|q*` → eroare | **F40**    | F39, D314, D316–D326✅          |
+| ⏳     | **2+n**     | IEEE f32/f64 nativ LogTScript | **`show(; f32)`**, **NFORMAT**, **ADD/MULTIPLY/…** pe `32wire`/`64wire`; codec partajat cu logic — conversie fire↔logic naturală | **F41**    | F40, F39 fp16, D327+            |
+| ⏳     | **2+m**     | `is/2` float extins         | Post-**F40c** — `**`, `mod`, `rem`, `abs`, `min`/`max`, `floor`/`ceiling`/`round`, `call(is/2)` meta-call; eventual `random` float | **F42?**   | F26 D157, F40c, D318            |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · **2+l → F40** (ready) · **2+m** (post-F40c) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · **2+n → F41** (ready) · **2+m** (post-F40c) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -9405,7 +9425,7 @@ Split F39a/b/c ca F38.
 | ----- | ------- | ---- |
 | Literale float Prolog (`1.5`) | ❌ | fază viitoare |
 | `float/1`, `is/2` pe reale | ❌ | F26 rămâne integer |
-| `atom_number/2` | ❌ | fază viitoare |
+| `atom_number/2` | ✅ F40d | livrat |
 | Format `df` | ❌ | — |
 | Infer format din lățime (fără `/`) | ❌ | ca D196 — explicit obligatoriu |
 | **Packed scalar `number list` → 16 bit fix** | ❌ **neschimbat** | vezi explicație mai jos |
@@ -9559,17 +9579,17 @@ Secțiune completă: [Faza 40 — Float Prolog + frontieră `float/<format>`](#f
 | **`random` float** | Extinde **F34** (`random_between` pe reale) — opțional |
 | **Trig / `sqrt`** | Doar dacă cerință explicită |
 
-**Candidat fază:** **F41** sau subfază **F40f** — după livrarea **F40c**.
+**Candidat fază:** **F42** — după **F41** (codec IEEE comun).
 
 **Legat de:** [D318](#d318--is2-pe-reale-confirmed-a--mvp-în-f40c-extins-în-2m) · [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed).
 
 ---
 
-## Faza 40 — Float Prolog + frontieră **`float/<format>`** **2+l** **(ready-to-implement)**
+## Faza 40 — Float Prolog + frontieră **`float/<format>`** **2+l** **(completed)**
 
 > **Backlog:** **2+l** — promovat 2026-08-25 după **F39✅**.  
 > **Extinde:** [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) (`is/2`), [Faza 32](#faza-32--doc-logic-values--type-predicates-completed) (`number/1` → + `float/1`), [Faza 25](#decizii-faza-25--liste-tipate-pe-wire--binding-explicit-2c-d182-completed) + [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) (frontieră wire).  
-> **Status:** **F40b✅** (2026-08-25) — teste **4175–4203** migrate la `float/*`, noi **4230–4245**; **3383/3383**; următor: **F40c**.
+> **Status:** **F40e✅** (2026-08-25) — teste **4292–4307**; **3441/3441**; **F40 (2+l) complet**.
 
 ### Problemă (stare azi post-F39)
 
@@ -9583,8 +9603,8 @@ Secțiune completă: [Faza 40 — Float Prolog + frontieră `float/<format>`](#f
 | Kind `float` în KB | ✅ F40a |
 | `float/1` | ✅ F40a — reserved head; filter pe float |
 | Unificare int vs float | ✅ F40a — `1 = 1.0` fail; `=:=` pe float |
-| `is/2` pe reale | ❌ — F26 integer only |
-| `atom_number/2` | ❌ |
+| `is/2` pe reale | ✅ F40c — `+ - * /`, promovare int→float, `/0` fail |
+| `atom_number/2` | ✅ F40d — atom ↔ int/float parse/format |
 | Packed `number list` fără vector | 16 biți/celulă fix |
 
 **Motiv fază:** utilizatorii vor **valori umane** (`1.5`, `-2.75`) în facts/reguli și la pin/query, nu raw bits; separare clară **int** vs **float**.
@@ -9638,9 +9658,9 @@ listMod    := list [each]
 | ------- | -------- | ------------- |
 | **F40a** | Parse literale float; kind `float`; `float/1`; unificare/comparare float vs int fail | **4210–4225✅** |
 | **F40b** | `float/<fmt>` frontieră; respinge `number/fp16|q*`; migrare teste F39; `float list`/`each` | **4175–4203✅ migrat, 4230–4245✅** |
-| **F40c** | `is/2` pe reale | **4250+** |
-| **F40d** | `atom_number/2` | **4270+** |
-| **F40e** | packed `float/<fmt> list`; `df` (opțional) | **4290+** |
+| **F40c** | `is/2` pe reale | **4250–4271✅** |
+| **F40d** | `atom_number/2` | **4272–4291✅** |
+| **F40e** | packed `float/<fmt> list`; I/O output + comp redirect + mutation | **4292–4307✅** |
 
 ### Decizii **(D316–D320)**
 
@@ -9767,10 +9787,142 @@ Neschimbat — livrare F40d.
 | **D323** | Literale float | **A** — `1.5`, `.5`; fără `1e10` F40a |
 | **D324** | NaN/Inf | **A** — JS Number în KB |
 | **D325** | `f32`/`f64` în F40b | **A** |
-| **D326** | `atom_number/2` | amânat F40d |
+| **D326** | `atom_number/2` | **F40d✅** |
 
 **Ce este:** extensie **F25/F39** — int rămâne pe `number`, fracții/IEEE pe `float`.
 
 **Nu este:** înlocuirea tagged builtins wire; float în expresii LogTScript non-logic.
 
 **Compat:** `number` fără `/` neschimbat; **breaking intenționat:** `number/q4p4` / `number/fp16` → migrate la `float/…` în F40b.
+
+---
+
+## Faza 41 — IEEE **f32/f64** nativ LogTScript **2+n** **(ready-to-implement)**
+
+> **Backlog:** **2+n** — promovat 2026-08-25 după **F40✅** (user: conversie fire↔logic naturală).  
+> **Extinde:** [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) (`fp16`/`bf16` în `numeric-formats.js`), [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (`f32`/`f64` doar la frontieră logic azi).  
+> **Status:** **ready-to-implement** — decizii **D327–D331** confirmed 2026-08-25.
+
+### Problemă (stare azi post-F40)
+
+| Topic | LogTScript nativ (`show`, builtins, NFORMAT) | Logic frontieră (`float/f32`, `float/f64`) |
+| ----- | -------------------------------------------- | ------------------------------------------- |
+| **`fp16`**, **`bf16`** (16 bit) | ✅ `show(w; fp16)`, `ADD(...; fp16)`, `NFORMAT(...; fp16 to_q4p4)` | ✅ `float/fp16` pin/query |
+| **`f32`** (32 bit IEEE single) | ❌ — fire = biți goi; fără tag display/arithmetic | ✅ decode/encode în `logic-float-formats.js` |
+| **`f64`** (64 bit IEEE double) | ❌ idem | ✅ idem |
+| **Codec partajat** | `fp16ToFloat` / `floatToFp16` în `numeric-formats.js` | `binToFloat32` / `float32ToBin` **duplicat** în `logic-float-formats.js` |
+| **Round-trip** | `32wire` → logic → `32wire` funcționează, dar **nu poți inspecta** `1.5` cu `show` | KB logic afișează `1.5` cu `show/1` |
+
+**Motiv fază:** `f32`/`f64` sunt **aceeași familie IEEE 754** ca `fp16` — extensie naturală la 32/64 biți, **nu** fixed-point (`q4p4`) și **nu** format nou. Utilizatorul trebuie să poată scrie, afișa și calcula pe `32wire`/`64wire` la fel ca pe `16wire` cu `fp16`, iar logic să folosească **același codec**.
+
+### Scope (subfaze)
+
+| Subfază | Livrabil | Teste (draft) |
+| ------- | -------- | ------------- |
+| **F41a** | Codec **`f32`/`f64`** canonical în `numeric-formats.js`; `logic-float-formats.js` **delegă** (fără duplicat DataView) | **4310–4324** |
+| **F41b** | **`show` / `peek`** — tag-uri **`; f32`**, **`; f64`** (`debug-display-format.js`, `parser.js` DISPLAY_FORMAT_TAGS) | **4325–4339** |
+| **F41c** | **`NFORMAT`** — `to_f32`, `to_f64`, surse `f32`/`f64`; conversii cu `fp16`/`q*`/`signed` unde are sens | **4340–4354** |
+| **F41d** | **Builtins aritmetice** — `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `DOT`, `GT`, `LT`, `ABS`, `CLAMP`, `MIN`, `MAX` pe **`32wire`** cu **`; f32`** și **`64wire`** cu **`; f64`** (mirror pattern F39 fp16) | **4355–4369** |
+| **F41e** | Doc EN + **round-trip** logic↔wire (aceleași biți fp16/f32/f64); cross-ref `number-conversion.md`, `logic-value-types.md` | **4370–4385** |
+
+**Out of scope F41:** literale `1.5` în sursa LogTScript non-logic; `is/2` extins → **2+m / F42**; packed vector/matrix SIMD nou.
+
+### Sintaxă țintă (mirror fp16)
+
+```text
+show(sensor; f32)              ; 32wire IEEE single → text uman (ex. 1.5)
+show(reading; f64)               ; 64wire IEEE double
+
+16wire r, 1wire st = ADD(a, b; fp16)    ; existent
+32wire r, 1wire st = ADD(a, b; f32)     ; nou — lățime operand = 32
+64wire r, 1wire st = ADD(a, b; f64)     ; nou — lățime operand = 64
+
+8wire q = NFORMAT(x; q4p4 to_f32)       ; fixed → IEEE single raw
+32wire h = NFORMAT(x; f32 to_fp16)       ; truncate/round la half
+```
+
+| Wire | Tag format | IEEE variant |
+| ---- | ---------- | ------------ |
+| **`16wire`** | `fp16`, `bf16` | binary16 / bfloat16 (F39 — neschimbat) |
+| **`32wire`** | **`f32`** | binary32 (single) |
+| **`64wire`** | **`f64`** | binary64 (double) |
+
+**Validare lățime:** `ADD(a, b; f32)` cere **`32wire`** (sau vector/matrix cu `elementWidth=32`); mesaj ca la fp16: `format f32 requires 32-bit wire`.
+
+### Round-trip natural logic ↔ LogTScript (post-F41)
+
+```text
+32wire sensorIn = …bits f32…
+    ↓  T = float/f32 sensorIn     (sau T = float sensorIn pe 32wire)
+KB: T = 1.5
+    ↓  show(T)  → "1.5"
+    ↓  32wire out = .x:query(..., X=float)
+32wire out = …aceleași biți f32…
+    ↓  show(out; f32)  → "1.5"     ← NOU în F41b
+```
+
+Aceleași funcții `encodeIEEE` / `decodeIEEE` servesc **logic frontieră** și **LogTScript show/builtins**.
+
+### Decizii **(D327–D331)**
+
+#### D327 — Familie format: extindere IEEE, nu format nou **(confirmed: A)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — IEEE 754 binary32/64 ✓** | `f32`/`f64` alături de `fp16`/`bf16` în `FORMAT_TAG_NAMES` |
+| B | Format proprietar LogTScript | Respinse — duplică IEEE deja folosit în logic |
+
+**Decizie:** **A** — user 2026-08-25.
+
+#### D328 — Sursă unică codec **(confirmed: A — numeric-formats.js)**
+
+| Opțiune | Unde trăiește codec |
+| ------- | ------------------- |
+| **A — `numeric-formats.js` ✓** | `fp32ToFloat`, `floatToFp32`, `fp64ToFloat`, `floatToFp64`; logic importă |
+| B | Păstrează duplicat în `logic-float-formats.js` | Respinse — risc divergență round-trip |
+
+**Decizie:** **A**. `logic-float-formats.js` rămâne facade frontieră logic (q*, X, validare bind).
+
+#### D329 — Builtins: set minim mirror fp16 **(confirmed: A)**
+
+Aceeași listă ca F39 **`BUILTIN_FORMAT_TAG_FUNCS`**: `ADD`, `SUBTRACT`, `SUM`, `MIN`, `MAX`, `GT`, `LT`, `CLAMP`, `MULTIPLY`, `MAC`, `DOT`, `DIVIDE`, `ABS`, `RSHIFT`, `ARGMAX`, `ARGMIN` — cu tag **`f32`** pe 32 bit și **`f64`** pe 64 bit.
+
+**Nu** în F41: funcții noi beyond setul fp16; trig/sqrt.
+
+#### D330 — NFORMAT destinations **(confirmed: A)**
+
+Adaugă **`to_f32`**, **`to_f64`**; surse **`f32`**, **`f64`** în `parseNformatFormatName`. Conversii cross-family (ex. `f32 to_fp16`, `q4p4 to_f32`) — da, reutilizând pipeline NFORMAT existent.
+
+#### D331 — Afișare **(confirmed: A)**
+
+`show(w; f32)` / `show(w; f64)` — același UX ca `show(w; fp16)`: valoare umană + opțional raw bits în doc viewer.
+
+### Fișiere țintă
+
+| Fișier | Rol F41 |
+| ------ | ------- |
+| `numeric-formats.js` | Codec **`f32`/`f64`**; extinde `FORMAT_TAG_NAMES`, `decodeToFloat`, `encodeFromFloat`, builtin dispatch |
+| `logic-float-formats.js` | Delegă f32/f64 la `LogTScriptNumericFormats`; păstrează q*, X, validare |
+| `debug-display-format.js` | Tag-uri **`f32`**, **`f64`** în `FORMAT_TAGS` |
+| `parser.js` | `DISPLAY_FORMAT_TAGS` + validare call tags builtins |
+| `signed-arithmetic.js` | Branch format tag f32/f64 dacă e necesar (mirror fp16) |
+| `interpreter.js` | NFORMAT parse tags |
+| `doc/number-conversion.md`, `doc-function.md`, `doc/builtin-*.md` | EN + exemple `show(; f32)` |
+| `doc/logic-value-types.md` | Cross-ref: logic `float/f32` = aceiași biți ca `show(; f32)` |
+| `tests/test_suite.js` | **4310+** legacy+wave |
+
+### Rezumat decizii F41
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D327** | f32/f64 = IEEE extins | **A** |
+| **D328** | Codec unic numeric-formats | **A** |
+| **D329** | Builtins mirror fp16 | **A** |
+| **D330** | NFORMAT to_f32/f64 | **A** |
+| **D331** | show/peek ; f32/f64 | **A** |
+
+**Ce este:** paritate LogTScript nativ cu **`fp16`** pentru lățimi **32** și **64**; baza pentru inspectarea firelor produse de logic.
+
+**Nu este:** tip „float wire” separat — firele rămân **`Nwire` bit vectors**; tag-ul e la **`show`/builtins/NFORMAT** și la **logic bind**.
+
+**Compat:** `fp16`/`bf16`/`q*` neschimbat; **F40** frontieră logic neschimbată ca API — doar implementare codec comună (fără breaking).

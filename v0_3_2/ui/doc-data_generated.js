@@ -11422,15 +11422,16 @@ comp [logic] .characterLogic:
 | Form | Meaning |
 |------|---------|
 | \`X is number myX\` | Logic var **X** ← unsigned binary; pin width from assign wire (default/max **64** bits) |
-| \`V is number/fp16 valPin\` | Logic var **V** ← raw IEEE half bits as integer; pin must be **16** bits wide |
-| \`V is number/q4p4 valPin\` | Logic var **V** ← raw fixed-point integer; format width must match pin width |
+| \`V is float/fp16 valPin\` | Logic var **V** ← IEEE half decoded to float; pin must be **16** bits wide |
+| \`V is float/q4p4 valPin\` | Logic var **V** ← fixed-point decoded to float; format width must match pin width |
+| \`V is float valPin\` | **\`float/X\`** — codec from pin width (\`fp16\` / \`f32\` / \`f64\`) |
 | \`Name is text myName\` | ASCII text — pin width = assign wire width (multiple of 8, max **256** bits) |
 | \`Alive is bool myAlive\` | 1-bit boolean |
 | \`Nodes is text list routePin\` | List of atoms — pin width follows assign wire; decode skips fill cells |
 | \`Vals is number list scorePin\` | List of integers — 16 bits per element on vector wires |
 | \`Flags is bool list bitPin\` | List of booleans — 1 bit per element |
 
-Only **\`number\`**, **\`text\`**, and **\`bool\`** scalars, plus **\`list\`** on those types, are supported at the pin boundary.
+Only **\`number\`**, **\`float\`**, **\`text\`**, and **\`bool\`** scalars, plus **\`list\`** on those types, are supported at the pin boundary.
 
 ### Pin \`text\` — lățime variabilă (nu fixă)
 
@@ -24270,7 +24271,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`nth0/3\`** | 3 | yes | no | List element at **0-based** index |
 | **\`nth1/3\`** | 3 | yes | no | List element at **1-based** index |
 | **\`nth1/4\`** | 4 | yes | no | Element at **1-based** index + list suffix after it |
-| **\`is/2\`** | 2 | yes | no | Integer arithmetic (+ infix **\`M is Expr\`**) |
+| **\`is/2\`** | 2 | yes | no | Arithmetic (+ infix **\`M is Expr\`**) — integer or float |
 | **\`member/2\`** | 2 | yes | no | List membership with backtracking |
 | **\`append/3\`** | 3 | yes | no | Concatenate or decompose lists |
 | **\`append/2\`** | 2 | yes | no | Close a **difference list** \`Front-Hole\` to a ground list |
@@ -24278,6 +24279,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`string_to_codes/2\`** | 2 | yes | no | Atom or string literal ↔ list of character codes (integers) |
 | **\`atom_chars/2\`** | 2 | yes | no | Atom ↔ list of one-character atoms |
 | **\`atom_codes/2\`** | 2 | yes | no | Atom ↔ list of character codes (integers) |
+| **\`atom_number/2\`** | 2 | yes | no | Atom ↔ integer or float (parse/format numeric text) |
 | **\`between/3\`** | 3 | yes | no | Integer range with backtracking (\`Low\` … \`High\` inclusive) |
 | **\`phrase/2\`** | 2 | yes | no | Run a DCG non-terminal on a **closed** list (parse or generate) |
 | **\`phrase/3\`** | 3 | yes | no | Run a DCG non-terminal with explicit **rest**; supports dif-list input |
@@ -24574,7 +24576,7 @@ comp [logic] .worldLogic:
 
 ## \`is/2\`
 
-Integer arithmetic evaluation in logic bodies. Also written infix: **\`M is Expr\`**.
+Arithmetic evaluation in logic bodies. Also written infix: **\`M is Expr\`**.
 
 **Reserved:** **\`is/2\`** cannot be a fact, rule, or constraint head. **\`is/1\`**, **\`is/3\`**, atom **\`is\`**, etc. remain ordinary terms.
 
@@ -24584,11 +24586,17 @@ Integer arithmetic evaluation in logic bodies. Also written infix: **\`M is Expr
 | \`M is N + 1\` | **Fail** | Arithmetic |
 | \`M =:= N + 1\` | **Fail** | Numeric equality test |
 
-RHS must fully evaluate to an integer. Free variables, divide-by-zero, or non-numeric RHS → **fail**. Integer **\`/\`** truncates toward zero.
+RHS must fully evaluate. Free variables or divide-by-zero → **fail**.
+
+| Expression kind | Result kind | \`/\` behaviour |
+|-----------------|-------------|---------------|
+| All integers | **\`number\`** | Truncates toward zero (e.g. \`7 / 2\` → \`3\`) |
+| Any float literal or promoted float | **\`float\`** | Real division (e.g. \`7.0 / 2.0\` → \`3.5\`) |
+| Mixed int + float | **\`float\`** | int operands promote (e.g. \`10 + 1.5\` → \`11.5\`) |
 
 See also [inline-logic.md — \`=\` vs \`is/2\`](inline-logic.md#arithmetic-is2) for the full contrast table.
 
-### Example — counter
+### Example — counter (integer)
 
 \`\`\`logts-play
 inline [logic] .world:
@@ -24616,6 +24624,34 @@ comp [logic] .worldLogic:
 \`\`\`
 
 **Load & Run** prints **\`done\`**.
+
+### Example — float scaling
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    scale(A, B) <- B is A * 2.0
+
+    query q:
+        scale(1.5, R),
+        show(R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`3\`** (float \`3.0\` displayed as \`3\`).
 
 ---
 
@@ -24894,6 +24930,42 @@ comp [logic] .brandLogic:
 \`\`\`
 
 **Load & Run** prints **\`toyota\`**.
+
+### Example — \`atom_number/2\` (parse and format)
+
+Bidirectional conversion between a numeric **atom** (typically a **\`"..."\` string literal**) and an **integer** or **float** value. Integer text such as **\`"42"\`** yields **\`kind: number\`**; fractional text such as **\`"1.5"\`** or **\`".5"\`** yields **\`kind: float\`**. Scientific notation (for example **\`"1e10"\`**) is **not** accepted (same rule as float literals in [logic-value-types.md](logic-value-types.md)). **\`1\`** and **\`1.0\`** remain distinct kinds — **\`atom_number("42", 1.5)\`** fails.
+
+\`\`\`logts-play
+inline [logic] .num:
+
+    query parseInt:
+        atom_number("42", N),
+        show(N)
+
+    query parseFloat:
+        atom_number("1.5", F),
+        show(F)
+
+    query format:
+        atom_number(A, 1.5),
+        show(A)
+
+:
+
+comp [logic] .numLogic:
+    on: 1
+    .num { }
+:
+
+1wire trigger = 1
+
+.numLogic:{
+    query = parseInt
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`42\`**. Use **Load**, set **\`query = parseFloat\`**, **Load & Run** to print **\`1.5\`**. Set **\`query = format\`** to print **\`"1.5"\`**.
 
 ### Example — \`atom_codes/2\` round-trip
 
@@ -28241,7 +28313,26 @@ Every query binding after the goal block **must** name a decode type. Width alon
 8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)
 \`\`\`
 
-The engine flattens the first solution list into consecutive cells (ASCII per atom on text lists). Unused slots use the wire fill pattern (\`\\0\` for text).
+The engine flattens the first solution list into consecutive cells (ASCII per atom on text lists; **\`f32\`** per float on default **\`float list\`** output). Unused slots use the wire fill pattern (\`\\0\` for text).
+
+#### Float list output (packed \`f32\` default)
+
+\`\`\`logts-play
+inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query check:
+        row(1, L)
+
+:
+
+64wire packedOut = 0000000000000000000000000000000000000000000000000000000000000000
+
+64wire packedFlat = .batch:query({ row(1, L) }, L=float list)
+\`\`\`
+
+**Load & Run:** first solution list encodes as two **\`f32\`** cells on **\`packedFlat\`**. Explicit **\`float/fp16 list\`** or **\`float/f64 list\`** changes slot width on packed scalar wires.
 
 ### List codec rules
 
@@ -29950,6 +30041,8 @@ inline [logic] .vals:
 
 ### Packed \`float list\` (default 32-bit cells)
 
+**Input** — explicit **\`float/fp16\`** on a 32-bit packed wire (two half floats):
+
 \`\`\`logts-play
 inline [logic] .batch:
 
@@ -29966,6 +30059,25 @@ inline [logic] .batch:
 \`\`\`
 
 **Load & Run:** **\`ok = 1\`** — two fp16 values in a 32-bit packed wire.
+
+**Output** — **\`float list\`** without a format packs solutions as **\`f32\`** (32 bits per slot):
+
+\`\`\`logts-play
+inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query check:
+        row(1, L)
+
+:
+
+64wire packedOut = 0000000000000000000000000000000000000000000000000000000000000000
+
+64wire packedFlat = .batch:query({ row(1, L) }, L=float list)
+\`\`\`
+
+**Load & Run:** **\`packedFlat\`** holds two IEEE **\`f32\`** cells (\`1.0\`, then \`2.0\`). Use **\`float/fp16 list\`** or **\`float/f64 list\`** when you need 16- or 64-bit packed slots instead.
 
 ---
 

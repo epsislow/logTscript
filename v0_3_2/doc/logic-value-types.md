@@ -514,6 +514,8 @@ inline [logic] .vals:
 
 ### Packed `float list` (default 32-bit cells)
 
+**Input** — explicit **`float/fp16`** on a 32-bit packed wire (two half floats):
+
 ```logts-play
 inline [logic] .batch:
 
@@ -530,6 +532,25 @@ inline [logic] .batch:
 ```
 
 **Load & Run:** **`ok = 1`** — two fp16 values in a 32-bit packed wire.
+
+**Output** — **`float list`** without a format packs solutions as **`f32`** (32 bits per slot):
+
+```logts-play
+inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query check:
+        row(1, L)
+
+:
+
+64wire packedOut = 0000000000000000000000000000000000000000000000000000000000000000
+
+64wire packedFlat = .batch:query({ row(1, L) }, L=float list)
+```
+
+**Load & Run:** **`packedFlat`** holds two IEEE **`f32`** cells (`1.0`, then `2.0`). Use **`float/fp16 list`** or **`float/f64 list`** when you need 16- or 64-bit packed slots instead.
 
 ---
 

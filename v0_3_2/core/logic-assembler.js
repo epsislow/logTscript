@@ -55,6 +55,7 @@ const LOGIC_BUILTIN_STRING_TO_LIST_PRED = 'string_to_list';
 const LOGIC_BUILTIN_STRING_TO_CODES_PRED = 'string_to_codes';
 const LOGIC_BUILTIN_ATOM_CHARS_PRED = 'atom_chars';
 const LOGIC_BUILTIN_ATOM_CODES_PRED = 'atom_codes';
+const LOGIC_BUILTIN_ATOM_NUMBER_PRED = 'atom_number';
 const LOGIC_BUILTIN_BETWEEN_PRED = 'between';
 const LOGIC_BUILTIN_PHRASE_PRED = 'phrase';
 const LOGIC_BUILTIN_LAZY_LIST_PRED = 'lazy_list';
@@ -121,6 +122,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_STRING_TO_CODES_PRED]: [2],
   [LOGIC_BUILTIN_ATOM_CHARS_PRED]: [2],
   [LOGIC_BUILTIN_ATOM_CODES_PRED]: [2],
+  [LOGIC_BUILTIN_ATOM_NUMBER_PRED]: [2],
   [LOGIC_BUILTIN_BETWEEN_PRED]: [3],
   [LOGIC_BUILTIN_PHRASE_PRED]: [2, 3],
   [LOGIC_BUILTIN_LAZY_LIST_PRED]: [2],
@@ -575,16 +577,21 @@ class LogicParser {
     logicError('expected term', this.peek().line);
   }
 
-  parseExpr() {
+  parseMulExpr() {
     let node = this.parseTerm();
-    while (this.at('OP') && (this.peek().value === '+' || this.peek().value === '-')) {
+    while (this.at('OP') && (this.peek().value === '*' || this.peek().value === '/')) {
       const op = this.advance().value;
       const right = this.parseTerm();
       node = { kind: 'arith', op, left: node, right };
     }
-    while (this.at('OP') && (this.peek().value === '*' || this.peek().value === '/')) {
+    return node;
+  }
+
+  parseExpr() {
+    let node = this.parseMulExpr();
+    while (this.at('OP') && (this.peek().value === '+' || this.peek().value === '-')) {
       const op = this.advance().value;
-      const right = this.parseTerm();
+      const right = this.parseMulExpr();
       node = { kind: 'arith', op, left: node, right };
     }
     return node;
@@ -1120,6 +1127,7 @@ function logicReservedHeadError(predicate, arity) {
       || predicate === LOGIC_BUILTIN_STRING_TO_CODES_PRED
       || predicate === LOGIC_BUILTIN_ATOM_CHARS_PRED
       || predicate === LOGIC_BUILTIN_ATOM_CODES_PRED
+      || predicate === LOGIC_BUILTIN_ATOM_NUMBER_PRED
       || predicate === LOGIC_BUILTIN_LAZY_LIST_PRED) && arity === 2) {
     return `'${predicate}/${arity}' is reserved — cannot define ${predicate} as fact or rule head`;
   }

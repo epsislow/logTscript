@@ -115,7 +115,26 @@ Every query binding after the goal block **must** name a decode type. Width alon
 8wire[4] routeFlat = .routes:query({ path(a, Nodes) }, Nodes=text list)
 ```
 
-The engine flattens the first solution list into consecutive cells (ASCII per atom on text lists). Unused slots use the wire fill pattern (`\0` for text).
+The engine flattens the first solution list into consecutive cells (ASCII per atom on text lists; **`f32`** per float on default **`float list`** output). Unused slots use the wire fill pattern (`\0` for text).
+
+#### Float list output (packed `f32` default)
+
+```logts-play
+inline [logic] .batch:
+
+    row(1, [1.0, 2.0])
+
+    query check:
+        row(1, L)
+
+:
+
+64wire packedOut = 0000000000000000000000000000000000000000000000000000000000000000
+
+64wire packedFlat = .batch:query({ row(1, L) }, L=float list)
+```
+
+**Load & Run:** first solution list encodes as two **`f32`** cells on **`packedFlat`**. Explicit **`float/fp16 list`** or **`float/f64 list`** changes slot width on packed scalar wires.
 
 ### List codec rules
 

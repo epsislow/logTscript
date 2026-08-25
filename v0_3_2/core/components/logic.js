@@ -1031,9 +1031,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
               }
             }
             if (sol0 && sol0.kind === 'list' && listEncFn && (listBindType || listBtFn)) {
-              const listFmt = typeof logicEffectiveListNumberFormat === 'function'
-                ? logicEffectiveListNumberFormat(listNumberFormat, shape)
-                : listNumberFormat;
+              let listFmt = listNumberFormat;
+              if (listBindType === 'float' && typeof logicEffectiveListFloatFormat === 'function') {
+                listFmt = logicEffectiveListFloatFormat(listNumberFormat, shape);
+              } else if (typeof logicEffectiveListNumberFormat === 'function') {
+                listFmt = logicEffectiveListNumberFormat(listNumberFormat, shape);
+              }
               bits = listEncFn(
                 sol0, listBindType || listBtFn(sol0), shape.count, shape.ew, fillBits, listFmt,
               );
@@ -1096,7 +1099,51 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
             ? packVarsFromSelFn(freeVars, columnSelect, argVarSlots)
             : freeVars;
           const rowCols = rowPackVars.length;
-          if (rowPackVars.length === 1 && shape.kind === 'scalar') {
+          const listEncFn = typeof logicEncodeListToVectorBits === 'function'
+            ? logicEncodeListToVectorBits : null;
+          const listBtFn = typeof logicListBindTypeFromTerm === 'function'
+            ? logicListBindTypeFromTerm : null;
+          let listBindType = null;
+          let listNumberFormat = null;
+          if (rowPackVars.length === 1) {
+            for (const pin of Object.values(comp.pinStorage || {})) {
+              if (pin.logicVar === rowPackVars[0] && pin.listFlag) {
+                listBindType = pin.bindType;
+                listNumberFormat = pin.numberFormat || null;
+                break;
+              }
+            }
+          }
+          const solTerm = solutions[idx] && rowPackVars.length === 1
+            ? solutions[idx][rowPackVars[0]]
+            : null;
+          if (solTerm && solTerm.kind === 'list' && listEncFn && (listBindType || listBtFn)) {
+            let listFmt = listNumberFormat;
+            if (listBindType === 'float' && typeof logicEffectiveListFloatFormat === 'function') {
+              listFmt = logicEffectiveListFloatFormat(listNumberFormat, shape);
+            } else if (typeof logicEffectiveListNumberFormat === 'function') {
+              listFmt = logicEffectiveListNumberFormat(listNumberFormat, shape);
+            }
+            if (shape.kind === 'vector') {
+              bits = listEncFn(
+                solTerm, listBindType || listBtFn(solTerm), shape.count, shape.ew, fillBits, listFmt,
+              );
+            } else if (shape.kind === 'scalar') {
+              const layoutFn = typeof logicResolveListWireLayout === 'function'
+                ? logicResolveListWireLayout : null;
+              if (layoutFn) {
+                const layout = layoutFn(width, listBindType || listBtFn(solTerm), null, listFmt);
+                bits = listEncFn(
+                  solTerm,
+                  listBindType || listBtFn(solTerm),
+                  layout.slotCount,
+                  layout.elementWidth,
+                  fillBits,
+                  listFmt,
+                );
+              }
+            }
+          } else if (rowPackVars.length === 1 && shape.kind === 'scalar') {
             if (!solutions[idx]) continue;
             const term = solutions[idx][rowPackVars[0]];
             bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
