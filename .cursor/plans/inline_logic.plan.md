@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **F43 ready** mutation **every** (**2+o**); **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -206,6 +206,24 @@ todos:
   - id: logic-is-42e
     content: "F42e: random_between float + random/1 float + doc — teste 4402+"
     status: completed
+  - id: logic-mutation-every
+    content: "Faza 43 (2+o): mutation every expansion — D341–D346, D348, D354✅; D345✅; D347, D349–D353 A draft"
+    status: pending
+  - id: logic-mutation-43a
+    content: "F43a: parser postfix every + AST everyFlag (mutually exclusive cu each) — teste 4411+"
+    status: pending
+  - id: logic-mutation-43b
+    content: "F43b: expand cartesian every-only (top-level args) — teste 4418+"
+    status: pending
+  - id: logic-mutation-43c
+    content: "F43c: mix each + every (zip rânduri, apoi cartesian per rând) — teste 4425+"
+    status: pending
+  - id: logic-mutation-43d
+    content: "F43d: expand recursiv în compound-uri imbricate (each + every) — teste 4432+"
+    status: pending
+  - id: logic-mutation-43e
+    content: "F43e: float/<format> every + doc + trace/.check — teste 4440+"
+    status: pending
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
     status: completed
@@ -1497,6 +1515,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 40** Float Prolog + frontieră (**2+l**)        | **F40a→F40e✅** — [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) | **(completed)** |
 | **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
 | **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e✅** — [Faza 42](#faza-42--is2-extins--random-float-2m--completed) | **✅ completed** |
+| **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e** — D341–D346, D348, D354✅ — [Faza 43](#faza-43--mutation-every-expansion-2o) | **(ready-to-implement)** |
 
 
 ---
@@ -6764,9 +6783,10 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+l**~~ | Logic numeric post-F39      | **Promovat → Faza 40✅** — float Prolog + `float/<format>`; `number/fp16|q*` → eroare | **F40**    | F39, D314, D316–D326✅          |
 | ✅     | ~~**2+n**~~ | IEEE f32/f64 nativ LogTScript | **Livrat → Faza 41✅** — `show(; f32/f64)`, NFORMAT, builtins; codec unificat logic↔wire; teste **4310–4385** | **F41**    | F40, F39 fp16, D327+ **(completed)** |
 | ✅     | ~~**2+m**~~ | `is/2` float extins         | **Livrat → Faza 42✅** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float**, **`random/1`**; teste **4386–4410** | **F42**    | F26, F40c, F34, D332–D340 **(completed)** |
+| ⏳     | **2+o**     | Mutation **`every`**        | **Promovat → Faza 43** — cartesian wire refs; mix `each`+`every`; expand recursiv compound — sketch [logic_every](../my_ideas/logic_every) | **F43**    | F33 D248–D260, F25, F40b **(draft)** |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · **2+o** (every) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -9590,6 +9610,16 @@ comp [logic] .sensorLogic:
 
 **Legat de:** [D318](#d318--is2-pe-reale-confirmed-a--mvp-în-f40c-extins-în-2m) · [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) · [Faza 34](#faza-34--builtins-random-integer-2h--completed).
 
+#### **2+o** ⏳ → **F43** (D341+ draft)
+
+**Promovat:** 2026-08-26 — sketch [logic_every](../my_ideas/logic_every): keyword **`every`** la mutation args — produs cartesian pe colecții wire, complementar cu **`each`** (zip F33).
+
+**Draft:** secțiune [Faza 43 — Mutation every expansion](#faza-43--mutation-every-expansion-2o). Teste draft **4411+** legacy+wave.
+
+**Legat de:** [Faza 33](#faza-33--mutation-each-expansion-completed--d248260) (each zip) · [Faza 25](#faza-25--liste-tipate-pe-wire-2c-completed) (wire bind) · [Faza 40b](#f40b--floatformat-frontieră--float-listeach) (`float list each`).
+
+**Nu e în 2+o:** cap configurabil comp (decizie **D348** deschisă); trig/`log` → **2+p?**.
+
 ---
 
 ## Faza 40 — Float Prolog + frontieră **`float/<format>`** **2+l** **(completed)**
@@ -10185,3 +10215,395 @@ set_random(42), random_between(0.0, 10.0, X)   ; determinist cu seed
 | `v0_3_2/doc/logic-builtins.md`, `inline-logic.md` | secțiune `is/2` extins | `random_between` float |
 
 **Verify țintă post-livrare:** `node node/_gen_test_manifest.js` → `node node/_run_test_suite_node.js -q` → doc verify (pattern F41).
+
+---
+
+## Faza 43 — Mutation **every** expansion **2+o**
+
+> **Backlog:** **2+o** — promovat 2026-08-26 din sketch [logic_every](../my_ideas/logic_every).  
+> **Extinde:** [Faza 33](#faza-33--mutation-each-expansion-completed--d248260) (`each` zip), [Faza 25](#faza-25--liste-tipate-pe-wire-2c-completed) (wire bind + list codec), [Faza 40b](#f40b--floatformat-frontieră--float-listeach) (`float/<format> list each`).  
+> **Status:** **(ready-to-implement)** — **D341–D346, D348, D354 ✅** confirmed user 2026-08-26; **D347, D349–D353** — **A** recommended (neconfirmate explicit, safe defaults).
+
+### Problemă (stare azi post-F33)
+
+| Situație | Comportament azi (F33) |
+| -------- | ---------------------- |
+| `+ pair(text each A, text each B)` | ✅ zip sincronizat — N facts |
+| `+ pair(text every A, text every B)` | ❌ sintaxă inexistentă |
+| `+ triple(text each A, text each B, text every C)` | ❌ mix each+every |
+| `+ located(text each N, zone(number each I, text each R))` | ❌ `each` **doar** la args top-level compound — **nu** recursiv în sub-compound |
+| Produs cartesian din vectori | ❌ N×M linii manuale sau reguli auxiliare |
+
+**Scop F43:** keyword **`every`** — expansie **cartesiană** pe colecții wire; combinație **`each` + `every`** (zip apoi cartesian per rând); expansie **structurală recursivă** în compound-uri imbricate. Engine-ul logic primește doar termeni ground expandați (ca F33).
+
+### Roluri deliberate (sketch)
+
+| Modifier | Semantica |
+| -------- | --------- |
+| **`each`** | Zip sincronizat — rândul `i` din fiecare colecție (F33 ✅) |
+| **`every`** | Produs cartesian — fiecare element din colecție ca alternativă |
+| **plain** (fără modifier) | Broadcast — aceeași valoare la fiecare fact expandat (F33 D250) |
+
+**Model mental:** `each` → alege rândul · `every` → alege fiecare valoare pentru acel context · plain → repetă.
+
+### Sintaxă țintă **(draft — postfix F25/F33)**
+
+```
+<bindType> [/<format>] list? (each | every)? <wireName>
+```
+
+| Formă | Wire | Semantica expand |
+| ----- | ---- | ---------------- |
+| `text every V` | vector `N` celule | fiecare atom din `V` = o alternativă |
+| `number every V` | vector | fiecare număr |
+| `bool every V` | vector | fiecare bool |
+| `float/fp16 every V` | vector packed | fiecare float decodat (F40b pattern) |
+| `text list every M` | matrix `R` rânduri | fiecare rând → listă Prolog = alternativă |
+| `text every W` **+** `text every W2` | 2 vectori | produs cartesian **N×M** facts |
+| `text each A` **+** `text every B` | vector + vector | zip pe `each` → apoi cartesian `every` **per rând** |
+| fără modifier | scalar / broadcast | neschimbat F25/F33 D250 |
+
+**Ordine modifier (D353 draft):** `list` **înainte** de `each`|`every` — ex. `text list every M`, **nu** `text every list M`.
+
+**Exclusivitate (D346 draft):** același `wireRef` **nu** poate avea **`each` și `every`** simultan → eroare elaborare.
+
+### Scope (subfaze echilibrate — mirror F42)
+
+| Subfază | Livrabil | Fișiere principale | Teste (draft) |
+| ------- | -------- | ------------------ | ------------- |
+| **F43a** | Parser postfix **`every`** + AST `everyFlag`; mutual exclusive cu `eachFlag` | `logic-assembler.js` | **4411–4417** |
+| **F43b** | Expand cartesian **`every`-only** (args top-level, fără `each`) | `logic-engine.js`, `components/logic.js` | **4418–4424** |
+| **F43c** | Mix **`each` + `every`** — zip rânduri apoi cartesian per rând | `logic-engine.js` | **4425–4431** |
+| **F43d** | Expand **recursiv** în **compound-uri** imbricate (`each` + `every` în sub-args) | `logic-engine.js` | **4432–4439** |
+| **F43e** | **`float/<format> every`**, doc EN, trace + `.check` paritate | doc + teste | **4440–4455** |
+
+**Pattern teste:** legacy + wave ca F33/F42; ultimul ID F42 = **4410** → F43 pornește la **4411**.
+
+### Exemple țintă (din sketch)
+
+**Cartesian simplu — doi vectori:**
+
+```logts
+logic {
+    + pair(text every owners, text every cars)
+}
+```
+
+`owners = [a, b, c]`, `cars = [h, i]` → **6 facts**: `(a,h)`, `(a,i)`, `(b,h)`, `(b,i)`, `(c,h)`, `(c,i)`.
+
+**Mix each + every:**
+
+```logts
+logic {
+    + triple(text each owners, text each cars, text every colors)
+}
+```
+
+`owners = [a, b]`, `cars = [h, i]`, `colors = [red, blue, green]` → **6 facts** (2 rânduri × 3 culori).
+
+**Compound cu every în interior:**
+
+```logts
+logic {
+    + located(
+        text each names,
+        zone(number each ids, text every areas)
+    )
+}
+```
+
+`names = [john, mary]`, `ids = [1, 2]`, `areas = [north, south, east]` → **6 facts** — outer `each` zip; inner `every` cartesian pe `areas` per rând.
+
+**Broadcast neschimbat (F33 D250):**
+
+```logts
+logic {
+    + tag(text each owners, active, text list tags)
+}
+```
+
+→ `active` și lista `tags` repetate pe fiecare rând `each`.
+
+### Pipeline **(draft — extinde F33 D252)**
+
+```
+parse logic { + pair(text every A, text every B) }
+    ↓
+logicExpandMutationOps (pre-resolve)   // refactor din logicExpandMutationEachOps
+    → produs cartesian / zip+every / recursiv compound
+    → [ + pair(a,h), + pair(a,i), … ]   // ground shape, fără everyFlag/eachFlag
+    ↓
+for each op (ordine păstrată):
+    resolve wire refs (F25)
+    apply ± to proposed store
+    ↓
+validate constraints on all + facts (F12)
+    ↓
+COMMIT or ROLLBACK (F11) — fără commit parțial
+```
+
+**Invariant:** după expand, downstream **nu** știe de `each`/`every` (ca F33).
+
+### Decizii F43 **(D341+ — confirmare parțială 2026-08-26)**
+
+| ID | Decizie | Alegere |
+| -- | ------- | ------- |
+| **D341** | **Marker `every`** | **A ✅** — keyword postfix ca `each` |
+| **D342** | **Multiple args `every`** | **A ✅** — produs cartesian complet |
+| **D343** | **Mix `each` + `every`** | **A ✅** — zip rânduri, apoi cartesian per rând |
+| **D344** | **`text list every` pe matrix** | **A ✅** — fiecare rând-listă = alternativă |
+| **D345** | **Compound nested** | **A ✅** — expand recursiv; include `each` în compound (gap F33) |
+| **D346** | **`each` ⊥ `every` pe același ref** | **A ✅** — per wire fie `each` fie `every`; ambele → eroare |
+| **D347** | **Backward compat F33** | **A** draft — fără `every` = F33 neschimbat |
+| **D348** | **Limită număr facts expandate** | **B ✅** — cap fix **10 000** facts expandate per op → `mutationFailed=1` |
+| **D349** | **`.check` + trace** | **A** draft |
+| **D350** | **`-` remove** | **A** draft |
+| **D351** | **Colecție goală (`every` count 0)** | **A** draft |
+| **D352** | **Refactor pipeline expand** | **A** draft |
+| **D353** | **Ordine `list` vs `every`** | **A** draft |
+| **D354** | **`float/<format> every`** | **A ✅** — mirror F39/F40b/F41; F43e |
+
+#### D341 — Marker `every` **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — keyword explicit postfix ✓** | `text every W`, `number every V`, `text list every M` — simetric cu F33 `each` |
+| B | Auto-cartesian când 2+ wire refs plain pe vectori | Respinse — surpriză; explicit `every` ca la `each` |
+
+**Decizie:** **A ✅** — confirmed 2026-08-26.
+
+#### D342 — Produs cartesian multi-`every` **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — produs complet ✓** | `every A` × `every B` × … = toate combinațiile (ordine: nested loop stabil documentat) |
+| B | Doar un singur arg `every` per mutation | Prea restrictiv pentru sketch |
+
+**Decizie:** **A ✅** — confirmed 2026-08-26.
+
+#### D343 — Mix `each` + `every` **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — each rows, then every ✓** | Pas 1: zip toate args `each` (D249). Pas 2: per rând, cartesian pe args `every`. Plain broadcast per rând. |
+| B | `every` ignoră `each` — cartesian global | Contrazice sketch `triple(each, each, every)` |
+
+**Decizie:** **A ✅** — confirmed 2026-08-26.
+
+#### D344 — `text list every` pe matrix **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — alternativă = rând-listă ✓** | Matrix `R` rânduri → `R` alternative; skip fill ca F25/F33 |
+| B | Cartesian între **elementele** tuturor rândurilor flatten | Diferit de sketch; ambiguu cu list semantics |
+
+**Decizie:** **A ✅** — confirmed 2026-08-26.
+
+#### D345 — Compound nested — exemple A vs B
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — expand structural recursiv ✓** | `each`/`every` funcționează **și în interiorul** compound-urilor imbricate; expand în adâncime înainte de commit |
+| **B — doar top-level (F33 azi)** | `each`/`every` **doar** pe args directe ale predicate-ului mutation; sub-compound-urile sunt opaci |
+
+**Decizie:** **A ✅** — expand structural recursiv; confirmed 2026-08-26. Vezi [exemple A vs B](#d345--compound-nested--exemple-a-vs-b).
+
+##### Exemplu script — ce face **A** (recursiv)
+
+Wires:
+
+```text
+names = [john, mary]          /* vector 2 */
+ids   = [1, 2]                /* vector 2 */
+areas = [north, south, east]  /* vector 3 */
+```
+
+Mutation:
+
+```logts
+logic {
+    + located(
+        text each names,
+        zone(number each ids, text every areas)
+    )
+}
+```
+
+**Cu A (F43d):** expand recursiv — outer `each` zip pe `names`+context; în sub-compound `zone(...)`, `number each ids` zip + `text every areas` cartesian.
+
+**Rezultat — 6 facts ground:**
+
+```text
+located(john, zone(1, north))
+located(john, zone(1, south))
+located(john, zone(1, east))
+located(mary, zone(2, north))
+located(mary, zone(2, south))
+located(mary, zone(2, east))
+```
+
+##### Exemplu script — ce face **B** (doar top-level)
+
+Aceeași mutation ca mai sus.
+
+**Cu B:** parser acceptă sintaxa, dar **`each`/`every` din interiorul `zone(...)` sunt ignorate** (sau eroare „unsupported in compound”). Wire refs din sub-args rămân nerezolvate / un singur op fără expand.
+
+**Rezultat — 1 fact (broken) sau eroare:**
+
+```text
+/* B nu poate produce cele 6 facts — fie fail, fie 1 fact cu wire refs nerezolvate */
+located(john, zone(???))   /* ids/areas neexpandate */
+```
+
+Sau, dacă user scrie **flat** (workaround manual sub B):
+
+```logts
+logic {
+    + located(text each names, zone(number each ids, text each areas))
+}
+```
+
+→ **2 facts** (zip sincronizat), **nu** 6 — pentru că `areas` ar fi `each` (zip), nu `every` (cartesian):
+
+```text
+located(john, zone(1, north))
+located(mary, zone(2, south))   /* presupunând areas aliniat 1:1 cu ids */
+```
+
+**Concluzie:** **A** = un singur mutation compact generează combinații structurate. **B** = fie refuzi compound interior, fie user descompune manual în N linii `+` — contrazice sketch-ul [logic_every](../my_ideas/logic_every).
+
+##### Bonus — gap F33 inclus în A
+
+F33 azi suportă `each` **doar** la args top-level. **A** adaugă și:
+
+```logts
+logic {
+    + located(text each names, zone(number each ids, text each areas))
+}
+```
+
+→ **2 facts** cu `each` **în** `zone(...)` — astăzi **nu merge**; cu **A** merge.
+
+**Cu B:** rămâne broken ca azi pentru `each` în compound.
+
+#### D346 — Mutual exclusive `each`/`every` **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — un singur modifier per wireRef ✓** | Per wire: fie `text each W`, fie `text every W`; `text each every W` → **eroare** elaborare |
+| B | `every` override `each` | Confuz |
+
+**Decizie:** **A ✅** — confirmed 2026-08-26.
+
+#### D348 — Limită număr facts expandate **(confirmed: B — user 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| A — fără cap hardcoded | Orice produs cartesian permis |
+| **B — cap fix engine ✓** | Max **10 000** facts expandate **per op** mutation/check → `mutationFailed=1` |
+| C — cap opțional comp | atribut `mutationExpandCap:` pe `comp [logic]` |
+
+**Decizie:** **B ✅** — cap **10 000**; mesaj: `every: expansion limit exceeded (N > 10000)`.
+
+#### D354 — Formate `float/<format> every` **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — mirror F39/F40b/F41 ✓** | `float/fp16 every W`, `float list every M` — același codec ca `each` |
+| B | Doar `text|number|bool` | Respinse — inconsistent cu F40b |
+
+**Decizie:** **A ✅** — livrat în **F43e**; confirmed 2026-08-26.
+
+### Erori elaborare (mesaje draft)
+
+| Condiție | Rezultat |
+| -------- | -------- |
+| `text each every W` | **error** — `each and every are mutually exclusive` |
+| `text every V` cu vector count 0 | **error** — `every: collection must have at least 1 element` |
+| `text list every` pe vector (non-matrix) | **error** — `every list requires matrix wire` (mirror D255) |
+| `each` row mismatch + `every` | **error** — zip `each` eșuează **înainte** de cartesian (D249) |
+| Produs cartesian > **10 000** (D348-B) | **error** — `every: expansion limit exceeded (N > 10000)` |
+| Constraint fail pe fact expandat | rollback total — ca F33 D258 |
+| Wire inexistent | **error** — ca F11 |
+
+### Fișiere țintă
+
+| Fișier | Schimbare |
+| ------ | --------- |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | `parseMutationTerm` — `every?` postfix; AST `wireRef.everyFlag`; exclusivitate `each`/`every` |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | `logicExpandMutationOps` (cartesian + zip+every + recursiv compound); refactor din `logicExpandMutationEachOps` |
+| `[components/logic.js](../v0_3_2/core/components/logic.js)` | Hook expand unificat mutation + check |
+| `[interpreter.js](../v0_3_2/core/interpreter.js)` | `.check({ … })` — același expand |
+| `[logic-runtime.md](../v0_3_2/doc/logic-runtime.md)` | Secțiune **each vs every** + exemple cartesian/compound |
+| `[logic-constraints.md](../v0_3_2/doc/logic-constraints.md)` | Validate per fact expandat (cross-ref) |
+| `[comp-logic.md](../v0_3_2/doc/comp-logic.md)` | Exec block syntax |
+| `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | Cross-link sketch semantics |
+| `tests/test_suite.js` | **4411+** legacy+wave |
+
+### Teste draft (checklist)
+
+| ID | Scenariu |
+| -- | -------- |
+| 4411 | parse `+ pair(text every a, text every b)` |
+| 4412 | cartesian 3×2 vectori → 6 facts ground; query OK |
+| 4413 | `text every` singur pe vector 4 celule → 4 facts |
+| 4414 | `text list every` matrix 3 rânduri → 3 alternative |
+| 4415 | `each` + `every` mix — 2×3 = 6 facts |
+| 4416 | broadcast plain arg cu `every` — repetat per combinație |
+| 4417 | parse error `text each every W` |
+| 4418 | compound `zone(number each ids, text every areas)` — 6 facts |
+| 4419 | nested compound multi-nivel (sketch `property/details/rent`) |
+| 4420 | `- pair(text every …)` — remove N facts |
+| 4421 | `.check({ + … text every … })` — paritate mutation |
+| 4422 | constraint fail pe al 3-lea fact expandat → rollback total |
+| 4423 | `logic-mut` trace — ops expandate |
+| 4424 | regresie F33: `+ car(text each A, text list each M)` neschimbat |
+| 4425 | `float/fp16 every` vector — F43e |
+| 4426 | colecție goală `every` → fail tranzacție |
+| 4427 | (D348-B) expansion 100×100=10001 → fail tranzacție |
+
+### Livrabile F43 (checklist — neimplementat)
+
+- [ ] Parser postfix `every` + AST `everyFlag` (F43a)
+- [ ] `logicExpandMutationOps` cartesian + each+every (F43b–c)
+- [ ] Expand recursiv compound (F43d)
+- [ ] Teste **4411–4455** legacy+wave
+- [ ] Doc EN `logic-runtime.md`, `comp-logic.md`
+- [ ] Regen doc-data + verify logic pages
+
+### Estimare
+
+Medie-mare — parser mic + engine expand (cartesian + recursiv compound) + teste (~3–5 zile). Nu atinge solver/backtracking.
+
+### Decizii F43 — status
+
+**Confirmed user 2026-08-26:** **D341 ✅ D342 ✅ D343 ✅ D344 ✅ D345 ✅ D346 ✅ D348 ✅ (B, cap 10 000) D354 ✅**  
+**Draft A (neconfirmate explicit, safe defaults):** D347, D349–D353.
+
+### Out of scope F43
+
+- Lazy streams pe wire (**2+j**)
+- Infer tip wire fără bind explicit (F25 respins)
+- Auto-cartesian fără keyword `every`
+- Reguli Prolog care generează combinații (rămâne responsabilitatea user/query)
+
+### Rezumat decizii F43 **(2026-08-26)**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D341** | Marker `every` postfix | **A ✅** |
+| **D342** | Multi-`every` cartesian | **A ✅** |
+| **D343** | Mix each+every | **A ✅** |
+| **D344** | `text list every` matrix | **A ✅** |
+| **D345** | Compound nested (+ each gap F33) | **A ✅** |
+| **D346** | each ⊥ every per wire | **A ✅** |
+| **D347** | Backward compat F33 | **A** draft |
+| **D348** | Cap expansion | **B ✅** — **10 000** facts/op |
+| **D349** | `.check` + trace | **A** draft |
+| **D350** | `-` remove expand | **A** draft |
+| **D351** | Colecție goală | **A** draft |
+| **D352** | Refactor `logicExpandMutationOps` | **A** draft |
+| **D353** | Ordine `list every` | **A** draft |
+| **D354** | `float/<format> every` | **A ✅** |
+
+**Status:** **(ready-to-implement)** — poate începe F43; D347, D349–D353 = **A** recommended dacă nu se obiectează.
