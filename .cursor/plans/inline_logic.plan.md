@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **F43✅** mutation every; **F30✅** mini-monopoly doc; **F44⏳** inline assert/retract + retractall (decizii); **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** … **F43✅**; **F44⏳** `+`/`-`/`~`/`commit` **comp-only**; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -225,7 +225,7 @@ todos:
     content: "F43e: float/<format> every + doc + trace/.check — teste 4421+"
     status: completed
   - id: logic-inline-mut-44
-    content: "Faza 44 (2+p): inline +/− + retractall — D355–D372 decizii deschise"
+    content: "Faza 44 (2+p): +/−/~ + commit — comp-only exec; inline static la :query — D355–D378✅"
     status: pending
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
@@ -1519,7 +1519,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
 | **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e✅** — [Faza 42](#faza-42--is2-extins--random-float-2m--completed) | **✅ completed** |
 | **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e✅** — D341–D354 — [Faza 43](#faza-43--mutation-every-expansion-2o--completed) | **✅ completed** |
-| **Faza 44** Inline **+/−** + **retractall** (**2+p**) | D355–D372 — [Faza 44](#faza-44--inline-assertretract--retractall-2p--planning) | **⏳ planning** |
+| **Faza 44** Inline **`+`/`-`/`~`** + **`commit/…`** (**2+p**) | D355–D375 — [Faza 44](#faza-44--inline--retractall-via-2p--planning) | **⏳ planning** |
 
 
 ---
@@ -6788,9 +6788,10 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+n**~~ | IEEE f32/f64 nativ LogTScript | **Livrat → Faza 41✅** — `show(; f32/f64)`, NFORMAT, builtins; codec unificat logic↔wire; teste **4310–4385** | **F41**    | F40, F39 fp16, D327+ **(completed)** |
 | ✅     | ~~**2+m**~~ | `is/2` float extins         | **Livrat → Faza 42✅** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float**, **`random/1`**; teste **4386–4410** | **F42**    | F26, F40c, F34, D332–D340 **(completed)** |
 | ✅     | ~~**2+o**~~ | Mutation **`every`**        | **Livrat → Faza 43✅** — cartesian; mix `each`+`every`; compound nested; cap 10 000; teste **4411–4428** | **F43**    | F33, F25, F40b, D341–D354 **(completed)** |
+| ⏳     | **2+p**     | Inline **`+`/`-`/`~`** + **`commit`** | **F44⏳** — mutații **doar comp**; inline `:query` static; `:mutate` respins — [Faza 44](#faza-44--inline--retractall-via-2p--planning) | **F44**    | F11, D49 **(planning done)** |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · ~~**2+o**~~ **→ F43✅** · **2+p** (inline assert/retract + retractall) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · ~~**2+o**~~ **→ F43✅** · **2+p** (inline `+`/`-`/`~`) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -7041,9 +7042,9 @@ Query/redirect direct pe inline fără `comp [logic]` — **respins** (D1). Mode
 
 **Istoric:** D49-A — mutație **comp-only**; `.world:mutate` pe inline respins.
 
-**Motivație nouă (2026-08-26):** jocuri tip Monopoly au nevoie de **reset KB** (`retractall(turn(_))`, …) fără zeci de linii `- fact(...)` ground în `logic { }` pe exec block. User cere **`+`/`-` în programul inline** (analog **assertz/retract**) + **`retractall`**.
+**Motivație nouă (2026-08-26):** reset KB fără zeci de linii `- fact` ground. **Exec mutații doar `comp [logic]`** — inline rămâne **static** la `.world:query`; un inline folosit de **N** comp-uri → store unic per comp, fără sync imposibil.
 
-**Stare:** decizii **D355–D372** — vezi [Faza 44](#faza-44--inline-assertretract--retractall-2p--planning). **Nu** implementare încă.
+**Stare:** **D355–D378✅** — vezi [Faza 44](#faza-44--inline--retractall-via-2p--planning). Ready **F44a**.
 
 #### ~~**1+n**~~ 🟠✗ — parțial redeschis în F44
 
@@ -10614,3 +10615,610 @@ Medie-mare — parser mic + engine expand (cartesian + recursiv compound) + test
 - Infer tip wire fără bind explicit (F25 respins)
 - Auto-cartesian fără keyword `every`
 - Reguli Prolog care generează combinații (rămâne responsabilitatea user/query)
+
+---
+
+## Faza 44 — Inline **`+`/`-`/`~`** (retractall via `~`) **(2+p — planning)**
+
+> **Scop:** putem **scrie și aplica** `+ fact` / `- fact` / `~ Template` din **programul inline `[logic]`**, nu doar din `logic { }` pe exec block-ul `comp [logic]`.  
+> **Motivație:** reset joc / batch update; API apropiat de Prolog **`assertz`/`retract`/`retractall`**, dar **fără** builtins `assertz/1`, `retract/1`, `retractall/1` — doar prefix **`+` / `-` / `~`**.  
+> **Stare:** **⏳ planning complete** — **D355–D378✅**; mutații **comp-only**; gata **F44a**.  
+> **Context:** [F11](#faza-11--runtime-mutation-done) · [D49-A](#d49--inline-mutation-worldmutate-confirmed-a) **reconfirmat** — **fără** `.world:mutate`, **fără** store inline; F44 extinde ops în **program** inline dar **exec** doar pe **`comp.dynamicStore`**.
+
+### Problemă (exemplu user)
+
+Reset Monopoly azi (exec block) — verbose, fragil la facts noi:
+
+```logts
+.game:{
+    logic {
+        - phase(waitRoll)
+        - phase(waitChoice)
+        - phase(landed)
+        - turn(p1)
+        - turn(p2)
+        - playerPos(p1, 0)
+        - playerPos(p2, 0)
+        - playerCash(p1, 1500)
+        - playerCash(p2, 1500)
+        /* … owns, inJail, deck … */
+        + phase(waitRoll)
+        + turn(p1)
+        + playerPos(p1, 0)
+        + playerPos(p2, 0)
+        + playerCash(p1, 1500)
+        + playerCash(p2, 1500)
+    }
+    query = bootGame
+    set = kReset
+}
+```
+
+**Țintă dorită** (B/C — **fără** bloc `mutate { }` top-level):
+
+```logts
+inline [logic] .mono:
+
+    /* B — query cu mutații */
+    query resetGame:
+        commit(
+            ~ turn(_),
+            ~ playerPos(_, _),
+            ~ playerCash(_, _),
+            + phase(waitRoll),
+            + turn(p1),
+            + playerPos(p1, 0),
+            + playerPos(p2, 0),
+            + playerCash(p1, 1500),
+            + playerCash(p2, 1500)
+        ),
+        show("Game Reset")
+
+    /* C — regulă; apelată din query, nu din comp direct */
+    reset <- commit(
+        ~ turn(_),
+        ~ playerPos(_, _),
+        + phase(waitRoll),
+        + turn(p1)
+    )
+
+    query resetGame:
+        reset,
+        show("Game Reset")
+
+    bootAfterReset <- reset, show("ok")    /* și din altă regulă */
+```
+
+**Mapare Prolog → LogTscript inline:**
+
+| Prolog | LogTscript inline |
+| ------ | ----------------- |
+| `assertz(Fact)` | `+ Fact` |
+| `retract(Fact)` | `- Fact` (ground) |
+| `retractall(Template)` | `~ Template` |
+| — | **nu** expunem `assertz/1`, `retract/1`, `retractall/1` ca predicate |
+
+### Ce există azi (F11–F43)
+
+| Mechanism | Unde | `+`/`-` ground | `~` / template `_` | Tranzacție |
+|-----------|------|----------------|---------------------|------------|
+| **`logic { + / - }`** | exec block **comp** | ✅ | ❌ | ✅ atomic + `mutationFailed` |
+| **Facts inline** | `inline [logic]` | ✅ static init | — | la load / seed |
+| **Query** | inline | read + **`show`** | ❌ | ❌ no write |
+| **Reguli `<-`** | inline | read | ❌ | ❌ no write |
+| **`~ Template`** | — | **❌** | — | — |
+
+**Separare ASM (păstrată):** inline = **program**; comp = **runtime** care execută pass-uri. F44 extinde mutația în **toate** căile de invocare (A–E).
+
+### Non-goals (draft)
+
+- **Builtins `assertz/1`, `retract/1`, `retractall/1`** — respins; doar prefix **`+`/`-`/`~`**
+- **`{ … }` ca block mutație în goals** — respins (D375); atomic = **`commit(…)`**
+- **`+`/`-`/`~` cu rollback implicit în sequence `,`** — respins; folosește **`commit`**
+- **Auto-persist query results** — query rămâne read-only ca azi *dacă* nu conține ops `+`/`-`/`~` permise
+- **Înlocuire completă** a exec block `logic { }` — comp rămâne orchestrator (keys, wires, `on:`)
+
+---
+
+### Decizii (D355–D372)
+
+#### D355 — **Unde** trăiesc `+`/`-`/`~`? **(confirmed: B–D — fără A, E — revizuit 2026-08-26)**
+
+**Definiție** în program inline; **exec commit** doar pe calea **`comp [logic]`** (D378).
+
+| Opțiune | Descriere | Stare |
+| ------- | --------- | ----- |
+| **A — bloc top-level `mutate { }`** | | ❌ **respins** |
+| **B — goals în query** | `query resetGame: reset, show(…)` — mutație când **`comp` `query = resetGame`** | ✅ |
+| **C — goals în regulă** | `reset <- commit(…)` — apel din query/regulă **pe cale comp** | ✅ |
+| **D — comp `logic { }`** | `~` / `commit` în exec block | ✅ |
+| **E — `.world:mutate` / mutații via `.world:query`** | | ❌ **respins** — [D378](#d378--inline-static-la-worldquery--fără-worldmutate--2026-08-26) |
+
+**Semantica regulă (C) pe cale comp:** apel `reset` → body left-to-right; ops pe **`comp.dynamicStore`**; **`commit`** atomic; fail conform D376.
+
+#### D356 — **Când** se execută mutațiile? **(confirmed — 2026-08-26)**
+
+| Cale | Mutații |
+| ---- | ------- |
+| **`comp` exec** — `logic { … }`, **`query = name`** | ✅ **singura** cale de commit |
+| **`.world:query({ … })`** | ❌ static only — hit mutation → **eroare** |
+| **`.world:mutate`** | ❌ **interzis** |
+| **`comp:check({ … })`** | simulate only (F11), pe store comp |
+
+#### D357 — **Sintaxă: doar `+` / `-` / `~`** **(confirmed — 2026-08-26)**
+
+| Element | Decizie |
+| ------- | ------- |
+| **`+ Fact`** | ✅ assert (analog `assertz`) — ground sau wire refs ca F11 |
+| **`- Fact`** | ✅ retract **un** fact ground (analog `retract`) |
+| **`~ Template`** | ✅ retract **toate** instanțele care unifică cu template (analog `retractall`) |
+| **`assertz/1`, `retract/1`, `retractall/1`** | ❌ **respins** — nu apar în KB ca builtins |
+| **În reguli/query** | ✅ ops în program inline — **exec mutație doar via comp** (D378) |
+
+**Istoric:** inițial propus `-- Template`; user a ales **`~`** (D366-B). Tranzacții: **nu** atomic implicit în sequence `,` — vezi **D360**, **D373**.
+
+#### D358 — **Semantica `~ Template`** **(confirmed: A — Prolog SWI-like — 2026-08-26)**
+
+User: **`~` șterge tot** ce match-uiește template-ul — static + dynamic, ca **`retractall`** în Prolog. Facts statice inline → **tombstone** (F11); effective KB nu le mai vede după commit/op reușit.
+
+| Opțiune | Descriere | Stare |
+| ------- | --------- | ----- |
+| **A — Prolog SWI-like ✓** | Retrage **toate** instanțele care unifică; static + dynamic; tombstone pe static | ✅ **confirmed** |
+| **B — doar dynamic store** | | **respins** |
+| **C — doar pattern full term** | subsumed by A | |
+| **D — per predicate/arity** | `~ turn/1` — sintaxă alternativă | **low priority** |
+
+**Exemplu așteptat:**
+
+```logts
+~ turn(_)              /* 0 sau N facts turn/1 — oriunde în KB */
+~ playerPos(_, _)      /* toate pozițiile */
+~ own(john, _)         /* toate mașinile lui john */
+```
+
+#### D359 — **Variabile `_` în `-` vs `~`** **(confirmed: A — user confirm 2026-08-26)**
+
+**Decizie:** **`_` (anonim) doar în `~ Template`**. La **`- Fact`** și **`+ Fact`** — fact **ground** (F11): fiecare argument e **concret**, fără `_`, fără variabile Prolog libere.
+
+**Ce înseamnă „ground”:** fact **complet specificat** — știi exact ce scrii/retragi, ca un rând fix în KB.
+
+| Fact | Ground? | Unde |
+| ---- | ------- | ---- |
+| `own(john, audi)` | ✅ da | `+` / `-` |
+| `own(john, bmw)` | ✅ da | `+` / `-` |
+| `own(john, _)` | ❌ nu — `_` = „orice mașină” | doar **`~ own(john, _)`** |
+| `own(X, audi)` | ❌ nu — variabilă | **interzis** la `+`/`-` |
+| `turn(_)` | ❌ nu | doar **`~ turn(_)`** |
+
+**Exemplu script:**
+
+```logts
+inline [logic] .garage:
+
+    own(john, audi).
+    own(john, bmw).
+    own(mary, fiat).
+
+    /* - = retract UN fact exact (ground) */
+
+    dropAudi <-
+        - own(john, audi)          /* OK — dispare doar audi; bmw rămâne */
+
+    /* EROARE la compile/elab — _ interzis după - */
+    /* dropAny <- - own(john, _) */
+
+    /* ~ = pattern retractall — _ = „match orice aici” */
+
+    stripJohn <-
+        ~ own(john, _)             /* OK — dispare audi ȘI bmw; fiat (mary) rămâne */
+
+    stripAllCars <-
+        ~ own(_, _)                /* OK — toate own/2 */
+
+    resetJohnToBmwOnly <-
+        commit(
+            ~ own(john, _),
+            + own(john, bmw)
+        )
+        /* ~ șterge toate mașinile lui john; + adaugă ground own(john,bmw) */
+
+    /* Dacă ai turn(p1) ȘI turn(p2) — retract singular vs batch: */
+
+    endP1Turn <- - turn(p1)        /* OK — doar turn(p1) */
+    endAnyTurn <- ~ turn(_)        /* OK — turn(p1), turn(p2), … toate */
+```
+
+**De ce separăm `-` vs `~`:** `- own(john, audi)` e **o singură** retragere precisă (ca Prolog `retract(own(john,audi))`). `~ own(john, _)` e **batch** (ca `retractall(own(john,_))`). `_` după `-` ar fi ambiguu — de aceea **`~` obligatoriu** pentru pattern (D363).
+
+#### D360 — **Tranzacție atomică vs ops izolate** **(confirmed: B + commit — 2026-08-26)**
+
+**Problemă identificată user:** în regulă/query, sequence `~ a, + b` **fără** wrapper atomic lasă stare parțială dacă `+ b` eșuează după ce `~ a` a aplicat deja.
+
+| Model | Semantica | Constraints |
+| ----- | --------- | ----------- |
+| **Ops bare `+`/`-`/`~` în body** | fiecare op **aplică imediat** (dacă reușește) | validate **după fiecare op** pe KB curent; fail → op fail, **fără rollback** al ops anterioare din același body |
+| **`commit(Op1, Op2, …)`** | **atomic** — ca F11 `logic { }` | validate **starea propusă finală** |
+| **Comp `logic { … }`** | **atomic** (F11, neschimbat) | proposed state F12 |
+
+| Opțiune veche | Stare |
+| ------------- | ----- |
+| **C — sequence `,` atomic implicit** | **respins** — prea ascuns; user preferă **`commit` explicit** |
+
+**Legătură F12:** constraints pe KB curent (per-op) sau pe **starea propusă** (în `commit`).
+
+#### D373 — **`commit/…` — tranzacție atomică explicită** **(draft confirmed user — 2026-08-26)**
+
+**Sintaxă** (variadic — doar ops mutație):
+
+```logts
+resetJohnCar <-
+    commit(~ own(john, _), + own(john, bmw))
+
+resetJohnCar2 <-
+    commit(
+        ~ own(john, _),
+        + own(john, bmw)
+    )
+```
+
+| Regulă | Decizie |
+| ------ | ------- |
+| **`commit` rezervat** | ✅ builtin/keyword — **nu** poate fi redefinit ca regulă/fact |
+| **Args permise** | **doar** `+ Fact`, `- Fact`, `~ Template` — separate prin **`,`** (o linie sau mai multe); **nu** `show`, query, alte goals |
+| **Minimum arity** | 1 op ( `commit(+ fact)` trivial dar valid ) |
+| **Formatare multiline** | ✅ aceleași **`,`** între ops pe mai multe rânduri — vezi `resetJohnCar2` |
+| **`{ … }` block mutație** | ❌ **respins** — `{ }` rezervat pentru viitor (DCG / alt usage user) |
+| **Imbricare `commit(commit(…))`** | ❌ **respins** — eroare parse/elaborare |
+| **Mix în body regulă** | ✅ `precond, commit(~ a, + b), postcond` — doar interiorul `commit` e atomic |
+
+**Ordine goals în body (Prolog `,`):**
+
+| Body | Ce se întâmplă |
+| ---- | -------------- |
+| `otherGoalThatFails, commit(…)` | **`commit` nu rulează** — primul goal fail, restul sărite |
+| `otherGoalThatFails, ~ own(john, _)` | **`~` nu rulează** — la fel |
+| `commit(…), otherGoalThatFails` | **`commit` reușește și rămâne** — fail ulterior **nu** anulează commit (Prolog-like impur) |
+
+**Echivalențe:**
+
+| Formă | Tranzacție |
+| ----- | ---------- |
+| `logic { ~ a, + b }` pe comp | atomic (F11) |
+| `commit(~ a, + b)` în regulă/query | atomic |
+| `reset <- commit(~ a, + b)` regulă apelată | atomic în commit; regulă fail dacă commit fail |
+| `~ a, + b` în regulă/query | **nu** atomic — 2 ops + 2 constraint checks |
+
+#### D374 — **Constraints: per-op vs commit** **(confirmed — 2026-08-26)**
+
+| Context | Când rulează validator F12 | La fail |
+| ------- | -------------------------- | ------- |
+| **`+`/`-`/`~` bare** | după **fiecare** op, pe effective KB | op **fail** (goal fail); KB rămâne cu ops deja reușite **anterior în același body** |
+| **`commit(…)`** | o dată, pe **starea propusă finală** (după expand `~`) | **rollback** întreg commit; KB neschimbat |
+| **Init static facts** | neschimbat F12 | — |
+
+**Scenariu user — reset mașini John (intent clar):**
+
+```logts
+/* constraint exemplu: own(P,C) <= allowed(P,C)  — bmw poate fi interzis pentru john */
+
+resetJohnCarBare <-
+    ~ own(john, _),           /* 1) șterge toate mașinile lui john — aplicat imediat */
+    + own(john, bmw)          /* 2) dacă constraint zice „john nu are voie la bmw” → FAIL aici */
+
+/* Problema bare (nu constraint absurd „john n-are mașini”):
+   după pas 1 john n-are nicio mașină; pas 2 fail → john rămâne FĂRĂ mașini,
+   deși intenția era „doar bmw”. De aceea multi-step → commit. */
+
+resetJohnCar <-
+    commit(~ own(john, _), + own(john, bmw))
+    /* constraint pe starea FINALĂ: john are doar bmw — dacă bmw interzis → rollback total,
+       john păstrează mașinile vechi */
+```
+
+**Nu** ne referim la un constraint care verifică „john n-are mașini” după `~` — constraints F12 validează **facts permise în KB**, nu „lipsa” ca side-effect al retract. Fail-ul realist = **`+ own(john, bmw)` propune un fact interzis** (sau starea finală din `commit` încalcă regula).
+
+**Recomandare doc:** orice „reset + reassign” multi-step → **`commit`**.
+
+#### D376 — **Ordine goals + backtracking post-commit** **(confirmed — 2026-08-26)**
+
+| Regulă | Semantica |
+| ------ | --------- |
+| **Execuție `,` left-to-right** | goal stânga eșuează → **goals din dreapta nu rulează** (inclusiv `commit`, inclusiv `~` bare) |
+| **`commit` reușit, apoi fail** | commit **persistă** — **fără** rollback la backtracking / fail goal ulterior |
+| **Fail în interior `commit`** | rollback **doar** ops din acel `commit` |
+
+```logts
+bad1 <- otherGoalThatFails, commit(~ own(john, _), + own(john, bmw))
+/* commit never runs */
+
+bad2 <- otherGoalThatFails, ~ own(john, _)
+/* ~ never runs */
+
+bad3 <- commit(~ own(john, _), + own(john, bmw)), otherGoalThatFails
+/* commit applied; otherGoalThatFails fails — KB stays post-commit */
+```
+
+#### D375 — **Bloche `{ ops }` pentru mutații** **(confirmed: respins — 2026-08-26)**
+
+| Opțiune | Stare |
+| ------- | ----- |
+| **`mutate name { … }` top-level (D355-A)** | ❌ **respins** — user nu vrea bloc dedicat |
+| **`{ + … ~ … }` în goals** | ❌ **respins** — `{ }` rezervat (DCG / viitor) |
+| **`commit(…)`** | ✅ atomic explicit în reguli/query/comp |
+
+#### D361 — **Store țintă — doar `comp.dynamicStore`** **(confirmed revizuit — 2026-08-26)**
+
+| Origine | Store | Mutații |
+| ------- | ----- | ------- |
+| **`comp [logic]`** — `logic { }`, `query = …` | **`comp.dynamicStore`** | ✅ respectă **`data:`** — **`static`** → **eroare** |
+| **`.inline:query({ … })`** | **static inline only** (ca azi) | ❌ **eroare instant** dacă goal ajunge la `+`/`-`/`~`/`commit` sau regulă mutatoare |
+| **`.inline:mutate`** | — | ❌ **eroare** — metodă inexistentă / interzisă |
+| **`comp:check({ … })`** | simulate pe **`comp.dynamicStore`** | ✅ read-only dry-run (F11 extins cu `~`/`commit`) |
+
+**Effective KB comp pass:** `static inline ∖ tombstones ∪ comp.dynamicStore` (F17 overlay/seed).
+
+**Effective KB `.world:query`:** **static inline only** — **fără** overlay comp, **fără** store inline.
+
+#### D377 — ~~`.world:mutate` vs `.world:query`~~ **(superseded by D378)**
+
+#### D378 — **Inline static la `.world:query` — fără `.world:mutate`** **(confirmed — 2026-08-26)**
+
+| Regulă | Decizie |
+| ------ | ------- |
+| **`.world:mutate`** | ❌ **nu** implementăm — eroare parse/runtime dacă apare |
+| **`.world:query`** | ✅ rămâne **read-only**; dacă evaluarea atinge **`+`/`-`/`~`/`commit`** sau apelează regulă/query definită cu ops mutație → **eroare instant** (elaboration sau primul step) |
+| **Program inline** | ✅ poate **defini** reguli/query cu mutații — rulează **doar** pe cale comp |
+| **Motiv** | inline partajat N comp-uri → un store inline partajat e **nesincronizabil** |
+
+```logts
+inline [logic] .mono:
+    reset <- commit(~ turn(_), + turn(p1))
+    query resetGame: reset, show("ok")
+
+comp [logic] .game program .mono:     /* OK — scrie comp.dynamicStore */
+.kReset:{ query = resetGame, set = k }
+
+1wire x = .mono:query({ reset })     /* EROARE — mutation in :query */
+1wire y = .mono:mutate({ reset })    /* EROARE — :mutate forbidden */
+```
+
+#### D362 — **Relație cu D49 / F11** **(confirmed — realiniere D49-A — 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — F44a reconfirm D49** | F44 extinde **program** inline (ops în reguli/query) dar **exec store = comp only**; `.world:query` static + error on mutation |
+| **B — păstrează D49 strict** | **respins** anterior — acum **reconfirmat** via D378 |
+| **C — ambele căi duplicate** | **respins** |
+
+#### D363 — **`~` vs multiline `-`** **(confirmed: A — 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — `~` obligatoriu pentru pattern** | `- turn(p1)` + `- turn(p2)` rămâne valid ground; `~ turn(_)` = batch |
+| **B — `- turn(_)` permis** | **respins** — user vrea `~` explicit |
+| **C — sugar Prolog `retractall/1`** | **respins** |
+
+#### D364 — **Ordinea în sequence cu mix `~`/`+`/`show`** **(confirmed — 2026-08-26)**
+
+| Opțiune | Descriere | Stare |
+| ------- | --------- | ----- |
+| **A — ordine textuală strictă** | execuție left-to-right ca Prolog `,` | ✅ |
+| **B — fază mutate apoi fază query read-only** | | **respins** |
+| **C — interzis `show` după `+` în body** | | **respins** — `show` permis după mutații |
+| **D — `show` interzis în `commit(…)`** | interior commit = **doar** `+`/`-`/`~` | ✅ **confirmed** |
+
+**Permis:**
+
+```logts
+ok <- commit(~ own(john, _), + own(john, bmw)), show("john reset")
+
+bad <- commit(~ own(john, _), show("x"), + own(john, bmw))   /* EROARE — show în commit */
+```
+
+#### D365 — **Invoke din comp: query → regulă** **(confirmed — 2026-08-26)**
+
+**Decizie user:** **`reset` e regulă, nu query** — comp **nu** invocă reguli direct. Regula își face efectul doar când e **apelată ca goal** dintr-un **query** (sau din altă regulă).
+
+| Opțiune | Stare |
+| ------- | ----- |
+| **A — `query = resetGame` pe comp** | ✅ — mecanism **existent** F18; query-ul conține apel `reset` sau ops direct |
+| **B — `run = reset` / `goal = reset` / `mutate = reset` pe comp** | ❌ **respins** — fără keyword nou; regulă ≠ query |
+| **C — `query = reset` unde `reset` e regulă** | ❌ **respins** — numele din `query =` trebuie să fie **query** definit, nu regulă |
+
+**Flux (are sens — ca Prolog):**
+
+```logts
+inline [logic] .mono:
+
+    /* C — regulă side-effect (nu e entry point comp) */
+    reset <- commit(
+        ~ turn(_),
+        ~ playerPos(_, _),
+        + phase(waitRoll),
+        + turn(p1)
+    )
+
+    /* B — query = entry point; apelează regula */
+    query resetGame:
+        reset,
+        show("Game Reset")
+
+    /* sau ops direct în query, fără regulă intermediară */
+    query resetInline:
+        commit(~ turn(_), + phase(waitRoll), + turn(p1)),
+        show("done")
+
+comp [logic] .game program .mono:
+
+.kReset:{
+    query = resetGame      /* OK — nume query, nu regulă */
+    set = kReset
+}
+
+/* INVALID — reset e regulă, nu query */
+/* .bad:{ query = reset, set = kReset } */
+```
+
+**Apel în lanț:** comp → **query** → goal **`reset`** (regulă) → **`commit`** → KB. Fail oriunde → query fail; **`commit`** fail → rollback commit.
+
+**Alternativa D:** `logic { ~ …, + … }` pe comp — neschimbat F11+.  
+**Alternativa E:** respinsă — vezi D378.
+
+#### D366 — **Parser: token `~` (retractall-pattern)** **(confirmed: B — `~ Template` — 2026-08-26)**
+
+**Decizie user:** **`~ Template`** în loc de **`-- Template`** — alternativa **3** din analiza inițială.
+
+| Aspect | Detaliu |
+| ------ | ------- |
+| **Token nou** | `TILDE_RETRACT` sau `RETRACT_ALL` cu lexem `~` — **un caracter**, prefix la început de mutate-goal |
+| **Conflict DCG `-->`** | **eliminat** — nu mai folosim `--` |
+| **Conflict dif-list `L - H`** | **zero** — `-` rămâne infix; `~` e prefix distinct |
+| **Conflict unary `-` numeric** | **zero** — `-5` în expr; `~ turn(_)` e statement |
+| **Lexer azi** | `~` **neutilizat** în `logic-assembler.js` — adăugare simplă |
+| **Spațiu** | `~ turn(_)` — spațiu recomandat după `~` (consistent cu `+ fact`) |
+
+**Istoric respins:**
+
+| Sintaxă | Motiv respingere |
+| ------- | ---------------- |
+| **`-- Template`** | confuzie vizuală cu DCG `-->`; necesită token `RETRACT_ALL` pe 2 chars |
+| **`retractall/1`** | user respins — vrea prefix, nu builtin Prolog |
+
+#### D367 — **Index facts / perf** **(OPEN)**
+
+`~ playerPos(_,_))` pe KB mare — invalidare index F13?
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — rebuild index la commit** | simplu |
+| **B — incremental tombstone sweep** | |
+| **C — cap count `~` expand per pass** | mirror D348 10 000 |
+
+#### D368 — **Trace / debug** **(OPEN)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — logic-mut trace listează N ops expandate din `~`** | |
+| **B — eveniment separat `logic-retract-all`** | |
+
+#### D369 — **Doc + tutorial** **(OPEN)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — secțiune `logic-runtime.md` + `inline-logic.md`** | mapare Prolog `assertz/retract/retractall` → `+`/`-`/`~` |
+| **B — refactor mini-monopoly reset** | după implementare — **nu acum** |
+
+#### D370 — **Teste draft** **(OPEN)**
+
+| ID | Scenariu |
+| -- | -------- |
+| 4430 | `~ turn(_)` cu `turn(p1)` + `turn(p2)` dynamic → 0 turn facts |
+| 4431 | `~ playerPos(_,_))` păstrează alte predicate |
+| 4432 | tranzacție: `~` + `+` init — atomic fail rollback |
+| 4433 | tombstone static: `~` pe fact static + re-query absent |
+| 4434 | constraint fail după `~` + assert |
+| 4435 | `data: static` — mutate pe **comp** interzis |
+| 4436 | invoke `resetGame` din comp — paritate cu `logic { }` manual |
+| 4437 | regresie F11: `logic { + - }` comp neschimbat |
+| 4438 | parse `~ turn(_)` — token TILDE_RETRACT |
+| 4439 | regulă `reset <- ~ turn(_), + …` invocată din comp |
+| 4440 | `.mono:query({ reset })` → **error** mutation forbidden (D378) |
+| 4441 | `.mono:mutate({ … })` → **error** method forbidden |
+| 4442 | regresie dif-list: `append(X-Y, …)` neschimbat |
+| 4443 | regresie DCG: `--> rule` neschimbat |
+| 4444 | `commit(~ a, + b)` success — KB final corect |
+| 4445 | `commit(~ a, + bad)` constraint fail — rollback, KB unchanged |
+| 4446 | bare `~ own(john,_), + own(john,bmw)` cu `allowed(john,bmw)` false — john rămâne fără mașini (stare parțială) |
+| 4451 | `otherGoalThatFails, commit(…)` — commit never runs |
+| 4452 | `otherGoalThatFails, ~ own(john,_)` — ~ never runs |
+| 4453 | `commit(…), otherGoalThatFails` — commit persists |
+| 4447 | `commit` cu `show` inside → parse/elab error |
+| 4448 | `commit` rezervat — regulă `commit(X) <- …` forbidden |
+| 4449 | static fact `own(john, audi)` + `commit(~ own(john,_), + own(john,bmw))` — tombstone + new |
+| 4454 | comp `data: static` + mutation pe cale comp → error |
+| 4455 | același inline pe 2 comp — `comp.dynamicStore` independent per comp |
+| 4456 | `.mono:query({ reset })` → **error** (D378) indiferent de comp `data:` |
+| 4457 | `.mono:mutate({ … })` → **error** |
+
+#### D371 — **Prioritate implementare** **(confirmed revizuit — comp-only — 2026-08-26)**
+
+| Opțiune | Scope | Efort |
+| ------- | ----- | ----- |
+| **A — F44a: `~` + extindere comp `logic { }`** | mic; unblock Monopoly reset | ~2–3 zile |
+| **B — F44b: ops în query (D355-B)** | mediu | |
+| **C — F44c: ops în regulă + query comp-invoke (D355-B,C)** | mediu-mare | |
+
+**Ordine recomandată:** **F44a → F44b → F44c** — **fără F44d** (`.world:mutate` respins).
+
+#### D372 — **Subfaze** **(confirmed: B revizuit — 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **B — F44a…F44c** | `~` + comp → query comp → reguli — **comp-only exec** |
+
+---
+
+### Propunere sketch (post-decizii parțiale)
+
+```mermaid
+flowchart TD
+  subgraph inline [inline program B C]
+    Q[query resetGame]
+    R[reset rule]
+  end
+  subgraph comp [comp D only]
+    EB[query= / logic block]
+  end
+  KB[(comp.dynamicStore)]
+  WQ[.world:query] -->|static read-only| inline
+  WQ -->|mutation hit| ERR[error D378]
+  EB --> Q
+  EB --> R
+  Q --> KB
+  R --> KB
+```
+
+**Flux preferat:**
+
+1. **Reset multi-step** → regulă **`reset <- commit(…)`** sau query cu `commit` — **nu** bloc `mutate { }`.
+2. **Apel** → `reset` ca goal (regulă/query/comp/world) → mută sau fail.
+3. **Op singular** → bare `+`/`-`/`~` în regulă; multi-step → **`commit`**.
+
+---
+
+### Fișiere țintă (după confirmare D361)
+
+| Fișier | Schimbare probabilă |
+| ------ | ------------------- |
+| `[logic-assembler.js](../v0_3_2/core/logic-assembler.js)` | token `~`; parse `commit/…`; ops în query/rule |
+| `[logic-engine.js](../v0_3_2/core/logic-engine.js)` | expand `~`; per-op vs commit transaction |
+| `[components/logic.js](../v0_3_2/core/components/logic.js)` | invoke regulă/query; `commit` eval in solve pass |
+| `[parser.js](../v0_3_2/core/parser.js)` | exec `query =`; guard `.world:query` anti-mutation |
+| `[interpreter.js](../v0_3_2/core/interpreter.js)` | `evalLogicInlineQuery` — error on mutation step |
+| `[logic-constraints.md](../v0_3_2/doc/logic-constraints.md)` | per-op vs commit validation |
+| `[logic-runtime.md](../v0_3_2/doc/logic-runtime.md)` | `+`/`-`/`~`/`commit` |
+| `[inline-logic.md](../v0_3_2/doc/inline-logic.md)` | ops în reguli/query — fără mutate-block |
+| `tests/test_suite.js` | **4430+** |
+
+### Criterii done (viitor)
+
+- [x] **D358** — `~` șterge tot (static tombstone)
+- [x] **D360** — per-op vs `commit` atomic
+- [x] **D373–D375** — `commit/…` + respins `{ ops }`
+- [x] **D374** — constraints per-op vs commit (exemplu john/bmw)
+- [x] **D376** — ordine `,` + no rollback post-commit
+- [x] **D359** — `_` doar în `~`; `+`/`-` ground
+- [x] **D364** — `show` interzis în `commit`
+- [x] **D361** — comp-only store
+- [x] **D378** — inline `:query` static; `:mutate` forbidden
+- [ ] Teste **4430+**; doc EN
+
+### Status F44
+
+**⏳ planning complete** — **D355–D378✅** — **comp-only exec** — ready **F44a**.
+
+### Legături
+
+- [Faza 11 — runtime mutation](#faza-11--runtime-mutation-done) · [D49](#d49--inline-mutation-worldmutate-confirmed-a) — **reconfirmat** (D378)
+- [Faza 17 — data: seed/static](#faza-17--comp-logic-data-static--seed-1r-completed)
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — jocul rămâne pe F11 până la F44
