@@ -204,7 +204,7 @@ todos:
     content: "F42d: call(is/2) meta-call (D157 deferred) — teste 4431+"
     status: pending
   - id: logic-is-42e
-    content: "F42e: random_between pe float + doc is/2 extins + verify suite — teste 4446+"
+    content: "F42e: random_between float + random/1 float + doc is/2 extins + verify suite — teste 4446+"
     status: pending
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
@@ -6763,7 +6763,7 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+k**~~ | Formate numerice logic wire | **`number/<format>`** int — F39a→c✅ — [Faza 39](#faza-39--formate-numerice-la-frontieră-2k--completed) | **F39**    | F25, D305–D315✅, tagged builtins |
 | ✅     | ~~**2+l**~~ | Logic numeric post-F39      | **Promovat → Faza 40✅** — float Prolog + `float/<format>`; `number/fp16|q*` → eroare | **F40**    | F39, D314, D316–D326✅          |
 | ✅     | ~~**2+n**~~ | IEEE f32/f64 nativ LogTScript | **Livrat → Faza 41✅** — `show(; f32/f64)`, NFORMAT, builtins; codec unificat logic↔wire; teste **4310–4385** | **F41**    | F40, F39 fp16, D327+ **(completed)** |
-| ⏳     | **2+m**     | `is/2` float extins         | **Promovat → Faza 42** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float** | **F42**    | F26 D157, F40c, F41, D318 **(ready)** |
+| ⏳     | **2+m**     | `is/2` float extins         | **Promovat → Faza 42** — …, **`random_between` float**, **`random/1` float** | **F42**    | … |
 
 
 **Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · **2+m → F42** (ready) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
@@ -9940,7 +9940,7 @@ Adaugă **`to_f32`**, **`to_f64`**; surse **`f32`**, **`f64`** în `parseNformat
 
 > **Backlog:** **2+m** — promovat 2026-08-25 post-**F40c** (D318); renumerotat **F42** post-**F41✅**.  
 > **Extinde:** [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) (`is/2` int), [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) (**F40c** float MVP), [Faza 34](#faza-34--builtins-random-integer-2h--completed) (`random_between/3` int).  
-> **Status:** **ready-to-implement** — dependențe îndeplinite; **fără cod încă**.
+> **Status:** **✅ completed** 2026-08-26 — decizii **D332–D340 ✅**; teste **4386–4410**; **3542/3542**; doc **logic-builtins** 76/76.
 
 ### Problemă (stare azi post-F41)
 
@@ -9951,6 +9951,7 @@ Adaugă **`to_f32`**, **`to_f64`**; surse **`f32`**, **`f64`** în `parseNformat
 | **Funcții în expr** | ❌ `abs`, `floor`, `ceiling`, `round`, `truncate`, `min`, `max` |
 | **`call(is/2)`** | ❌ deferred din **F26** D157 |
 | **`random_between/3`** | ✅ F34 — **doar integer**; float low/high/out → fail |
+| **`random/1`** | ❌ respins F34 (D214); **planificat F42e** — float `[0.0, 1.0)` |
 | **Gramatică expr** | `parseMulExpr` — doar `*` `/`; fără nivel `**`; fără apel funcții în expr |
 
 **Motiv fază:** închide gap-ul Prolog-style pentru aritmetică umană (`1.5`, `min(A,B)`, `sqrt(X)`) și RNG pe reale, fără trig/`log`/notație științifică.
@@ -9961,9 +9962,9 @@ Adaugă **`to_f32`**, **`to_f64`**; surse **`f32`**, **`f64`** în `parseNformat
 | ------- | -------- | ------------------ | ------------- |
 | **F42a** | Operatori **`**`**, **`mod`**, **`rem`**, **`//`** în RHS `is/2` — int + float; precedență: `**` > `*``/``//` > `+``-` > `mod``rem`; `/0`, `//0`, `mod 0` → fail | `logic-assembler.js` (tokenizer `**`, `//`; parser nivele); `logic-engine.js` (`logicEvalNumeric`) | **4386–4400** |
 | **F42b** | Funcții unare în expr: **`abs`**, **`sqrt`**, **`floor`**, **`ceiling`**, **`round`**, **`truncate`** — formă `fn(Arg)`; int/float; rezultat float dacă operand float; **`sqrt`** pe int negativ sau NaN → fail | parser (`parseTermPrimary` / apel în expr); `logicEvalNumeric` + kind `call`/`func` | **4401–4415** |
-| **F42c** | **`min`/`max`** binare în expr — `min(A, B)`, `max(A, B)`; promovare int→float ca la `+` | idem F42b | **4416–4430** |
+| **F42c** | **`min`/`max`** binare în expr — `min(A, B)`, `max(A, B)`; **ambele int → int**; float doar dacă vreun operand e float (regula F40c) | idem F42b | **4416–4430** |
 | **F42d** | **`call(is/2)` meta-call** — `call(is(X, Y))` echivalent `X is Y` (D157); head `is/2` rămâne rezervat | `logic-engine.js` (`_solveCall` / intercept) | **4431–4445** |
-| **F42e** | **`random_between(L, H, Out)` pe float** — același RNG F34; interval `[L,H]` inclusiv pe reale; `set_random/1` neschimbat (seed int); doc EN + regression F40c/F34 | `logic-engine.js` (`_solveRandomBetween`, `logicRandomFloatBetween`); `logic-builtins.md`, `inline-logic.md` | **4446–4460** |
+| **F42e** | **`random_between/3` float** + **`random/1` float** — același RNG F34; `random(R)` → `R` float ∈ `[0.0, 1.0)`; `set_random/1` neschimbat; doc EN + regression F34 | `logic-engine.js` (`_solveRandomBetween`, `_solveRandom`, `logicRandomFloatBetween`); `logic-builtins.md`, `inline-logic.md` | **4446–4465** |
 
 **Pattern teste:** legacy + wave ca F40c/F41; ultimul ID F41 = **4385** → F42 pornește la **4386**.
 
@@ -9977,20 +9978,195 @@ R is 7.0 mod 3.0              ; 1.0 (float mod — semantics TBD în D332)
 Z is abs(-1.5)                ; 1.5
 D is sqrt(9)                  ; 3 (int perfect square)
 E is sqrt(2.0)                ; ~1.414… (float)
-W is min(A, B)                ; promovare mixed
+W is max(2, 3)                ; 3 (int — nu 3.0)
+V is max(2, 3.0)              ; 3.0 (float — un operand float)
 call(is(T, 10 + 5))           ; meta-call
-random_between(0.0, 1.0, F)   ; float out (F42e)
+random_between(0.0, 1.0, F)   ; interval custom (F42e)
+random(R)                     ; R float în [0.0, 1.0) — SWI-style (F42e)
+random_between(1, 6, D)       ; int neschimbat (F34)
 ```
+
+### Decizii **(D332–D339)** **(confirmed user 2026-08-26)**
+
+> **User 2026-08-26:** D332 ✅ … D339 ✅ · **D340 ✅** (`random/1` float)
+
+#### D332 — Gramatică expr `is/2`: operatori noi + precedență **(confirmed: A)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — nivele Prolog-style ✓** | Tokenizer: `**`, `//` (două caractere); `mod`/`rem` ca **ID infix** (ca SWI). Precedență (strâns → larg): `**` (dreapta-asoc.) → `*` `/` `//` → `+` `-` → `mod` `rem`. Funcții `fn(Arg)` și `min(A,B)` la `parseTermPrimary`. |
+| B | Doar formă funcție `mod(A,B)` fără infix | Respinse — inconsistent cu SWI/Prolog docs |
+
+**Decizie:** **A** — confirmed 2026-08-26.
+
+#### D333 — `mod` / `rem` pe int **(confirmed: A — SWI)**
+
+| Opțiune | Semantica |
+| ------- | --------- |
+| **A — SWI Prolog ✓** | **`mod`**: semnul rezultatului = semnul **divizorului**. **`rem`**: semnul rezultatului = semnul **dividendului**. Ex.: `(-7) mod 3 = 2`, `(-7) rem 3 = -1`. **`mod 0` / `rem 0` → fail**. |
+| B | Python `%` pentru ambele | Respinse — Prolog users așteaptă distincția mod/rem |
+
+**Decizie:** **A** — confirmed 2026-08-26.
+
+#### D334 — `mod` / `rem` / `//` pe float **(confirmed: A)**
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — promovare float ✓** | Dacă **orice** operand e float → rezultat **`float`**; altfel **`number`**. **`//`**: trunc spre zero (ca `/` int F40c), dar pe float tot trunc (ex. `7.0 // 2.0 → 3.0` float sau int TBD — vezi D334b). **`mod`/`rem` pe float**: `Math.fmod` + ajustare semn conform D333. |
+| B | `//` doar pe int; float → fail | Mai strict, dar surpriză pentru `7.0 // 2` |
+
+**Decizie:** **A** + **D334b A** — confirmed 2026-08-26.
+
+#### D335 — Funcții unare: `abs`, `sqrt`, `floor`, `ceiling`, `round`, `truncate` **(confirmed: A)**
+
+| Funcție | Semantica propusă |
+| ------- | ----------------- |
+| **`abs`** | Int → int dacă rezultatul încape; float operand → float |
+| **`sqrt`** | Operand negativ → **fail**; `sqrt(9)` → **`number` 3**; `sqrt(2)` / `sqrt(2.0)` → **`float`**; NaN/Inf → fail |
+| **`floor`/`ceiling`/`round`/`truncate`** | Operand int → int neschimbat (ex. `floor(3) = 3`); operand float → **`number`** dacă rezultatul e integral exact, altfel **`float`** |
+
+**Decizie:** **A** — confirmed 2026-08-26.
+
+#### D336 — `min` / `max` binare în expr **(confirmed: A — regula F40c, nu conversie automată int→float)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — `min(A,B)` / `max(A,B)` ✓** | **Regula kind rezultat (identică F40c):** dacă **ambele** operanzii sunt **`number`** → rezultat **`number`**. Dacă **cel puțin unul** e **`float`** → rezultat **`float`**. **Nu** convertim int la float „de capul lui”. |
+| B | Variadic `min(A,B,C,…)` | Amânat — MVP binar |
+
+**Exemple confirmate:**
+
+| Expr | Rezultat | Kind |
+| ---- | -------- | ---- |
+| `max(2, 3)` | **`3`** | **`number`** — **nu** `3.0` |
+| `min(2, 3)` | **`2`** | **`number`** |
+| `max(2, 3.0)` | **`3.0`** | **`float`** |
+| `min(1.5, 2.5)` | **`1.5`** | **`float`** |
+
+**Decizie:** **A** — confirmed 2026-08-26.
+
+#### D337 — `call(is/2)` meta-call **(confirmed: A — închide D157-C)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — `call(is(X, Y))` ≡ `X is Y` ✓** | Implementare F42d; **`is/2` head rămâne rezervat**; meta-call doar prin `call/1` existent |
+| B | Fără meta-call | Respinse — D157 amânat explicit pentru post-F26/F40 |
+
+**Decizie:** **A** — confirmed 2026-08-26.
+
+#### D338 — `random_between/3` pe float **(confirmed: A)**
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — extinde același builtin F34 ✓** | **Nu** predicate nou (`random_float_between` etc.). **`random_between/3`** acceptă capete **`number`** sau **`float`**; al treilea argument leagă **`number`** sau **`float`** după regula de mai jos. |
+
+**Decizie:** **A** — confirmed 2026-08-26. Detaliu catalog — [Built-in random float](#built-in-random-float-f42e--d338--d340).
+
+#### D340 — `random/1` float **(confirmed: A — user 2026-08-26)**
+
+| Opțiune | Descriere |
+| ------- | --------- |
+| **A — SWI `random(-Float)` ✓** | Builtin **`random/1`**: **`random(R)`** leagă **`R`** la **`float`** uniform **`[0.0, 1.0)`**. Același RNG + impure slot ca F34. Head **`random/1`** rezervat (ca **`random_between/3`**). |
+| B | Doar `random_between(0.0, 1.0, R)` | Verbose; SWI expune ambele |
+
+**Decizie:** **A** — confirmed 2026-08-26. Închide **D214** (respins la F34).
+
+#### D339 — Out of scope clarificat **(confirmed: A)**
+
+| În scope F42 | În afara scope |
+| ------------ | -------------- |
+| D332–D338, **D340** | Trig (`sin`, `cos`, …), **`log`/`exp`** → fază separată **2+p?** |
+| | **`sign`** — opțional, nu MVP |
+| | Notație științifică `1e10` |
+| | `random` pe wire packed IEEE |
+
+**Decizie:** **A** — confirmed 2026-08-26.
+
+### Built-in random float **(F42e / D338 + D340)**
+
+> **Azi (F34):** `random_between/3` int + `set_random/1`; **`random/1` respins** (D214 — „fără float în logic”).  
+> **F42e:** extinde **`random_between/3`** la float **și** adaugă **`random/1`**.
+
+| Builtin | Semnătură | Rezultat |
+| ------- | --------- | -------- |
+| **`set_random/1`** | **`set_random(+Seed)`** | Seed int **0 … 4294967295** — **neschimbat** (F34) |
+| **`random/1`** | **`random(-R)`** | **`R`** = **`float`** uniform **`[0.0, 1.0)`** — **NOU F42e (D340)** |
+| **`random_between/3`** | **`random_between(+Low, +High, -Out)`** | Interval **`[Low, High]`** inclusiv — int (F34) sau float (D338) |
+
+**Reguli comune (impuritate — ca F34):**
+
+- Backtracking: re-satisfacere → **aceeași** valoare legată
+- **`set_random/1`** / **`randomSeed:`** comp — același generator
+- Head **`random/1`**, **`random_between/3`**, **`set_random/1`** — **rezervate**
+
+**Exemple țintă:**
+
+```text
+random(R)                              ; R ≈ 0.37 (float)
+set_random(42), random(R)              ; determinist
+X is 0.0 + random(R) * 10.0            ; [0, 10) via is/2 + random/1
+random_between(0.0, 1.0, F)            ; echivalent conceptual la interval închis [0,1] — preferă random/1 pentru unit interval
+random_between(1, 6, D)                  ; zar int — neschimbat
+```
+
+**Doc la livrare:** `logic-builtins.md` — secțiune nouă **`random/1`** + actualizare **`random_between/3`** (șterge „No floats”); catalog tabel linia ~77.
+
+**Implementare:** `_solveRandom/1` în `logic-engine.js`; `logicRandomFloatUnit()` = `logicRngNext()` (deja ∈ `[0,1)`).
+
+### Built-in `random_between/3` — extindere float **(F42e / D338)**
+
+> Secțiune păstrată pentru detaliu **`random_between`**; vezi și [Built-in random float](#built-in-random-float-f42e--d338--d340) de mai sus.
+
+| Builtin | Semnătură (post-F42) | Range / kind |
+| ------- | ------------------- | ------------ |
+| **`set_random/1`** | **`set_random(+Seed)`** | **`Seed`** ground int **0 … 4294967295** — **neschimbat** |
+| **`random_between/3`** | **`random_between(+Low, +High, -Out)`** | **`Low`**, **`High`**, **`Out`**: **`number`** (int) **sau** **`float`** |
+
+**Reguli kind (D338):**
+
+| Situație | Comportament |
+| -------- | ------------ |
+| **`Low`**, **`High`**, **`Out` toate int** | Comportament **F34** neschimbat — int uniform în **`[Low, High]`** inclusiv |
+| **Orice** dintre **`Low`**, **`High`**, **`Out`** e **`float`** | Flux **float**: **`Out`** ∈ **`[Low, High]`** inclusiv pe reale (uniform pe interval) |
+| **`Low` > `High`** | **fail** |
+| Operand liber / neevaluabil / out of range | **fail** |
+| Backtracking | Aceeași valoare **`Out`** la re-satisfacere (impure, ca F34) |
+
+**Exemple țintă (doc + teste F42e):**
+
+```text
+random_between(1, 6, D)           ; D = 4 (int) — ca azi
+random_between(0.0, 1.0, F)       ; F = 0.37… (float)
+random_between(0, 1, F)           ; Low int, Out float ground → fail sau promote? → Out float → flux float
+set_random(42), random_between(0.0, 10.0, X)   ; determinist cu seed
+```
+
+**Notă `random_between(0, 1, F)` cu `F` variabilă:** dacă **`Low`/`High` sunt int** dar **`Out`** e variabilă legată ulterior ca float — la bind **`Out`** e float doar dacă vreun capăt e float; altfel int. Dacă user scrie capete int dar vrea float out, folosește literale float la capete: **`0.0, 1.0`**.
+
+**Implementare:** `logicRandomFloatBetween(low, high)` în `logic-engine.js`; **`_solveRandomBetween`** acceptă `number`/`float` la toți cei 3 termeni.
+
+**Doc de actualizat la livrare:** `logic-builtins.md` (secțiunea `random_between/3`), `inline-logic.md`, tabel catalog builtins (linia „No floats” → șters).
+
+### Rezumat decizii F42 **(confirmed 2026-08-26)**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D332** | Gramatică + precedență | **A ✅** |
+| **D333** | `mod`/`rem` int | **A ✅** SWI |
+| **D334** | `mod`/`rem`/`//` float | **A ✅** |
+| **D334b** | `//` cu float | **A ✅** |
+| **D335** | Unare incl. **`sqrt`** | **A ✅** |
+| **D336** | `min`/`max` | **A ✅** — int pur → int; mixed → float |
+| **D337** | `call(is/2)` | **A ✅** |
+| **D338** | `random_between` float | **A ✅** |
+| **D340** | **`random/1` float `[0.0, 1.0)`** | **A ✅** |
+| **D339** | Out of scope | **A ✅** |
+
+**Status:** decizii **D332–D340 închise** — ready pentru implementare F42a→e.
 
 ### Semantici de confirmat (decizii draft **D332+**)
 
-| Topic | Propunere MVP |
-| ----- | ------------- |
-| **`mod` vs `rem`** | SWI-style: `mod` semn divisor; `rem` semn dividend; pe float = `Math.fmod` / trunc variant — de confirmat la implementare |
-| **`//`** | Integer-only (fail dacă operand float?) **sau** trunc ca int chiar cu float ground — de confirmat |
-| **`random_between` float** | Inclusiv capete; același impure slot F34; mixed int/float → promote la float |
-| **`sqrt`** | `Math.sqrt`; operand int negativ → fail; rezultat float dacă operand float sau rădăcină neîntreagă (ex. `sqrt(2)` → float) — de confirmat la D332 |
-| **`sign`** | Out of scope F42 (opțional) |
+> **Superseded:** tabelul de mai jos e rezumat scurt; detaliu complet — secțiunea [Decizii (D332–D339)](#decizii-d332339--draft-de-confirmat).
 
 ### Out of scope F42
 

@@ -17,7 +17,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`nth0/3`** | 3 | yes | no | List element at **0-based** index |
 | **`nth1/3`** | 3 | yes | no | List element at **1-based** index |
 | **`nth1/4`** | 4 | yes | no | Element at **1-based** index + list suffix after it |
-| **`is/2`** | 2 | yes | no | Arithmetic (+ infix **`M is Expr`**) — integer or float |
+| **`is/2`** | 2 | yes | no | Arithmetic — `+ - * / // ** mod rem`, functions, `min`/`max` |
 | **`member/2`** | 2 | yes | no | List membership with backtracking |
 | **`append/3`** | 3 | yes | no | Concatenate or decompose lists |
 | **`append/2`** | 2 | yes | no | Close a **difference list** `Front-Hole` to a ground list |
@@ -74,8 +74,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`float/1`** | 1 | yes | no | Type test — argument is a float |
 | **`list/1`** | 1 | yes | no | Type test — argument is a list |
 | **`compound/1`** | 1 | yes | no | Type test — argument is a compound (not a list) |
-| **`random_between/3`** | 3 | yes | yes (RNG) | Uniform random integer in `[Low, High]` inclusive |
-| **`set_random/1`** | 1 | yes | yes (RNG) | Reseed the global integer RNG |
+| **`random/1`** | 1 | yes | yes (RNG) | Uniform random float in **`[0.0, 1.0)`** |
+| **`random_between/3`** | 3 | yes | yes (RNG) | Uniform random in **`[Low, High]`** — integer or float |
+| **`set_random/1`** | 1 | yes | yes (RNG) | Reseed the global RNG (integer seed) |
 
 Type predicates filter bound terms — see [logic-value-types.md](logic-value-types.md).
 
@@ -332,13 +333,33 @@ Arithmetic evaluation in logic bodies. Also written infix: **`M is Expr`**.
 | `M is N + 1` | **Fail** | Arithmetic |
 | `M =:= N + 1` | **Fail** | Numeric equality test |
 
-RHS must fully evaluate. Free variables or divide-by-zero → **fail**.
+RHS must fully evaluate. Free variables, divide-by-zero, **`sqrt`** of a negative number, or other invalid numeric operations → **fail**.
 
-| Expression kind | Result kind | `/` behaviour |
-|-----------------|-------------|---------------|
-| All integers | **`number`** | Truncates toward zero (e.g. `7 / 2` → `3`) |
-| Any float literal or promoted float | **`float`** | Real division (e.g. `7.0 / 2.0` → `3.5`) |
-| Mixed int + float | **`float`** | int operands promote (e.g. `10 + 1.5` → `11.5`) |
+| Expression kind | Result kind | Notes |
+|-----------------|-------------|-------|
+| All integers | **`number`** | e.g. **`7 / 2`** → **`3`** (trunc toward zero) |
+| Any float operand | **`float`** | int promotes when mixed (e.g. **`10 + 1.5`** → **`11.5`**) |
+| **`min`/`max` both int** | **`number`** | e.g. **`max(2, 3)`** → **`3`**, not **`3.0`** |
+| **`min`/`max` with float** | **`float`** | e.g. **`max(2, 3.0)`** → **`3.0`** |
+
+**Operators** (tightest binding first): **`**`** (right-associative) → **`*` `/` `//`** → **`+` `-`** → **`mod` `rem`**. Parentheses **`( … )`** group sub-expressions.
+
+| Operator | Meaning |
+|----------|---------|
+| **`+` `-` `*` `/`** | Addition, subtraction, multiplication, division |
+| **`//`** | Integer division — truncates toward zero |
+| **`**`** | Exponentiation |
+| **`mod`** | Remainder; sign of result follows the **divisor** (SWI-style) |
+| **`rem`** | Remainder; sign of result follows the **dividend** (SWI-style) |
+
+**Functions** in expressions (not separate goals): **`abs(X)`**, **`sqrt(X)`**, **`floor(X)`**, **`ceiling(X)`**, **`round(X)`**, **`truncate(X)`**, **`min(A, B)`**, **`max(A, B)`**.
+
+| Function | Notes |
+|----------|-------|
+| **`sqrt(X)`** | **`sqrt(9)`** → integer **`3`**; non-perfect square → **float**; negative → **fail** |
+| **`floor`/`ceiling`/`round`/`truncate`** | Integer operand → integer; float → integer when exact, else float |
+
+**Meta-call:** **`call(is(X, Expr))`** is equivalent to **`X is Expr`** — see [`call/1`](#call1) below.
 
 See also [inline-logic.md — `=` vs `is/2`](inline-logic.md#arithmetic-is2) for the full contrast table.
 
@@ -398,6 +419,118 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints **`3`** (float `3.0` displayed as `3`).
+
+### Example — power and integer division
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        P is 2 ** 10,
+        Q is 7 // 2,
+        show("power", P),
+        show("idiv", Q)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`power 1024`** then **`idiv 3`**.
+
+### Example — `mod`, `rem`, and `sqrt`
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        M is (-7) mod 3,
+        R is (-7) rem 3,
+        S is sqrt(9),
+        show("mod", M),
+        show("rem", R),
+        show("sqrt", S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`mod 2`**, **`rem -1`**, **`sqrt 9`**.
+
+### Example — `min`/`max` (integer stays integer)
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        A is max(2, 3),
+        B is max(2, 3.0),
+        show("int", A),
+        show("mixed", B)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`int 3`** then **`mixed 3`** (float **`3.0`** displayed as **`3`**).
+
+### Example — `call(is/2)` meta-call
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        call(is(T, 10 + 5)),
+        show(T)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`15`**.
 
 ---
 
@@ -2603,27 +2736,116 @@ comp [logic] .worldLogic:
 
 ---
 
-## `random_between/3` and `set_random/1`
+## `random/1`, `random_between/3`, and `set_random/1`
 
-Integer random numbers for dice, board steps, and other game logic. **No floats** — only ground integers in the ranges below.
+Random numbers for dice, jitter, simulation, and game logic. One **global RNG** per run — use **`set_random/1`** or comp **`randomSeed:`** for reproducible tests.
 
-| Builtin | Arguments | Range |
-|---------|-----------|-------|
-| **`set_random(+Seed)`** | **`Seed`** ground integer | **0 … 4294967295** (32-bit unsigned) |
-| **`random_between(+Low, +High, -Int)`** | **`Low`**, **`High`**, **`Int`** | **-2147483648 … 2147483647** (signed 32-bit) |
+| Builtin | Arguments | Result |
+|---------|-----------|--------|
+| **`set_random(+Seed)`** | **`Seed`** ground integer **0 … 4294967295** | Reseeds the generator |
+| **`random(-R)`** | **`R`** variable or ground float | **`R`** ∈ **`[0.0, 1.0)`** (float) |
+| **`random_between(+Low, +High, -Out)`** | Integer or float bounds | Uniform in **`[Low, High]`** inclusive |
 
-**Rules:**
+**Kind rules for `random_between/3`:**
 
-- **`Low`**, **`High`**, and **`Seed`** must be **ground** integers in range — free variables or out-of-range values → **fail**.
+| **`Low` / `High` / `Out`** | Behaviour |
+|----------------------------|-----------|
+| All **integers** | **`Out`** is an integer (same as classic dice / board logic) |
+| **Any** bound or **`Out`** is **float** | **`Out`** is a **float** on the real interval |
+
+**Rules (all three builtins):**
+
+- Ground bounds required — free **`Low`** or **`High`** → **fail**.
 - **`Low` > `High`** → **fail** (not an engine error).
-- **`Int`** is bound to a uniform integer in **`[Low, High]`** inclusive.
-- **Backtracking:** re-satisfying the same **`random_between/3`** goal returns the **same** **`Int`** (SWI-style impure semantics).
-- **RNG scope:** one global generator per run. **`set_random/1`** in a query body resets it; a later **`set_random/1`** overrides an earlier seed in the same query.
-- **Reserved heads:** you cannot define **`random_between/3`** or **`set_random/1`** as fact, rule, or constraint heads.
+- **Backtracking:** re-satisfying the same random goal returns the **same** value (SWI-style impure semantics).
+- **`set_random/1`** in a query overrides the generator; later **`set_random/1`** in the same query wins.
+- **Reserved heads:** you cannot define **`random/1`**, **`random_between/3`**, or **`set_random/1`** as fact, rule, or constraint heads.
 
-**Component seed:** optional **`randomSeed:`** on **`comp [logic]`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass, equivalent to **`set_random(Val)`** before mutations and queries. See [comp-logic.md — `randomSeed:`](comp-logic.md#component-attributes).
+**Component seed:** optional **`randomSeed:`** on **`comp [logic]`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass. See [comp-logic.md — `randomSeed:`](comp-logic.md#component-attributes).
 
-### Example — dice with deterministic seed
+### Example — unit float with `random/1`
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        set_random(42),
+        random(R),
+        show("unit", R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`unit 0.6011037519201636`** (deterministic for seed **42**).
+
+### Example — scale unit random with `is/2`
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        set_random(42),
+        random(U),
+        X is U * 10.0,
+        show("scaled", X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`scaled 6.011037519201636`**.
+
+### Example — float interval
+
+```logts-play
+inline [logic] .world:
+
+    query q:
+        set_random(42),
+        random_between(0.0, 10.0, X),
+        show("float", X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run** prints **`float 6.011037519201636`**.
+
+### Example — dice with deterministic seed (integer)
 
 ```logts-play
 inline [logic] .dice:

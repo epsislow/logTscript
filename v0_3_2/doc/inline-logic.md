@@ -1116,7 +1116,7 @@ The word **`is`** appears in three different places in LogTScript. Only **logic 
 | Goal | When `N` is free in `N + 1` | Typical use |
 |------|----------------------------|-------------|
 | `M = N + 1` | **`M`** ← structure `{+, N, 1}` | Unify terms, lists, structures |
-| `M is N + 1` | **Fail** | Integer calculation, counters |
+| `M is N + 1` | **Fail** | Integer or float calculation, counters |
 | `is(M, N + 1)` | **Fail** | Same builtin as **`M is N + 1`** |
 | `M =:= N + 1` | **Fail** | Test numeric equality (both sides must evaluate) |
 | `7 is 3 + 4` | — | **Success** (ground test) |

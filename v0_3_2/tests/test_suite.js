@@ -47664,5 +47664,176 @@ comp [logic] .dataLogic:
     h.assert('show 1.5', String(out.some(l => /r \(64wire\) = \\1\.5;f64/.test(l))), 'true');
   });
 
+  function runF42aIsPow(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 2 ** 10,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 2 ** 10, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 1024', String(session.outIncludes(interp, '1024')), 'true');
+  }
+
+  reg(4386, 'logic', 'F42a is/2 power ** (legacy)', runF42aIsPow);
+  reg(4387, 'logic', 'F42a is/2 power ** (wave)', runF42aIsPow, { propagation: 'wave' });
+
+  function runF42aIsIdiv(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        X is 7 // 2,
+        show(X)
+
+:
+
+1wire ok = .world:query({ X is 7 // 2, show(X) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 3', String(session.outIncludes(interp, '3')), 'true');
+  }
+
+  reg(4388, 'logic', 'F42a is/2 integer // (legacy)', runF42aIsIdiv);
+  reg(4389, 'logic', 'F42a is/2 integer // (wave)', runF42aIsIdiv, { propagation: 'wave' });
+
+  function runF42aIsModRem(h, session) {
+    const prog = parseLogicBody([
+      'query q: M is (-7) mod 3, R is (-7) rem 3',
+    ].join('\n'));
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('mod 2', String(sols[0].M.value), '2');
+    h.assert('rem -1', String(sols[0].R.value), '-1');
+  }
+
+  reg(4390, 'logic', 'F42a is/2 mod rem SWI (legacy)', runF42aIsModRem);
+  reg(4391, 'logic', 'F42a is/2 mod rem SWI (wave)', runF42aIsModRem, { propagation: 'wave' });
+
+  function runF42aPrecedence(h, session) {
+    const prog = parseLogicBody('query q: X is 2 + 3 ** 2');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('2+3**2=11', String(sols[0].X.value), '11');
+  }
+
+  reg(4392, 'logic', 'F42a is/2 ** precedence (legacy)', runF42aPrecedence);
+  reg(4393, 'logic', 'F42a is/2 ** precedence (wave)', runF42aPrecedence, { propagation: 'wave' });
+
+  function runF42bSqrt(h, session) {
+    const prog = parseLogicBody('query q: A is sqrt(9), B is sqrt(2)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('sqrt9 int', String(sols[0].A.kind), 'number');
+    h.assert('sqrt9=3', String(sols[0].A.value), '3');
+    h.assert('sqrt2 float', String(sols[0].B.kind), 'float');
+  }
+
+  reg(4394, 'logic', 'F42b is/2 sqrt (legacy)', runF42bSqrt);
+  reg(4395, 'logic', 'F42b is/2 sqrt (wave)', runF42bSqrt, { propagation: 'wave' });
+
+  function runF42bAbsFloor(h, session) {
+    const prog = parseLogicBody('query q: A is abs(-1.5), F is floor(3.7)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('abs float', String(sols[0].A.kind), 'float');
+    h.assert('abs=1.5', String(sols[0].A.value), '1.5');
+    h.assert('floor=3', String(sols[0].F.value), '3');
+  }
+
+  reg(4396, 'logic', 'F42b is/2 abs floor (legacy)', runF42bAbsFloor);
+  reg(4397, 'logic', 'F42b is/2 abs floor (wave)', runF42bAbsFloor, { propagation: 'wave' });
+
+  function runF42cMinMax(h, session) {
+    const prog = parseLogicBody('query q: A is max(2, 3), B is max(2, 3.0)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('max int', String(sols[0].A.kind), 'number');
+    h.assert('max int val', String(sols[0].A.value), '3');
+    h.assert('max float', String(sols[0].B.kind), 'float');
+    h.assert('max float val', String(sols[0].B.value), '3');
+  }
+
+  reg(4398, 'logic', 'F42c is/2 min max kind (legacy)', runF42cMinMax);
+  reg(4399, 'logic', 'F42c is/2 min max kind (wave)', runF42cMinMax, { propagation: 'wave' });
+
+  function runF42dCallIs(h, session) {
+    const src = `inline [logic] .world:
+
+    query q:
+        call(is(T, 10 + 5)),
+        show(T)
+
+:
+
+1wire ok = .world:query({ call(is(T, 10 + 5)), show(T) })`;
+    const { interp } = session.run(src);
+    h.assert('ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('shows 15', String(session.outIncludes(interp, '15')), 'true');
+  }
+
+  reg(4400, 'logic', 'F42d call(is/2) meta-call (legacy)', runF42dCallIs);
+  reg(4401, 'logic', 'F42d call(is/2) meta-call (wave)', runF42dCallIs, { propagation: 'wave' });
+
+  function runF42eRandomUnit(h, session) {
+    const prog = parseLogicBody('query q: set_random(42), random(R)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('one sol', String(sols.length), '1');
+    h.assert('float kind', String(sols[0].R.kind), 'float');
+    h.assert('seed42 unit', String(sols[0].R.value), '0.6011037519201636');
+  }
+
+  reg(4402, 'logic', 'F42e random/1 deterministic (legacy)', runF42eRandomUnit);
+  reg(4403, 'logic', 'F42e random/1 deterministic (wave)', runF42eRandomUnit, { propagation: 'wave' });
+
+  function runF42eRandomBetweenFloat(h, session) {
+    const prog = parseLogicBody('query q: set_random(42), random_between(0.0, 10.0, X)');
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('float kind', String(sols[0].X.kind), 'float');
+    h.assert('seed42 float range', String(sols[0].X.value), '6.011037519201636');
+  }
+
+  reg(4404, 'logic', 'F42e random_between float (legacy)', runF42eRandomBetweenFloat);
+  reg(4405, 'logic', 'F42e random_between float (wave)', runF42eRandomBetweenFloat, { propagation: 'wave' });
+
+  reg(4406, 'logic', 'F42e random/1 reserved head', function(h) {
+    h.assertThrows(
+      'reserved random/1',
+      function() { parseLogicBody('random(R) <- R = 1'); },
+      "'random/1' is reserved",
+    );
+  });
+
+  reg(4407, 'logic', 'F42a is/2 mod zero fails', function(h) {
+    const prog = parseLogicBody('query bad: X is 10 mod 0');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  reg(4408, 'logic', 'F42b is/2 sqrt negative fails', function(h) {
+    const prog = parseLogicBody('query bad: X is sqrt(-1)');
+    const eng = new LogicEngine([]);
+    h.assert('no sol', String(eng.solveQuery(logicQueryGoals(prog.queries[0]), {}).length), '0');
+  });
+
+  function runF42eRandomIntRegression(h, session) {
+    const prog = parseLogicBody([
+      'roll(D) <- random_between(1, 6, D)',
+      'query q: set_random(42), roll(D)',
+    ].join('\n'));
+    const eng = new LogicEngine(prog.clauses);
+    const sols = eng.solveQuery(logicQueryGoals(prog.queries[0]), {});
+    h.assert('dice 4', String(sols[0].D.value), '4');
+  }
+
+  reg(4409, 'logic', 'F42e random_between int regression (legacy)', runF42eRandomIntRegression);
+  reg(4410, 'logic', 'F42e random_between int regression (wave)', runF42eRandomIntRegression, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

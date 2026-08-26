@@ -55,7 +55,7 @@ function logicInternTerm(term, table) {
       kind: 'arith',
       op: term.op,
       left: logicInternTerm(term.left, table),
-      right: logicInternTerm(term.right, table),
+      right: term.right != null ? logicInternTerm(term.right, table) : null,
     };
   }
   return term;
@@ -158,6 +158,93 @@ function logicRandomIntBetween(low, high) {
   const range = high - low + 1;
   if (range <= 0) return null;
   return low + Math.floor(logicRngNext() * range);
+}
+
+function logicNormalizeRandomFloat(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
+  return n;
+}
+
+function logicRandomFloatUnit() {
+  logicEnsureRng();
+  return logicRngNext();
+}
+
+function logicRandomFloatBetween(low, high) {
+  if (high < low) return null;
+  if (low === high) return low;
+  return low + logicRandomFloatUnit() * (high - low);
+}
+
+function logicSwiRem(a, b) {
+  return a - Math.trunc(a / b) * b;
+}
+
+function logicSwiMod(a, b) {
+  const r = logicSwiRem(a, b);
+  if (r === 0) return 0;
+  if ((r > 0) === (b > 0)) return r;
+  return r + b;
+}
+
+const LOGIC_IS_UNARY_FUNCS = new Set(['abs', 'sqrt', 'floor', 'ceiling', 'round', 'truncate']);
+const LOGIC_IS_BINARY_FUNCS = new Set(['min', 'max']);
+
+function logicNumericOutFloat(a, b) {
+  if (b == null) return a.kind === 'float';
+  return a.kind === 'float' || b.kind === 'float';
+}
+
+function logicNumericFromValue(value, preferFloat) {
+  if (!preferFloat && Number.isInteger(value) && Math.abs(value) <= 9007199254740991) {
+    return { kind: 'number', value };
+  }
+  return { kind: 'float', value };
+}
+
+function logicEvalNumericFunc(comp, env, table) {
+  const pred = comp.predicate;
+  const args = comp.args || [];
+  if (LOGIC_IS_UNARY_FUNCS.has(pred) && args.length === 1) {
+    const a = logicEvalNumeric(args[0], env, table);
+    if (!a) return null;
+    const av = a.value;
+    let result;
+    switch (pred) {
+      case 'abs':
+        result = Math.abs(av);
+        return logicNumericFromValue(result, a.kind === 'float');
+      case 'sqrt':
+        if (av < 0) return null;
+        result = Math.sqrt(av);
+        if (!Number.isFinite(result)) return null;
+        if (a.kind === 'number' && Number.isInteger(result)) return { kind: 'number', value: result };
+        return { kind: 'float', value: result };
+      case 'floor':
+        result = Math.floor(av);
+        return logicNumericFromValue(result, a.kind === 'float' && result !== av);
+      case 'ceiling':
+        result = Math.ceil(av);
+        return logicNumericFromValue(result, a.kind === 'float' && result !== av);
+      case 'round':
+        result = Math.round(av);
+        return logicNumericFromValue(result, a.kind === 'float' && result !== av);
+      case 'truncate':
+        result = Math.trunc(av);
+        return logicNumericFromValue(result, a.kind === 'float' && result !== av);
+      default:
+        return null;
+    }
+  }
+  if (LOGIC_IS_BINARY_FUNCS.has(pred) && args.length === 2) {
+    const a = logicEvalNumeric(args[0], env, table);
+    const b = logicEvalNumeric(args[1], env, table);
+    if (!a || !b) return null;
+    const outFloat = logicNumericOutFloat(a, b);
+    const result = pred === 'min' ? Math.min(a.value, b.value) : Math.max(a.value, b.value);
+    return logicNumericFromValue(result, outFloat);
+  }
+  return null;
 }
 
 class LogicEngine {
@@ -311,6 +398,9 @@ class LogicEngine {
     }
     if (g0.kind === 'call' && g0.predicate === 'random_between' && g0.arity === 3) {
       return this._solveRandomBetween(g0.args[0], g0.args[1], g0.args[2], g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'call' && g0.predicate === 'random' && g0.arity === 1) {
+      return this._solveRandom(g0.args[0], g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call' && g0.predicate === 'set_random' && g0.arity === 1) {
       return this._solveSetRandom(g0.args[0], rest, env, depth, onSuccess, onDepthExceeded);
@@ -539,36 +629,119 @@ class LogicEngine {
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
-  _solveRandomBetween(lowTerm, highTerm, intTerm, goalRef, rest, env, depth, onSuccess, onDepthExceeded) {
+  _solveRandomBetween(lowTerm, highTerm, outTerm, goalRef, rest, env, depth, onSuccess, onDepthExceeded) {
     const lowD = logicDeref(lowTerm, env);
     const highD = logicDeref(highTerm, env);
-    if (lowD.kind !== 'number' || highD.kind !== 'number') return false;
-    const lowVal = logicNormalizeRandomInt(lowD.value);
-    const highVal = logicNormalizeRandomInt(highD.value);
-    if (lowVal == null || highVal == null || lowVal > highVal) return false;
+    const outD = logicDeref(outTerm, env);
+    let useFloat = lowD.kind === 'float' || highD.kind === 'float' || outD.kind === 'float';
 
     if (!env.impureRandom) env.impureRandom = new Map();
     const cp = env.choiceDepth();
     let slot = env.impureRandom.get(goalRef);
     if (!slot || cp < slot.cp) {
-      slot = { cp, value: null };
+      slot = { cp, value: null, kind: useFloat ? 'float' : 'number' };
+      env.impureRandom.set(goalRef, slot);
+    } else if (slot.value != null) {
+      useFloat = slot.kind === 'float';
+    }
+
+    if (useFloat) {
+      if (lowD.kind !== 'number' && lowD.kind !== 'float') return false;
+      if (highD.kind !== 'number' && highD.kind !== 'float') return false;
+      const lowVal = lowD.kind === 'float'
+        ? logicNormalizeRandomFloat(lowD.value)
+        : logicNormalizeRandomFloat(lowD.value);
+      const highVal = highD.kind === 'float'
+        ? logicNormalizeRandomFloat(highD.value)
+        : logicNormalizeRandomFloat(highD.value);
+      if (lowVal == null || highVal == null || lowVal > highVal) return false;
+
+      if (outD.kind === 'var') {
+        if (slot.value == null) {
+          slot.value = logicRandomFloatBetween(lowVal, highVal);
+          slot.kind = 'float';
+          if (slot.value == null) return false;
+        }
+        if (outD.name !== '_') env.bind(outD.name, { kind: 'float', value: slot.value });
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      if (outD.kind === 'float') {
+        if (slot.value == null) {
+          if (outD.value < lowVal || outD.value > highVal) return false;
+          slot.value = outD.value;
+          slot.kind = 'float';
+        } else if (!Object.is(outD.value, slot.value)) {
+          return false;
+        }
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      if (outD.kind === 'number') {
+        if (slot.value == null) {
+          if (outD.value < lowVal || outD.value > highVal) return false;
+          if (!Number.isInteger(outD.value)) return false;
+          slot.value = outD.value;
+          slot.kind = 'float';
+        } else if (slot.value !== outD.value) {
+          return false;
+        }
+        return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+      }
+      return false;
+    }
+
+    if (lowD.kind !== 'number' || highD.kind !== 'number') return false;
+    const lowVal = logicNormalizeRandomInt(lowD.value);
+    const highVal = logicNormalizeRandomInt(highD.value);
+    if (lowVal == null || highVal == null || lowVal > highVal) return false;
+
+    if (outD.kind === 'var') {
+      if (slot.value == null) {
+        slot.value = logicRandomIntBetween(lowVal, highVal);
+        slot.kind = 'number';
+        if (slot.value == null) return false;
+      }
+      if (outD.name !== '_') env.bind(outD.name, { kind: 'number', value: slot.value });
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    if (outD.kind === 'number') {
+      if (slot.value == null) {
+        if (outD.value < lowVal || outD.value > highVal) return false;
+        slot.value = outD.value;
+        slot.kind = 'number';
+      } else if (outD.value !== slot.value) {
+        return false;
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    return false;
+  }
+
+  _solveRandom(outTerm, goalRef, rest, env, depth, onSuccess, onDepthExceeded) {
+    const outD = logicDeref(outTerm, env);
+    if (outD.kind !== 'var' && outD.kind !== 'float') return false;
+
+    if (!env.impureRandom) env.impureRandom = new Map();
+    const cp = env.choiceDepth();
+    let slot = env.impureRandom.get(goalRef);
+    if (!slot || cp < slot.cp) {
+      slot = { cp, value: null, kind: 'float' };
       env.impureRandom.set(goalRef, slot);
     }
 
-    const intD = logicDeref(intTerm, env);
-    if (intD.kind === 'var') {
+    if (outD.kind === 'var') {
       if (slot.value == null) {
-        slot.value = logicRandomIntBetween(lowVal, highVal);
-        if (slot.value == null) return false;
+        slot.value = logicRandomFloatUnit();
+        slot.kind = 'float';
       }
-      if (intD.name !== '_') env.bind(intD.name, { kind: 'number', value: slot.value });
+      if (outD.name !== '_') env.bind(outD.name, { kind: 'float', value: slot.value });
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
-    if (intD.kind === 'number') {
+    if (outD.kind === 'float') {
       if (slot.value == null) {
-        if (intD.value < lowVal || intD.value > highVal) return false;
-        slot.value = intD.value;
-      } else if (intD.value !== slot.value) {
+        if (outD.value < 0 || outD.value >= 1) return false;
+        slot.value = outD.value;
+        slot.kind = 'float';
+      } else if (!Object.is(outD.value, slot.value)) {
         return false;
       }
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
@@ -2895,7 +3068,7 @@ function logicCloneTerm(term) {
       kind: 'arith',
       op: term.op,
       left: logicCloneTerm(term.left),
-      right: logicCloneTerm(term.right),
+      right: term.right != null ? logicCloneTerm(term.right) : null,
     };
   }
   return term;
@@ -3147,11 +3320,18 @@ function logicEvalNumeric(term, env, table) {
   const d = logicDeref(term, env);
   if (d.kind === 'number') return { kind: 'number', value: d.value };
   if (d.kind === 'float') return { kind: 'float', value: d.value };
+  if (d.kind === 'compound') return logicEvalNumericFunc(d, env, table);
   if (d.kind === 'arith') {
+    if (d.op === 'neg') {
+      const l = logicEvalNumeric(d.left, env, table);
+      if (!l) return null;
+      if (l.kind === 'float') return { kind: 'float', value: -l.value };
+      return { kind: 'number', value: -l.value };
+    }
     const l = logicEvalNumeric(d.left, env, table);
     const r = logicEvalNumeric(d.right, env, table);
     if (!l || !r) return null;
-    const outFloat = l.kind === 'float' || r.kind === 'float';
+    const outFloat = logicNumericOutFloat(l, r);
     const lv = l.value;
     const rv = r.value;
     let result;
@@ -3163,7 +3343,27 @@ function logicEvalNumeric(term, env, table) {
         if (rv === 0) return null;
         result = outFloat ? (lv / rv) : Math.trunc(lv / rv);
         break;
+      case '//':
+        if (rv === 0) return null;
+        result = Math.trunc(lv / rv);
+        break;
+      case '**':
+        result = Math.pow(lv, rv);
+        if (!Number.isFinite(result)) return null;
+        break;
+      case 'mod':
+        if (rv === 0) return null;
+        result = logicSwiMod(lv, rv);
+        break;
+      case 'rem':
+        if (rv === 0) return null;
+        result = logicSwiRem(lv, rv);
+        break;
       default: return null;
+    }
+    if (d.op === '**') {
+      const powFloat = outFloat || !Number.isInteger(result);
+      return logicNumericFromValue(result, powFloat);
     }
     if (outFloat) return { kind: 'float', value: result };
     return { kind: 'number', value: result };
@@ -3549,7 +3749,10 @@ function logicTermIsGround(term) {
     if (term.nil) return true;
     return logicTermIsGround(term.head) && logicTermIsGround(term.tail);
   }
-  if (term.kind === 'arith') return logicTermIsGround(term.left) && logicTermIsGround(term.right);
+  if (term.kind === 'arith') {
+    if (term.op === 'neg') return logicTermIsGround(term.left);
+    return logicTermIsGround(term.left) && logicTermIsGround(term.right);
+  }
   return true;
 }
 

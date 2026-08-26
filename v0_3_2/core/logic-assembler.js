@@ -17,6 +17,7 @@ const LOGIC_BUILTIN_FLOAT_PRED = 'float';
 const LOGIC_BUILTIN_LIST_PRED = 'list';
 const LOGIC_BUILTIN_COMPOUND_PRED = 'compound';
 const LOGIC_BUILTIN_RANDOM_BETWEEN_PRED = 'random_between';
+const LOGIC_BUILTIN_RANDOM_PRED = 'random';
 const LOGIC_BUILTIN_SET_RANDOM_PRED = 'set_random';
 const LOGIC_BUILTIN_LAST_PRED = 'last';
 const LOGIC_BUILTIN_SELECT_PRED = 'select';
@@ -84,6 +85,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_LIST_PRED]: [1],
   [LOGIC_BUILTIN_COMPOUND_PRED]: [1],
   [LOGIC_BUILTIN_RANDOM_BETWEEN_PRED]: [3],
+  [LOGIC_BUILTIN_RANDOM_PRED]: [1],
   [LOGIC_BUILTIN_SET_RANDOM_PRED]: [1],
   [LOGIC_BUILTIN_LAST_PRED]: [2],
   [LOGIC_BUILTIN_SELECT_PRED]: [3],
@@ -188,6 +190,12 @@ function logicTokenize(src) {
     if (ch === '}') { tokens.push({ type: 'RBRACE', value: '}', line: startLine }); i++; continue; }
     if (ch === '-' && src[i + 1] === '-' && src[i + 2] === '>') {
       tokens.push({ type: 'DCG_ARROW', value: '-->', line: startLine }); i += 3; continue;
+    }
+    if (ch === '*' && i + 1 < src.length && src[i + 1] === '*') {
+      tokens.push({ type: 'OP', value: '**', line: startLine }); i += 2; continue;
+    }
+    if (ch === '/' && i + 1 < src.length && src[i + 1] === '/') {
+      tokens.push({ type: 'OP', value: '//', line: startLine }); i += 2; continue;
     }
     if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
       tokens.push({ type: 'OP', value: ch, line: startLine }); i++; continue;
@@ -459,7 +467,7 @@ class LogicParser {
       const compound = this.parseCompound();
       return { kind: 'call', predicate: compound.predicate, args: compound.args };
     }
-    const left = this.parseExpr();
+    const left = (this.at('LBRACKET') || this.at('STRING')) ? this.parseTerm() : this.parseExpr();
     if (this.at('CMP')) {
       const op = this.advance().value;
       const right = this.parseExpr();
@@ -467,7 +475,7 @@ class LogicParser {
     }
     if (this.at('EQ')) {
       this.advance();
-      const right = this.parseExpr();
+      const right = this.parseStructExpr();
       return { kind: 'unify', left, right };
     }
     if (this.at('ID', LOGIC_BUILTIN_IS_PRED)) {
@@ -577,7 +585,7 @@ class LogicParser {
     logicError('expected term', this.peek().line);
   }
 
-  parseMulExpr() {
+  parseStructMulExpr() {
     let node = this.parseTerm();
     while (this.at('OP') && (this.peek().value === '*' || this.peek().value === '/')) {
       const op = this.advance().value;
@@ -587,7 +595,27 @@ class LogicParser {
     return node;
   }
 
-  parseExpr() {
+  parseStructExpr() {
+    let node = this.parseStructMulExpr();
+    while (this.at('OP') && (this.peek().value === '+' || this.peek().value === '-')) {
+      const op = this.advance().value;
+      const right = this.parseStructMulExpr();
+      node = { kind: 'arith', op, left: node, right };
+    }
+    return node;
+  }
+
+  parseModRemExpr() {
+    let node = this.parseAddExpr();
+    while (this.at('ID', 'mod') || this.at('ID', 'rem')) {
+      const op = this.advance().value;
+      const right = this.parseAddExpr();
+      node = { kind: 'arith', op, left: node, right };
+    }
+    return node;
+  }
+
+  parseAddExpr() {
     let node = this.parseMulExpr();
     while (this.at('OP') && (this.peek().value === '+' || this.peek().value === '-')) {
       const op = this.advance().value;
@@ -595,6 +623,66 @@ class LogicParser {
       node = { kind: 'arith', op, left: node, right };
     }
     return node;
+  }
+
+  parseMulExpr() {
+    let node = this.parsePowExpr();
+    while (this.at('OP') && (this.peek().value === '*' || this.peek().value === '/' || this.peek().value === '//')) {
+      const op = this.advance().value;
+      const right = this.parsePowExpr();
+      node = { kind: 'arith', op, left: node, right };
+    }
+    return node;
+  }
+
+  parsePowExpr() {
+    let node = this.parseUnaryExpr();
+    if (this.at('OP', '**')) {
+      this.advance();
+      const right = this.parsePowExpr();
+      node = { kind: 'arith', op: '**', left: node, right };
+    }
+    return node;
+  }
+
+  parseUnaryExpr() {
+    if (this.at('OP', '-')) {
+      this.advance();
+      const inner = this.parseUnaryExpr();
+      if (inner.kind === 'number') return { kind: 'number', value: -inner.value };
+      if (inner.kind === 'float') return { kind: 'float', value: -inner.value };
+      return { kind: 'arith', op: 'neg', left: inner, right: null };
+    }
+    return this.parseIsPrimary();
+  }
+
+  parseIsPrimary() {
+    if (this.at('LP')) {
+      this.advance();
+      const node = this.parseModRemExpr();
+      this.expect('RP');
+      return node;
+    }
+    if (this.at('FLOAT')) {
+      return { kind: 'float', value: this.advance().value };
+    }
+    if (this.at('NUMBER')) {
+      return { kind: 'number', value: this.advance().value };
+    }
+    if (this.looksLikeCompound()) {
+      return this.parseCompound();
+    }
+    if (this.at('ID')) {
+      const name = this.advance().value;
+      if (logicIsVarName(name)) return { kind: 'var', name };
+      if (logicIsAtomName(name)) return { kind: 'atom', name };
+      logicError(`invalid expression term '${name}'`, this.peek().line);
+    }
+    logicError('expected expression', this.peek().line);
+  }
+
+  parseExpr() {
+    return this.parseModRemExpr();
   }
 
   parseList() {
@@ -1020,6 +1108,9 @@ function logicReservedHeadError(predicate, arity) {
   }
   if (predicate === LOGIC_BUILTIN_RANDOM_BETWEEN_PRED && arity === 3) {
     return "'random_between/3' is reserved — cannot define random_between as fact or rule head";
+  }
+  if (predicate === LOGIC_BUILTIN_RANDOM_PRED && arity === 1) {
+    return "'random/1' is reserved — cannot define random as fact or rule head";
   }
   if (predicate === LOGIC_BUILTIN_SET_RANDOM_PRED && arity === 1) {
     return "'set_random/1' is reserved — cannot define set_random as fact or rule head";
