@@ -1,6 +1,6 @@
 # Logic runtime — static KB, dynamic overlay, mutations
 
-This page describes how **`comp [logic]`** builds the knowledge base used on each solve pass: **static** facts from `inline [logic]`, a **dynamic overlay** (adds and tombstones), and the **`logic { + / - }`** mutation block in exec blocks.
+This page describes how **`comp [logic]`** builds the knowledge base used on each solve pass: **static** facts from `inline [logic]`, a **dynamic overlay** (adds and tombstones), **`logic { + / - / ~ }`** mutation blocks, and **`commit(…)`** / bare mutation goals in **named queries** and **rule bodies** (executed only on the component dynamic store).
 
 Definition syntax → [inline-logic.md](inline-logic.md). Component wiring and query redirects → [comp-logic.md](comp-logic.md). Ad-hoc expression queries → [logic-query-exec.md](logic-query-exec.md).
 
@@ -15,8 +15,9 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Static KB** | Ground facts and rules from `inline [logic]` — unchanged at runtime |
 | **Effective KB** | Mode-dependent — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
 | **Dynamic overlay** | Per-component store: **adds** (`+`) and **tombstones** (`-`) — **`overlay`** mode |
-| **Mutation syntax** | `logic { + fact\n- fact }` in exec block — Prolog **assert** / **retract** analogy |
-| **Transaction** | All ops in one `logic { }` block commit together or roll back |
+| **Mutation syntax** | `logic { + / - / ~ fact }` in exec block; **`commit(…)`** and bare **`+` / `-` / `~`** in query/rule bodies on **`comp [logic]`** |
+| **Prolog mapping** | **`+`** ≈ assertz · **`-`** ≈ retract (one ground fact) · **`~ Template`** ≈ retractall · **`commit(…)`** = one atomic batch |
+| **Transaction** | All ops in one `logic { }` block **or** one **`commit(…)`** — succeed together or roll back |
 | **`mutationFailed`** | Pout **`1`** if the transaction failed (non-ground fact, etc.) |
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across `set` passes on the same component |
@@ -186,6 +187,141 @@ Adding a fact that is **already** in the effective KB (static or dynamic) succee
 ### Tombstones (D45)
 
 `- inside(box1, c1)` on a static fact does **not** edit the inline module. It records a **tombstone** so `inside(box1, c1)` is skipped when building runtime clauses. Queries on the component see the fact as **retracted**.
+
+---
+
+## Pattern retract — `~ Template`
+
+Use **`~`** to retract **every** ground fact that matches a template. **`_`** in the template matches any term at that argument position (wildcard — only valid with **`~`**, not with **`-`**).
+
+| Form | Meaning |
+|------|---------|
+| **`~ turn(_)`** | Remove all `turn/1` facts |
+| **`~ own(john, _)`** | Remove every `own(john, Car)` fact |
+| **`- own(john, audi)`** | Remove **one** precise ground fact |
+
+`~` works in **`logic { }`**, in **`commit(…)`**, and as a bare goal in a query or rule body on **`comp [logic]`**.
+
+### Example — clear all turns, then assert one (Load & Run)
+
+```logts-play
+inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+:
+
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP1 = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    logic {
+        ~ turn(_)
+        + turn(p1)
+    }
+    hasP1 >= okP1
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 0`**, **`okP1 = 1`**, **`okP2 = 0`** — both old turns removed, only **`turn(p1)`** remains.
+
+---
+
+## Atomic batch — `commit(…)`
+
+**`commit(Op1, Op2, …)`** applies **`+`**, **`-`**, and **`~`** ops as **one transaction**: validate the **final** KB once; on failure **nothing** from that `commit` is kept.
+
+| Rule | Detail |
+|------|--------|
+| **Minimum** | At least one op inside the parentheses |
+| **Allowed ops** | **`+`**, **`-`**, **`~`** only — **`show`** and nested **`commit`** are rejected |
+| **Reserved** | A rule head named **`commit`** is forbidden |
+| **Bare ops** | **`+` / `-` / `~`** outside `commit` apply **immediately**, one op at a time (no rollback of earlier ops in the same body) |
+| **After successful `commit`** | Later goals may still fail — the commit **stays** applied |
+
+Use **`commit(…)`** in **named queries**, **rule bodies**, and **`logic { }`** lines are still the per-block batch from F11 (equivalent to a single transaction for the whole block).
+
+### Example — reset query with `commit` (Load & Run)
+
+```logts-play
+inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    query reset:
+        commit(~ turn(_), + turn(p1))
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+:
+
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP1 = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    hasP1 >= okP1
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 0`**, **`okP1 = 1`**, **`okP2 = 0`**.
+
+### Example — rule body reset
+
+```logts
+inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    reset() <- commit(~ turn(_), + turn(p1))
+
+    query resetGame:
+        reset()
+
+:
+```
+
+Wire **`query = resetGame`** on **`comp [logic]`**, or rely on default “run all queries” and redirect **`hasP1`**, **`hasP2`**, etc.
+
+---
+
+## Inline `:query` stays read-only
+
+**`.world:query({ … })`** (and **`.inline:query`**) still reads the **static** inline KB only. Goals that reach **`+` / `-` / `~` / `commit`**, or call a rule whose body contains them, fail with an error. Use **`comp [logic]`** for runtime mutations.
+
+**`.inline:mutate({ … })`** is not available — elaboration/runtime error.
 
 ---
 

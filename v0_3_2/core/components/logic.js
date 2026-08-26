@@ -373,7 +373,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       deltaFn(comp.factIndex, ops);
       verifyFn(comp.factIndex, runtimeClauses);
     } else {
-      comp.factIndex = indexFn(runtimeClauses);
+      comp.factIndex = indexFn(runtimeClauses, comp.factIndex && comp.factIndex.table);
     }
   }
 
@@ -771,16 +771,21 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return term;
   }
 
-  _collectMutationOps(mutationBlocks, ctx, compName) {
+  _collectMutationOps(mutationBlocks, ctx, compName, merged, comp) {
     const parseFn = typeof parseLogicMutationBlock === 'function' ? parseLogicMutationBlock : null;
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
     if (!parseFn || !mutationBlocks || !mutationBlocks.length) return [];
+    const buildOpts = comp ? this._buildDataOpts(comp) : {};
+    const runtimeClauses = (buildFn && merged && comp && comp.dynamicStore)
+      ? buildFn(merged.clauses, comp.dynamicStore, buildOpts)
+      : (merged && merged.clauses) || [];
     const ops = [];
-    const expandFn = typeof logicExpandMutationOps === 'function'
-      ? logicExpandMutationOps
-      : (typeof logicExpandMutationEachOps === 'function' ? logicExpandMutationEachOps : null);
+    const expandFn = typeof logicExpandMutationItemsToOps === 'function'
+      ? logicExpandMutationItemsToOps
+      : (typeof logicExpandMutationOps === 'function' ? logicExpandMutationOps : null);
     for (const block of mutationBlocks) {
       const parsed = parseFn(block.raw);
-      const expanded = expandFn ? expandFn(parsed, ctx) : parsed;
+      const expanded = expandFn ? expandFn(parsed, ctx, runtimeClauses, comp.factIndex && comp.factIndex.table) : parsed;
       for (const item of expanded) {
         ops.push({
           op: item.op,
@@ -822,7 +827,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       return;
     }
     if (comp.dataMode === 'static') {
-      comp.mutationFailed = 0;
+      comp.mutationFailed = 1;
       return;
     }
     if (!comp.dynamicStore) {
@@ -832,7 +837,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
     let ops;
     try {
-      ops = this._collectMutationOps(mutationBlocks, ctx, compName);
+      ops = this._collectMutationOps(mutationBlocks, ctx, compName, merged, comp);
     } catch (err) {
       comp.mutationFailed = 1;
       const msg = err && err.message ? err.message : String(err);
@@ -925,6 +930,90 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     }
   }
 
+  _resolveMutationGoal(goal, ctx, compName) {
+    if (!goal) return goal;
+    if (goal.kind === 'mut_add' || goal.kind === 'mut_remove') {
+      return { kind: goal.kind, head: this._resolveMutationTerm(goal.head, ctx, compName) };
+    }
+    if (goal.kind === 'mut_retract_all') return goal;
+    if (goal.kind === 'mut_commit') {
+      return {
+        kind: 'mut_commit',
+        ops: (goal.ops || []).map((op) => {
+          if (op.op === 'retract_all') return op;
+          return { op: op.op, head: this._resolveMutationTerm(op.head, ctx, compName) };
+        }),
+      };
+    }
+    return goal;
+  }
+
+  _buildMutationRuntime(comp, compName, merged, ctx) {
+    const self = this;
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const expandGoalFn = typeof logicExpandMutationGoalToOps === 'function'
+      ? logicExpandMutationGoalToOps : null;
+    const execMutFn = typeof logicExecuteMutationOps === 'function'
+      ? logicExecuteMutationOps : null;
+    const createStoreFn = typeof logicCreateDynamicStore === 'function'
+      ? logicCreateDynamicStore : null;
+    if (!buildFn || !expandGoalFn || !execMutFn) {
+      return { applyGoal: () => ({ ok: false }) };
+    }
+    return {
+      getFactIndex() {
+        return comp.factIndex || null;
+      },
+      getRuleClauses() {
+        return comp.ruleClauses || (merged && merged.ruleClauses) || [];
+      },
+      applyGoal(goal, options) {
+        const atomic = !!(options && options.atomic);
+        if (comp.dataMode === 'static') {
+          comp.mutationFailed = 1;
+          return { ok: false, code: 'static' };
+        }
+        if (!comp.dynamicStore) {
+          comp.dynamicStore = createStoreFn
+            ? createStoreFn() : { adds: new Map(), tombstones: new Set() };
+        }
+        const buildOpts = self._buildDataOpts(comp);
+        const resolvedGoal = self._resolveMutationGoal(goal, ctx, compName);
+        const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore, buildOpts);
+        const table = (comp.factIndex && comp.factIndex.table) || null;
+        const execOps = expandGoalFn(resolvedGoal, ctx, runtimeClauses, table);
+        const execOpts = {};
+        if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
+        if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+        if (comp.indexFacts && comp.factIndex) {
+          execOpts.factIndex = comp.factIndex;
+          execOpts.ruleClauses = comp.ruleClauses || [];
+        }
+        const result = execMutFn({
+          store: comp.dynamicStore,
+          staticClauses: merged.clauses,
+          constraints: (merged && merged.constraints) || [],
+          buildOpts,
+          execOpts,
+          ops: execOps,
+          atomic,
+        });
+        if (!result || !result.ok) {
+          comp.mutationFailed = 1;
+          return { ok: false };
+        }
+        comp.mutationFailed = 0;
+        self._updateFactIndexAfterCommit(comp, merged, execOps);
+        return {
+          ok: true,
+          factIndex: comp.factIndex,
+          ruleClauses: comp.ruleClauses || (merged && merged.ruleClauses) || [],
+          runtimeClauses: result.runtimeClauses,
+        };
+      },
+    };
+  }
+
   _runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks, queryOpts) {
     const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
     const execFn = typeof executeLogicQueries === 'function' ? executeLogicQueries : null;
@@ -957,6 +1046,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (ctx.out) {
       execOpts.onShowLine = (line) => { ctx.out.push(line); };
     }
+    execOpts.mutationRuntime = this._buildMutationRuntime(comp, compName, merged, ctx);
     const raw = execFn(runtimeMerged, inputEnv, execOpts);
     const meta = raw._logicMeta || {};
     delete raw._logicMeta;
@@ -1225,12 +1315,25 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       throw Error(`logic ${compName}: check({ }) requires at least one op`);
     }
 
+    const inst = ctx.inlineInstances.get(comp.programRef);
+    if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
+    const merged = resolveFn(inst, ctx.inlineInstances);
+    if (!comp.dynamicStore) {
+      comp.dynamicStore = typeof logicCreateDynamicStore === 'function'
+        ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() };
+    }
+
+    const buildOpts = this._buildDataOpts(comp);
+
     let expanded;
     try {
-      const expandFn = typeof logicExpandMutationOps === 'function'
-        ? logicExpandMutationOps
-        : (typeof logicExpandMutationEachOps === 'function' ? logicExpandMutationEachOps : null);
-      expanded = expandFn ? expandFn(parsed, ctx) : parsed;
+      const runtimeClauses = buildFn
+        ? buildFn(merged.clauses, comp.dynamicStore, buildOpts)
+        : merged.clauses;
+      const expandFn = typeof logicExpandMutationItemsToOps === 'function'
+        ? logicExpandMutationItemsToOps
+        : (typeof logicExpandMutationOps === 'function' ? logicExpandMutationOps : null);
+      expanded = expandFn ? expandFn(parsed, ctx, runtimeClauses, comp.factIndex && comp.factIndex.table) : parsed;
     } catch (err) {
       const msg = err && err.message ? err.message : String(err);
       throw Error(msg);
@@ -1251,15 +1354,6 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       }
     }
 
-    const inst = ctx.inlineInstances.get(comp.programRef);
-    if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
-    const merged = resolveFn(inst, ctx.inlineInstances);
-    if (!comp.dynamicStore) {
-      comp.dynamicStore = typeof logicCreateDynamicStore === 'function'
-        ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() };
-    }
-
-    const buildOpts = this._buildDataOpts(comp);
     const execOpts = {};
     if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
     if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;

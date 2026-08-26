@@ -52,6 +52,7 @@ const LOGIC_BUILTIN_BAGOF_PRED = 'bagof';
 const LOGIC_BUILTIN_SETOF_PRED = 'setof';
 const LOGIC_BUILTIN_TRUE_PRED = 'true';
 const LOGIC_BUILTIN_FAIL_PRED = 'fail';
+const LOGIC_MUTATION_COMMIT_PRED = 'commit';
 const LOGIC_BUILTIN_STRING_TO_LIST_PRED = 'string_to_list';
 const LOGIC_BUILTIN_STRING_TO_CODES_PRED = 'string_to_codes';
 const LOGIC_BUILTIN_ATOM_CHARS_PRED = 'atom_chars';
@@ -196,6 +197,9 @@ function logicTokenize(src) {
     }
     if (ch === '/' && i + 1 < src.length && src[i + 1] === '/') {
       tokens.push({ type: 'OP', value: '//', line: startLine }); i += 2; continue;
+    }
+    if (ch === '~') {
+      tokens.push({ type: 'TILDE', value: '~', line: startLine }); i++; continue;
     }
     if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
       tokens.push({ type: 'OP', value: ch, line: startLine }); i++; continue;
@@ -354,6 +358,9 @@ class LogicParser {
   parseClause() {
     const line = this.peek().line;
     let predicate = this.expect('ID').value;
+    if (predicate === LOGIC_MUTATION_COMMIT_PRED) {
+      logicError('commit is reserved for atomic mutation transactions', line);
+    }
     while (this.at('DOT')) {
       this.advance();
       if (!this.at('ID')) {
@@ -443,6 +450,19 @@ class LogicParser {
     return goals;
   }
 
+  looksLikeMutationRemove() {
+    if (!this.at('OP', '-')) return false;
+    let look = this.pos + 1;
+    if (look >= this.tokens.length || this.tokens[look].type !== 'ID') return false;
+    look++;
+    while (look < this.tokens.length && this.tokens[look].type === 'DOT') {
+      look++;
+      if (look >= this.tokens.length || this.tokens[look].type !== 'ID') return false;
+      look++;
+    }
+    return look < this.tokens.length && this.tokens[look].type === 'LP';
+  }
+
   parseBodyGoal() {
     if (this.at('NOT')) {
       this.advance();
@@ -451,6 +471,24 @@ class LogicParser {
     if (this.at('BANG')) {
       this.advance();
       return { kind: 'cut' };
+    }
+    if (this.at('OP', '+')) {
+      this.advance();
+      const head = this.parseMutationFactHead();
+      return { kind: 'mut_add', head };
+    }
+    if (this.at('TILDE')) {
+      this.advance();
+      const template = this.parseMutationTemplateHead();
+      return { kind: 'mut_retract_all', template };
+    }
+    if (this.looksLikeMutationRemove()) {
+      this.advance();
+      const head = this.parseMutationFactHead();
+      return { kind: 'mut_remove', head };
+    }
+    if (this.at('ID', LOGIC_MUTATION_COMMIT_PRED) && this.looksLikeCompound()) {
+      return this.parseCommitGoal();
     }
     if (this.at('ID', LOGIC_BUILTIN_TRUE_PRED) && !this.looksLikeCompound()) {
       this.advance();
@@ -812,6 +850,110 @@ class LogicParser {
 
   parseMutationFactHead() {
     return this.parseMutationCompound();
+  }
+
+  parseCommitGoal() {
+    const line = this.peek().line;
+    this.expect('ID', LOGIC_MUTATION_COMMIT_PRED);
+    this.expect('LP');
+    const ops = [];
+    if (!this.at('RP')) {
+      ops.push(this.parseCommitMutationOp());
+      while (this.at('COMMA')) {
+        this.advance();
+        ops.push(this.parseCommitMutationOp());
+      }
+    }
+    this.expect('RP');
+    if (!ops.length) logicError('commit requires at least one mutation op', line);
+    return { kind: 'mut_commit', ops };
+  }
+
+  parseCommitMutationOp() {
+    const line = this.peek().line;
+    if (this.at('OP', '+')) {
+      this.advance();
+      return { op: 'add', head: this.parseMutationFactHead() };
+    }
+    if (this.at('TILDE')) {
+      this.advance();
+      return { op: 'retract_all', template: this.parseMutationTemplateHead() };
+    }
+    if (this.looksLikeMutationRemove()) {
+      this.advance();
+      return { op: 'remove', head: this.parseMutationFactHead() };
+    }
+    if (this.at('ID', LOGIC_MUTATION_COMMIT_PRED) && this.looksLikeCompound()) {
+      logicError('nested commit is not allowed', line);
+    }
+    if (this.at('ID', LOGIC_BUILTIN_SHOW_PRED) && this.looksLikeCompound()) {
+      logicError('show is not allowed inside commit', line);
+    }
+    logicError('commit op must be +, -, or ~', line);
+  }
+
+  parseMutationTemplateHead() {
+    let predicate = this.expect('ID').value;
+    while (this.at('DOT')) {
+      this.advance();
+      if (!this.at('ID')) {
+        logicError('expected predicate name after .', this.peek().line);
+      }
+      predicate += '.' + this.advance().value;
+    }
+    this.expect('LP');
+    const args = [];
+    if (!this.at('RP')) {
+      args.push(this.parseMutationTemplateTerm());
+      while (this.at('COMMA')) {
+        this.advance();
+        args.push(this.parseMutationTemplateTerm());
+      }
+    }
+    this.expect('RP');
+    return { kind: 'compound', predicate, args };
+  }
+
+  parseMutationTemplateTerm() {
+    if (this.at('ID') && this.peek().value === '_') {
+      this.advance();
+      return { kind: 'var', name: '_' };
+    }
+    if (this.at('ID') && LOGIC_MUTATION_BIND_TYPES.has(this.peek().value)) {
+      logicError('wire references are not allowed in ~ template', this.peek().line);
+    }
+    if (this.at('ID')) {
+      const save = this.pos;
+      this.advance();
+      if (this.at('LP') || this.at('DOT')) {
+        this.pos = save;
+        return this.parseMutationTemplateCompound();
+      }
+      this.pos = save;
+    }
+    return this.parseTerm();
+  }
+
+  parseMutationTemplateCompound() {
+    let predicate = this.expect('ID').value;
+    while (this.at('DOT')) {
+      this.advance();
+      if (!this.at('ID')) {
+        logicError('expected predicate name after .', this.peek().line);
+      }
+      predicate += '.' + this.advance().value;
+    }
+    this.expect('LP');
+    const args = [];
+    if (!this.at('RP')) {
+      args.push(this.parseMutationTemplateTerm());
+      while (this.at('COMMA')) {
+        this.advance();
+        args.push(this.parseMutationTemplateTerm());
+      }
+    }
+    this.expect('RP');
+    return { kind: 'compound', predicate, args };
   }
 }
 
@@ -1887,8 +2029,8 @@ function logicJoinMutationSourceLines(src) {
     const line = rawLine.trim();
     if (!line || line.startsWith(';')) continue;
     if (!buf) {
-      if (!line.startsWith('+') && !line.startsWith('-')) {
-        logicError(`mutation line must start with + or -: ${line}`);
+      if (!line.startsWith('+') && !line.startsWith('-') && !line.startsWith('~')) {
+        logicError(`mutation line must start with +, -, or ~: ${line}`);
       }
       buf = line;
     } else {
@@ -1914,28 +2056,73 @@ function parseLogicMutationBlock(bodyRaw) {
   const ops = [];
   for (const line of logicJoinMutationSourceLines(src)) {
     let op = null;
+    let item = null;
     if (line.startsWith('+')) op = 'add';
     else if (line.startsWith('-')) op = 'remove';
-    else logicError(`mutation line must start with + or -: ${line}`);
+    else if (line.startsWith('~')) op = 'retract_all';
+    else logicError(`mutation line must start with +, -, or ~: ${line}`);
     let rest = line.slice(1).trim();
-    if (!rest) logicError('mutation line requires a fact after + or -');
+    if (!rest) logicError('mutation line requires a term after +, -, or ~');
     if (!rest.endsWith('.')) rest += '.';
     const tokens = logicTokenize(rest);
     const parser = new LogicParser(tokens);
-    const head = parser.parseMutationFactHead();
-    if (parser.at('DOT')) parser.advance();
-    if (!parser.at('EOF')) {
-      logicError('unexpected tokens after mutation fact', parser.peek().line);
+    if (op === 'retract_all') {
+      const template = parser.parseMutationTemplateHead();
+      if (parser.at('DOT')) parser.advance();
+      if (!parser.at('EOF')) {
+        logicError('unexpected tokens after mutation template', parser.peek().line);
+      }
+      item = { op, template };
+    } else {
+      const head = parser.parseMutationFactHead();
+      if (parser.at('DOT')) parser.advance();
+      if (!parser.at('EOF')) {
+        logicError('unexpected tokens after mutation fact', parser.peek().line);
+      }
+      item = { op, head };
     }
-    ops.push({ op, head });
+    ops.push(item);
   }
   return ops;
+}
+
+function logicGoalIsMutation(goal) {
+  if (!goal) return false;
+  if (goal.kind === 'mut_add' || goal.kind === 'mut_remove'
+    || goal.kind === 'mut_retract_all' || goal.kind === 'mut_commit') return true;
+  if (goal.kind === 'not') return logicGoalIsMutation(goal.goal);
+  return false;
+}
+
+function logicGoalsContainMutation(goals) {
+  for (const g of goals || []) {
+    if (logicGoalIsMutation(g)) return true;
+  }
+  return false;
+}
+
+function logicClauseBodyContainsMutation(clause) {
+  return logicGoalsContainMutation(clause && clause.body);
+}
+
+function logicProgramContainsMutation(program) {
+  if (!program) return false;
+  for (const c of program.clauses || []) {
+    if (logicClauseBodyContainsMutation(c)) return true;
+  }
+  for (const q of program.queries || []) {
+    if (logicGoalsContainMutation(q && q.goals)) return true;
+  }
+  return false;
 }
 
 if (typeof globalThis !== 'undefined') {
   globalThis.parseLogicBody = parseLogicBody;
   globalThis.parseLogicGoalsBlock = parseLogicGoalsBlock;
   globalThis.parseLogicMutationBlock = parseLogicMutationBlock;
+  globalThis.logicGoalsContainMutation = logicGoalsContainMutation;
+  globalThis.logicGoalIsMutation = logicGoalIsMutation;
+  globalThis.logicProgramContainsMutation = logicProgramContainsMutation;
   globalThis.parseLogicProgramBlock = parseLogicProgramBlock;
   globalThis.logicResolveMerged = logicResolveMerged;
   globalThis.formatLogicInstanceDoc = formatLogicInstanceDoc;
@@ -1952,6 +2139,9 @@ if (typeof module !== 'undefined' && module.exports) {
     parseLogicBody,
     parseLogicGoalsBlock,
     parseLogicMutationBlock,
+    logicGoalsContainMutation,
+    logicGoalIsMutation,
+    logicProgramContainsMutation,
     parseLogicProgramBlock,
     logicResolveMerged,
     formatLogicInstanceDoc,

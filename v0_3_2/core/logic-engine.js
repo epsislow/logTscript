@@ -105,6 +105,28 @@ function logicInternGoal(goal, table) {
   if (goal.kind === 'cut') {
     return { kind: 'cut' };
   }
+  if (goal.kind === 'mut_add' || goal.kind === 'mut_remove') {
+    return {
+      kind: goal.kind,
+      head: logicInternTerm(goal.head, table),
+    };
+  }
+  if (goal.kind === 'mut_retract_all') {
+    return {
+      kind: goal.kind,
+      template: logicInternTerm(goal.template, table),
+    };
+  }
+  if (goal.kind === 'mut_commit') {
+    return {
+      kind: goal.kind,
+      ops: (goal.ops || []).map((op) => ({
+        op: op.op,
+        head: op.head ? logicInternTerm(op.head, table) : null,
+        template: op.template ? logicInternTerm(op.template, table) : null,
+      })),
+    };
+  }
   return goal;
 }
 
@@ -247,6 +269,105 @@ function logicEvalNumericFunc(comp, env, table) {
   return null;
 }
 
+function logicDenormTerm(term, table) {
+  if (!term) return term;
+  if (term.kind === 'atom') {
+    const name = term.name != null ? term.name : (table ? table.name(term.id) : null);
+    const r = { kind: 'atom', name };
+    if (term.logicTraceAsString) r.logicTraceAsString = true;
+    return r;
+  }
+  if (term.kind === 'var') return { kind: 'var', name: term.name };
+  if (term.kind === 'number') return { kind: 'number', value: term.value };
+  if (term.kind === 'float') return { kind: 'float', value: term.value };
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      args: (term.args || []).map((a) => logicDenormTerm(a, table)),
+    };
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicDenormTerm(term.head, table),
+      tail: logicDenormTerm(term.tail, table),
+    };
+  }
+  if (term.kind === 'dif_list') {
+    return {
+      kind: 'dif_list',
+      front: logicDenormTerm(term.front, table),
+      hole: logicDenormTerm(term.hole, table),
+    };
+  }
+  if (term.kind === 'arith') {
+    return {
+      kind: 'arith',
+      op: term.op,
+      left: logicDenormTerm(term.left, table),
+      right: logicDenormTerm(term.right, table),
+    };
+  }
+  return term;
+}
+
+function logicDenormGoal(goal, table) {
+  if (!goal) return goal;
+  if (goal.kind === 'not') return { kind: 'not', goal: logicDenormGoal(goal.goal, table) };
+  if (goal.kind === 'cut') return { kind: 'cut' };
+  if (goal.kind === 'call') {
+    return {
+      kind: 'call',
+      predicate: goal.predicate,
+      args: (goal.args || []).map((a) => logicDenormTerm(a, table)),
+    };
+  }
+  if (goal.kind === 'cmp') {
+    return {
+      kind: 'cmp', op: goal.op,
+      left: logicDenormTerm(goal.left, table),
+      right: logicDenormTerm(goal.right, table),
+    };
+  }
+  if (goal.kind === 'unify') {
+    return {
+      kind: 'unify',
+      left: logicDenormTerm(goal.left, table),
+      right: logicDenormTerm(goal.right, table),
+    };
+  }
+  if (goal.kind === 'is') {
+    return {
+      kind: 'is',
+      left: logicDenormTerm(goal.left, table),
+      right: logicDenormTerm(goal.right, table),
+    };
+  }
+  if (goal.kind === 'mut_add' || goal.kind === 'mut_remove') {
+    return { kind: goal.kind, head: logicDenormTerm(goal.head, table) };
+  }
+  if (goal.kind === 'mut_retract_all') {
+    return { kind: goal.kind, template: logicDenormTerm(goal.template, table) };
+  }
+  if (goal.kind === 'mut_commit') {
+    return {
+      kind: goal.kind,
+      ops: (goal.ops || []).map((op) => ({
+        op: op.op,
+        head: op.head ? logicDenormTerm(op.head, table) : null,
+        template: op.template ? logicDenormTerm(op.template, table) : null,
+      })),
+    };
+  }
+  return goal;
+}
+
+function logicReinternGoals(goals, table) {
+  return (goals || []).map((g) => logicInternGoal(logicDenormGoal(g, table), table));
+}
+
 class LogicEngine {
   constructor(clauses, options) {
     const opts = options || {};
@@ -258,6 +379,10 @@ class LogicEngine {
     this.depthExceeded = false;
     this.onShowLine = typeof opts.onShowLine === 'function' ? opts.onShowLine : null;
     this._renameSerial = 0;
+    this.mutationRuntime = opts.mutationRuntime || null;
+    this._ruleClauses = opts.ruleClauses || null;
+    this._factIndexRef = opts.factIndex || null;
+    this._mutationDirty = false;
     if (opts.factIndex) {
       const rules = opts.ruleClauses || (clauses || []).filter((c) => c.body && c.body.length);
       for (const c of rules) {
@@ -287,13 +412,70 @@ class LogicEngine {
     }
   }
 
+  _reloadFactIndex(factIndex, ruleClauses) {
+    if (factIndex && factIndex.table) this.table = factIndex.table;
+    this.index.clear();
+    const rules = ruleClauses || this._ruleClauses || [];
+    for (const c of rules) {
+      const ic = logicInternClause(c, this.table);
+      const head = ic.head;
+      if (!head || head.kind !== 'compound') continue;
+      const key = logicPredicateKey(head.predicate, head.arity);
+      if (!this.index.has(key)) this.index.set(key, []);
+      this.index.get(key).push(ic);
+    }
+    if (factIndex) {
+      for (const ic of factIndex.keys.values()) {
+        const head = ic.head;
+        if (!head || head.kind !== 'compound') continue;
+        const key = logicPredicateKey(head.predicate, head.arity);
+        if (!this.index.has(key)) this.index.set(key, []);
+        this.index.get(key).push(ic);
+      }
+    }
+    this._factIndexRef = factIndex;
+    this._ruleClauses = rules;
+  }
+
+  _continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded) {
+    const nextGoals = logicReinternGoals(rest, this.table);
+    return this._solveGoals(nextGoals, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _applyMutationGoal(goal, atomic) {
+    const rt = this.mutationRuntime;
+    if (!rt || typeof rt.applyGoal !== 'function') {
+      throw Error('mutation is forbidden in inline :query (use comp [logic])');
+    }
+    const denormed = logicDenormGoal(goal, this.table);
+    const result = rt.applyGoal(denormed, { atomic });
+    if (!result || !result.ok) return false;
+    this._mutationDirty = true;
+    if (result.factIndex !== undefined) {
+      this._reloadFactIndex(result.factIndex, result.ruleClauses || this._ruleClauses);
+    } else if (result.runtimeClauses) {
+      this._reloadFactIndex(null, this._ruleClauses);
+      this.index.clear();
+      for (const c of result.runtimeClauses) {
+        const ic = logicInternClause(c, this.table);
+        const head = ic.head;
+        if (!head || head.kind !== 'compound') continue;
+        const key = logicPredicateKey(head.predicate, head.arity);
+        if (!this.index.has(key)) this.index.set(key, []);
+        this.index.get(key).push(ic);
+      }
+    }
+    return true;
+  }
+
   executeQueries(queries, inputEnv) {
     this.truncated = false;
     this.depthExceeded = false;
     const out = {};
     for (const q of queries || []) {
       const goals = logicEngineQueryGoals(q);
-      out[q.name] = this.solveQuery(goals, inputEnv || {});
+      const sol = this.solveQuery(goals, inputEnv || {});
+      out[q.name] = sol;
     }
     return out;
   }
@@ -539,6 +721,18 @@ class LogicEngine {
     }
     if (g0.kind === 'call' && g0.predicate === 'fail' && g0.arity === 0) {
       return false;
+    }
+    if (g0.kind === 'mut_add' || g0.kind === 'mut_remove') {
+      if (!this._applyMutationGoal(g0, false)) return false;
+      return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'mut_retract_all') {
+      if (!this._applyMutationGoal(g0, false)) return false;
+      return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'mut_commit') {
+      if (!this._applyMutationGoal(g0, true)) return false;
+      return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
@@ -3511,13 +3705,38 @@ function executeLogicQueries(mergedDef, inputEnv, options) {
       if (q) queries.push(q);
     }
   }
-  const engine = opts.factIndex
-    ? new LogicEngine(mergedDef.clauses || [], { factIndex: opts.factIndex, ruleClauses: opts.ruleClauses })
-    : new LogicEngine(mergedDef.clauses || []);
+  const engineOpts = {
+    factIndex: opts.factIndex,
+    ruleClauses: opts.ruleClauses,
+    mutationRuntime: opts.mutationRuntime,
+  };
+  let engine = opts.factIndex
+    ? new LogicEngine(mergedDef.clauses || [], engineOpts)
+    : new LogicEngine(mergedDef.clauses || [], { mutationRuntime: opts.mutationRuntime });
   if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
   if (opts.onShowLine) engine.onShowLine = opts.onShowLine;
-  const out = engine.executeQueries(queries, inputEnv);
+  const out = {};
+  for (const q of queries || []) {
+    const goals = logicEngineQueryGoals(q);
+    out[q.name] = engine.solveQuery(goals, inputEnv || {});
+    if (engine._mutationDirty && opts.mutationRuntime) {
+      const rt = opts.mutationRuntime;
+      const fi = typeof rt.getFactIndex === 'function' ? rt.getFactIndex() : opts.factIndex;
+      const rc = typeof rt.getRuleClauses === 'function' ? rt.getRuleClauses() : opts.ruleClauses;
+      const nextOpts = {
+        factIndex: fi || opts.factIndex,
+        ruleClauses: rc || opts.ruleClauses,
+        mutationRuntime: rt,
+      };
+      engine = fi
+        ? new LogicEngine(mergedDef.clauses || [], nextOpts)
+        : new LogicEngine(mergedDef.clauses || [], { mutationRuntime: rt });
+      if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
+      if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
+      if (opts.onShowLine) engine.onShowLine = opts.onShowLine;
+    }
+  }
   out._logicMeta = { truncated: engine.truncated, depthExceeded: engine.depthExceeded };
   return out;
 }
@@ -3553,6 +3772,22 @@ function logicPrepareGoalsForInvoke(goals) {
     }
     if (g.kind === 'unify') {
       return { kind: 'unify', left: mapTerm(g.left), right: mapTerm(g.right) };
+    }
+    if (g.kind === 'mut_add' || g.kind === 'mut_remove') {
+      return { kind: g.kind, head: mapTerm(g.head) };
+    }
+    if (g.kind === 'mut_retract_all') {
+      return { kind: g.kind, template: mapTerm(g.template) };
+    }
+    if (g.kind === 'mut_commit') {
+      return {
+        kind: g.kind,
+        ops: (g.ops || []).map((op) => ({
+          op: op.op,
+          head: op.head ? mapTerm(op.head) : null,
+          template: op.template ? mapTerm(op.template) : null,
+        })),
+      };
     }
     return g;
   }
@@ -4249,9 +4484,14 @@ function logicMutationDeltaPlusFacts(ops) {
 
 function executeLogicGoals(mergedDef, goals, inputEnv, options) {
   const opts = options || {};
+  const engineOpts = {
+    factIndex: opts.factIndex,
+    ruleClauses: opts.ruleClauses,
+    mutationRuntime: opts.mutationRuntime,
+  };
   const engine = opts.factIndex
-    ? new LogicEngine(mergedDef.clauses || [], { factIndex: opts.factIndex, ruleClauses: opts.ruleClauses })
-    : new LogicEngine(mergedDef.clauses || []);
+    ? new LogicEngine(mergedDef.clauses || [], engineOpts)
+    : new LogicEngine(mergedDef.clauses || [], { mutationRuntime: opts.mutationRuntime });
   if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
   if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
   if (opts.onShowLine) engine.onShowLine = opts.onShowLine;
@@ -4621,6 +4861,84 @@ function logicExpandEachEveryOnCompound(op, compound, ctx, eachRowIndex) {
   return [{ op, head: compound }];
 }
 
+function logicAtomDisplayName(term, table) {
+  if (!term || term.kind !== 'atom') return null;
+  if (term.name != null) return term.name;
+  if (term.id != null && table) return table.name(term.id);
+  return null;
+}
+
+function logicTermMatchesRetractTemplate(template, factHead, table) {
+  if (!template || !factHead) return false;
+  if (template.kind !== 'compound' || factHead.kind !== 'compound') return false;
+  if (template.predicate !== factHead.predicate) return false;
+  const ta = template.args || [];
+  const fa = factHead.args || [];
+  if (ta.length !== fa.length) return false;
+  for (let i = 0; i < ta.length; i++) {
+    const tv = ta[i];
+    const fv = fa[i];
+    if (tv.kind === 'var' && tv.name === '_') continue;
+    if (tv.kind === 'atom' || fv.kind === 'atom') {
+      if (logicAtomDisplayName(tv, table) !== logicAtomDisplayName(fv, table)) return false;
+      continue;
+    }
+    if (!logicTermsEqualGround(tv, fv)) return false;
+  }
+  return true;
+}
+
+function logicExpandRetractAllOps(template, runtimeClauses, table) {
+  const ops = [];
+  const seen = new Set();
+  for (const c of runtimeClauses || []) {
+    if (c.body && c.body.length) continue;
+    if (!c.head || c.head.kind !== 'compound') continue;
+    if (!logicTermMatchesRetractTemplate(template, c.head, table)) continue;
+    const clause = { head: c.head, body: [] };
+    const key = logicFactClauseKey(clause);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ops.push({ op: 'remove', head: c.head });
+  }
+  return ops;
+}
+
+function logicExpandMutationItemsToOps(items, ctx, runtimeClauses, table) {
+  let expanded = logicExpandMutationEachOps(items, ctx);
+  const out = [];
+  for (const item of expanded) {
+    if (item.op === 'retract_all') {
+      out.push(...logicExpandRetractAllOps(item.template, runtimeClauses, table));
+    } else {
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+function logicExpandMutationGoalToOps(goal, ctx, runtimeClauses, table) {
+  if (!goal) return [];
+  if (goal.kind === 'mut_add') return [{ op: 'add', head: goal.head }];
+  if (goal.kind === 'mut_remove') return [{ op: 'remove', head: goal.head }];
+  if (goal.kind === 'mut_retract_all') {
+    return logicExpandRetractAllOps(goal.template, runtimeClauses, table);
+  }
+  if (goal.kind === 'mut_commit') {
+    const items = (goal.ops || []).map((op) => {
+      if (op.op === 'retract_all') return { op: 'retract_all', template: op.template };
+      return { op: op.op, head: op.head };
+    });
+    return logicExpandMutationItemsToOps(items, ctx, runtimeClauses, table);
+  }
+  return [];
+}
+
+function logicExpandMutationOps(items, ctx, runtimeClauses) {
+  if (runtimeClauses) return logicExpandMutationItemsToOps(items, ctx, runtimeClauses);
+  return logicExpandMutationEachOps(items, ctx);
+}
+
 function logicExpandOneMutationEachItem(item, ctx) {
   const head = item && item.head;
   if (!head || head.kind !== 'compound') return [item];
@@ -4636,8 +4954,72 @@ function logicExpandMutationEachOps(items, ctx) {
   return out;
 }
 
-function logicExpandMutationOps(items, ctx) {
-  return logicExpandMutationEachOps(items, ctx);
+function logicExecuteMutationOps(params) {
+  const p = params || {};
+  const store = p.store;
+  const staticClauses = p.staticClauses || [];
+  const constraints = p.constraints || [];
+  const buildOpts = p.buildOpts || {};
+  const execOpts = p.execOpts || {};
+  const ops = p.ops || [];
+  const atomic = !!p.atomic;
+  const applyFn = typeof logicApplyMutationTransaction === 'function'
+    ? logicApplyMutationTransaction : null;
+  const simFn = typeof logicSimulateMutationStore === 'function'
+    ? logicSimulateMutationStore : null;
+  const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+  const validateFactsFn = typeof logicValidateConstraintsForFacts === 'function'
+    ? logicValidateConstraintsForFacts : null;
+  const deltaFn = typeof logicMutationDeltaPlusFacts === 'function'
+    ? logicMutationDeltaPlusFacts : null;
+  const simCheckFn = typeof logicSimulateCheckTransaction === 'function'
+    ? logicSimulateCheckTransaction : null;
+  if (!applyFn || !buildFn) return { ok: false, code: 'engine' };
+
+  for (const op of ops) {
+    if (!op) return { ok: false, code: 'ground' };
+    if (op.op === 'add' || op.op === 'remove') {
+      if (!op.head || !logicTermIsGround(op.head)) return { ok: false, code: 'ground' };
+    } else if (op.op === 'retract_all') {
+      return { ok: false, code: 'expand' };
+    }
+  }
+
+  if (atomic) {
+    if (simCheckFn && constraints.length) {
+      const check = simCheckFn(staticClauses, store, ops, constraints, { ...buildOpts, execOpts });
+      if (!check || !check.pass) return { ok: false, code: 'constraint' };
+    }
+    const result = applyFn(store, ops, buildOpts);
+    if (!result || !result.success) return { ok: false, code: 'store' };
+    return {
+      ok: true,
+      ops,
+      runtimeClauses: buildFn(staticClauses, store, buildOpts),
+    };
+  }
+
+  for (const op of ops) {
+    const batch = [op];
+    if (constraints.length && simCheckFn) {
+      const check = simCheckFn(staticClauses, store, batch, constraints, { ...buildOpts, execOpts });
+      if (!check || !check.pass) return { ok: false, code: 'constraint' };
+    } else if (constraints.length && simFn && validateFactsFn && deltaFn) {
+      const proposedStore = simFn(store, batch, buildOpts);
+      if (!proposedStore) return { ok: false, code: 'store' };
+      const proposedClauses = buildFn(staticClauses, proposedStore, buildOpts);
+      const deltaFacts = deltaFn(batch);
+      const vResult = validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts);
+      if (!vResult.ok) return { ok: false, code: 'constraint' };
+    }
+    const result = applyFn(store, batch, buildOpts);
+    if (!result || !result.success) return { ok: false, code: 'store' };
+  }
+  return {
+    ok: true,
+    ops,
+    runtimeClauses: buildFn(staticClauses, store, buildOpts),
+  };
 }
 
 function logicWireRowToListTerm(bits, matrixShape, rowIndex, bindType, fillBits, numberFormat) {
@@ -4965,6 +5347,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicEachRowCountForWireRef = logicEachRowCountForWireRef;
   globalThis.logicExpandMutationEachOps = logicExpandMutationEachOps;
   globalThis.logicExpandMutationOps = logicExpandMutationOps;
+  globalThis.logicExpandRetractAllOps = logicExpandRetractAllOps;
+  globalThis.logicExpandMutationGoalToOps = logicExpandMutationGoalToOps;
+  globalThis.logicExpandMutationItemsToOps = logicExpandMutationItemsToOps;
+  globalThis.logicExecuteMutationOps = logicExecuteMutationOps;
+  globalThis.logicTermMatchesRetractTemplate = logicTermMatchesRetractTemplate;
   globalThis.logicExpandOneMutationEachItem = logicExpandOneMutationEachItem;
   globalThis.logicEncodeListToVectorBits = logicEncodeListToVectorBits;
   globalThis.logicListBindTypeFromTerm = logicListBindTypeFromTerm;

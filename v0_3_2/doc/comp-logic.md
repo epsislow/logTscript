@@ -998,11 +998,11 @@ After **Load & Run**: **`failed = 0`**. No query is solved; the mutation commits
 
 ---
 
-## Runtime mutations — `logic { + / - }`
+## Runtime mutations — `logic { + / - / ~ }` and `commit(…)`
 
-Change the effective knowledge base on each solve pass without editing `inline [logic]`. Full behaviour, tombstones, and **`mutationFailed`** → [logic-runtime.md](logic-runtime.md).
+Change the effective knowledge base on each solve pass without editing `inline [logic]`. Full behaviour, tombstones, pattern retract, atomic batches, and **`mutationFailed`** → [logic-runtime.md](logic-runtime.md).
 
-**`data:`** selects the runtime KB mode (**`overlay`**, **`static`**, **`seed`**) — see [logic-runtime.md — data modes](logic-runtime.md#data-modes). **`data: static`** forbids **`logic { }`** blocks.
+**`data:`** selects the runtime KB mode (**`overlay`**, **`static`**, **`seed`**) — see [logic-runtime.md — data modes](logic-runtime.md#data-modes). **`data: static`** forbids **`logic { }`** blocks and runtime mutation goals.
 
 ```logts
 .whLogic:{
@@ -1019,7 +1019,9 @@ Change the effective knowledge base on each solve pass without editing `inline [
 | Construct | Role |
 |-----------|------|
 | **`+ groundFact`** | Assert fact into component dynamic store |
-| **`- groundFact`** | Tombstone — hide matching static or dynamic fact |
+| **`- groundFact`** | Tombstone — hide one matching static or dynamic fact |
+| **`~ Template`** | Retract **all** ground facts matching the template (`_` wildcard per argument) |
+| **`commit(Op1, Op2, …)`** | Atomic batch in **named query** or **rule body** — all ops succeed or none apply |
 | **`text each vec`** / **`text list each mat`** | Expand to **N** separate ground facts (zip rows) before commit — [logic-runtime.md — each](logic-runtime.md#mutation-each--zip-rows-into-n-facts) |
 | **`text every vec`** / **`text list every mat`** | Cartesian expansion — every cell or row-list is an alternative; combine with **`each`** inside compounds — [logic-runtime.md — every](logic-runtime.md#mutation-every--cartesian-expansion) |
 | **`mutationFailed >= wire`** | **`1`** if transaction failed (store unchanged) |
@@ -1027,6 +1029,90 @@ Change the effective knowledge base on each solve pass without editing `inline [
 Mutations run **before** query redirects in the same pass. The dynamic store **persists** across `set` triggers on the same component.
 
 **Constraints** (`constraint P <= Body` in inline) validate init and each mutation commit — [logic-constraints.md](logic-constraints.md).
+
+### Example — pattern retract `~` (Load & Run)
+
+```logts-play
+inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+:
+
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP1 = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    logic {
+        ~ turn(_)
+        + turn(p1)
+    }
+    hasP1 >= okP1
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 0`**, **`okP1 = 1`**, **`okP2 = 0`**.
+
+### Example — `commit(…)` in a named query (Load & Run)
+
+Define a rule or query that batches **`~`** and **`+`** ops, then wire **`query = resetGame`** on the component:
+
+```logts-play
+inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    reset() <- commit(~ turn(_), + turn(p1))
+
+    query resetGame:
+        reset()
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+:
+
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP1 = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    query = resetGame, hasP1, hasP2
+    hasP1 >= okP1
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 0`**, **`okP1 = 1`**, **`okP2 = 0`**. A successful **`commit`** stays applied even when a **later goal in the same query** fails — see [logic-runtime.md — commit](logic-runtime.md#atomic-batch--commit).
 
 ```logts-play
 inline [logic] .warehouse:
@@ -1064,9 +1150,9 @@ After **Load & Run**: **`where`** shows **`c2`**; **`failed = 0`**.
 
 ---
 
-## Constraint check — `.whLogic:check({ + / - })`
+## Constraint check — `.whLogic:check({ + / - / ~ })`
 
-Simulate a mutation transaction **read-only**: same ops syntax and constraint validator as **`logic { }`**, but the dynamic store is **not** modified and **`mutationFailed`** is **not** set.
+Simulate a mutation transaction **read-only**: same ops syntax (**`+`**, **`-`**, **`~`**) and constraint validator as **`logic { }`**, but the dynamic store is **not** modified and **`mutationFailed`** is **not** set.
 
 Invoke on **`comp [logic]`** only (not on inline instances):
 

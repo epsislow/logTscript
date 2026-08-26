@@ -5325,6 +5325,10 @@ assignment() {
           const bracePos = this.t.i - 1;
           const raw = this.parseRawBraceBlock(bracePos);
           methodArgs.push({ kind: 'logicMutationBlock', raw });
+        } else if (property === 'mutate' && this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const raw = this.parseRawBraceBlock(bracePos);
+          methodArgs.push({ kind: 'logicMutationBlock', raw });
         } else if (property === 'query' && this.c.type === 'SYM' && this.c.value === '{') {
           const bracePos = this.t.i - 1;
           const raw = this.parseRawBraceBlock(bracePos);

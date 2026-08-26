@@ -86,11 +86,11 @@ comp [logic] .worldLogic: on: 1 .world { } :
     {
       name: 'last recursive',
       src: `inline [logic] .world:
-    last([X], X)
-    last([_ | T], X) <- last(T, X)
+    lastElem([X], X)
+    lastElem([_ | T], X) <- lastElem(T, X)
     route([n, e, s])
 :
-1wire ok = .world:query({ route(L), last(L, X), show(X) })`,
+1wire ok = .world:query({ route(L), lastElem(L, X), show(X) })`,
       expect: ['s'],
     },
     {

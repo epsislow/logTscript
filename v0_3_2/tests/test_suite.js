@@ -48189,5 +48189,289 @@ comp [logic] .pairLogic:
   reg(4427, 'logic', 'F33 each zip regression after F43 (legacy)', runF33EachZipVectors);
   reg(4428, 'logic', 'F33 each zip regression after F43 (wave)', runF33EachZipVectors, { propagation: 'wave' });
 
+  const INLINE_LOGIC_F44_TURNS = `inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    reset() <- commit(~ turn(_), + turn(p1))
+
+    query resetGame:
+        reset()
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+:`;
+
+  const INLINE_LOGIC_F44_MIXED = `inline [logic] .mixed:
+
+    playerPos(p1, c1)
+    playerPos(p2, c2)
+    status(active)
+
+    query hasStatus:
+        status(active)
+
+    query hasP1:
+        playerPos(p1, _)
+
+:`;
+
+  function runF44RetractAll(h, session) {
+    const src = `inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+:` + `
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP1 = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    logic { ~ turn(_) }
+    hasP1 >= okP1
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('p1 gone', interp.getWireEffectiveValue('okP1'), '0');
+    h.assert('p2 gone', interp.getWireEffectiveValue('okP2'), '0');
+  }
+
+  reg(4430, 'logic', 'F44 ~ turn(_) clears all turn facts (legacy)', runF44RetractAll);
+  reg(4431, 'logic', 'F44 ~ turn(_) clears all turn facts (wave)', runF44RetractAll, { propagation: 'wave' });
+
+  function runF44RetractPreservesOther(h, session) {
+    const src = INLINE_LOGIC_F44_MIXED + `
+comp [logic] .mg:
+    on: 1
+    .mixed { }
+:
+
+1wire failed = 0
+1wire okStatus = 0
+1wire okP1 = 1
+1wire trigger = 1
+
+.mg:{
+    logic { ~ playerPos(_, _) }
+    hasStatus >= okStatus
+    hasP1 >= okP1
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('status kept', interp.getWireEffectiveValue('okStatus'), '1');
+    h.assert('p1 gone', interp.getWireEffectiveValue('okP1'), '0');
+  }
+
+  reg(4432, 'logic', 'F44 ~ pattern keeps other predicates (legacy)', runF44RetractPreservesOther);
+  reg(4433, 'logic', 'F44 ~ pattern keeps other predicates (wave)', runF44RetractPreservesOther, { propagation: 'wave' });
+
+  reg(4438, 'logic', 'F44 parse ~ turn(_) token', function(h) {
+    const ops = parseLogicMutationBlock('~ turn(_)\n+ turn(p1)');
+    h.assert('two ops', String(ops.length), '2');
+    h.assert('retract_all', ops[0].op, 'retract_all');
+    h.assert('add', ops[1].op, 'add');
+    h.assert('wildcard', ops[0].template.args[0].name, '_');
+  });
+
+  function runF44CommitResetRule(h, session) {
+    const src = INLINE_LOGIC_F44_TURNS + `
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP1 = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    query = resetGame, hasP1, hasP2
+    hasP1 >= okP1
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('only p1', interp.getWireEffectiveValue('okP1'), '1');
+    h.assert('p2 gone', interp.getWireEffectiveValue('okP2'), '0');
+  }
+
+  reg(4439, 'logic', 'F44 resetGame query invokes commit rule (legacy)', runF44CommitResetRule);
+  reg(4444, 'logic', 'F44 resetGame query invokes commit rule (wave)', runF44CommitResetRule, { propagation: 'wave' });
+
+  function runF44InlineQueryMutationError(h, session) {
+    const src = INLINE_LOGIC_F44_TURNS + `
+1wire q = 0
+q = .turns:query({ reset() })`;
+    let err = '';
+    try { session.run(src); } catch (e) { err = e.message || String(e); }
+    h.assert('mutation forbidden', err.includes('mutation') ? '1' : '0', '1');
+  }
+
+  reg(4441, 'logic', 'F44 inline :query invoking mutating rule errors (legacy)', runF44InlineQueryMutationError);
+  reg(4442, 'logic', 'F44 inline :query invoking mutating rule errors (wave)', runF44InlineQueryMutationError, { propagation: 'wave' });
+
+  reg(4443, 'logic', 'F44 inline :mutate method forbidden (legacy)', function(h, session) {
+    const src = `inline [logic] .x:
+    status(a)
+:
+1wire q = 0
+q = .x:mutate({ + status(b) })`;
+    let err = '';
+    try { session.run(src); } catch (e) { err = e.message || String(e); }
+    h.assert('mutate forbidden', err.includes('mutate') ? '1' : '0', '1');
+  });
+
+  function runF44StaticDataMutation(h, session) {
+    const src = INLINE_LOGIC_F44_TURNS + `
+comp [logic] .tg:
+    on: 1
+    data: static
+    .turns { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.tg:{
+    logic { + turn(p3) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    let err = '';
+    try { session.run(src); } catch (e) { err = e.message || String(e); }
+    h.assert('static forbids mutation', err.includes('static') ? '1' : '0', '1');
+  }
+
+  reg(4454, 'logic', 'F44 data static forbids comp mutation (legacy)', runF44StaticDataMutation);
+  reg(4455, 'logic', 'F44 data static forbids comp mutation (wave)', runF44StaticDataMutation, { propagation: 'wave' });
+
+  function runF44CommitPersistsAfterFail(h, session) {
+    const src = `inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    reset() <- commit(~ turn(_), + turn(p1))
+
+    query resetGame:
+        reset()
+
+    query hasP1:
+        turn(p1)
+
+    query hasP2:
+        turn(p2)
+
+    query resetThenFail:
+        commit(~ turn(_), + turn(p1)), fail()
+
+:` + `
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire okP1 = 0
+1wire trigger = 1
+
+.tg:{
+    query = resetThenFail, hasP1
+    hasP1 >= okP1
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('commit persisted despite fail()', interp.getWireEffectiveValue('okP1'), '1');
+  }
+
+  function runF44CommitThenGoalSameQuery(h, session) {
+    const src = `inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    query resetAndCheck:
+        commit(~ turn(_), + turn(p1)), turn(p1)
+
+:` + `
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.tg:{
+    resetAndCheck >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('commit then goal succeeds', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4457, 'logic', 'F44 commit then goal in same query (legacy)', runF44CommitThenGoalSameQuery);
+  reg(4458, 'logic', 'F44 commit then goal in same query (wave)', runF44CommitThenGoalSameQuery, { propagation: 'wave' });
+
+  reg(4453, 'logic', 'F44 commit persists when later goal fails (legacy)', runF44CommitPersistsAfterFail);
+  reg(4456, 'logic', 'F44 commit persists when later goal fails (wave)', runF44CommitPersistsAfterFail, { propagation: 'wave' });
+
+  reg(4447, 'logic', 'F44 show inside commit parse error', function(h) {
+    let err = '';
+    try { parseLogicGoalsBlock('commit(show("x"), + status(a))'); } catch (e) { err = e.message || String(e); }
+    h.assert('show rejected', err.includes('show') ? '1' : '0', '1');
+  });
+
+  reg(4448, 'logic', 'F44 commit rule head reserved', function(h) {
+    let err = '';
+    try { parseLogicBody('commit(X) <- true'); } catch (e) { err = e.message || String(e); }
+    h.assert('commit reserved', err.includes('commit') ? '1' : '0', '1');
+  });
+
+  reg(4437, 'logic', 'F44 logic { + - } regression unchanged (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_TAGS + `
+comp [logic] .tagLogic:
+    on: 1
+    .tags { }
+:
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+.tagLogic:{
+    logic { + status(box1, active) }
+    hasActive >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

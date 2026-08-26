@@ -4,6 +4,8 @@
 
 Runtime wiring lives in [`comp [logic]`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [`logic-query-exec.md`](logic-query-exec.md) — **`.world:query({ goals }, Var=<type> wire)`** with explicit **`text` / `number` / `bool`** and optional **`list`**.
 
+**`.world:query({ … })`** and **`.inline:query({ … })`** are **read-only**: goals that mutate the KB (**`+`**, **`-`**, **`~`**, **`commit(…)`**, or rules whose bodies contain them) are rejected. Use **`comp [logic]`** with **`logic { }`**, named queries, or rule bodies for runtime mutations — see [logic-runtime.md](logic-runtime.md).
+
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run**.
 
 ---
@@ -438,24 +440,24 @@ inline [logic] .world:
 
 ### Last element — recursion and `append/3`
 
-**Recursive last/2** (standard Prolog textbook pattern):
+**Recursive last/2** (standard Prolog textbook pattern — user-defined name; built-in **`last/2`** is reserved):
 
 ```logts-play
 inline [logic] .world:
 
-    last([X], X)
-    last([_ | T], X) <- last(T, X)
+    lastElem([X], X)
+    lastElem([_ | T], X) <- lastElem(T, X)
 
     route([n, e, s])
 
     query lastStep:
         route(L),
-        last(L, X),
+        lastElem(L, X),
         show(X)
 
 :
 
-1wire ok = .world:query({ route(L), last(L, X), show(X) })
+1wire ok = .world:query({ route(L), lastElem(L, X), show(X) })
 ```
 
 **Load & Run** → **`s`**.

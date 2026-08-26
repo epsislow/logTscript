@@ -1743,6 +1743,11 @@ class Interpreter {
     }
 
     const goals = parseGoalsFn(blockArg.raw);
+    const containMutFn = typeof logicGoalsContainMutation === 'function'
+      ? logicGoalsContainMutation : null;
+    if (containMutFn && containMutFn(goals)) {
+      throw new Error(`${instName}:query does not support mutation goals (+ / - / ~ / commit)`);
+    }
     const merged = resolveFn(inlineInst, this.inlineInstances);
     const inputEnv = {};
     const outputHints = {};
@@ -2020,6 +2025,9 @@ class Interpreter {
     }
     if (inlineInst && inlineInst.kind === 'logic' && method === 'query') {
       return this.evalLogicInlineQuery(invoke);
+    }
+    if (inlineInst && inlineInst.kind === 'logic' && method === 'mutate') {
+      throw new Error(`${instName}:mutate is not available on inline [logic]`);
     }
     if (inlineInst && inlineInst.kind === 'protocol' && method === 'decode') {
       return this.evalProtocolDecode(inlineInst, args, computeRefs);
