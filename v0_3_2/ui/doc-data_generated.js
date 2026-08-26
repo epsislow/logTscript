@@ -6958,7 +6958,7 @@ Dual-mode gates (fold or bitwise). Example with OR:
 ### Runnable example
 
 \`\`\`logts-play
-5wire a = 111
+3wire a = 111
 5wire b = 10000
 5wire y = AND(a, b)
 show(y)
