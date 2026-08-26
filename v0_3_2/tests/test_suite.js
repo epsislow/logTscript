@@ -48895,56 +48895,56 @@ comp [logic] .colorLogic:
   reg(4481, 'logic', 'F45 || OR in comp query body (legacy)', runF45QueryOrInline);
   reg(4482, 'logic', 'F45 || OR in comp query body (wave)', runF45QueryOrInline, { propagation: 'wave' });
 
-  const INLINE_LOGIC_F45_SAU_CUT = `inline [logic] .sau:
+  const INLINE_LOGIC_F45_SMART_OR = `inline [logic] .smartOr:
 
-    conditie1(a, b)
-    conditie2(c)
+    condition1(a, b)
+    condition2(c)
 
-    cond1() <- conditie1(a, b)
-    cond2() <- conditie2(c)
-    condFail() <- fail()
+    goalCond1() <- condition1(a, b)
+    goalCond2() <- condition2(c)
+    goalFail() <- fail()
 
-    sau_inteligent(Cond1, _) <- call(Cond1), !
-    sau_inteligent(_, Cond2) <- call(Cond2)
+    smart_or(Cond1, _) <- call(Cond1), !
+    smart_or(_, Cond2) <- call(Cond2)
 
-    query firstWins:
-        sau_inteligent(cond1(), cond2()),
+    query firstBranchWins:
+        smart_or(goalCond1(), goalCond2()),
         show("first")
 
-    query secondWins:
-        sau_inteligent(condFail(), cond2()),
+    query secondBranchWins:
+        smart_or(goalFail(), goalCond2()),
         show("second")
 
     query bothFail:
-        sau_inteligent(condFail(), condFail())
+        smart_or(goalFail(), goalFail())
 
 :`;
 
-  function runF45SauInteligentCut(h, session) {
-    const mergedSrc = INLINE_LOGIC_F45_SAU_CUT;
+  function runF45SmartOrCut(h, session) {
+    const mergedSrc = INLINE_LOGIC_F45_SMART_OR;
     session.run(mergedSrc);
     const merged = logicResolveMerged(
-      session.interp.inlineInstances.get('.sau'),
+      session.interp.inlineInstances.get('.smartOr'),
       session.interp.inlineInstances,
     );
     const results = executeLogicQueries(merged, {}, {});
-    h.assert('firstWins one solution', String(results.firstWins.length), '1');
-    h.assert('secondWins one solution', String(results.secondWins.length), '1');
+    h.assert('firstBranchWins one solution', String(results.firstBranchWins.length), '1');
+    h.assert('secondBranchWins one solution', String(results.secondBranchWins.length), '1');
     h.assert('bothFail no solution', String(results.bothFail.length), '0');
-    h.assert('two sau_inteligent clauses', String(
-      merged.clauses.filter((c) => c.head.predicate === 'sau_inteligent').length,
+    h.assert('two smart_or clauses', String(
+      merged.clauses.filter((c) => c.head.predicate === 'smart_or').length,
     ), '2');
 
     const srcComp = mergedSrc + `
-comp [logic] .sauLogic:
+comp [logic] .smartOrLogic:
     on: 1
-    .sau { }
+    .smartOr { }
 :
 
 1wire trigger = 1
 
-.sauLogic:{
-    query = firstWins
+.smartOrLogic:{
+    query = firstBranchWins
     set = trigger
 }`;
     const { interp } = session.run(srcComp);
@@ -48952,8 +48952,8 @@ comp [logic] .sauLogic:
     h.assert('no spurious second', String(session.outIncludes(interp, 'second')), 'false');
   }
 
-  reg(4483, 'logic', 'F45 sau_inteligent two clauses + ! like if (legacy)', runF45SauInteligentCut);
-  reg(4484, 'logic', 'F45 sau_inteligent two clauses + ! like if (wave)', runF45SauInteligentCut, { propagation: 'wave' });
+  reg(4483, 'logic', 'F45 smart_or two clauses + ! like if (legacy)', runF45SmartOrCut);
+  reg(4484, 'logic', 'F45 smart_or two clauses + ! like if (wave)', runF45SmartOrCut, { propagation: 'wave' });
 
   window.LogTScriptTestSuite.finalize();
 })();

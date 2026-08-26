@@ -1425,8 +1425,8 @@ See [logic-builtins.md — `if/3`](logic-builtins.md#if3).
 The same **soft if-then-else** semantics can be written without **`if/3`**, using **two clauses** and **cut** (classic Prolog `->` idiom). **`_`** in the rule head marks an argument slot that is **not used** in that clause (anonymous “don’t care” position — distinct from a named variable like **`_Cond`**).
 
 ```logts
-sau_inteligent(Cond1, _) <- call(Cond1), !
-sau_inteligent(_, Cond2) <- call(Cond2)
+smart_or(Cond1, _) <- call(Cond1), !
+smart_or(_, Cond2) <- call(Cond2)
 ```
 
 | Call | Behaviour |
@@ -1438,50 +1438,50 @@ sau_inteligent(_, Cond2) <- call(Cond2)
 This is equivalent to:
 
 ```logts
-sau_inteligent(C1, C2) <- if(call(C1), true, call(C2))
+smart_or(C1, C2) <- if(call(C1), true, call(C2))
 ```
 
 Use **`if/3`** when you prefer one rule; use **clauses + `!`** when porting Prolog or when **`call/1`** receives a compound goal term.
 
-### Example — `sau_inteligent` with cut (Load & Run)
+### Example — `smart_or` with cut (Load & Run)
 
 ```logts-play
-inline [logic] .sau:
+inline [logic] .smartOr:
 
-    conditie1(a, b)
-    conditie2(c)
+    condition1(a, b)
+    condition2(c)
 
-    cond1() <- conditie1(a, b)
-    cond2() <- conditie2(c)
-    condFail() <- fail()
+    goalCond1() <- condition1(a, b)
+    goalCond2() <- condition2(c)
+    goalFail() <- fail()
 
-    sau_inteligent(Cond1, _) <- call(Cond1), !
-    sau_inteligent(_, Cond2) <- call(Cond2)
+    smart_or(Cond1, _) <- call(Cond1), !
+    smart_or(_, Cond2) <- call(Cond2)
 
-    query firstWins:
-        sau_inteligent(cond1(), cond2()),
+    query firstBranchWins:
+        smart_or(goalCond1(), goalCond2()),
         show("first branch")
 
-    query secondWins:
-        sau_inteligent(condFail(), cond2()),
+    query secondBranchWins:
+        smart_or(goalFail(), goalCond2()),
         show("second branch")
 
 :
 
-comp [logic] .sauLogic:
+comp [logic] .smartOrLogic:
     on: 1
-    .sau { }
+    .smartOr { }
 :
 
 1wire trigger = 1
 
-.sauLogic:{
-    query = firstWins
+.smartOrLogic:{
+    query = firstBranchWins
     set = trigger
 }
 ```
 
-**Load & Run** prints **`first branch`** only — **`cond2()`** is not tried because **`cond1()`** succeeded and **`!`** committed. Change to **`query = secondWins`** and run again — prints **`second branch`**.
+**Load & Run** prints **`first branch`** only — **`goalCond2()`** is not tried because **`goalCond1()`** succeeded and **`!`** committed. Change to **`query = secondBranchWins`** and run again — prints **`second branch`**.
 
 ### Example — reset when allowed (Load & Run)
 
