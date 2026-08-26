@@ -22111,6 +22111,69 @@ Each argument is a single goal or **\`( g1, g2, … )\`**. Use parentheses for m
 
 See [logic-builtins.md — \`if/3\`](logic-builtins.md#if3).
 
+### Prolog-style equivalent — two clauses + \`!\`
+
+The same **soft if-then-else** semantics can be written without **\`if/3\`**, using **two clauses** and **cut** (classic Prolog \`->\` idiom). **\`_\`** in the rule head marks an argument slot that is **not used** in that clause (anonymous “don’t care” position — distinct from a named variable like **\`_Cond\`**).
+
+\`\`\`logts
+sau_inteligent(Cond1, _) <- call(Cond1), !
+sau_inteligent(_, Cond2) <- call(Cond2)
+\`\`\`
+
+| Call | Behaviour |
+|------|-----------|
+| **\`call(Cond1)\`** succeeds | First clause succeeds; **\`!\`** prevents trying the second clause |
+| **\`call(Cond1)\`** fails | Second clause runs **\`call(Cond2)\`** |
+| Both fail | Query fails (no solution) |
+
+This is equivalent to:
+
+\`\`\`logts
+sau_inteligent(C1, C2) <- if(call(C1), true, call(C2))
+\`\`\`
+
+Use **\`if/3\`** when you prefer one rule; use **clauses + \`!\`** when porting Prolog or when **\`call/1\`** receives a compound goal term.
+
+### Example — \`sau_inteligent\` with cut (Load & Run)
+
+\`\`\`logts-play
+inline [logic] .sau:
+
+    conditie1(a, b)
+    conditie2(c)
+
+    cond1() <- conditie1(a, b)
+    cond2() <- conditie2(c)
+    condFail() <- fail()
+
+    sau_inteligent(Cond1, _) <- call(Cond1), !
+    sau_inteligent(_, Cond2) <- call(Cond2)
+
+    query firstWins:
+        sau_inteligent(cond1(), cond2()),
+        show("first branch")
+
+    query secondWins:
+        sau_inteligent(condFail(), cond2()),
+        show("second branch")
+
+:
+
+comp [logic] .sauLogic:
+    on: 1
+    .sau { }
+:
+
+1wire trigger = 1
+
+.sauLogic:{
+    query = firstWins
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`first branch\`** only — **\`cond2()\`** is not tried because **\`cond1()\`** succeeded and **\`!\`** committed. Change to **\`query = secondWins\`** and run again — prints **\`second branch\`**.
+
 ### Example — reset when allowed (Load & Run)
 
 \`\`\`logts-play
@@ -27282,6 +27345,8 @@ if(Cond, Then, Else)
 **Side effects:** **\`show/N\`** on the branch **not taken** does not run (same as Prolog).
 
 **Mutations:** **\`commit(…)\`** and **\`+\` / \`-\` / \`~\`** may appear in **Then** / **Else** on **\`comp [logic]\`** (same store as [logic-runtime.md](logic-runtime.md)). **\`||\`** between two **\`commit\`** goals is **allowed** — effects from an earlier branch may persist after backtrack; prefer **\`if/3\`** when you need a single deterministic choice.
+
+**Prolog alternative:** two clauses + **\`!\`** + **\`call/1\`** — same soft if-then-else as **\`if(call(Cond), true, Else)\`**; see [inline-logic.md — Prolog-style equivalent](inline-logic.md#prolog-style-equivalent--two-clauses--).
 
 ### Example — allowed vs denied (Load & Run)
 

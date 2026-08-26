@@ -2729,6 +2729,8 @@ if(Cond, Then, Else)
 
 **Mutations:** **`commit(…)`** and **`+` / `-` / `~`** may appear in **Then** / **Else** on **`comp [logic]`** (same store as [logic-runtime.md](logic-runtime.md)). **`||`** between two **`commit`** goals is **allowed** — effects from an earlier branch may persist after backtrack; prefer **`if/3`** when you need a single deterministic choice.
 
+**Prolog alternative:** two clauses + **`!`** + **`call/1`** — same soft if-then-else as **`if(call(Cond), true, Else)`**; see [inline-logic.md — Prolog-style equivalent](inline-logic.md#prolog-style-equivalent--two-clauses--).
+
 ### Example — allowed vs denied (Load & Run)
 
 ```logts-play

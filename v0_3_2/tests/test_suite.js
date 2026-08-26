@@ -48895,5 +48895,65 @@ comp [logic] .colorLogic:
   reg(4481, 'logic', 'F45 || OR in comp query body (legacy)', runF45QueryOrInline);
   reg(4482, 'logic', 'F45 || OR in comp query body (wave)', runF45QueryOrInline, { propagation: 'wave' });
 
+  const INLINE_LOGIC_F45_SAU_CUT = `inline [logic] .sau:
+
+    conditie1(a, b)
+    conditie2(c)
+
+    cond1() <- conditie1(a, b)
+    cond2() <- conditie2(c)
+    condFail() <- fail()
+
+    sau_inteligent(Cond1, _) <- call(Cond1), !
+    sau_inteligent(_, Cond2) <- call(Cond2)
+
+    query firstWins:
+        sau_inteligent(cond1(), cond2()),
+        show("first")
+
+    query secondWins:
+        sau_inteligent(condFail(), cond2()),
+        show("second")
+
+    query bothFail:
+        sau_inteligent(condFail(), condFail())
+
+:`;
+
+  function runF45SauInteligentCut(h, session) {
+    const mergedSrc = INLINE_LOGIC_F45_SAU_CUT;
+    session.run(mergedSrc);
+    const merged = logicResolveMerged(
+      session.interp.inlineInstances.get('.sau'),
+      session.interp.inlineInstances,
+    );
+    const results = executeLogicQueries(merged, {}, {});
+    h.assert('firstWins one solution', String(results.firstWins.length), '1');
+    h.assert('secondWins one solution', String(results.secondWins.length), '1');
+    h.assert('bothFail no solution', String(results.bothFail.length), '0');
+    h.assert('two sau_inteligent clauses', String(
+      merged.clauses.filter((c) => c.head.predicate === 'sau_inteligent').length,
+    ), '2');
+
+    const srcComp = mergedSrc + `
+comp [logic] .sauLogic:
+    on: 1
+    .sau { }
+:
+
+1wire trigger = 1
+
+.sauLogic:{
+    query = firstWins
+    set = trigger
+}`;
+    const { interp } = session.run(srcComp);
+    h.assert('cut skips second branch output', String(session.outIncludes(interp, 'first')), 'true');
+    h.assert('no spurious second', String(session.outIncludes(interp, 'second')), 'false');
+  }
+
+  reg(4483, 'logic', 'F45 sau_inteligent two clauses + ! like if (legacy)', runF45SauInteligentCut);
+  reg(4484, 'logic', 'F45 sau_inteligent two clauses + ! like if (wave)', runF45SauInteligentCut, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
