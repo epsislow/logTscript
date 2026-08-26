@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** … **F43✅**; **F44⏳** `+`/`-`/`~`/`commit` **comp-only**; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** … **F44✅**; **F45** **`||`** OR + **`if/3`** — D379–D388✅ ready-to-implement; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -225,7 +225,10 @@ todos:
     content: "F43e: float/<format> every + doc + trace/.check — teste 4421+"
     status: completed
   - id: logic-inline-mut-44
-    content: "Faza 44 (2+p): +/−/~ + commit — comp-only exec; inline static la :query — D355–D378✅"
+    content: "Faza 44 (2+p): +/−/~ + commit — comp-only exec; inline static la :query — D355–D378✅; teste 4430–4458"
+    status: completed
+  - id: logic-control-flow-45
+    content: "Faza 45 (2+q): || OR + if/3 soft cut — D379–D388✅ confirmed; interzis :query — ready-to-implement"
     status: pending
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
@@ -1519,7 +1522,8 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
 | **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e✅** — [Faza 42](#faza-42--is2-extins--random-float-2m--completed) | **✅ completed** |
 | **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e✅** — D341–D354 — [Faza 43](#faza-43--mutation-every-expansion-2o--completed) | **✅ completed** |
-| **Faza 44** Inline **`+`/`-`/`~`** + **`commit/…`** (**2+p**) | D355–D375 — [Faza 44](#faza-44--inline--retractall-via-2p--planning) | **⏳ planning** |
+| **Faza 44** Inline **`+`/`-`/`~`** + **`commit/…`** (**2+p**) | D355–D378 — [Faza 44](#faza-44--inline--retractall-via-2p--completed) | **✅ completed** |
+| **Faza 45** Control flow **`||`** + **`if/3`** (**2+q**) | D379–D388✅ — [Faza 45](#faza-45--control-flow--or--if3-2q--ready-to-implement) | **(ready-to-implement)** |
 
 
 ---
@@ -6788,10 +6792,11 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+n**~~ | IEEE f32/f64 nativ LogTScript | **Livrat → Faza 41✅** — `show(; f32/f64)`, NFORMAT, builtins; codec unificat logic↔wire; teste **4310–4385** | **F41**    | F40, F39 fp16, D327+ **(completed)** |
 | ✅     | ~~**2+m**~~ | `is/2` float extins         | **Livrat → Faza 42✅** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float**, **`random/1`**; teste **4386–4410** | **F42**    | F26, F40c, F34, D332–D340 **(completed)** |
 | ✅     | ~~**2+o**~~ | Mutation **`every`**        | **Livrat → Faza 43✅** — cartesian; mix `each`+`every`; compound nested; cap 10 000; teste **4411–4428** | **F43**    | F33, F25, F40b, D341–D354 **(completed)** |
-| ⏳     | **2+p**     | Inline **`+`/`-`/`~`** + **`commit`** | **F44⏳** — mutații **doar comp**; inline `:query` static; `:mutate` respins — [Faza 44](#faza-44--inline--retractall-via-2p--planning) | **F44**    | F11, D49 **(planning done)** |
+| ✅     | ~~**2+p**~~     | Inline **`+`/`-`/`~`** + **`commit`** | **F44✅** — [Faza 44](#faza-44--inline--retractall-via-2p--completed) | **F44**    | F11, D355–D378 **(completed)** |
+| ⏳     | **2+q**     | **`||`** OR + builtin **`if/3`** | **F45** — D379–D388✅ — [Faza 45](#faza-45--control-flow--or--if3-2q--ready-to-implement) | **F45**    | F24 (`!`), F7 (`\+`), F9, F44 **(ready-to-implement)** |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · ~~**2+o**~~ **→ F43✅** · **2+p** (inline `+`/`-`/`~`) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · … · ~~**2+o**~~ **→ F43✅** · ~~**2+p**~~ **→ F44✅** · **2+q** (`||` + `if/3`) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -6847,7 +6852,14 @@ Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`,
 
 **Amânat post-F24 MVP.** F24 livrează `!` în query/reguli + **interzice** `!` în `\+ (…)` (D149-A). Cazul `\+ (p(X), !)` — cut **inner contorizat** în subdovada negată (spec ISO/SWI: taie doar choice point-urile din paranteză, nu pe cele din query/regulă exterioară) — **elaborare + implementare** când promovăm **2+f**. Până atunci: parse/validate → **elaboration error** clar (ex. `cut is not allowed inside \\+ (...)`).
 
-#### ~~**2+i**~~ ✅ → **Faza 38** (DCG Prolog) **(F38a✅ F38b✅ — completed)**
+#### ~~**2+p**~~ ✅ → **F44** (D355–D378) **(completed)**
+
+Inline **`+`/`-`/`~`** + **`commit(…)`** — exec **comp-only**; `.world:query` static; teste **4430–4458**. Vezi [Faza 44](#faza-44--inline--retractall-via-2p--completed).
+
+#### **2+q** ⏳ → **F45** (D379–D388✅) **(ready-to-implement)**
+
+**`||`** OR în corp (choice point) + builtin rezervat **`if/3`** (soft cut). Paranteze **`( goalSeq )`** per argument `if`. **Interzis** în `.world:query`. Vezi [Faza 45](#faza-45--control-flow--or--if3-2q--ready-to-implement).
+
 
 **Promovat** la **D290-B** (DCG out of scope F37). **Secțiune completă:** [Faza 38 — DCG Prolog](#faza-38--dcg-prolog-phrase-2i--completed) (**D297–D304✅** confirmed, **livrat**).
 
@@ -7044,7 +7056,7 @@ Query/redirect direct pe inline fără `comp [logic]` — **respins** (D1). Mode
 
 **Motivație nouă (2026-08-26):** reset KB fără zeci de linii `- fact` ground. **Exec mutații doar `comp [logic]`** — inline rămâne **static** la `.world:query`; un inline folosit de **N** comp-uri → store unic per comp, fără sync imposibil.
 
-**Stare:** **D355–D378✅** — vezi [Faza 44](#faza-44--inline--retractall-via-2p--planning). Ready **F44a**.
+**Stare:** **D355–D378✅** — vezi [Faza 44](#faza-44--inline--retractall-via-2p--completed). **✅ completed**.
 
 #### ~~**1+n**~~ 🟠✗ — parțial redeschis în F44
 
@@ -10618,11 +10630,11 @@ Medie-mare — parser mic + engine expand (cartesian + recursiv compound) + test
 
 ---
 
-## Faza 44 — Inline **`+`/`-`/`~`** (retractall via `~`) **(2+p — planning)**
+## Faza 44 — Inline **`+`/`-`/`~`** (retractall via `~`) **(2+p — completed)**
 
 > **Scop:** putem **scrie și aplica** `+ fact` / `- fact` / `~ Template` din **programul inline `[logic]`**, nu doar din `logic { }` pe exec block-ul `comp [logic]`.  
 > **Motivație:** reset joc / batch update; API apropiat de Prolog **`assertz`/`retract`/`retractall`**, dar **fără** builtins `assertz/1`, `retract/1`, `retractall/1` — doar prefix **`+` / `-` / `~`**.  
-> **Stare:** **⏳ planning complete** — **D355–D378✅**; mutații **comp-only**; gata **F44a**.  
+> **Stare:** **✅ completed** 2026-08-26 — **D355–D378✅**; teste **4430–4458** legacy+wave; doc **logic-runtime**, **comp-logic**, **inline-logic**; `commit` post-fail persistă (D376).  
 > **Context:** [F11](#faza-11--runtime-mutation-done) · [D49-A](#d49--inline-mutation-worldmutate-confirmed-a) **reconfirmat** — **fără** `.world:mutate`, **fără** store inline; F44 extinde ops în **program** inline dar **exec** doar pe **`comp.dynamicStore`**.
 
 ### Problemă (exemplu user)
@@ -11211,14 +11223,202 @@ flowchart TD
 - [x] **D364** — `show` interzis în `commit`
 - [x] **D361** — comp-only store
 - [x] **D378** — inline `:query` static; `:mutate` forbidden
-- [ ] Teste **4430+**; doc EN
+- [x] Teste **4430+**; doc EN
 
 ### Status F44
 
-**⏳ planning complete** — **D355–D378✅** — **comp-only exec** — ready **F44a**.
+**✅ completed** — **D355–D378✅** — teste **4430–4458**; doc EN; `_applyMutationGoal` denorm fix pentru goals internate post-`commit`.
 
 ### Legături
 
 - [Faza 11 — runtime mutation](#faza-11--runtime-mutation-done) · [D49](#d49--inline-mutation-worldmutate-confirmed-a) — **reconfirmat** (D378)
 - [Faza 17 — data: seed/static](#faza-17--comp-logic-data-static--seed-1r-completed)
-- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — jocul rămâne pe F11 până la F44
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — reset `commit(~ turn(_), …)` disponibil post-F44
+- [Faza 45 — `||` + `if/3`](#faza-45--control-flow--or--if3-2q--ready-to-implement) — control flow următor
+
+---
+
+## Faza 45 — Control flow **`||`** OR + builtin **`if/3`** **(2+q — ready-to-implement)**
+
+> **Backlog:** **2+q** — promovat 2026-08-26 din discuție design (OR vs if-then-else separate).  
+> **Extinde:** [Faza 7](#faza-7--negation--goal-completed) (`\+`), [Faza 24](#faza-24--cut--completed) (`!`), [Faza 44](#faza-44--inline--retractall-via-2p--completed) (`commit` + side effects în Then/Else).  
+> **Status:** **(ready-to-implement)** — **D379–D388✅** confirmed 2026-08-26; teste draft **4459+**; ready **F45a**.
+
+### Problemă (stare azi post-F44)
+
+| Situație | Comportament azi |
+| -------- | ---------------- |
+| OR în **același corp** de regulă | ❌ doar `,` (AND); OR doar prin **clauze multiple** același head |
+| If-then-else / soft cut | ❌ lipsește; workaround: clauze + `!` + helper predicates — verbose |
+| `reset() <- commit(...), show(...)` imbricat condițional | ✅ F44 `commit` + secvență `,` — **fără** ramuri condiționale compacte |
+| Backtrack prin OR când goal ulterior fail | ✅ la nivel de **clauze** (engine Prolog-like); ❌ **nu** exprimabil compact în corp |
+| `.world:query({ … })` | ✅ doar AND + read-only — păstrăm |
+
+**Scop F45:** două constructe **ortogonale**:
+
+1. **`||`** — OR pur (choice point, backtracking Prolog `;`)
+2. **`if/3`** — builtin rezervat (soft cut Prolog `->` / `;`, **nu** OR)
+
+**Explicit respins (user 2026-08-26):** cuvinte cheie `IF`/`THEN`/`ELSE`; Prolog literal `;` + `->` (confuz cu `<-`); `{ … }` ca grup goal în reguli (rezervat DCG/viitor); `{ ops }` mutații.
+
+### Sintaxă țintă
+
+#### **`||` — OR în corp (reguli + query comp)**
+
+```logts
+color(C) <- color_red(C) || color_blue(C)
+
+ceva(X) <- regula1(), X = r1 || regula2(), X = r2
+
+callCeva() <- ceva(X), nuAcceptRegula1(X)
+/* backtrack: regula1 path fail la nuAccept → încearcă regula2 */
+```
+
+| Regulă | Semantica |
+| ------ | --------- |
+| **`G1 \|\| G2`** | choice point — încearcă G1; la fail/backtrack încearcă G2 |
+| **`,`** | AND — leagă mai strâns decât `\|\|` (D383) |
+| **Paranteze** | `( a, b \|\| c ), d` — obligatorii când amesteci AND/OR |
+
+**Echivalent azi (verbose):** două clauze același head — același backtracking, fără tag pe ramură.
+
+#### **`if/3`** — builtin rezervat (soft cut)
+
+```logts
+reset() <- if(
+    ( canReset(), slotFree(_) ),
+    (
+        commit(~ turn(_), + turn(p1)),
+        show("turn reseted")
+    ),
+    show("not allowed to reset turn now")
+)
+```
+
+| Regulă | Semantica |
+| ------ | --------- |
+| **`if(Cond, Then, Else)`** | dacă **Cond** reușește → **doar Then** (fără backtrack Cond↔Else); altfel **Else** |
+| **Cond / Then / Else** | un singur goal **sau** **`( g1, g2, … )`** secvență AND (D381) |
+| **≥2 goals sau `\|\|` în arg** | paranteze **`( … )` obligatorii** — virgula din afara parantezelor = separator argument `if/3` |
+| **Imbricare** | `if(C1, if(C2, T, E2), E1)` sau multi-linii — formatare liberă |
+| **Head `if/3`** | ❌ rezervat (ca `last/2`, `commit`) |
+
+**Nu e OR:** `if(regula1(), regula2())` **nu** înseamnă „regula1 sau regula2” — pentru asta → **`||`**.
+
+### Decizii confirmate **D379–D388**
+
+#### D379 — **`||` = OR pur (choice point)** **(confirmed — 2026-08-26)**
+
+| Regulă | Decizie |
+| ------ | ------- |
+| Semantica | identică Prolog **`;`** — backtrack la fail pe rest goals |
+| Soluții multiple | da — dacă ambele ramuri reușesc cu binding-uri diferite (ex. `color(red) \|\| color(blue)`) |
+| Locuri permise | corp regulă, query **`comp [logic]`**, apel regulă din solve pass |
+| `.world:query` | ❌ **eroare elaborare** (D382) |
+
+#### D380 — **`if/3` builtin rezervat — soft cut** **(confirmed — 2026-08-26)**
+
+| Regulă | Decizie |
+| ------ | ------- |
+| Nume | **`if/3`** — **nu** `if_then_else/3` |
+| Semantica | Prolog **`(Cond -> Then ; Else)`** — Cond reușit → Then only; Cond fail → Else only |
+| Then fail după Cond OK | **nu** revine la Else (soft cut pe Cond) |
+| **`if/2`** | ❌ out of scope F45 MVP — folosește `if(C, T, fail())` dacă e nevoie |
+| Interacțiune `!` | documentat ca F24 — cut în Then/Else ca Prolog |
+
+#### D381 — **Paranteze `( goalSeq )` per argument `if/3`** **(confirmed — 2026-08-26)**
+
+| Formă | Valid |
+| ----- | ----- |
+| `if(canReset(), show("ok"), show("no"))` | ✅ un goal per arg |
+| `if( (a, b), (c, d), e )` | ✅ secvențe multi-goal |
+| `if( (a \|\| b), c, d )` | ✅ `\|\|` **în interiorul** parantezelor Cond |
+| `if(a, b, c, d)` | ❌ eroare — „if/3 expects 3 arguments; use `( … )` for multiple goals” |
+
+#### D382 — **Interzis în `.world:query` și `:query` inline read-only** **(confirmed — 2026-08-26)**
+
+| Construct | `.world:query` | `comp [logic]` reguli/query |
+| --------- | -------------- | --------------------------- |
+| **`||`** | ❌ | ✅ |
+| **`if/3`** | ❌ | ✅ |
+| Motiv | query ad-hoc = AND + unificare; control flow → reguli + comp | |
+
+#### D383 — **Precedență operators** **(confirmed — 2026-08-26)**
+
+| Nivel (strâns → larg) | Operator |
+| --------------------- | -------- |
+| 1 | `,` (AND) |
+| 2 | `\|\|` (OR) |
+| 3 | apel goal (`if/3`, predicate, …) |
+
+Paranteze explicite recomandate în doc pentru `( (a \|\| b), c )`.
+
+#### D384 — **OR la nivel de clauză rămâne** **(confirmed — 2026-08-26)**
+
+Clauze multiple același head = OR — **neschimbat** (F1). **`||`** = OR **în corp**; echivalent expresiv, nu depreciat.
+
+#### D385 — **Engine: fără motor nou** **(confirmed — 2026-08-26)**
+
+| Construct | Implementare draft |
+| --------- | ------------------- |
+| **`||`** | goal kind `or` — choice point în `_solveGoals` (mirror `_solveCall` multi-clause) |
+| **`if/3`** | builtin în `_solveCall` — soft cut: Cond once → Then sau Else |
+| Backtracking existent | choice stack + trail — deja folosit |
+
+#### D386 — **Side effects (`show`) în Then/Else** **(confirmed — 2026-08-26)**
+
+Comportament Prolog: output din ramura aleasă; **`show` pe ramura nealeasă nu rulează**. Teste obligatorii (pattern F21 show-backtrack).
+
+#### D387 — **Mutations în ramuri `if` / `||`** **(confirmed — 2026-08-26)**
+
+| Context | Regulă |
+| ------- | ------ |
+| **`commit` / `+` în Then** | ✅ pe **`comp.dynamicStore`** (F44) |
+| **`||` între două `commit`-uri** | ✅ **permis** — **fără** eroare elaborare; rulează cu backtrack Prolog; **doc** explică că efectele `commit` din prima ramură pot persista la backtrack — recomandă **`if`** când vrei alegere exclusivă deterministă, dar **nu** interzice |
+| `.world:query` | ❌ (D382) |
+
+#### D388 — **DCG `{ … }` neschimbat** **(confirmed — 2026-08-26)**
+
+`{ goals }` rămâne **doar** în corp DCG `-->` — **nu** reutilizat pentru goal-seq în reguli normale (user constraint).
+
+### Scope (subfaze echilibrate)
+
+| Subfază | Livrabil | Fișiere principale | Teste (draft) |
+| ------- | -------- | ------------------ | ------------- |
+| **F45a** | Parse **`if/3`** + `( goalSeq )` + rezervare head **`if/3`** | `logic-assembler.js` | **4459–4468** |
+| **F45b** | Engine **`if/3`** soft cut + denorm goals internate | `logic-engine.js` | **4469–4478** |
+| **F45c** | Token **`||`** + parse precedență + goal kind `or` | `logic-assembler.js`, `logic-engine.js` | **4479–4490** |
+| **F45d** | Guard **`.world:query`** + elaboration errors | `interpreter.js`, `parser.js` | **4491–4496** |
+| **F45e** | Doc EN + exemple `reset()` + `logts-play` + verify | `inline-logic.md`, `logic-builtins.md`, `comp-logic.md` | doc verify |
+
+**Pattern teste:** legacy + wave; ultimul ID F44 = **4458** → F45 pornește la **4459**.
+
+### Exemple test obligatorii (draft)
+
+| # | Scenariu | Așteptat |
+| --- | -------- | -------- |
+| T1 | `color(red) \|\| color(blue)` query | 2 soluții |
+| T2 | `ceva(X), tag(X)` — OR + fail rest → backtrack | soluție pe ramura 2 (tag explicit) |
+| T3 | `if(canReset(), commit(...), show("denied"))` | Then/Else exclusiv |
+| T4 | `if((a \|\| b), t, e)` în Cond | `\|\|` doar în paranteze Cond |
+| T5 | `.world:query({ if(...) })` | elaboration error |
+| T6 | `if( (c1,c2), t, e ), goalAfter` — Then fail | **nu** revine la Else; **nu** backtrack OR din Cond dacă soft cut (clarificat în test) |
+| T7 | `commit(A) \|\| commit(B)` — prima ramură commit + fail rest → backtrack | **fără** eroare; doc + test semantica persistență commit (D387) |
+
+### Criterii done (viitor)
+
+- [x] **D379–D388** confirmed
+- [ ] **F45a…F45e** livrate
+- [ ] Teste **4459+** legacy+wave
+- [ ] Doc EN + `logts-play` verify
+- [ ] **Fără** breaking changes pe reguli existente (doar additive)
+
+### Status F45
+
+**(ready-to-implement)** — **D379–D388✅** confirmed 2026-08-26; sintaxă **`||` + `if/3`**; ready **F45a** (parse `if/3`).
+
+### Legături
+
+- [Faza 24 — Cut `!`](#faza-24--cut--completed) · [Faza 7 — `\+`](#faza-7--negation--goal-completed)
+- [Faza 44 — `commit`](#faza-44--inline--retractall-via-2p--completed) — Then/Else cu mutații
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — `reset()` cu `if` + `commit` după F45
