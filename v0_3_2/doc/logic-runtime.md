@@ -21,7 +21,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across `set` passes on the same component |
 | **`.world:query`** | Reads **static inline only** — not the component dynamic overlay |
-| **Wire in mutation** | `text w` / `text list w` / … — bare id = atom; **`text each w`** / **`text list each matrix`** expand to N ops |
+| **Wire in mutation** | `text w` / `text list w` / … — bare id = atom; **`text each w`** zip rows; **`text every w`** Cartesian alternatives; **`text list each matrix`** / **`text list every matrix`** |
 | **Constraints** | `constraint P <= Body` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
@@ -609,6 +609,189 @@ comp [logic] .tagLogic:
 ```
 
 The literal **`active`** and the **`text list sharedTags`** value are identical on every expanded `tag/3` fact.
+
+---
+
+## Mutation **`every`** — Cartesian expansion
+
+Postfix modifier on wire refs (extends **`each`**):
+
+```text
+<text | number | bool | float[/fmt]> [list] every <wireName>
+```
+
+| Form | Wire shape | Expansion |
+|------|------------|-----------|
+| `text every V` | vector `Wwire[N]` | **every** cell value is an alternative (N expanded calls per other `every` arg) |
+| `number every V` | vector | every number cell |
+| `bool every V` | vector | every bool cell |
+| `float/fp16 every V` | vector | every decoded float cell |
+| `text list every M` | matrix `Wwire[R,C]` | **each matrix row** as one Prolog list alternative (R alternatives) |
+| `text every A` + `text every B` | two vectors | **full Cartesian product** (N×M expanded facts) |
+| `text each A` + `text every B` | vector + vector | **`each` zip** establishes rows, then **`every`** multiplies **within each row** |
+
+**Rules:**
+
+- **`each`** and **`every`** are **mutually exclusive on the same wire ref** (`text each every W` → parse error).
+- Multiple **`every`** args in one fact → Cartesian product across all of them.
+- Args **without** a modifier are **broadcast** (same as **`each`** expansion).
+- **`every`** inside **nested compounds** is expanded structurally before commit (same pipeline as top-level).
+- Expansion is capped at **10 000** ground facts per mutation/check op; exceeding the cap sets **`mutationFailed = 1`** with no partial commit.
+- `-` uses the same expansion as `+`.
+
+**Mental model:** **`each`** = pick synchronized row · **`every`** = pick every alternative · **plain** = broadcast once.
+
+### Example — Cartesian product (3×2)
+
+```logts-play
+inline [logic] .pairs:
+
+    query qah:
+        pair(a, h)
+    query qai:
+        pair(a, i)
+    query qbh:
+        pair(b, h)
+    query qbi:
+        pair(b, i)
+    query qch:
+        pair(c, h)
+    query qci:
+        pair(c, i)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.pairLogic:{
+    logic {
+        + pair(text every owners, text every cars)
+    }
+    qah >= ok
+    qai >= ok
+    qbh >= ok
+    qbi >= ok
+    qch >= ok
+    qci >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: six facts `(a,h)`, `(a,i)`, `(b,h)`, `(b,i)`, `(c,h)`, `(c,i)` → all six query wires **`1`**, **`failed = 0`**.
+
+### Example — `each` rows + `every` colors per row
+
+```logts-play
+inline [logic] .triples:
+
+    query q1:
+        triple(a, h, r)
+    query q6:
+        triple(b, i, b)
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+8wire[2] cars = 01101000 + 01101001
+8wire[3] colors = 01110010 + 01100111 + 01100010
+
+comp [logic] .tripleLogic:
+    on: 1
+    .triples { }
+:
+
+1wire ok1 = 0
+1wire ok6 = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tripleLogic:{
+    logic {
+        + triple(text each owners, text each cars, text every colors)
+    }
+    q1 >= ok1
+    q6 >= ok6
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **6** facts (2 zip rows × 3 colors) → **`ok1 = 1`**, **`ok6 = 1`**, **`failed = 0`**.
+
+### Example — nested compound with `each` + `every`
+
+```logts-play
+inline [logic] .loc:
+
+    query q1:
+        located(j, zone(1, n))
+    query q6:
+        located(m, zone(2, e))
+
+:
+
+8wire[2] names = 01101010 + 01101101
+16wire[2] ids = 0000000000000001 + 0000000000000010
+8wire[3] areas = 01101110 + 01110011 + 01100101
+
+comp [logic] .locLogic:
+    on: 1
+    .loc { }
+:
+
+1wire ok1 = 0
+1wire ok6 = 0
+1wire failed = 0
+1wire trigger = 1
+
+.locLogic:{
+    logic {
+        + located(
+            text each names,
+            zone(number each ids, text every areas)
+        )
+    }
+    q1 >= ok1
+    q6 >= ok6
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **6** facts — outer **`each`** on names; inner **`number each ids`** follows the same row index; inner **`text every areas`** Cartesian per row → **`ok1 = 1`**, **`ok6 = 1`**.
+
+Multiline **`logic { + … }`** facts are supported (parentheses may span lines).
+
+### Example — `check({ + … every … })`
+
+```logts-play
+inline [logic] .pairs:
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire pass = .pairLogic:check({ + pair(text every owners, text every cars) })
+```
+
+After **Load & Run**: **`pass = 1`** (same expansion and validation as a commit).
 
 ---
 

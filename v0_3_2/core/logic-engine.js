@@ -4370,7 +4370,9 @@ function logicCloneMutationTerm(term) {
       numberFormat: term.numberFormat || null,
       listFlag: !!term.listFlag,
       eachFlag: !!term.eachFlag,
+      everyFlag: !!term.everyFlag,
       eachIndex: term.eachIndex,
+      everyIndex: term.everyIndex,
       wireName: term.wireName,
     };
   }
@@ -4414,21 +4416,58 @@ function logicEachRowCountForWireRef(term, wire, ctx) {
   throw Error('each requires vector or matrix wire');
 }
 
-function logicWireRowToListTerm(bits, matrixShape, rowIndex, bindType, fillBits, numberFormat) {
-  const cols = matrixShape.cols;
-  const ew = matrixShape.ew;
-  const rowBits = bits.substr(rowIndex * cols * ew, cols * ew);
-  const virtualShape = { kind: 'vector', count: cols, ew };
-  return logicWireBitsToListTerm(rowBits, bindType, fillBits, virtualShape, numberFormat);
+function logicEveryCountForWireRef(term, wire, ctx) {
+  const shapeFn = typeof globalThis.logicWireShape === 'function' ? globalThis.logicWireShape : null;
+  if (!shapeFn) throw Error('logicWireShape is not loaded');
+  const shape = shapeFn(wire, ctx);
+  if (term.listFlag) {
+    if (shape.kind !== 'matrix') throw Error('every list requires matrix wire');
+    return shape.rows;
+  }
+  if (shape.kind === 'vector') return shape.count;
+  if (shape.kind === 'matrix') throw Error('every scalar requires vector wire');
+  throw Error('every requires vector or matrix wire');
 }
 
-function logicExpandOneMutationEachItem(item, ctx) {
-  const head = item && item.head;
-  if (!head || head.kind !== 'compound') return [item];
-  const args = head.args || [];
-  const eachRefs = args.filter((a) => a && a.kind === 'wireRef' && a.eachFlag);
-  if (!eachRefs.length) return [item];
+function logicMutationTermHasExpandModifiers(term) {
+  if (!term) return false;
+  if (term.kind === 'wireRef') return !!(term.eachFlag || term.everyFlag);
+  if (term.kind === 'compound') {
+    return (term.args || []).some(logicMutationTermHasExpandModifiers);
+  }
+  if (term.kind === 'list') {
+    if (term.nil) return false;
+    return logicMutationTermHasExpandModifiers(term.head)
+      || logicMutationTermHasExpandModifiers(term.tail);
+  }
+  return false;
+}
 
+function logicCartesianProduct(lists) {
+  if (!lists.length) return [[]];
+  let acc = [[]];
+  for (const list of lists) {
+    const next = [];
+    for (const prefix of acc) {
+      for (const item of list) {
+        next.push(prefix.concat([item]));
+      }
+    }
+    acc = next;
+  }
+  return acc;
+}
+
+const LOGIC_MUTATION_EXPAND_CAP = 10000;
+
+function logicEnforceMutationExpandCap(items) {
+  if ((items || []).length > LOGIC_MUTATION_EXPAND_CAP) {
+    throw Error(`every: expansion limit exceeded (${items.length} > ${LOGIC_MUTATION_EXPAND_CAP})`);
+  }
+  return items;
+}
+
+function logicGetEachZipCount(eachRefs, ctx) {
   const counts = [];
   for (const ref of eachRefs) {
     if (!ctx.wires || !ctx.wires.has(ref.wireName)) {
@@ -4443,35 +4482,150 @@ function logicExpandOneMutationEachItem(item, ctx) {
       throw Error(`each: row count mismatch (${counts.join(' vs ')})`);
     }
   }
-  if (n <= 0) throw Error('each: row count must be at least 1');
+  return n;
+}
 
+function logicApplyEachRowToArgs(args, rowIndex) {
+  return (args || []).map((a) => {
+    if (a && a.kind === 'wireRef' && a.eachFlag) {
+      return {
+        kind: 'wireRef',
+        bindType: a.bindType,
+        numberFormat: a.numberFormat || null,
+        listFlag: a.listFlag,
+        eachFlag: false,
+        everyFlag: !!a.everyFlag,
+        eachIndex: rowIndex,
+        everyIndex: a.everyIndex,
+        wireName: a.wireName,
+      };
+    }
+    return logicCloneMutationTerm(a);
+  });
+}
+
+function logicApplyEveryIndicesToArgs(args, ctx) {
+  const everyRefs = (args || []).filter((a) => a && a.kind === 'wireRef' && a.everyFlag);
+  if (!everyRefs.length) return [args];
+  const indexLists = [];
+  for (const ref of everyRefs) {
+    if (!ctx.wires || !ctx.wires.has(ref.wireName)) {
+      throw Error(`logic mutation: wire '${ref.wireName}' not found`);
+    }
+    const wire = ctx.wires.get(ref.wireName);
+    const count = logicEveryCountForWireRef(ref, wire, ctx);
+    if (count <= 0) throw Error('every: collection must have at least 1 element');
+    const indices = [];
+    for (let i = 0; i < count; i++) indices.push(i);
+    indexLists.push(indices);
+  }
+  const combos = logicCartesianProduct(indexLists);
   const out = [];
-  for (let row = 0; row < n; row++) {
-    const newArgs = args.map((a) => {
-      if (a && a.kind === 'wireRef' && a.eachFlag) {
+  for (const combo of combos) {
+    let everySlot = 0;
+    const newArgs = (args || []).map((a) => {
+      if (a && a.kind === 'wireRef' && a.everyFlag) {
+        const idx = combo[everySlot];
+        everySlot += 1;
         return {
           kind: 'wireRef',
           bindType: a.bindType,
           numberFormat: a.numberFormat || null,
           listFlag: a.listFlag,
           eachFlag: false,
-          eachIndex: row,
+          everyFlag: false,
+          eachIndex: a.eachIndex,
+          everyIndex: idx,
           wireName: a.wireName,
         };
       }
       return logicCloneMutationTerm(a);
     });
-    out.push({
-      op: item.op,
+    out.push(newArgs);
+  }
+  return out;
+}
+
+function logicExpandEachEveryOnCompound(op, compound, ctx, eachRowIndex) {
+  let args = compound.args || [];
+  const eachRefs = args.filter((a) => a && a.kind === 'wireRef' && a.eachFlag);
+
+  if (eachRefs.length > 0 && eachRowIndex == null) {
+    const n = logicGetEachZipCount(eachRefs, ctx);
+    if (n <= 0) throw Error('each: row count must be at least 1');
+    const out = [];
+    for (let row = 0; row < n; row++) {
+      const rowArgs = logicApplyEachRowToArgs(args, row);
+      const rowCompound = {
+        kind: 'compound',
+        predicate: compound.predicate,
+        arity: rowArgs.length,
+        args: rowArgs,
+      };
+      out.push(...logicExpandEachEveryOnCompound(op, rowCompound, ctx, row));
+    }
+    return logicEnforceMutationExpandCap(out);
+  }
+
+  if (eachRefs.length > 0 && eachRowIndex != null) {
+    args = logicApplyEachRowToArgs(args, eachRowIndex);
+    compound = {
+      kind: 'compound',
+      predicate: compound.predicate,
+      arity: args.length,
+      args,
+    };
+  }
+
+  const argVariantLists = [];
+  let hasInnerExpand = false;
+  for (const arg of args) {
+    if (arg && arg.kind === 'compound' && logicMutationTermHasExpandModifiers(arg)) {
+      const subItems = logicExpandEachEveryOnCompound(op, arg, ctx, eachRowIndex);
+      argVariantLists.push(subItems.map((it) => it.head));
+      hasInnerExpand = true;
+    } else {
+      argVariantLists.push([logicCloneMutationTerm(arg)]);
+    }
+  }
+
+  if (hasInnerExpand) {
+    const out = [];
+    for (const combo of logicCartesianProduct(argVariantLists)) {
+      const c = {
+        kind: 'compound',
+        predicate: compound.predicate,
+        arity: combo.length,
+        args: combo,
+      };
+      out.push(...logicExpandEachEveryOnCompound(op, c, ctx, eachRowIndex));
+    }
+    return logicEnforceMutationExpandCap(out);
+  }
+
+  const everyRefs = args.filter((a) => a && a.kind === 'wireRef' && a.everyFlag);
+  if (everyRefs.length > 0) {
+    const argLists = logicApplyEveryIndicesToArgs(args, ctx);
+    const out = argLists.map((newArgs) => ({
+      op,
       head: {
         kind: 'compound',
-        predicate: head.predicate,
+        predicate: compound.predicate,
         arity: newArgs.length,
         args: newArgs,
       },
-    });
+    }));
+    return logicEnforceMutationExpandCap(out);
   }
-  return out;
+
+  return [{ op, head: compound }];
+}
+
+function logicExpandOneMutationEachItem(item, ctx) {
+  const head = item && item.head;
+  if (!head || head.kind !== 'compound') return [item];
+  if (!logicMutationTermHasExpandModifiers(head)) return [item];
+  return logicExpandEachEveryOnCompound(item.op, head, ctx, null);
 }
 
 function logicExpandMutationEachOps(items, ctx) {
@@ -4480,6 +4634,18 @@ function logicExpandMutationEachOps(items, ctx) {
     out.push(...logicExpandOneMutationEachItem(item, ctx));
   }
   return out;
+}
+
+function logicExpandMutationOps(items, ctx) {
+  return logicExpandMutationEachOps(items, ctx);
+}
+
+function logicWireRowToListTerm(bits, matrixShape, rowIndex, bindType, fillBits, numberFormat) {
+  const cols = matrixShape.cols;
+  const ew = matrixShape.ew;
+  const rowBits = bits.substr(rowIndex * cols * ew, cols * ew);
+  const virtualShape = { kind: 'vector', count: cols, ew };
+  return logicWireBitsToListTerm(rowBits, bindType, fillBits, virtualShape, numberFormat);
 }
 
 function logicWireBitsToListTerm(bits, bindType, fillBits, vectorShape, numberFormat) {
@@ -4798,6 +4964,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicCloneMutationTerm = logicCloneMutationTerm;
   globalThis.logicEachRowCountForWireRef = logicEachRowCountForWireRef;
   globalThis.logicExpandMutationEachOps = logicExpandMutationEachOps;
+  globalThis.logicExpandMutationOps = logicExpandMutationOps;
   globalThis.logicExpandOneMutationEachItem = logicExpandOneMutationEachItem;
   globalThis.logicEncodeListToVectorBits = logicEncodeListToVectorBits;
   globalThis.logicListBindTypeFromTerm = logicListBindTypeFromTerm;

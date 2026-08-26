@@ -758,14 +758,32 @@ class LogicParser {
         this.advance();
         eachFlag = true;
       }
+      let everyFlag = false;
+      if (this.at('ID') && this.peek().value === 'every') {
+        this.advance();
+        everyFlag = true;
+      }
+      if (eachFlag && everyFlag) {
+        logicError('each and every are mutually exclusive on the same wire reference', this.peek().line);
+      }
+      const modSuffix = `${listFlag ? ' list' : ''}${eachFlag ? ' each' : ''}${everyFlag ? ' every' : ''}`;
       if (!this.at('ID')) {
         logicError(
-          `expected wire name after ${bindType}${listFlag ? ' list' : ''}${eachFlag ? ' each' : ''}`,
+          `expected wire name after ${bindType}${modSuffix}`,
           this.peek().line,
         );
       }
       const wireName = this.advance().value;
-      return { kind: 'wireRef', bindType, numberFormat, listFlag, eachFlag, wireName };
+      return { kind: 'wireRef', bindType, numberFormat, listFlag, eachFlag, everyFlag, wireName };
+    }
+    if (this.at('ID')) {
+      const save = this.pos;
+      this.advance();
+      if (this.at('LP') || this.at('DOT')) {
+        this.pos = save;
+        return this.parseMutationCompound();
+      }
+      this.pos = save;
     }
     return this.parseTerm();
   }
@@ -1861,12 +1879,40 @@ function parseLogicGoalsBlock(bodyRaw) {
   return goals;
 }
 
+function logicJoinMutationSourceLines(src) {
+  const joined = [];
+  let buf = '';
+  let depth = 0;
+  for (const rawLine of String(src).split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith(';')) continue;
+    if (!buf) {
+      if (!line.startsWith('+') && !line.startsWith('-')) {
+        logicError(`mutation line must start with + or -: ${line}`);
+      }
+      buf = line;
+    } else {
+      buf += ' ' + line;
+    }
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth--;
+    }
+    if (depth <= 0) {
+      joined.push(buf);
+      buf = '';
+      depth = 0;
+    }
+  }
+  if (buf) logicError('unclosed mutation fact (missing ) or .)');
+  return joined;
+}
+
 function parseLogicMutationBlock(bodyRaw) {
   const src = bodyRaw == null ? '' : String(bodyRaw);
   const ops = [];
-  for (const rawLine of src.split('\n')) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith(';')) continue;
+  for (const line of logicJoinMutationSourceLines(src)) {
     let op = null;
     if (line.startsWith('+')) op = 'add';
     else if (line.startsWith('-')) op = 'remove';

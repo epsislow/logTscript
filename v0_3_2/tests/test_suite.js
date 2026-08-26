@@ -47835,5 +47835,359 @@ comp [logic] .dataLogic:
   reg(4409, 'logic', 'F42e random_between int regression (legacy)', runF42eRandomIntRegression);
   reg(4410, 'logic', 'F42e random_between int regression (wave)', runF42eRandomIntRegression, { propagation: 'wave' });
 
+  reg(4411, 'logic', 'F43 parse mutation text every postfix', function(h) {
+    const ops = parseLogicMutationBlock('+ pair(text every owners, text every cars).');
+    h.assert('one op', String(ops.length), '1');
+    h.assert('add', ops[0].op, 'add');
+    const args = ops[0].head.args;
+    h.assert('arg0 every', String(args[0].everyFlag), 'true');
+    h.assert('arg0 no each', String(args[0].eachFlag), 'false');
+    h.assert('arg1 every', String(args[1].everyFlag), 'true');
+  });
+
+  reg(4412, 'logic', 'F43 parse each and every mutually exclusive', function(h) {
+    h.assertThrows(
+      'each every error',
+      function() { parseLogicMutationBlock('+ pair(text each every owners).'); },
+      'mutually exclusive',
+    );
+  });
+
+  function runF43EveryCartesian(h, session) {
+    const src = `inline [logic] .pairs:
+
+    query qah:
+        pair(a, h)
+    query qai:
+        pair(a, i)
+    query qbh:
+        pair(b, h)
+    query qbi:
+        pair(b, i)
+    query qch:
+        pair(c, h)
+    query qci:
+        pair(c, i)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okAH = 0
+1wire okAI = 0
+1wire okBH = 0
+1wire okBI = 0
+1wire okCH = 0
+1wire okCI = 0
+
+.pairLogic:{
+    logic {
+        + pair(text every owners, text every cars)
+    }
+    qah >= okAH
+    qai >= okAI
+    qbh >= okBH
+    qbi >= okBI
+    qch >= okCH
+    qci >= okCI
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okAH', interp.getWireEffectiveValue('okAH'), '1');
+    h.assert('okAI', interp.getWireEffectiveValue('okAI'), '1');
+    h.assert('okBH', interp.getWireEffectiveValue('okBH'), '1');
+    h.assert('okBI', interp.getWireEffectiveValue('okBI'), '1');
+    h.assert('okCH', interp.getWireEffectiveValue('okCH'), '1');
+    h.assert('okCI', interp.getWireEffectiveValue('okCI'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4413, 'logic', 'F43 every cartesian 3x2 vectors (legacy)', runF43EveryCartesian);
+  reg(4414, 'logic', 'F43 every cartesian 3x2 vectors (wave)', runF43EveryCartesian, { propagation: 'wave' });
+
+  function runF43EachEveryMix(h, session) {
+    const src = `inline [logic] .triples:
+
+    query q1:
+        triple(a, h, r)
+    query q2:
+        triple(a, h, g)
+    query q3:
+        triple(a, h, b)
+    query q4:
+        triple(b, i, r)
+    query q5:
+        triple(b, i, g)
+    query q6:
+        triple(b, i, b)
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+8wire[2] cars = 01101000 + 01101001
+8wire[3] colors = 01110010 + 01100111 + 01100010
+
+comp [logic] .tripleLogic:
+    on: 1
+    .triples { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire ok1 = 0
+1wire ok2 = 0
+1wire ok3 = 0
+1wire ok4 = 0
+1wire ok5 = 0
+1wire ok6 = 0
+
+.tripleLogic:{
+    logic {
+        + triple(text each owners, text each cars, text every colors)
+    }
+    q1 >= ok1
+    q2 >= ok2
+    q3 >= ok3
+    q4 >= ok4
+    q5 >= ok5
+    q6 >= ok6
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok1', interp.getWireEffectiveValue('ok1'), '1');
+    h.assert('ok2', interp.getWireEffectiveValue('ok2'), '1');
+    h.assert('ok3', interp.getWireEffectiveValue('ok3'), '1');
+    h.assert('ok4', interp.getWireEffectiveValue('ok4'), '1');
+    h.assert('ok5', interp.getWireEffectiveValue('ok5'), '1');
+    h.assert('ok6', interp.getWireEffectiveValue('ok6'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4415, 'logic', 'F43 each+every mix 2x3 (legacy)', runF43EachEveryMix);
+  reg(4416, 'logic', 'F43 each+every mix 2x3 (wave)', runF43EachEveryMix, { propagation: 'wave' });
+
+  function runF43CompoundNested(h, session) {
+    const src = `inline [logic] .loc:
+
+    query q1:
+        located(j, zone(1, n))
+    query q2:
+        located(j, zone(1, s))
+    query q3:
+        located(j, zone(1, e))
+    query q4:
+        located(m, zone(2, n))
+    query q5:
+        located(m, zone(2, s))
+    query q6:
+        located(m, zone(2, e))
+
+:
+
+8wire[2] names = 01101010 + 01101101
+16wire[2] ids = 0000000000000001 + 0000000000000010
+8wire[3] areas = 01101110 + 01110011 + 01100101
+
+comp [logic] .locLogic:
+    on: 1
+    .loc { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire ok1 = 0
+1wire ok2 = 0
+1wire ok3 = 0
+1wire ok4 = 0
+1wire ok5 = 0
+1wire ok6 = 0
+
+.locLogic:{
+    logic {
+        + located(
+            text each names,
+            zone(number each ids, text every areas)
+        )
+    }
+    q1 >= ok1
+    q2 >= ok2
+    q3 >= ok3
+    q4 >= ok4
+    q5 >= ok5
+    q6 >= ok6
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok1', interp.getWireEffectiveValue('ok1'), '1');
+    h.assert('ok2', interp.getWireEffectiveValue('ok2'), '1');
+    h.assert('ok3', interp.getWireEffectiveValue('ok3'), '1');
+    h.assert('ok4', interp.getWireEffectiveValue('ok4'), '1');
+    h.assert('ok5', interp.getWireEffectiveValue('ok5'), '1');
+    h.assert('ok6', interp.getWireEffectiveValue('ok6'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4417, 'logic', 'F43 compound each+every nested (legacy)', runF43CompoundNested);
+  reg(4418, 'logic', 'F43 compound each+every nested (wave)', runF43CompoundNested, { propagation: 'wave' });
+
+  function runF43EachInCompound(h, session) {
+    const src = `inline [logic] .loc:
+
+    query q1:
+        located(j, zone(1, n))
+    query q2:
+        located(m, zone(2, s))
+
+:
+
+8wire[2] names = 01101010 + 01101101
+16wire[2] ids = 0000000000000001 + 0000000000000010
+8wire[2] areas = 01101110 + 01110011
+
+comp [logic] .locLogic:
+    on: 1
+    .loc { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire ok1 = 0
+1wire ok2 = 0
+
+.locLogic:{
+    logic {
+        + located(
+            text each names,
+            zone(number each ids, text each areas)
+        )
+    }
+    q1 >= ok1
+    q2 >= ok2
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('ok1', interp.getWireEffectiveValue('ok1'), '1');
+    h.assert('ok2', interp.getWireEffectiveValue('ok2'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4419, 'logic', 'F43 each inside compound zip (legacy)', runF43EachInCompound);
+  reg(4420, 'logic', 'F43 each inside compound zip (wave)', runF43EachInCompound, { propagation: 'wave' });
+
+  function runF43EveryCheck(h, session) {
+    const src = `inline [logic] .pairs:
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire pass = .pairLogic:check({ + pair(text every owners, text every cars) })`;
+    const { interp } = session.run(src);
+    h.assert('check pass', interp.getWireEffectiveValue('pass'), '1');
+  }
+
+  reg(4421, 'logic', 'F43 check every expansion (legacy)', runF43EveryCheck);
+  reg(4422, 'logic', 'F43 check every expansion (wave)', runF43EveryCheck, { propagation: 'wave' });
+
+  function runF43ExpandCapFail(h, session) {
+    const ownersBits = new Array(101).fill('01100001').join(' + ');
+    const carsBits = new Array(100).fill('01101000').join(' + ');
+    const src = `inline [logic] .pairs:
+
+    query qa:
+        pair(a, h)
+
+:
+
+8wire[101] owners = ${ownersBits}
+8wire[100] cars = ${carsBits}
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+
+.pairLogic:{
+    logic {
+        + pair(text every owners, text every cars)
+    }
+    qa >= okA
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed cap', interp.getWireEffectiveValue('failed'), '1');
+    h.assert('no commit', interp.getWireEffectiveValue('okA'), '0');
+  }
+
+  reg(4423, 'logic', 'F43 expansion cap 10000 exceeded (legacy)', runF43ExpandCapFail);
+  reg(4424, 'logic', 'F43 expansion cap 10000 exceeded (wave)', runF43ExpandCapFail, { propagation: 'wave' });
+
+  function runF43FloatEvery(h, session) {
+    const src = `inline [logic] .pairs:
+
+    query qa:
+        pair(a, X)
+    query qb:
+        pair(b, X)
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+16wire[2] vals = 0011110000000000 + 0100000000000000
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire trigger = 1
+1wire failed = 0
+1wire okA = 0
+1wire okB = 0
+
+.pairLogic:{
+    logic {
+        + pair(text each owners, float/fp16 every vals)
+    }
+    qa >= okA
+    qb >= okB
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('okA', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('okB', interp.getWireEffectiveValue('okB'), '1');
+    h.assert('failed', interp.getWireEffectiveValue('failed'), '0');
+  }
+
+  reg(4425, 'logic', 'F43 float/fp16 every per each row (legacy)', runF43FloatEvery);
+  reg(4426, 'logic', 'F43 float/fp16 every per each row (wave)', runF43FloatEvery, { propagation: 'wave' });
+
+  reg(4427, 'logic', 'F33 each zip regression after F43 (legacy)', runF33EachZipVectors);
+  reg(4428, 'logic', 'F33 each zip regression after F43 (wave)', runF33EachZipVectors, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

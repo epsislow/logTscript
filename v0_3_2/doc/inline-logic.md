@@ -1672,7 +1672,7 @@ doc(.character)
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
 - **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
 - **DCG grammars** → [logic-dcg.md](logic-dcg.md)
-- Static vs dynamic KB, `logic { + / - }`, tombstones, **`each`** row expansion → [logic-runtime.md](logic-runtime.md)
+- Static vs dynamic KB, `logic { + / - }`, tombstones, **`each`** row expansion, **`every`** Cartesian expansion → [logic-runtime.md](logic-runtime.md)
 - Constraints `<=` vs rules `<-` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — `inline.type{logic}`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)

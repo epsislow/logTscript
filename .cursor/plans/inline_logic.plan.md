@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **F43 ready** mutation **every** (**2+o**); **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **F43✅** mutation every; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -207,23 +207,23 @@ todos:
     content: "F42e: random_between float + random/1 float + doc — teste 4402+"
     status: completed
   - id: logic-mutation-every
-    content: "Faza 43 (2+o): mutation every expansion — D341–D346, D348, D354✅; D345✅; D347, D349–D353 A draft"
-    status: pending
+    content: "Faza 43 (2+o): mutation every expansion — D341–D354✅ — teste 4411–4428"
+    status: completed
   - id: logic-mutation-43a
     content: "F43a: parser postfix every + AST everyFlag (mutually exclusive cu each) — teste 4411+"
-    status: pending
+    status: completed
   - id: logic-mutation-43b
-    content: "F43b: expand cartesian every-only (top-level args) — teste 4418+"
-    status: pending
+    content: "F43b: expand cartesian every-only (top-level args) — teste 4413+"
+    status: completed
   - id: logic-mutation-43c
-    content: "F43c: mix each + every (zip rânduri, apoi cartesian per rând) — teste 4425+"
-    status: pending
+    content: "F43c: mix each + every (zip rânduri, apoi cartesian per rând) — teste 4415+"
+    status: completed
   - id: logic-mutation-43d
-    content: "F43d: expand recursiv în compound-uri imbricate (each + every) — teste 4432+"
-    status: pending
+    content: "F43d: expand recursiv în compound-uri imbricate (each + every) — teste 4417+"
+    status: completed
   - id: logic-mutation-43e
-    content: "F43e: float/<format> every + doc + trace/.check — teste 4440+"
-    status: pending
+    content: "F43e: float/<format> every + doc + trace/.check — teste 4421+"
+    status: completed
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
     status: completed
@@ -1515,7 +1515,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 40** Float Prolog + frontieră (**2+l**)        | **F40a→F40e✅** — [Faza 40](#faza-40--float-prolog--frontieră-floatformat-2l--completed) | **(completed)** |
 | **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
 | **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e✅** — [Faza 42](#faza-42--is2-extins--random-float-2m--completed) | **✅ completed** |
-| **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e** — D341–D346, D348, D354✅ — [Faza 43](#faza-43--mutation-every-expansion-2o) | **(ready-to-implement)** |
+| **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e✅** — D341–D354 — [Faza 43](#faza-43--mutation-every-expansion-2o--completed) | **✅ completed** |
 
 
 ---
@@ -6783,10 +6783,10 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+l**~~ | Logic numeric post-F39      | **Promovat → Faza 40✅** — float Prolog + `float/<format>`; `number/fp16|q*` → eroare | **F40**    | F39, D314, D316–D326✅          |
 | ✅     | ~~**2+n**~~ | IEEE f32/f64 nativ LogTScript | **Livrat → Faza 41✅** — `show(; f32/f64)`, NFORMAT, builtins; codec unificat logic↔wire; teste **4310–4385** | **F41**    | F40, F39 fp16, D327+ **(completed)** |
 | ✅     | ~~**2+m**~~ | `is/2` float extins         | **Livrat → Faza 42✅** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float**, **`random/1`**; teste **4386–4410** | **F42**    | F26, F40c, F34, D332–D340 **(completed)** |
-| ⏳     | **2+o**     | Mutation **`every`**        | **Promovat → Faza 43** — cartesian wire refs; mix `each`+`every`; expand recursiv compound — sketch [logic_every](../my_ideas/logic_every) | **F43**    | F33 D248–D260, F25, F40b **(draft)** |
+| ✅     | ~~**2+o**~~ | Mutation **`every`**        | **Livrat → Faza 43✅** — cartesian; mix `each`+`every`; compound nested; cap 10 000; teste **4411–4428** | **F43**    | F33, F25, F40b, D341–D354 **(completed)** |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · **2+o** (every) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · ~~**2+o**~~ **→ F43✅** · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -9610,15 +9610,11 @@ comp [logic] .sensorLogic:
 
 **Legat de:** [D318](#d318--is2-pe-reale-confirmed-a--mvp-în-f40c-extins-în-2m) · [Faza 26](#faza-26--is2-evaluare-aritmetică-prolog--completed) · [Faza 34](#faza-34--builtins-random-integer-2h--completed).
 
-#### **2+o** ⏳ → **F43** (D341+ draft)
+#### ~~**2+o**~~ ✅ → **F43** (D341–D354 confirmed; livrat 2026-08-26)
 
-**Promovat:** 2026-08-26 — sketch [logic_every](../my_ideas/logic_every): keyword **`every`** la mutation args — produs cartesian pe colecții wire, complementar cu **`each`** (zip F33).
+**Livrat** — secțiune: [Faza 43 — Mutation every expansion](#faza-43--mutation-every-expansion-2o--completed). Teste **4411–4428**; **3560/3560**; doc **logic-runtime** 18/18.
 
-**Draft:** secțiune [Faza 43 — Mutation every expansion](#faza-43--mutation-every-expansion-2o). Teste draft **4411+** legacy+wave.
-
-**Legat de:** [Faza 33](#faza-33--mutation-each-expansion-completed--d248260) (each zip) · [Faza 25](#faza-25--liste-tipate-pe-wire-2c-completed) (wire bind) · [Faza 40b](#f40b--floatformat-frontieră--float-listeach) (`float list each`).
-
-**Nu e în 2+o:** cap configurabil comp (decizie **D348** deschisă); trig/`log` → **2+p?**.
+**Legat de:** [Faza 33](#faza-33--mutation-each-expansion-completed--d248260) · sketch [logic_every](../my_ideas/logic_every).
 
 ---
 
@@ -10218,11 +10214,11 @@ set_random(42), random_between(0.0, 10.0, X)   ; determinist cu seed
 
 ---
 
-## Faza 43 — Mutation **every** expansion **2+o**
+## Faza 43 — Mutation **every** expansion **2+o** **(completed)**
 
 > **Backlog:** **2+o** — promovat 2026-08-26 din sketch [logic_every](../my_ideas/logic_every).  
 > **Extinde:** [Faza 33](#faza-33--mutation-each-expansion-completed--d248260) (`each` zip), [Faza 25](#faza-25--liste-tipate-pe-wire-2c-completed) (wire bind + list codec), [Faza 40b](#f40b--floatformat-frontieră--float-listeach) (`float/<format> list each`).  
-> **Status:** **(ready-to-implement)** — **D341–D346, D348, D354 ✅** confirmed user 2026-08-26; **D347, D349–D353** — **A** recommended (neconfirmate explicit, safe defaults).
+> **Status:** **✅ completed** 2026-08-26 — decizii **D341–D354 ✅**; teste **4411–4428**; **3560/3560**; doc **logic-runtime** 18/18.
 
 ### Problemă (stare azi post-F33)
 
@@ -10562,14 +10558,14 @@ logic {
 | 4426 | colecție goală `every` → fail tranzacție |
 | 4427 | (D348-B) expansion 100×100=10001 → fail tranzacție |
 
-### Livrabile F43 (checklist — neimplementat)
+### Livrabile F43 (checklist — **livrat**)
 
-- [ ] Parser postfix `every` + AST `everyFlag` (F43a)
-- [ ] `logicExpandMutationOps` cartesian + each+every (F43b–c)
-- [ ] Expand recursiv compound (F43d)
-- [ ] Teste **4411–4455** legacy+wave
-- [ ] Doc EN `logic-runtime.md`, `comp-logic.md`
-- [ ] Regen doc-data + verify logic pages
+- [x] Parser postfix `every` + AST `everyFlag` (F43a); multiline mutation facts; nested `parseMutationCompound`
+- [x] `logicExpandMutationOps` cartesian + each+every + compound recursiv (F43b–d)
+- [x] Cap expansion **10 000** (D348-B)
+- [x] Teste **4411–4428** legacy+wave
+- [x] Doc EN `logic-runtime.md`, `comp-logic.md`, `inline-logic.md`
+- [x] Regen doc-data + verify logic-runtime **18/18**
 
 ### Estimare
 
@@ -10577,17 +10573,9 @@ Medie-mare — parser mic + engine expand (cartesian + recursiv compound) + test
 
 ### Decizii F43 — status
 
-**Confirmed user 2026-08-26:** **D341 ✅ D342 ✅ D343 ✅ D344 ✅ D345 ✅ D346 ✅ D348 ✅ (B, cap 10 000) D354 ✅**  
-**Draft A (neconfirmate explicit, safe defaults):** D347, D349–D353.
+**Toate D341–D354 confirmed** — implementat 2026-08-26. **F43 ✅ completed**.
 
-### Out of scope F43
-
-- Lazy streams pe wire (**2+j**)
-- Infer tip wire fără bind explicit (F25 respins)
-- Auto-cartesian fără keyword `every`
-- Reguli Prolog care generează combinații (rămâne responsabilitatea user/query)
-
-### Rezumat decizii F43 **(2026-08-26)**
+### Rezumat decizii F43 **(confirmed + livrat 2026-08-26)**
 
 | ID | Subiect | Decizie |
 | -- | ------- | ------- |
@@ -10597,13 +10585,20 @@ Medie-mare — parser mic + engine expand (cartesian + recursiv compound) + test
 | **D344** | `text list every` matrix | **A ✅** |
 | **D345** | Compound nested (+ each gap F33) | **A ✅** |
 | **D346** | each ⊥ every per wire | **A ✅** |
-| **D347** | Backward compat F33 | **A** draft |
+| **D347** | Backward compat F33 | **A ✅** |
 | **D348** | Cap expansion | **B ✅** — **10 000** facts/op |
-| **D349** | `.check` + trace | **A** draft |
-| **D350** | `-` remove expand | **A** draft |
-| **D351** | Colecție goală | **A** draft |
-| **D352** | Refactor `logicExpandMutationOps` | **A** draft |
-| **D353** | Ordine `list every` | **A** draft |
+| **D349** | `.check` + trace | **A ✅** |
+| **D350** | `-` remove expand | **A ✅** |
+| **D351** | Colecție goală | **A ✅** |
+| **D352** | Refactor `logicExpandMutationOps` | **A ✅** |
+| **D353** | Ordine `list every` | **A ✅** |
 | **D354** | `float/<format> every` | **A ✅** |
 
-**Status:** **(ready-to-implement)** — poate începe F43; D347, D349–D353 = **A** recommended dacă nu se obiectează.
+**Status:** **✅ completed** 2026-08-26 — teste **4411–4428**; **3560/3560**; doc **logic-runtime** 18/18.
+
+### Out of scope F43
+
+- Lazy streams pe wire (**2+j**)
+- Infer tip wire fără bind explicit (F25 respins)
+- Auto-cartesian fără keyword `every`
+- Reguli Prolog care generează combinații (rămâne responsabilitatea user/query)

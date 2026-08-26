@@ -710,7 +710,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         validateFn(
           term.bindType, term.numberFormat, term.listFlag, wire, ctx,
           `logic ${compName}: mutation wire '${wireName}'`,
-          !!(term.eachFlag || term.eachIndex != null),
+          !!(term.eachFlag || term.eachIndex != null || term.everyFlag || term.everyIndex != null),
         );
       }
       const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;
@@ -718,23 +718,27 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       const wireShape = wire && shapeFn ? shapeFn(wire, ctx) : null;
       const fillBits = wire && fillFn ? fillFn(wire, ctx) : '0'.repeat(8);
       let resolved;
-      if (term.eachIndex != null) {
-        const idx = term.eachIndex;
+      const pickIndex = term.eachIndex != null ? term.eachIndex : term.everyIndex;
+      if (pickIndex != null) {
+        const idx = pickIndex;
         if (term.listFlag) {
           if (!wireShape || wireShape.kind !== 'matrix') {
-            throw Error(`logic ${compName}: each list requires matrix wire '${wireName}'`);
+            const mod = term.eachIndex != null ? 'each' : 'every';
+            throw Error(`logic ${compName}: ${mod} list requires matrix wire '${wireName}'`);
           }
           const rowFn = typeof logicWireRowToListTerm === 'function' ? logicWireRowToListTerm : null;
           if (!rowFn) throw Error('Logic engine is not loaded');
           resolved = rowFn(bits, wireShape, idx, term.bindType, fillBits, term.numberFormat);
         } else {
           if (!wireShape || wireShape.kind !== 'vector') {
-            throw Error(`logic ${compName}: each scalar requires vector wire '${wireName}'`);
+            const mod = term.eachIndex != null ? 'each' : 'every';
+            throw Error(`logic ${compName}: ${mod} scalar requires vector wire '${wireName}'`);
           }
           const ew = wireShape.ew;
           const cellBits = bits.substr(idx * ew, ew);
           if (cellBits.length < ew) {
-            throw Error(`logic ${compName}: each index ${idx} out of range on wire '${wireName}'`);
+            const mod = term.eachIndex != null ? 'each' : 'every';
+            throw Error(`logic ${compName}: ${mod} index ${idx} out of range on wire '${wireName}'`);
           }
           resolved = pinFn(cellBits, term.bindType, term.numberFormat);
         }
@@ -771,8 +775,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const parseFn = typeof parseLogicMutationBlock === 'function' ? parseLogicMutationBlock : null;
     if (!parseFn || !mutationBlocks || !mutationBlocks.length) return [];
     const ops = [];
-    const expandFn = typeof logicExpandMutationEachOps === 'function'
-      ? logicExpandMutationEachOps : null;
+    const expandFn = typeof logicExpandMutationOps === 'function'
+      ? logicExpandMutationOps
+      : (typeof logicExpandMutationEachOps === 'function' ? logicExpandMutationEachOps : null);
     for (const block of mutationBlocks) {
       const parsed = parseFn(block.raw);
       const expanded = expandFn ? expandFn(parsed, ctx) : parsed;
@@ -1222,8 +1227,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
     let expanded;
     try {
-      const expandFn = typeof logicExpandMutationEachOps === 'function'
-        ? logicExpandMutationEachOps : null;
+      const expandFn = typeof logicExpandMutationOps === 'function'
+        ? logicExpandMutationOps
+        : (typeof logicExpandMutationEachOps === 'function' ? logicExpandMutationEachOps : null);
       expanded = expandFn ? expandFn(parsed, ctx) : parsed;
     } catch (err) {
       const msg = err && err.message ? err.message : String(err);

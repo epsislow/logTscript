@@ -12374,6 +12374,7 @@ Change the effective knowledge base on each solve pass without editing \`inline 
 | **\`+ groundFact\`** | Assert fact into component dynamic store |
 | **\`- groundFact\`** | Tombstone — hide matching static or dynamic fact |
 | **\`text each vec\`** / **\`text list each mat\`** | Expand to **N** separate ground facts (zip rows) before commit — [logic-runtime.md — each](logic-runtime.md#mutation-each--zip-rows-into-n-facts) |
+| **\`text every vec\`** / **\`text list every mat\`** | Cartesian expansion — every cell or row-list is an alternative; combine with **\`each\`** inside compounds — [logic-runtime.md — every](logic-runtime.md#mutation-every--cartesian-expansion) |
 | **\`mutationFailed >= wire\`** | **\`1\`** if transaction failed (store unchanged) |
 
 Mutations run **before** query redirects in the same pass. The dynamic store **persists** across \`set\` triggers on the same component.
@@ -21720,7 +21721,7 @@ The word **\`is\`** appears in three different places in LogTScript. Only **logi
 | Goal | When \`N\` is free in \`N + 1\` | Typical use |
 |------|----------------------------|-------------|
 | \`M = N + 1\` | **\`M\`** ← structure \`{+, N, 1}\` | Unify terms, lists, structures |
-| \`M is N + 1\` | **Fail** | Integer calculation, counters |
+| \`M is N + 1\` | **Fail** | Integer or float calculation, counters |
 | \`is(M, N + 1)\` | **Fail** | Same builtin as **\`M is N + 1\`** |
 | \`M =:= N + 1\` | **Fail** | Test numeric equality (both sides must evaluate) |
 | \`7 is 3 + 4\` | — | **Success** (ground test) |
@@ -22276,7 +22277,7 @@ doc(.character)
 - Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
 - **Built-in predicates** → [logic-builtins.md](logic-builtins.md)
 - **DCG grammars** → [logic-dcg.md](logic-dcg.md)
-- Static vs dynamic KB, \`logic { + / - }\`, tombstones, **\`each\`** row expansion → [logic-runtime.md](logic-runtime.md)
+- Static vs dynamic KB, \`logic { + / - }\`, tombstones, **\`each\`** row expansion, **\`every\`** Cartesian expansion → [logic-runtime.md](logic-runtime.md)
 - Constraints \`<=\` vs rules \`<-\` → [logic-constraints.md](logic-constraints.md)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)
@@ -24297,7 +24298,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`nth0/3\`** | 3 | yes | no | List element at **0-based** index |
 | **\`nth1/3\`** | 3 | yes | no | List element at **1-based** index |
 | **\`nth1/4\`** | 4 | yes | no | Element at **1-based** index + list suffix after it |
-| **\`is/2\`** | 2 | yes | no | Arithmetic (+ infix **\`M is Expr\`**) — integer or float |
+| **\`is/2\`** | 2 | yes | no | Arithmetic — \`+ - * / // ** mod rem\`, functions, \`min\`/\`max\` |
 | **\`member/2\`** | 2 | yes | no | List membership with backtracking |
 | **\`append/3\`** | 3 | yes | no | Concatenate or decompose lists |
 | **\`append/2\`** | 2 | yes | no | Close a **difference list** \`Front-Hole\` to a ground list |
@@ -24354,8 +24355,9 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **\`float/1\`** | 1 | yes | no | Type test — argument is a float |
 | **\`list/1\`** | 1 | yes | no | Type test — argument is a list |
 | **\`compound/1\`** | 1 | yes | no | Type test — argument is a compound (not a list) |
-| **\`random_between/3\`** | 3 | yes | yes (RNG) | Uniform random integer in \`[Low, High]\` inclusive |
-| **\`set_random/1\`** | 1 | yes | yes (RNG) | Reseed the global integer RNG |
+| **\`random/1\`** | 1 | yes | yes (RNG) | Uniform random float in **\`[0.0, 1.0)\`** |
+| **\`random_between/3\`** | 3 | yes | yes (RNG) | Uniform random in **\`[Low, High]\`** — integer or float |
+| **\`set_random/1\`** | 1 | yes | yes (RNG) | Reseed the global RNG (integer seed) |
 
 Type predicates filter bound terms — see [logic-value-types.md](logic-value-types.md).
 
@@ -24612,13 +24614,33 @@ Arithmetic evaluation in logic bodies. Also written infix: **\`M is Expr\`**.
 | \`M is N + 1\` | **Fail** | Arithmetic |
 | \`M =:= N + 1\` | **Fail** | Numeric equality test |
 
-RHS must fully evaluate. Free variables or divide-by-zero → **fail**.
+RHS must fully evaluate. Free variables, divide-by-zero, **\`sqrt\`** of a negative number, or other invalid numeric operations → **fail**.
 
-| Expression kind | Result kind | \`/\` behaviour |
-|-----------------|-------------|---------------|
-| All integers | **\`number\`** | Truncates toward zero (e.g. \`7 / 2\` → \`3\`) |
-| Any float literal or promoted float | **\`float\`** | Real division (e.g. \`7.0 / 2.0\` → \`3.5\`) |
-| Mixed int + float | **\`float\`** | int operands promote (e.g. \`10 + 1.5\` → \`11.5\`) |
+| Expression kind | Result kind | Notes |
+|-----------------|-------------|-------|
+| All integers | **\`number\`** | e.g. **\`7 / 2\`** → **\`3\`** (trunc toward zero) |
+| Any float operand | **\`float\`** | int promotes when mixed (e.g. **\`10 + 1.5\`** → **\`11.5\`**) |
+| **\`min\`/\`max\` both int** | **\`number\`** | e.g. **\`max(2, 3)\`** → **\`3\`**, not **\`3.0\`** |
+| **\`min\`/\`max\` with float** | **\`float\`** | e.g. **\`max(2, 3.0)\`** → **\`3.0\`** |
+
+**Operators** (tightest binding first): **\`**\`** (right-associative) → **\`*\` \`/\` \`//\`** → **\`+\` \`-\`** → **\`mod\` \`rem\`**. Parentheses **\`( … )\`** group sub-expressions.
+
+| Operator | Meaning |
+|----------|---------|
+| **\`+\` \`-\` \`*\` \`/\`** | Addition, subtraction, multiplication, division |
+| **\`//\`** | Integer division — truncates toward zero |
+| **\`**\`** | Exponentiation |
+| **\`mod\`** | Remainder; sign of result follows the **divisor** (SWI-style) |
+| **\`rem\`** | Remainder; sign of result follows the **dividend** (SWI-style) |
+
+**Functions** in expressions (not separate goals): **\`abs(X)\`**, **\`sqrt(X)\`**, **\`floor(X)\`**, **\`ceiling(X)\`**, **\`round(X)\`**, **\`truncate(X)\`**, **\`min(A, B)\`**, **\`max(A, B)\`**.
+
+| Function | Notes |
+|----------|-------|
+| **\`sqrt(X)\`** | **\`sqrt(9)\`** → integer **\`3\`**; non-perfect square → **float**; negative → **fail** |
+| **\`floor\`/\`ceiling\`/\`round\`/\`truncate\`** | Integer operand → integer; float → integer when exact, else float |
+
+**Meta-call:** **\`call(is(X, Expr))\`** is equivalent to **\`X is Expr\`** — see [\`call/1\`](#call1) below.
 
 See also [inline-logic.md — \`=\` vs \`is/2\`](inline-logic.md#arithmetic-is2) for the full contrast table.
 
@@ -24678,6 +24700,118 @@ comp [logic] .worldLogic:
 \`\`\`
 
 **Load & Run** prints **\`3\`** (float \`3.0\` displayed as \`3\`).
+
+### Example — power and integer division
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        P is 2 ** 10,
+        Q is 7 // 2,
+        show("power", P),
+        show("idiv", Q)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`power 1024\`** then **\`idiv 3\`**.
+
+### Example — \`mod\`, \`rem\`, and \`sqrt\`
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        M is (-7) mod 3,
+        R is (-7) rem 3,
+        S is sqrt(9),
+        show("mod", M),
+        show("rem", R),
+        show("sqrt", S)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`mod 2\`**, **\`rem -1\`**, **\`sqrt 9\`**.
+
+### Example — \`min\`/\`max\` (integer stays integer)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        A is max(2, 3),
+        B is max(2, 3.0),
+        show("int", A),
+        show("mixed", B)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`int 3\`** then **\`mixed 3\`** (float **\`3.0\`** displayed as **\`3\`**).
+
+### Example — \`call(is/2)\` meta-call
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        call(is(T, 10 + 5)),
+        show(T)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`15\`**.
 
 ---
 
@@ -26883,27 +27017,116 @@ comp [logic] .worldLogic:
 
 ---
 
-## \`random_between/3\` and \`set_random/1\`
+## \`random/1\`, \`random_between/3\`, and \`set_random/1\`
 
-Integer random numbers for dice, board steps, and other game logic. **No floats** — only ground integers in the ranges below.
+Random numbers for dice, jitter, simulation, and game logic. One **global RNG** per run — use **\`set_random/1\`** or comp **\`randomSeed:\`** for reproducible tests.
 
-| Builtin | Arguments | Range |
-|---------|-----------|-------|
-| **\`set_random(+Seed)\`** | **\`Seed\`** ground integer | **0 … 4294967295** (32-bit unsigned) |
-| **\`random_between(+Low, +High, -Int)\`** | **\`Low\`**, **\`High\`**, **\`Int\`** | **-2147483648 … 2147483647** (signed 32-bit) |
+| Builtin | Arguments | Result |
+|---------|-----------|--------|
+| **\`set_random(+Seed)\`** | **\`Seed\`** ground integer **0 … 4294967295** | Reseeds the generator |
+| **\`random(-R)\`** | **\`R\`** variable or ground float | **\`R\`** ∈ **\`[0.0, 1.0)\`** (float) |
+| **\`random_between(+Low, +High, -Out)\`** | Integer or float bounds | Uniform in **\`[Low, High]\`** inclusive |
 
-**Rules:**
+**Kind rules for \`random_between/3\`:**
 
-- **\`Low\`**, **\`High\`**, and **\`Seed\`** must be **ground** integers in range — free variables or out-of-range values → **fail**.
+| **\`Low\` / \`High\` / \`Out\`** | Behaviour |
+|----------------------------|-----------|
+| All **integers** | **\`Out\`** is an integer (same as classic dice / board logic) |
+| **Any** bound or **\`Out\`** is **float** | **\`Out\`** is a **float** on the real interval |
+
+**Rules (all three builtins):**
+
+- Ground bounds required — free **\`Low\`** or **\`High\`** → **fail**.
 - **\`Low\` > \`High\`** → **fail** (not an engine error).
-- **\`Int\`** is bound to a uniform integer in **\`[Low, High]\`** inclusive.
-- **Backtracking:** re-satisfying the same **\`random_between/3\`** goal returns the **same** **\`Int\`** (SWI-style impure semantics).
-- **RNG scope:** one global generator per run. **\`set_random/1\`** in a query body resets it; a later **\`set_random/1\`** overrides an earlier seed in the same query.
-- **Reserved heads:** you cannot define **\`random_between/3\`** or **\`set_random/1\`** as fact, rule, or constraint heads.
+- **Backtracking:** re-satisfying the same random goal returns the **same** value (SWI-style impure semantics).
+- **\`set_random/1\`** in a query overrides the generator; later **\`set_random/1\`** in the same query wins.
+- **Reserved heads:** you cannot define **\`random/1\`**, **\`random_between/3\`**, or **\`set_random/1\`** as fact, rule, or constraint heads.
 
-**Component seed:** optional **\`randomSeed:\`** on **\`comp [logic]\`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass, equivalent to **\`set_random(Val)\`** before mutations and queries. See [comp-logic.md — \`randomSeed:\`](comp-logic.md#component-attributes).
+**Component seed:** optional **\`randomSeed:\`** on **\`comp [logic]\`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass. See [comp-logic.md — \`randomSeed:\`](comp-logic.md#component-attributes).
 
-### Example — dice with deterministic seed
+### Example — unit float with \`random/1\`
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        set_random(42),
+        random(R),
+        show("unit", R)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`unit 0.6011037519201636\`** (deterministic for seed **42**).
+
+### Example — scale unit random with \`is/2\`
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        set_random(42),
+        random(U),
+        X is U * 10.0,
+        show("scaled", X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`scaled 6.011037519201636\`**.
+
+### Example — float interval
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    query q:
+        set_random(42),
+        random_between(0.0, 10.0, X),
+        show("float", X)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run** prints **\`float 6.011037519201636\`**.
+
+### Example — dice with deterministic seed (integer)
 
 \`\`\`logts-play
 inline [logic] .dice:
@@ -28845,7 +29068,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Order per pass** | Pin assigns → **mutations** → **queries** → redirects |
 | **Persistence** | Dynamic store survives across \`set\` passes on the same component |
 | **\`.world:query\`** | Reads **static inline only** — not the component dynamic overlay |
-| **Wire in mutation** | \`text w\` / \`text list w\` / … — bare id = atom; **\`text each w\`** / **\`text list each matrix\`** expand to N ops |
+| **Wire in mutation** | \`text w\` / \`text list w\` / … — bare id = atom; **\`text each w\`** zip rows; **\`text every w\`** Cartesian alternatives; **\`text list each matrix\`** / **\`text list every matrix\`** |
 | **Constraints** | \`constraint P <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 
 ---
@@ -29433,6 +29656,189 @@ comp [logic] .tagLogic:
 \`\`\`
 
 The literal **\`active\`** and the **\`text list sharedTags\`** value are identical on every expanded \`tag/3\` fact.
+
+---
+
+## Mutation **\`every\`** — Cartesian expansion
+
+Postfix modifier on wire refs (extends **\`each\`**):
+
+\`\`\`text
+<text | number | bool | float[/fmt]> [list] every <wireName>
+\`\`\`
+
+| Form | Wire shape | Expansion |
+|------|------------|-----------|
+| \`text every V\` | vector \`Wwire[N]\` | **every** cell value is an alternative (N expanded calls per other \`every\` arg) |
+| \`number every V\` | vector | every number cell |
+| \`bool every V\` | vector | every bool cell |
+| \`float/fp16 every V\` | vector | every decoded float cell |
+| \`text list every M\` | matrix \`Wwire[R,C]\` | **each matrix row** as one Prolog list alternative (R alternatives) |
+| \`text every A\` + \`text every B\` | two vectors | **full Cartesian product** (N×M expanded facts) |
+| \`text each A\` + \`text every B\` | vector + vector | **\`each\` zip** establishes rows, then **\`every\`** multiplies **within each row** |
+
+**Rules:**
+
+- **\`each\`** and **\`every\`** are **mutually exclusive on the same wire ref** (\`text each every W\` → parse error).
+- Multiple **\`every\`** args in one fact → Cartesian product across all of them.
+- Args **without** a modifier are **broadcast** (same as **\`each\`** expansion).
+- **\`every\`** inside **nested compounds** is expanded structurally before commit (same pipeline as top-level).
+- Expansion is capped at **10 000** ground facts per mutation/check op; exceeding the cap sets **\`mutationFailed = 1\`** with no partial commit.
+- \`-\` uses the same expansion as \`+\`.
+
+**Mental model:** **\`each\`** = pick synchronized row · **\`every\`** = pick every alternative · **plain** = broadcast once.
+
+### Example — Cartesian product (3×2)
+
+\`\`\`logts-play
+inline [logic] .pairs:
+
+    query qah:
+        pair(a, h)
+    query qai:
+        pair(a, i)
+    query qbh:
+        pair(b, h)
+    query qbi:
+        pair(b, i)
+    query qch:
+        pair(c, h)
+    query qci:
+        pair(c, i)
+
+:
+
+8wire[3] owners = 01100001 + 01100010 + 01100011
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire ok = 0
+1wire failed = 0
+1wire trigger = 1
+
+.pairLogic:{
+    logic {
+        + pair(text every owners, text every cars)
+    }
+    qah >= ok
+    qai >= ok
+    qbh >= ok
+    qbi >= ok
+    qch >= ok
+    qci >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: six facts \`(a,h)\`, \`(a,i)\`, \`(b,h)\`, \`(b,i)\`, \`(c,h)\`, \`(c,i)\` → all six query wires **\`1\`**, **\`failed = 0\`**.
+
+### Example — \`each\` rows + \`every\` colors per row
+
+\`\`\`logts-play
+inline [logic] .triples:
+
+    query q1:
+        triple(a, h, r)
+    query q6:
+        triple(b, i, b)
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+8wire[2] cars = 01101000 + 01101001
+8wire[3] colors = 01110010 + 01100111 + 01100010
+
+comp [logic] .tripleLogic:
+    on: 1
+    .triples { }
+:
+
+1wire ok1 = 0
+1wire ok6 = 0
+1wire failed = 0
+1wire trigger = 1
+
+.tripleLogic:{
+    logic {
+        + triple(text each owners, text each cars, text every colors)
+    }
+    q1 >= ok1
+    q6 >= ok6
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **6** facts (2 zip rows × 3 colors) → **\`ok1 = 1\`**, **\`ok6 = 1\`**, **\`failed = 0\`**.
+
+### Example — nested compound with \`each\` + \`every\`
+
+\`\`\`logts-play
+inline [logic] .loc:
+
+    query q1:
+        located(j, zone(1, n))
+    query q6:
+        located(m, zone(2, e))
+
+:
+
+8wire[2] names = 01101010 + 01101101
+16wire[2] ids = 0000000000000001 + 0000000000000010
+8wire[3] areas = 01101110 + 01110011 + 01100101
+
+comp [logic] .locLogic:
+    on: 1
+    .loc { }
+:
+
+1wire ok1 = 0
+1wire ok6 = 0
+1wire failed = 0
+1wire trigger = 1
+
+.locLogic:{
+    logic {
+        + located(
+            text each names,
+            zone(number each ids, text every areas)
+        )
+    }
+    q1 >= ok1
+    q6 >= ok6
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **6** facts — outer **\`each\`** on names; inner **\`number each ids\`** follows the same row index; inner **\`text every areas\`** Cartesian per row → **\`ok1 = 1\`**, **\`ok6 = 1\`**.
+
+Multiline **\`logic { + … }\`** facts are supported (parentheses may span lines).
+
+### Example — \`check({ + … every … })\`
+
+\`\`\`logts-play
+inline [logic] .pairs:
+
+:
+
+8wire[2] owners = 01100001 + 01100010
+8wire[2] cars = 01101000 + 01101001
+
+comp [logic] .pairLogic:
+    on: 1
+    .pairs { }
+:
+
+1wire pass = .pairLogic:check({ + pair(text every owners, text every cars) })
+\`\`\`
+
+After **Load & Run**: **\`pass = 1\`** (same expansion and validation as a commit).
 
 ---
 
