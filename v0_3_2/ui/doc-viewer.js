@@ -168,6 +168,7 @@ const DOC_SECTIONS = [
       { file: 'logic-query-exec.md', label: 'Inline logic query — `.world:query({ })`' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
+      { file: 'mini-monopoly-interactive.md', label: 'Mini Monopoly — interactive (keys + show)' },
       { file: 'mmap.md', label: 'Memory map (`comp [mmap]`)' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
       { file: 'servo.md', label: 'Servo component' },
