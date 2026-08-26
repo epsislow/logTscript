@@ -1748,6 +1748,11 @@ class Interpreter {
     if (containMutFn && containMutFn(goals)) {
       throw new Error(`${instName}:query does not support mutation goals (+ / - / ~ / commit)`);
     }
+    const containCtrlFn = typeof logicGoalsContainControlFlow === 'function'
+      ? logicGoalsContainControlFlow : null;
+    if (containCtrlFn && containCtrlFn(goals)) {
+      throw new Error(`${instName}:query does not support control-flow goals (|| / if/3)`);
+    }
     const merged = resolveFn(inlineInst, this.inlineInstances);
     const inputEnv = {};
     const outputHints = {};

@@ -48473,5 +48473,427 @@ comp [logic] .tagLogic:
     h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
   });
 
+  const INLINE_LOGIC_F45_COLORS = `inline [logic] .colors:
+
+    color_red(red)
+    color_blue(blue)
+
+    color(C) <- color_red(C) || color_blue(C)
+
+    query pick:
+        color(C)
+
+:`;
+
+  function runF45OrTwoSolutions(h, session) {
+    const src = INLINE_LOGIC_F45_COLORS + `
+comp [logic] .colorLogic:
+    on: 1
+    .colors { }
+:
+
+1wire trigger = 1
+
+.colorLogic:{
+    query = pick
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const merged = logicResolveMerged(
+      interp.inlineInstances.get('.colors'),
+      interp.inlineInstances,
+    );
+    const results = executeLogicQueries(merged, {}, {});
+    h.assert('two solutions', String(results.pick.length), '2');
+  }
+
+  reg(4459, 'logic', 'F45 || OR in rule body — two solutions (legacy)', runF45OrTwoSolutions);
+  reg(4460, 'logic', 'F45 || OR in rule body — two solutions (wave)', runF45OrTwoSolutions, { propagation: 'wave' });
+
+  const INLINE_LOGIC_F45_BACKTRACK = `inline [logic] .pick:
+
+    regula1()
+    regula2()
+
+    ceva(r1) <- regula1()
+    ceva(r2) <- regula2()
+
+    nuAccept(r1) <- fail()
+    nuAccept(r2)
+
+    query chosen:
+        ceva(X), nuAccept(X)
+
+:`;
+
+  function runF45OrBacktrack(h, session) {
+    const src = INLINE_LOGIC_F45_BACKTRACK + `
+comp [logic] .pickLogic:
+    on: 1
+    .pick { }
+:
+
+1wire trigger = 1
+
+.pickLogic:{
+    query = chosen
+    set = trigger
+}`;
+    session.run(src);
+    const merged = logicResolveMerged(
+      session.interp.inlineInstances.get('.pick'),
+      session.interp.inlineInstances,
+    );
+    const results = executeLogicQueries(merged, {}, {});
+    h.assert('one solution', String(results.chosen.length), '1');
+    h.assert('r2 tag', results.chosen[0].X.name, 'r2');
+  }
+
+  reg(4461, 'logic', 'F45 || OR backtrack on later goal fail (legacy)', runF45OrBacktrack);
+  reg(4462, 'logic', 'F45 || OR backtrack on later goal fail (wave)', runF45OrBacktrack, { propagation: 'wave' });
+
+  function runF45IfThen(h, session) {
+    const src = `inline [logic] .gate:
+
+    canReset()
+
+    query allowed:
+        if(
+            canReset(),
+            show("reset ok"),
+            show("denied")
+        )
+
+    query blocked:
+        if(
+            fail,
+            show("reset ok"),
+            show("denied")
+        )
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = allowed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('then branch', String(session.outIncludes(interp, 'reset ok')), 'true');
+    h.assert('no denied', String(session.outIncludes(interp, 'denied')), 'false');
+  }
+
+  reg(4463, 'logic', 'F45 if/3 Then branch show (legacy)', runF45IfThen);
+  reg(4464, 'logic', 'F45 if/3 Then branch show (wave)', runF45IfThen, { propagation: 'wave' });
+
+  function runF45IfElse(h, session) {
+    const src = `inline [logic] .gate:
+
+    query blocked:
+        if(
+            fail,
+            show("then"),
+            show("else")
+        )
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = blocked
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('else branch', String(session.outIncludes(interp, 'else')), 'true');
+    h.assert('no then', String(session.outIncludes(interp, 'then')), 'false');
+  }
+
+  reg(4465, 'logic', 'F45 if/3 Else branch show (legacy)', runF45IfElse);
+  reg(4466, 'logic', 'F45 if/3 Else branch show (wave)', runF45IfElse, { propagation: 'wave' });
+
+  function runF45IfSoftCut(h, session) {
+    const src = `inline [logic] .gate:
+
+    query soft:
+        if(
+            ( true, true ),
+            ( fail, show("then") ),
+            show("else")
+        ),
+        show("after")
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = soft
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const merged = logicResolveMerged(
+      interp.inlineInstances.get('.gate'),
+      session.interp.inlineInstances,
+    );
+    const results = executeLogicQueries(merged, {}, {});
+    h.assert('no solution', String(results.soft.length), '0');
+    h.assert('no else show', String(session.outIncludes(interp, 'else')), 'false');
+    h.assert('no after show', String(session.outIncludes(interp, 'after')), 'false');
+  }
+
+  reg(4467, 'logic', 'F45 if/3 Then fail does not fall back to Else (legacy)', runF45IfSoftCut);
+  reg(4468, 'logic', 'F45 if/3 Then fail does not fall back to Else (wave)', runF45IfSoftCut, { propagation: 'wave' });
+
+  function runF45IfCondOr(h, session) {
+    const src = `inline [logic] .gate:
+
+    opt(a)
+    opt(b)
+
+    query viaIf:
+        if(
+            ( opt(a) || opt(b), true ),
+            show("ok"),
+            show("no")
+        )
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = viaIf
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('cond or ok', String(session.outIncludes(interp, 'ok')), 'true');
+  }
+
+  reg(4469, 'logic', 'F45 if/3 Cond with || inside parens (legacy)', runF45IfCondOr);
+  reg(4470, 'logic', 'F45 if/3 Cond with || inside parens (wave)', runF45IfCondOr, { propagation: 'wave' });
+
+  reg(4471, 'logic', 'F45 if/3 parse error on four top-level args', function(h) {
+    let err = '';
+    try { parseLogicGoalsBlock('if(a, b, c, d)'); } catch (e) { err = e.message || String(e); }
+    h.assert('arity or invalid goal', (err.includes('3 arguments') || err.includes('invalid body goal')) ? '1' : '0', '1');
+  });
+
+  reg(4472, 'logic', 'F45 if/3 rule head reserved', function(h) {
+    let err = '';
+    try { parseLogicBody('if(A, B, C) <- true'); } catch (e) { err = e.message || String(e); }
+    h.assert('if reserved', err.includes('if/3') ? '1' : '0', '1');
+  });
+
+  reg(4473, 'logic', 'F45 .world:query rejects if/3', function(h, session) {
+    session.run(`inline [logic] .world:
+    query q:
+        true
+:`);
+    let err = '';
+    try {
+      session.interp.evalLogicInlineQuery({
+        var: '.world',
+        method: 'query',
+        args: [{ kind: 'logicGoalsBlock', raw: 'if(true, X = 1, X = 2)' }],
+        bindings: [],
+      });
+    } catch (e) { err = e.message || String(e); }
+    h.assert('if rejected', err.includes('if/3') ? '1' : '0', '1');
+  });
+
+  reg(4474, 'logic', 'F45 .world:query rejects ||', function(h, session) {
+    session.run(`inline [logic] .world:
+    color(red)
+    query q:
+        true
+:`);
+    let err = '';
+    try {
+      session.interp.evalLogicInlineQuery({
+        var: '.world',
+        method: 'query',
+        args: [{ kind: 'logicGoalsBlock', raw: 'color(red) || fail' }],
+        bindings: [],
+      });
+    } catch (e) { err = e.message || String(e); }
+    h.assert('or rejected', (err.includes('||') || err.includes('control-flow')) ? '1' : '0', '1');
+  });
+
+  function runF45IfShowExclusive(h, session) {
+    const src = `inline [logic] .gate:
+
+    query onlyThen:
+        if(
+            true,
+            show("then"),
+            show("else")
+        )
+
+    query onlyElse:
+        if(
+            fail,
+            show("then"),
+            show("else")
+        )
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = onlyThen
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('then only', String(session.outIncludes(interp, 'then')), 'true');
+    h.assert('else silent', String(session.outIncludes(interp, 'else')), 'false');
+  }
+
+  reg(4475, 'logic', 'F45 if/3 show only on chosen branch (legacy)', runF45IfShowExclusive);
+  reg(4476, 'logic', 'F45 if/3 show only on chosen branch (wave)', runF45IfShowExclusive, { propagation: 'wave' });
+
+  function runF45CommitOr(h, session) {
+    const src = `inline [logic] .turns:
+
+    turn(p1)
+    turn(p2)
+
+    path(a) <- commit(~ turn(_), + turn(p1))
+    path(b) <- commit(~ turn(_), + turn(p2))
+
+    pick(X) <- path(a), fail() || path(b)
+
+    query hasP2:
+        turn(p2)
+
+    query picked:
+        pick(X)
+
+:
+
+comp [logic] .tg:
+    on: 1
+    .turns { }
+:
+
+1wire failed = 0
+1wire okP2 = 0
+1wire trigger = 1
+
+.tg:{
+    picked >= okP2
+    hasP2 >= okP2
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('no mutation error', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('p2 committed via second branch', interp.getWireEffectiveValue('okP2'), '1');
+  }
+
+  reg(4477, 'logic', 'F45 || between commit paths allowed (legacy)', runF45CommitOr);
+  reg(4478, 'logic', 'F45 || between commit paths allowed (wave)', runF45CommitOr, { propagation: 'wave' });
+
+  function runF45ResetStyle(h, session) {
+    const src = `inline [logic] .game:
+
+    turn(p1)
+    turn(p2)
+    canReset()
+
+    resetMsg() <- if(
+        ( canReset(), true ),
+        (
+            commit(~ turn(_), + turn(p1)),
+            show("turn reset")
+        ),
+        show("not allowed")
+    )
+
+    query resetGame:
+        resetMsg()
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = resetGame
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('reset message', String(session.outIncludes(interp, 'turn reset')), 'true');
+  }
+
+  reg(4479, 'logic', 'F45 reset-style if + commit (legacy)', runF45ResetStyle);
+  reg(4480, 'logic', 'F45 reset-style if + commit (wave)', runF45ResetStyle, { propagation: 'wave' });
+
+  const INLINE_LOGIC_F45_QUERY_OR = `inline [logic] .colors:
+
+    color_red(red)
+    color_blue(blue)
+
+    query pickOr:
+        color_red(C) || color_blue(C)
+
+:`;
+
+  function runF45QueryOrInline(h, session) {
+    const src = INLINE_LOGIC_F45_QUERY_OR + `
+comp [logic] .colorLogic:
+    on: 1
+    .colors { }
+:
+
+1wire trigger = 1
+
+.colorLogic:{
+    query = pickOr
+    set = trigger
+}`;
+    session.run(src);
+    const merged = logicResolveMerged(
+      session.interp.inlineInstances.get('.colors'),
+      session.interp.inlineInstances,
+    );
+    const results = executeLogicQueries(merged, {}, {});
+    h.assert('query || two solutions', String(results.pickOr.length), '2');
+  }
+
+  reg(4481, 'logic', 'F45 || OR in comp query body (legacy)', runF45QueryOrInline);
+  reg(4482, 'logic', 'F45 || OR in comp query body (wave)', runF45QueryOrInline, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

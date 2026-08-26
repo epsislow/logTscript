@@ -105,6 +105,29 @@ function logicInternGoal(goal, table) {
   if (goal.kind === 'cut') {
     return { kind: 'cut' };
   }
+  if (goal.kind === 'or') {
+    return {
+      kind: 'or',
+      left: logicInternGoal(goal.left, table),
+      right: logicInternGoal(goal.right, table),
+    };
+  }
+  if (goal.kind === 'if') {
+    return {
+      kind: 'if',
+      cond: (goal.cond || []).map((g) => logicInternGoal(g, table)),
+      then: (goal.then || []).map((g) => logicInternGoal(g, table)),
+      else: (goal.else || []).map((g) => logicInternGoal(g, table)),
+      line: goal.line,
+    };
+  }
+  if (goal.kind === 'seq') {
+    return {
+      kind: 'seq',
+      goals: (goal.goals || []).map((g) => logicInternGoal(g, table)),
+      line: goal.line,
+    };
+  }
   if (goal.kind === 'mut_add' || goal.kind === 'mut_remove') {
     return {
       kind: goal.kind,
@@ -317,6 +340,29 @@ function logicDenormGoal(goal, table) {
   if (!goal) return goal;
   if (goal.kind === 'not') return { kind: 'not', goal: logicDenormGoal(goal.goal, table) };
   if (goal.kind === 'cut') return { kind: 'cut' };
+  if (goal.kind === 'or') {
+    return {
+      kind: 'or',
+      left: logicDenormGoal(goal.left, table),
+      right: logicDenormGoal(goal.right, table),
+    };
+  }
+  if (goal.kind === 'if') {
+    return {
+      kind: 'if',
+      cond: (goal.cond || []).map((g) => logicDenormGoal(g, table)),
+      then: (goal.then || []).map((g) => logicDenormGoal(g, table)),
+      else: (goal.else || []).map((g) => logicDenormGoal(g, table)),
+      line: goal.line,
+    };
+  }
+  if (goal.kind === 'seq') {
+    return {
+      kind: 'seq',
+      goals: (goal.goals || []).map((g) => logicDenormGoal(g, table)),
+      line: goal.line,
+    };
+  }
   if (goal.kind === 'call') {
     return {
       kind: 'call',
@@ -722,6 +768,15 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'fail' && g0.arity === 0) {
       return false;
     }
+    if (g0.kind === 'or') {
+      return this._solveOr(g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'if') {
+      return this._solveIf(g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
+    if (g0.kind === 'seq') {
+      return this._solveGoals((g0.goals || []).concat(rest), env, depth + 1, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'mut_add' || g0.kind === 'mut_remove') {
       if (!this._applyMutationGoal(g0, false)) return false;
       return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
@@ -753,6 +808,58 @@ class LogicEngine {
       return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     return false;
+  }
+
+  _logicOrBranches(goal) {
+    const branches = [];
+    const walk = (g) => {
+      if (g && g.kind === 'or') {
+        walk(g.left);
+        walk(g.right);
+      } else if (g) {
+        branches.push(g);
+      }
+    };
+    walk(goal);
+    return branches;
+  }
+
+  _solveOr(goal, rest, env, depth, onSuccess, onDepthExceeded) {
+    const branches = this._logicOrBranches(goal);
+    const cutParent = env.choiceDepth();
+    let any = false;
+    for (let i = 0; i < branches.length; i++) {
+      if (this._solutionCapReached) break;
+      const trail = env.trailLength();
+      env.pushChoice({ type: 'or', cutParent, trail });
+      const savedCut = env.cutDepth;
+      const savedCutCommitted = env.cutCommitted;
+      env.cutDepth = cutParent;
+      env.cutCommitted = false;
+      const ok = this._solveGoals([branches[i]].concat(rest), env, depth + 1, onSuccess, onDepthExceeded);
+      const cutCommitted = env.cutCommitted;
+      env.cutDepth = savedCut;
+      env.cutCommitted = savedCutCommitted || cutCommitted;
+      env.undo(trail);
+      if (env.choiceDepth() > cutParent) env.popChoice();
+      if (ok) any = true;
+      if (cutCommitted) break;
+    }
+    return any;
+  }
+
+  _solveIf(goal, rest, env, depth, onSuccess, onDepthExceeded) {
+    const condTrail = env.trailLength();
+    let condSucceeded = false;
+    this._solveGoals(goal.cond || [], env, depth + 1, () => {
+      condSucceeded = true;
+      return false;
+    }, onDepthExceeded);
+    if (condSucceeded) {
+      return this._solveGoals((goal.then || []).concat(rest), env, depth + 1, onSuccess, onDepthExceeded);
+    }
+    env.undo(condTrail);
+    return this._solveGoals((goal.else || []).concat(rest), env, depth + 1, onSuccess, onDepthExceeded);
   }
 
   _solveCount(goal, rest, env, depth, onSuccess, onDepthExceeded) {
@@ -2479,6 +2586,21 @@ function logicRenameApartClause(clause, idRef) {
     if (g.kind === 'is') {
       return { kind: 'is', left: walkTerm(g.left), right: walkTerm(g.right) };
     }
+    if (g.kind === 'or') {
+      return { kind: 'or', left: walkGoal(g.left), right: walkGoal(g.right) };
+    }
+    if (g.kind === 'if') {
+      return {
+        kind: 'if',
+        cond: (g.cond || []).map(walkGoal),
+        then: (g.then || []).map(walkGoal),
+        else: (g.else || []).map(walkGoal),
+        line: g.line,
+      };
+    }
+    if (g.kind === 'seq') {
+      return { kind: 'seq', goals: (g.goals || []).map(walkGoal), line: g.line };
+    }
     return g;
   }
   return {
@@ -3671,7 +3793,14 @@ function logicCollectFreeVarsInGoal(goal) {
   function walkGoal(g) {
     if (!g) return;
     if (g.kind === 'not') walkGoal(g.goal);
-    else if (g.kind === 'call' || g.kind === 'compound') {
+    else if (g.kind === 'or') { walkGoal(g.left); walkGoal(g.right); }
+    else if (g.kind === 'if') {
+      for (const sg of g.cond || []) walkGoal(sg);
+      for (const sg of g.then || []) walkGoal(sg);
+      for (const sg of g.else || []) walkGoal(sg);
+    } else if (g.kind === 'seq') {
+      for (const sg of g.goals || []) walkGoal(sg);
+    } else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
     } else if (g.kind === 'cmp' || g.kind === 'unify' || g.kind === 'is') {
       walkTerm(g.left); walkTerm(g.right);
@@ -3764,6 +3893,21 @@ function logicPrepareGoalsForInvoke(goals) {
     if (!g) return g;
     if (g.kind === 'not') return { kind: 'not', goal: mapGoal(g.goal) };
     if (g.kind === 'cut') return { kind: 'cut' };
+    if (g.kind === 'or') {
+      return { kind: 'or', left: mapGoal(g.left), right: mapGoal(g.right) };
+    }
+    if (g.kind === 'if') {
+      return {
+        kind: 'if',
+        cond: (g.cond || []).map(mapGoal),
+        then: (g.then || []).map(mapGoal),
+        else: (g.else || []).map(mapGoal),
+        line: g.line,
+      };
+    }
+    if (g.kind === 'seq') {
+      return { kind: 'seq', goals: (g.goals || []).map(mapGoal), line: g.line };
+    }
     if (g.kind === 'call' || g.kind === 'compound') {
       return { kind: 'call', predicate: g.predicate, args: (g.args || []).map(mapTerm) };
     }

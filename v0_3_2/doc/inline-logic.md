@@ -4,7 +4,7 @@
 
 Runtime wiring lives in [`comp [logic]`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [`logic-query-exec.md`](logic-query-exec.md) — **`.world:query({ goals }, Var=<type> wire)`** with explicit **`text` / `number` / `bool`** and optional **`list`**.
 
-**`.world:query({ … })`** and **`.inline:query({ … })`** are **read-only**: goals that mutate the KB (**`+`**, **`-`**, **`~`**, **`commit(…)`**, or rules whose bodies contain them) are rejected. Use **`comp [logic]`** with **`logic { }`**, named queries, or rule bodies for runtime mutations — see [logic-runtime.md](logic-runtime.md).
+**`.world:query({ … })`** and **`.inline:query({ … })`** are **read-only**: goals that mutate the KB (**`+`**, **`-`**, **`~`**, **`commit(…)`**, or rules whose bodies contain them) are rejected. Control-flow goals **`||`** and **`if/3`** are also rejected in inline query blocks — use **`comp [logic]`** named queries or rule bodies instead. Use **`comp [logic]`** with **`logic { }`**, named queries, or rule bodies for runtime mutations — see [logic-runtime.md](logic-runtime.md).
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run**.
 
@@ -55,6 +55,8 @@ LogTScript logic follows common Prolog conventions:
 | **Rule** | `modifier2(X, 0) <- X >= 9, X =< 12` | Head `<-` body goals (comma = AND) |
 | **Negation** | `\+ age(peter, _)` | Negation as failure — goal cannot be proven |
 | **Cut** | `!` | Commit — discard backtracking choices from the current clause |
+| **OR** | `\|\|` | Choice point in a rule/query body — try left branch, backtrack to right on failure |
+| **If-then-else** | **`if/3`** | Reserved builtin — soft cut (Prolog **`->` / `;`**) |
 | **Arithmetic eval** | `M is Expr`, `is(M, Expr)` | Built-in integer evaluation — [logic-builtins.md — `is/2`](logic-builtins.md#is2) |
 | **Query** | `query johnOwns: owns(john, X)` | Named goal(s) exported to runtime |
 
@@ -70,6 +72,8 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | `:-` rule neck | `<-` rule neck |
 | `\+ Goal` | `\+ Goal` — negation as failure (same idea as Prolog) |
 | `!` | Cut — commit current clause (same idea as Prolog) |
+| `\|\|` | OR in rule/query body — backtrack between branches (Prolog **`;`** in a body) |
+| **`if(Cond, Then, Else)`** | Soft if-then-else — reserved **`if/3`** ([logic-builtins.md — `if/3`](logic-builtins.md#if3)) |
 | `is` | Arithmetic evaluate-and-bind — **`Left is Right`** or **`is(Left, Right)`** (built-in) |
 | `true` / `fail` | **`true/0`**, **`fail/0`** — reserved builtins ([logic-builtins.md](logic-builtins.md#true0-and-fail0)) |
 | Floats | **Not supported** — atoms, integers, lists, string literals |
@@ -88,6 +92,8 @@ Operators in rule bodies:
 | `=:=` | Numeric equality test |
 | `=\=` | Numeric inequality test |
 | `>=`, `=<`, `>`, `<` | Numeric comparison |
+| `,` | AND — binds tighter than `\|\|` |
+| `\|\|` | OR — binds tighter than top-level argument commas in **`if/3`** |
 | `+`, `-`, `*`, `/` | Integer arithmetic |
 
 ---
@@ -1304,6 +1310,185 @@ comp [logic] .worldLogic:
 ```
 
 **Load & Run** prints **`pick red`** and **`done red`** once. Without `!`, backtracking would also print lines for green.
+
+---
+
+## OR in rule bodies — `||`
+
+**`||`** is **pure OR** (a Prolog **`;`** in the body): the engine tries the left goal sequence; if a later goal fails, it **backtracks** and tries the right branch. Multiple solutions are possible when both branches succeed with different bindings.
+
+**Precedence:** comma **`,`** (AND) binds **tighter** than **`||`**. Use parentheses to group mixed expressions:
+
+| Written | Parsed as |
+|---------|-----------|
+| `a, b \|\| c, d` | `a`, then `(b \|\| c)`, then `d` |
+| `(a \|\| b), c` | `(a \|\| b)`, then `c` |
+
+Parentheses **`( g1, g2, … )`** group AND sequences inside **`if/3`** arguments (see below). The same parentheses work in rule bodies when you need explicit grouping.
+
+**Where allowed:** rule bodies, named **`query`** blocks on **`comp [logic]`**.
+
+**Where forbidden:** **`.world:query({ … })`** and **`.inline:query({ … })`** — elaboration error.
+
+**Clause OR unchanged:** multiple clauses with the same head remain an alternative to **`||`** in the body.
+
+### Example — two colors via `||` (Load & Run)
+
+```logts-play
+inline [logic] .colors:
+
+    color_red(red)
+    color_blue(blue)
+
+    color(C) <- color_red(C) || color_blue(C)
+
+    query pick:
+        color(C),
+        show(C)
+
+:
+
+comp [logic] .colorLogic:
+    on: 1
+    .colors { }
+:
+
+1wire trigger = 1
+
+.colorLogic:{
+    query = pick
+    set = trigger
+}
+```
+
+**Load & Run** prints **`red`** then **`blue`**.
+
+### Example — OR backtrack when a later goal fails (Load & Run)
+
+```logts-play
+inline [logic] .pick:
+
+    regula1()
+    regula2()
+
+    ceva(r1) <- regula1()
+    ceva(r2) <- regula2()
+
+    reject(r1) <- fail()
+    reject(r2)
+
+    query chosen:
+        ceva(X),
+        reject(X),
+        show(X)
+
+:
+
+comp [logic] .pickLogic:
+    on: 1
+    .pick { }
+:
+
+1wire trigger = 1
+
+.pickLogic:{
+    query = chosen
+    set = trigger
+}
+```
+
+**Load & Run** prints **`r2`** only.
+
+---
+
+## If-then-else — `if/3`
+
+**`if(Cond, Then, Else)`** is a **reserved builtin** (soft cut). It is **not** OR:
+
+| Part | Meaning |
+|------|---------|
+| **Cond** | If this AND-sequence **succeeds**, run **Then** only |
+| **Then** | Runs when **Cond** succeeded |
+| **Else** | Runs when **Cond** **failed** |
+| **Then fails after Cond OK** | Does **not** fall back to **Else** |
+
+Each argument is a single goal or **`( g1, g2, … )`**. Use parentheses for multiple goals or **`||`** inside an argument.
+
+**Reserved head:** **`if/3`** cannot be a fact or rule head.
+
+**Where forbidden:** **`.world:query({ … })`**.
+
+See [logic-builtins.md — `if/3`](logic-builtins.md#if3).
+
+### Example — reset when allowed (Load & Run)
+
+```logts-play
+inline [logic] .game:
+
+    turn(p1)
+    turn(p2)
+    canReset()
+
+    resetMsg() <- if(
+        canReset(),
+        (
+            commit(~ turn(_), + turn(p1)),
+            show("turn reset")
+        ),
+        show("not allowed")
+    )
+
+    query resetGame:
+        resetMsg()
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = resetGame
+    set = trigger
+}
+```
+
+**Load & Run** prints **`turn reset`**.
+
+### Example — `if/3` with OR in Cond (Load & Run)
+
+```logts-play
+inline [logic] .gate:
+
+    opt(a)
+    opt(b)
+
+    query viaIf:
+        if(
+            ( opt(a) || opt(b), true ),
+            show("ok"),
+            show("no")
+        )
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = viaIf
+    set = trigger
+}
+```
+
+**Load & Run** prints **`ok`**.
 
 ---
 

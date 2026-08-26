@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** … **F44✅**; **F45** **`||`** OR + **`if/3`** — D379–D388✅ ready-to-implement; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** … **F45✅**; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -228,8 +228,8 @@ todos:
     content: "Faza 44 (2+p): +/−/~ + commit — comp-only exec; inline static la :query — D355–D378✅; teste 4430–4458"
     status: completed
   - id: logic-control-flow-45
-    content: "Faza 45 (2+q): || OR + if/3 soft cut — D379–D388✅ confirmed; interzis :query — ready-to-implement"
-    status: pending
+    content: "Faza 45 (2+q): || OR + if/3 soft cut — D379–D388✅; teste 4459–4482 legacy+wave"
+    status: completed
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
     status: completed
@@ -1523,7 +1523,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e✅** — [Faza 42](#faza-42--is2-extins--random-float-2m--completed) | **✅ completed** |
 | **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e✅** — D341–D354 — [Faza 43](#faza-43--mutation-every-expansion-2o--completed) | **✅ completed** |
 | **Faza 44** Inline **`+`/`-`/`~`** + **`commit/…`** (**2+p**) | D355–D378 — [Faza 44](#faza-44--inline--retractall-via-2p--completed) | **✅ completed** |
-| **Faza 45** Control flow **`||`** + **`if/3`** (**2+q**) | D379–D388✅ — [Faza 45](#faza-45--control-flow--or--if3-2q--ready-to-implement) | **(ready-to-implement)** |
+| **Faza 45** Control flow **`||`** + **`if/3`** (**2+q**) | D379–D388✅ — [Faza 45](#faza-45--control-flow--or--if3-2q--completed) | **✅ completed** |
 
 
 ---
@@ -6793,7 +6793,7 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+m**~~ | `is/2` float extins         | **Livrat → Faza 42✅** — `**`, `mod`, `rem`, `//`, funcții unare, `min`/`max`, `call(is/2)`, **`random_between` float**, **`random/1`**; teste **4386–4410** | **F42**    | F26, F40c, F34, D332–D340 **(completed)** |
 | ✅     | ~~**2+o**~~ | Mutation **`every`**        | **Livrat → Faza 43✅** — cartesian; mix `each`+`every`; compound nested; cap 10 000; teste **4411–4428** | **F43**    | F33, F25, F40b, D341–D354 **(completed)** |
 | ✅     | ~~**2+p**~~     | Inline **`+`/`-`/`~`** + **`commit`** | **F44✅** — [Faza 44](#faza-44--inline--retractall-via-2p--completed) | **F44**    | F11, D355–D378 **(completed)** |
-| ⏳     | **2+q**     | **`||`** OR + builtin **`if/3`** | **F45** — D379–D388✅ — [Faza 45](#faza-45--control-flow--or--if3-2q--ready-to-implement) | **F45**    | F24 (`!`), F7 (`\+`), F9, F44 **(ready-to-implement)** |
+| ✅     | **2+q**     | **`||`** OR + builtin **`if/3`** | **F45✅** — D379–D388 — [Faza 45](#faza-45--control-flow--or--if3-2q--completed) | **F45**    | F24, F7, F9, F44 **(completed)** |
 
 
 **Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · … · ~~**2+o**~~ **→ F43✅** · ~~**2+p**~~ **→ F44✅** · **2+q** (`||` + `if/3`) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
@@ -6856,9 +6856,9 @@ Builtins bibliotecă listă — `member/2`, `append/3`, `length/2`, `reverse/2`,
 
 Inline **`+`/`-`/`~`** + **`commit(…)`** — exec **comp-only**; `.world:query` static; teste **4430–4458**. Vezi [Faza 44](#faza-44--inline--retractall-via-2p--completed).
 
-#### **2+q** ⏳ → **F45** (D379–D388✅) **(ready-to-implement)**
+#### ~~**2+q**~~ ✅ → **F45** (D379–D388) **(completed)**
 
-**`||`** OR în corp (choice point) + builtin rezervat **`if/3`** (soft cut). Paranteze **`( goalSeq )`** per argument `if`. **Interzis** în `.world:query`. Vezi [Faza 45](#faza-45--control-flow--or--if3-2q--ready-to-implement).
+**`||`** OR + **`if/3`** — teste **4459–4482**. Vezi [Faza 45](#faza-45--control-flow--or--if3-2q--completed).
 
 
 **Promovat** la **D290-B** (DCG out of scope F37). **Secțiune completă:** [Faza 38 — DCG Prolog](#faza-38--dcg-prolog-phrase-2i--completed) (**D297–D304✅** confirmed, **livrat**).
@@ -11238,11 +11238,11 @@ flowchart TD
 
 ---
 
-## Faza 45 — Control flow **`||`** OR + builtin **`if/3`** **(2+q — ready-to-implement)**
+## Faza 45 — Control flow **`||`** OR + builtin **`if/3`** **(2+q — completed)**
 
 > **Backlog:** **2+q** — promovat 2026-08-26 din discuție design (OR vs if-then-else separate).  
 > **Extinde:** [Faza 7](#faza-7--negation--goal-completed) (`\+`), [Faza 24](#faza-24--cut--completed) (`!`), [Faza 44](#faza-44--inline--retractall-via-2p--completed) (`commit` + side effects în Then/Else).  
-> **Status:** **(ready-to-implement)** — **D379–D388✅** confirmed 2026-08-26; teste draft **4459+**; ready **F45a**.
+> **Status:** **✅ completed** 2026-08-26 — **D379–D388✅**; teste **4459–4482** legacy+wave; doc **inline-logic**, **logic-builtins**, **logic-runtime**.
 
 ### Problemă (stare azi post-F44)
 
@@ -11408,14 +11408,14 @@ Comportament Prolog: output din ramura aleasă; **`show` pe ramura nealeasă nu 
 ### Criterii done (viitor)
 
 - [x] **D379–D388** confirmed
-- [ ] **F45a…F45e** livrate
-- [ ] Teste **4459+** legacy+wave
-- [ ] Doc EN + `logts-play` verify
-- [ ] **Fără** breaking changes pe reguli existente (doar additive)
+- [x] **F45a…F45e** livrate
+- [x] Teste **4459+** legacy+wave
+- [x] Doc EN + `logts-play` verify
+- [x] **Fără** breaking changes pe reguli existente (doar additive)
 
 ### Status F45
 
-**(ready-to-implement)** — **D379–D388✅** confirmed 2026-08-26; sintaxă **`||` + `if/3`**; ready **F45a** (parse `if/3`).
+**✅ completed** — **D379–D388✅**; teste **4459–4482**; doc EN.
 
 ### Legături
 

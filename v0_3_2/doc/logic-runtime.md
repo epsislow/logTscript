@@ -319,7 +319,7 @@ Wire **`query = resetGame`** on **`comp [logic]`**, or rely on default “run al
 
 ## Inline `:query` stays read-only
 
-**`.world:query({ … })`** (and **`.inline:query`**) still reads the **static** inline KB only. Goals that reach **`+` / `-` / `~` / `commit`**, or call a rule whose body contains them, fail with an error. Use **`comp [logic]`** for runtime mutations.
+**`.world:query({ … })`** (and **`.inline:query`**) still reads the **static** inline KB only. Goals that reach **`+` / `-` / `~` / `commit`**, or call a rule whose body contains them, fail with an error. Control-flow **`||`** and **`if/3`** are also rejected in inline query blocks. Use **`comp [logic]`** for runtime mutations and for **`||`** / **`if/3`**.
 
 **`.inline:mutate({ … })`** is not available — elaboration/runtime error.
 

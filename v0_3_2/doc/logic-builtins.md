@@ -69,6 +69,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **`setof/3`** | 3 | yes | no | Like bagof, then unique + sorted list |
 | **`true/0`** | 0 | yes | no | Always succeeds (Prolog-style) |
 | **`fail/0`** | 0 | yes | no | Always fails (Prolog-style) |
+| **`if/3`** | 3 | yes | no | Soft if-then-else — **not** OR; see [inline-logic.md](inline-logic.md#if-then-else-if3) |
 | **`atom/1`** | 1 | yes | no | Type test — argument is an atom |
 | **`number/1`** | 1 | yes | no | Type test — argument is an integer |
 | **`float/1`** | 1 | yes | no | Type test — argument is a float |
@@ -82,9 +83,9 @@ Type predicates filter bound terms — see [logic-value-types.md](logic-value-ty
 
 ¹ Only **`count/2`** is intercepted — other arities named `count` remain user predicates.
 
-**Scope:** all builtins work in rule bodies, named queries, constraint bodies, **`.world:query({ … })`**, and **`.world:check({ … })`**.
+**Scope:** all builtins work in rule bodies, named queries, constraint bodies, **`.world:query({ … })`**, and **`.world:check({ … })`**, except **`if/3`** (forbidden in inline **`:query`** blocks).
 
-**Not in this table:** **`!`** (cut) and **`\+`** (negation) are goal operators — see [inline-logic.md](inline-logic.md). **`true/0`** and **`fail/0`** are zero-arity call builtins in the table above.
+**Not in this table:** **`!`** (cut), **`\+`** (negation), and **`||`** (OR) are goal operators — see [inline-logic.md](inline-logic.md). **`true/0`**, **`fail/0`**, and **`if/3`** are in the table above.
 
 ---
 
@@ -2696,6 +2697,70 @@ comp [logic] .gateLogic:
 ```
 
 **Load & Run** prints **`ok`**. Switch to **`query = blocked`** — no output (query fails).
+
+---
+
+## `if/3` — soft if-then-else
+
+Reserved control-flow builtin — **not** logical OR (use **`||`** in rule bodies for that).
+
+```logts
+if(Cond, Then, Else)
+```
+
+| Argument | Form | Semantics |
+|----------|------|-----------|
+| **Cond** | goal or **`( g1, g2, … )`** | AND-sequence — if it **succeeds**, only **Then** runs |
+| **Then** | goal or **`( … )`** | Runs when **Cond** succeeded |
+| **Else** | goal or **`( … )`** | Runs when **Cond** **failed** |
+
+**Soft cut:** when **Cond** succeeds but **Then** fails, the engine does **not** execute **Else**.
+
+**Parse rules:**
+
+- Exactly **three** arguments at the top level — use **`( … )`** inside an argument for multiple goals.
+- **`if(a, b, c, d)`** is an error (too many top-level commas).
+
+**Reserved head:** cannot define **`if/3`** as fact, rule, or constraint head.
+
+**Inline query:** **`if/3`** is **not** allowed inside **`.world:query({ … })`** — elaboration error.
+
+**Side effects:** **`show/N`** on the branch **not taken** does not run (same as Prolog).
+
+**Mutations:** **`commit(…)`** and **`+` / `-` / `~`** may appear in **Then** / **Else** on **`comp [logic]`** (same store as [logic-runtime.md](logic-runtime.md)). **`||`** between two **`commit`** goals is **allowed** — effects from an earlier branch may persist after backtrack; prefer **`if/3`** when you need a single deterministic choice.
+
+### Example — allowed vs denied (Load & Run)
+
+```logts-play
+inline [logic] .gate:
+
+    canGo()
+
+    msg() <- if(
+        canGo(),
+        show("go"),
+        show("stop")
+    )
+
+    query run:
+        msg()
+
+:
+
+comp [logic] .gateLogic:
+    on: 1
+    .gate { }
+:
+
+1wire trigger = 1
+
+.gateLogic:{
+    query = run
+    set = trigger
+}
+```
+
+**Load & Run** prints **`go`**. Delete **`canGo()`** and run again — prints **`stop`**.
 
 ---
 

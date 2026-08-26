@@ -52,6 +52,7 @@ const LOGIC_BUILTIN_BAGOF_PRED = 'bagof';
 const LOGIC_BUILTIN_SETOF_PRED = 'setof';
 const LOGIC_BUILTIN_TRUE_PRED = 'true';
 const LOGIC_BUILTIN_FAIL_PRED = 'fail';
+const LOGIC_BUILTIN_IF_PRED = 'if';
 const LOGIC_MUTATION_COMMIT_PRED = 'commit';
 const LOGIC_BUILTIN_STRING_TO_LIST_PRED = 'string_to_list';
 const LOGIC_BUILTIN_STRING_TO_CODES_PRED = 'string_to_codes';
@@ -121,6 +122,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_SETOF_PRED]: [3],
   [LOGIC_BUILTIN_TRUE_PRED]: [0],
   [LOGIC_BUILTIN_FAIL_PRED]: [0],
+  [LOGIC_BUILTIN_IF_PRED]: [3],
   [LOGIC_BUILTIN_STRING_TO_LIST_PRED]: [2],
   [LOGIC_BUILTIN_STRING_TO_CODES_PRED]: [2],
   [LOGIC_BUILTIN_ATOM_CHARS_PRED]: [2],
@@ -167,6 +169,9 @@ function logicTokenize(src) {
     if (ch === ',' ) { tokens.push({ type: 'COMMA', value: ',', line: startLine }); i++; continue; }
     if (ch === '[' ) { tokens.push({ type: 'LBRACKET', value: '[', line: startLine }); i++; continue; }
     if (ch === ']' ) { tokens.push({ type: 'RBRACKET', value: ']', line: startLine }); i++; continue; }
+    if (ch === '|' && i + 1 < src.length && src[i + 1] === '|') {
+      tokens.push({ type: 'OR', value: '||', line: startLine }); i += 2; continue;
+    }
     if (ch === '|' ) { tokens.push({ type: 'PIPE', value: '|', line: startLine }); i++; continue; }
     if (ch === '(' ) { tokens.push({ type: 'LP', value: '(', line: startLine }); i++; continue; }
     if (ch === ')' ) { tokens.push({ type: 'RP', value: ')', line: startLine }); i++; continue; }
@@ -442,12 +447,32 @@ class LogicParser {
 
   parseBodyGoals() {
     const goals = [];
-    goals.push(this.parseBodyGoal());
+    goals.push(this.parseOrGoal());
     while (this.at('COMMA')) {
       this.advance();
-      goals.push(this.parseBodyGoal());
+      goals.push(this.parseOrGoal());
     }
     return goals;
+  }
+
+  parseOrGoal() {
+    let left = this.parseBodyGoal();
+    while (this.at('OR')) {
+      this.advance();
+      const right = this.parseBodyGoal();
+      left = { kind: 'or', left, right };
+    }
+    return left;
+  }
+
+  parseIfArg() {
+    if (this.at('LP')) {
+      this.advance();
+      const goals = this.parseBodyGoals();
+      this.expect('RP');
+      return { kind: 'goal_seq', goals };
+    }
+    return { kind: 'goal_seq', goals: [this.parseOrGoal()] };
   }
 
   looksLikeMutationRemove() {
@@ -487,6 +512,13 @@ class LogicParser {
       const head = this.parseMutationFactHead();
       return { kind: 'mut_remove', head };
     }
+    if (this.at('LP')) {
+      const line = this.peek().line;
+      this.advance();
+      const goals = this.parseBodyGoals();
+      this.expect('RP');
+      return { kind: 'seq', goals, line };
+    }
     if (this.at('ID', LOGIC_MUTATION_COMMIT_PRED) && this.looksLikeCompound()) {
       return this.parseCommitGoal();
     }
@@ -503,6 +535,9 @@ class LogicParser {
     }
     if (this.looksLikeCompound()) {
       const compound = this.parseCompound();
+      if (compound.predicate === LOGIC_BUILTIN_IF_PRED) {
+        return logicNormalizeIfFromCompound(compound, compound.line);
+      }
       return { kind: 'call', predicate: compound.predicate, args: compound.args };
     }
     const left = (this.at('LBRACKET') || this.at('STRING')) ? this.parseTerm() : this.parseExpr();
@@ -561,7 +596,9 @@ class LogicParser {
     const args = [];
     const parseArg = predicate === LOGIC_BUILTIN_IS_PRED
       ? () => this.parseExpr()
-      : () => this.parseTerm();
+      : predicate === LOGIC_BUILTIN_IF_PRED
+        ? () => this.parseIfArg()
+        : () => this.parseTerm();
     if (!this.at('RP')) {
       args.push(parseArg());
       while (this.at('COMMA')) {
@@ -570,8 +607,9 @@ class LogicParser {
       }
     }
     this.expect('RP');
-    const compound = { kind: 'compound', predicate, args };
+    const compound = { kind: 'compound', predicate, args, line: startLine };
     if (predicate === LOGIC_BUILTIN_SHOW_PRED) logicValidateShowCall(args, startLine);
+    if (predicate === LOGIC_BUILTIN_IF_PRED) logicValidateIfCall(args, startLine);
     return compound;
   }
 
@@ -1040,6 +1078,21 @@ function logicCloneGoal(goal) {
       right: logicCloneTerm(goal.right),
     };
   }
+  if (goal.kind === 'or') {
+    return { kind: 'or', left: logicCloneGoal(goal.left), right: logicCloneGoal(goal.right) };
+  }
+  if (goal.kind === 'if') {
+    return {
+      kind: 'if',
+      cond: (goal.cond || []).map(logicCloneGoal),
+      then: (goal.then || []).map(logicCloneGoal),
+      else: (goal.else || []).map(logicCloneGoal),
+      line: goal.line,
+    };
+  }
+  if (goal.kind === 'seq') {
+    return { kind: 'seq', goals: (goal.goals || []).map(logicCloneGoal), line: goal.line };
+  }
   return goal;
 }
 
@@ -1374,6 +1427,9 @@ function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_FAIL_PRED && arity === 0) {
     return "'fail/0' is reserved — cannot define fail as fact or rule head";
   }
+  if (predicate === LOGIC_BUILTIN_IF_PRED && arity === 3) {
+    return "'if/3' is reserved — cannot define if as fact or rule head";
+  }
   if ((predicate === LOGIC_BUILTIN_STRING_TO_LIST_PRED
       || predicate === LOGIC_BUILTIN_STRING_TO_CODES_PRED
       || predicate === LOGIC_BUILTIN_ATOM_CHARS_PRED
@@ -1572,7 +1628,14 @@ function logicListFreeVarsInGoal(goal) {
     if (!g) return;
     if (g.kind === 'not') walkGoal(g.goal);
     else if (g.kind === 'cut') { /* no free vars */ }
-    else if (g.kind === 'call' || g.kind === 'compound') {
+    else if (g.kind === 'or') { walkGoal(g.left); walkGoal(g.right); }
+    else if (g.kind === 'if') {
+      for (const sg of g.cond || []) walkGoal(sg);
+      for (const sg of g.then || []) walkGoal(sg);
+      for (const sg of g.else || []) walkGoal(sg);
+    } else if (g.kind === 'seq') {
+      for (const sg of g.goals || []) walkGoal(sg);
+    } else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
     }     else if (g.kind === 'cmp' || g.kind === 'unify' || g.kind === 'is') {
       walkTerm(g.left); walkTerm(g.right);
@@ -1930,6 +1993,14 @@ function logicFormatGoal(g) {
   if (!g) return '';
   if (g.kind === 'cut') return '!';
   if (g.kind === 'not') return `\\+ ${logicFormatGoal(g.goal)}`;
+  if (g.kind === 'or') return `${logicFormatGoal(g.left)} || ${logicFormatGoal(g.right)}`;
+  if (g.kind === 'if') {
+    const cond = logicFormatGoalSeq(g.cond);
+    const thenPart = logicFormatGoalSeq(g.then);
+    const elsePart = logicFormatGoalSeq(g.else);
+    return `if(${cond}, ${thenPart}, ${elsePart})`;
+  }
+  if (g.kind === 'seq') return `( ${logicFormatGoalSeq(g.goals)} )`;
   if (g.kind === 'call' || g.kind === 'compound') return logicFormatCompound(g);
   if (g.kind === 'cmp') return `${logicFormatTerm(g.left)} ${g.op} ${logicFormatTerm(g.right)}`;
   if (g.kind === 'unify') return `${logicFormatTerm(g.left)} = ${logicFormatTerm(g.right)}`;
@@ -2086,6 +2157,51 @@ function parseLogicMutationBlock(bodyRaw) {
   return ops;
 }
 
+function logicIfBranchGoals(arg, line) {
+  if (!arg || arg.kind !== 'goal_seq') {
+    logicError('if/3 arguments must be goals or ( goal, … ) sequences', line);
+  }
+  return arg.goals || [];
+}
+
+function logicValidateIfCall(args, line) {
+  if ((args || []).length !== 3) {
+    logicError('if/3 expects 3 arguments; use ( … ) for multiple goals per argument', line);
+  }
+}
+
+function logicNormalizeIfFromCompound(compound, line) {
+  logicValidateIfCall(compound.args, line);
+  return {
+    kind: 'if',
+    cond: logicIfBranchGoals(compound.args[0], line),
+    then: logicIfBranchGoals(compound.args[1], line),
+    else: logicIfBranchGoals(compound.args[2], line),
+    line: line != null ? line : compound.line,
+  };
+}
+
+function logicFormatGoalSeq(goals) {
+  const parts = (goals || []).map(logicFormatGoal).filter(Boolean);
+  if (parts.length <= 1) return parts.join(', ');
+  return `( ${parts.join(', ')} )`;
+}
+
+function logicGoalContainsControlFlow(goal) {
+  if (!goal) return false;
+  if (goal.kind === 'or' || goal.kind === 'if') return true;
+  if (goal.kind === 'seq') return logicGoalsContainControlFlow(goal.goals);
+  if (goal.kind === 'not') return logicGoalContainsControlFlow(goal.goal);
+  return false;
+}
+
+function logicGoalsContainControlFlow(goals) {
+  for (const g of goals || []) {
+    if (logicGoalContainsControlFlow(g)) return true;
+  }
+  return false;
+}
+
 function logicGoalIsMutation(goal) {
   if (!goal) return false;
   if (goal.kind === 'mut_add' || goal.kind === 'mut_remove'
@@ -2121,6 +2237,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.parseLogicGoalsBlock = parseLogicGoalsBlock;
   globalThis.parseLogicMutationBlock = parseLogicMutationBlock;
   globalThis.logicGoalsContainMutation = logicGoalsContainMutation;
+  globalThis.logicGoalsContainControlFlow = logicGoalsContainControlFlow;
+  globalThis.logicGoalContainsControlFlow = logicGoalContainsControlFlow;
   globalThis.logicGoalIsMutation = logicGoalIsMutation;
   globalThis.logicProgramContainsMutation = logicProgramContainsMutation;
   globalThis.parseLogicProgramBlock = parseLogicProgramBlock;
