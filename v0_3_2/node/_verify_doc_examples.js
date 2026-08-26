@@ -10,6 +10,11 @@
  *   node v0_3_2/node/_verify_doc_examples.js doc/comp-logic.md
  *   node v0_3_2/node/_verify_doc_examples.js --blocks-only servo
  *   node v0_3_2/node/_verify_doc_examples.js --include-blocks comp-logic
+ *   node v0_3_2/node/_verify_doc_examples.js '*logic*'
+ *   node v0_3_2/node/_verify_doc_examples.js -f '*logic*'
+ *
+ * PAGE patterns may use * as a wildcard (matched against doc slug / filename without .md):
+ *   *logic*     → inline-logic, comp-logic, logic-runtime, …
  *
  * For each page:
  *   1. Runs every ```logts-play block (must not throw)
@@ -35,6 +40,7 @@ Usage:
 PAGE:
   Slug without .md (e.g. inline-logic, comp-logic, servo)
   Or path to a doc file (doc/foo.md or absolute path)
+  Wildcard * in slug patterns (e.g. *logic*, comp-*)
 
 Options:
   -h, --help         Show this help
@@ -42,12 +48,61 @@ Options:
   -a, --all          Run all pages with logts-play blocks
   --blocks-only      Skip extra checks from node/doc_verify/<slug>.js
   --include-blocks   Run logts-play blocks even when doc_verify sets skipBlocks
+  -f, --failures-only   Print only failed blocks/checks (hide OK lines; skip all-pass pages)
 
 Examples:
   node v0_3_2/node/_verify_doc_examples.js inline-logic
   node v0_3_2/node/_verify_doc_examples.js comp-logic logic-runtime
+  node v0_3_2/node/_verify_doc_examples.js '*logic*'
+  node v0_3_2/node/_verify_doc_examples.js -f --include-blocks '*logic*'
   node v0_3_2/node/_verify_doc_examples.js --all
 `);
+}
+
+function listAllDocSlugs() {
+  return fs.readdirSync(DOC)
+    .filter((name) => name.endsWith('.md'))
+    .map((name) => name.slice(0, -3))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function globPatternToRegExp(pattern) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped.replace(/\*/g, '.*')}$`);
+}
+
+function pagePatternHasWildcard(page) {
+  return page.includes('*') && !page.includes('/') && !page.includes('\\') && !page.endsWith('.md');
+}
+
+function expandPagePatterns(patterns) {
+  const allSlugs = listAllDocSlugs();
+  const resolved = [];
+  const seen = new Set();
+
+  for (const pattern of patterns) {
+    if (pagePatternHasWildcard(pattern)) {
+      const re = globPatternToRegExp(pattern);
+      const matches = allSlugs.filter((slug) => re.test(slug));
+      if (!matches.length) {
+        throw new Error(`No doc pages match pattern: ${pattern}`);
+      }
+      for (const slug of matches) {
+        if (!seen.has(slug)) {
+          seen.add(slug);
+          resolved.push(slug);
+        }
+      }
+      continue;
+    }
+    const slug = slugFromPage(pattern);
+    if (!seen.has(slug)) {
+      seen.add(slug);
+      resolved.push(pattern);
+    }
+  }
+
+  return resolved;
 }
 
 function createSandbox() {
@@ -170,13 +225,6 @@ function verifyPage(sandbox, page, opts) {
   let blockFails = 0;
   const blockResults = [];
 
-  console.log(`\n=== ${slug} (${path.relative(ROOT, docPath)}) ===`);
-  if (runBlocks) {
-    console.log(`--- logts-play blocks (${blocks.length}) ---`);
-  } else if (extraMod.skipBlocks && !opts.includeBlocks) {
-    console.log(`--- logts-play blocks: skipped (${blocks.length} in doc; use --include-blocks to run) ---`);
-  }
-
   if (runBlocks) {
     blocks.forEach((src, i) => {
       const { err } = runBlock(sandbox, src);
@@ -185,8 +233,44 @@ function verifyPage(sandbox, page, opts) {
       const ok = !err;
       if (!ok) blockFails++;
       blockResults.push({ index: i + 1, ok, snippet, err, src });
-      console.log(`${ok ? 'OK' : 'FAIL'} #${i + 1} ${snippet}${err ? ' — ' + err.message : ''}`);
     });
+  }
+
+  let extraFails = 0;
+  const extraResults = [];
+  if (extraCases.length) {
+    for (const c of extraCases) {
+      const r = runCase(sandbox, c);
+      if (!r.pass) extraFails++;
+      extraResults.push({ caseDef: c, result: r });
+    }
+  }
+
+  const pageFails = blockFails + extraFails;
+  if (opts.failuresOnly && pageFails === 0) {
+    const summary = {
+      slug,
+      blocks: blocks.length,
+      blockFails,
+      extra: extraCases.length,
+      extraFails,
+      skippedOutput: true,
+    };
+    return summary;
+  }
+
+  console.log(`\n=== ${slug} (${path.relative(ROOT, docPath)}) ===`);
+  if (runBlocks) {
+    console.log(`--- logts-play blocks (${blocks.length}) ---`);
+  } else if (extraMod.skipBlocks && !opts.includeBlocks) {
+    console.log(`--- logts-play blocks: skipped (${blocks.length} in doc; use --include-blocks to run) ---`);
+  }
+
+  if (runBlocks) {
+    for (const r of blockResults) {
+      if (opts.failuresOnly && r.ok) continue;
+      console.log(`${r.ok ? 'OK' : 'FAIL'} #${r.index} ${r.snippet}${r.err ? ' — ' + r.err.message : ''}`);
+    }
 
     if (blockFails) {
       console.log('--- failed block sources ---');
@@ -196,12 +280,10 @@ function verifyPage(sandbox, page, opts) {
     }
   }
 
-  let extraFails = 0;
   if (extraCases.length) {
     console.log(`--- extra checks (${extraCases.length}) ---`);
-    for (const c of extraCases) {
-      const r = runCase(sandbox, c);
-      if (!r.pass) extraFails++;
+    for (const { caseDef: c, result: r } of extraResults) {
+      if (opts.failuresOnly && r.pass) continue;
       let detail = '';
       if (!r.pass) {
         detail = `\n  expect: ${JSON.stringify(c.expect || null)}`;
@@ -214,7 +296,7 @@ function verifyPage(sandbox, page, opts) {
       }
       console.log(`${r.pass ? 'OK' : 'FAIL'} ${c.name}${detail}`);
     }
-  } else if (!opts.blocksOnly) {
+  } else if (!opts.blocksOnly && !opts.failuresOnly) {
     console.log('--- extra checks: none (add node/doc_verify/' + slug + '.js optional) ---');
   }
 
@@ -234,7 +316,14 @@ function verifyPage(sandbox, page, opts) {
 }
 
 function parseArgs(argv) {
-  const opts = { blocksOnly: false, includeBlocks: false, list: false, all: false, pages: [] };
+  const opts = {
+    blocksOnly: false,
+    includeBlocks: false,
+    failuresOnly: false,
+    list: false,
+    all: false,
+    pages: [],
+  };
   for (const arg of argv) {
     if (arg === '-h' || arg === '--help') {
       opts.help = true;
@@ -242,6 +331,8 @@ function parseArgs(argv) {
       opts.list = true;
     } else if (arg === '-a' || arg === '--all') {
       opts.all = true;
+    } else if (arg === '-f' || arg === '--failures-only') {
+      opts.failuresOnly = true;
     } else if (arg === '--blocks-only') {
       opts.blocksOnly = true;
     } else if (arg === '--include-blocks') {
@@ -282,6 +373,13 @@ function runCli(argv) {
   let pages = opts.pages;
   if (opts.all) {
     pages = listDocPagesWithPlayBlocks().map((p) => p.slug);
+  } else {
+    try {
+      pages = expandPagePatterns(pages);
+    } catch (e) {
+      console.error(e.message);
+      return 2;
+    }
   }
   if (!pages.length) {
     printHelp();
@@ -290,17 +388,32 @@ function runCli(argv) {
 
   const sandbox = createSandbox();
   let totalFails = 0;
+  let pagesWithFails = 0;
   for (const page of pages) {
     const summary = verifyPage(sandbox, page, opts);
     totalFails += summary.blockFails + summary.extraFails;
+    if (summary.blockFails + summary.extraFails > 0) pagesWithFails++;
   }
 
-  console.log(`\nTotal pages: ${pages.length}, failures: ${totalFails}`);
+  if (opts.failuresOnly && totalFails === 0) {
+    console.log(`\nAll ${pages.length} page(s): no failures.`);
+  } else {
+    console.log(`\nTotal pages: ${pages.length}, failures: ${totalFails}` +
+      (opts.failuresOnly ? ` (${pagesWithFails} page(s) with failures)` : ''));
+  }
   return totalFails > 0 ? 1 : 0;
 }
+
+module.exports = {
+  runCli,
+  verifyPage,
+  createSandbox,
+  listDocPagesWithPlayBlocks,
+  listAllDocSlugs,
+  expandPagePatterns,
+  resolveDocPath,
+};
 
 if (require.main === module) {
   process.exit(runCli(process.argv.slice(2)));
 }
-
-module.exports = { runCli, verifyPage, createSandbox, listDocPagesWithPlayBlocks, resolveDocPath };
