@@ -456,9 +456,9 @@ comp [logic] .worldLogic:
 
 :
 
-32wire[5, 2] table = 0
-32wire[2] row0 = 0
-8wire numRows = 00000000
+32wire[5, 2] table := 0
+32wire[2] row0 := 0
+8wire numRows := 0
 1wire trigger = 1
 
 .worldLogic:{
@@ -500,8 +500,8 @@ comp [logic] .worldLogic:
 
 :
 
-32wire[5] col0 = 0
-32wire[5] col1 = 0
+32wire[5] col0 := 0
+32wire[5] col1 := 0
 1wire trigger = 1
 
 .worldLogic:{
@@ -556,8 +556,8 @@ comp [logic] .worldLookup:
 
 :
 
-32wire nameSlot = 0
-8wire ageOut = 00000000
+32wire nameSlot := 0
+8wire ageOut := 0
 1wire trigger = 1
 
 .worldFetch:{
@@ -605,7 +605,7 @@ comp [logic] .worldLogic:
 
 :
 
-32wire nameSlot = 0
+32wire nameSlot := 0
 1wire trigger = 1
 
 .worldLogic:{
@@ -778,8 +778,8 @@ comp [logic] .worldLogic:
 
 :
 
-32wire[3, 2] table = 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-8wire numUniq = 00000000
+32wire[3, 2] table := 0
+8wire numUniq := 0
 1wire trigger = 1
 
 .worldLogic:{
