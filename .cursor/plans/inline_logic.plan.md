@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **F43✅** mutation every; **2+j** lazy streams.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — **F38✅** DCG; **F39✅** int; **F40✅** float logic; **F41✅** f32/f64 nativ LogTScript; **F42✅** is/2 extins + random float; **F43✅** mutation every; **F30✅** mini-monopoly doc; **2+j** lazy streams.
 todos:
   - id: logic-decisions
     content: Decizii D1–D19 closed; D19 → Faza 18 (1+l)
@@ -90,8 +90,8 @@ todos:
     content: "Faza 25: liste tipate pe wire (2+c) — text|number|bool [list], D182+ — completed"
     status: completed
   - id: logic-doc-monopoly
-    content: "Faza 30: doc mini-monopoly-logic.md — tutorial end-to-end (doc-only, fără engine nou)"
-    status: pending
+    content: "Faza 30: doc mini-monopoly-logic.md — tutorial end-to-end (doc-only) — D200–D210✅"
+    status: completed
   - id: logic-sel-i
     content: "Faza 31: ;sel(i) vector o coloană — extinde F29; _ interzis la sel; hints pe nume din goal"
     status: completed
@@ -1502,7 +1502,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 27** Builtins listă + doc `logic-builtins.md`    | D160–D169                                                                                            | **(completed)**                                   |
 | **Faza 29** Query N vars + `;sel(i,j)` redirect         | D170–D181                                                                                            | **(completed)**                                   |
 | **Faza 25** Liste tipate pe wire (**2+c**)              | D182–D199 (extinde D59, D32, D140)                                                                   | **(completed)**                                   |
-| **Faza 30** Doc tutorial mini-monopoly                  | D200–D210 (doc-only — pattern comp+logic+wires+UI)                                                   | **(doc-only — pending)**                          |
+| **Faza 30** Doc tutorial mini-monopoly                  | D200–D210✅ — [Faza 30](#faza-30--doc-tutorial-mini-monopoly-logic-doc-only--completed) | **✅ completed** |
 | **Faza 31** Query `;sel(i)` vector 1 coloană            | D217–D227 — extinde F29; `_` interzis la sel                                                         | **(completed)**                                   |
 | **Faza 32** Doc logic values + type predicates          | D228–D247 — doc + engine; `logic-value-types.md`                                                     | **(completed)**                                   |
 | **Faza 33** Mutation **each** expansion                 | D248–D260 — `text|number|bool [list] each wire` (postfix F25); zip rows; broadcast fără `each`       | **(completed)**                                   |
@@ -7083,7 +7083,11 @@ Ideea D72-B (`#K (line L)` în rollback) rămâne în backlog; **nu** se promove
 
 ---
 
-## Faza 30 — Doc tutorial **mini-monopoly-logic** **(doc-only — următoarea)**
+## Faza 30 — Doc tutorial **mini-monopoly-logic** **(doc-only — completed)**
+
+> **Scop:** pagină EN de documentație — Monopoly minimal cu `inline [logic]` + `comp [logic]` + UI.  
+> **Status:** **✅ completed** 2026-08-26 — `doc/mini-monopoly-logic.md`; **7/7** blocuri `logts-play`; verify extra turn swap.  
+> **Decizii:** **D203** `random_between` · **D204** P1+P4 · **D205** turn swap · **+** jail (just visiting / inJail), Go collect, loop mod 8, start cash **1500**.
 
 > **Scop:** pagină EN de documentație (model **[huffman-v2.md](../v0_3_2/doc/huffman-v2.md)**, **[mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)**, **[plc.md](../v0_3_2/doc/plc.md)**) — cum ai construi un **Monopoly minimal** cu `inline [logic]` + `comp [logic]` + wire-uri + butoane UI.  
 > **Nu** implementare engine / feature nou în cod — doar doc + eventual `_verify_doc_examples.js` pe scriptul final.  
@@ -7206,9 +7210,9 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 | **D200** | **Doc-only**               | F30 **nu** adaugă syntax/engine; doar pagină + verify opțional — **(confirmed)**                                                                   |
 | **D201** | **Nume fișier**            | `mini-monopoly-logic.md` (parallel `mini-cpu-v2`, `huffman-v2`) — **(confirmed)**                                                                  |
 | **D202** | **2 jucători, 8 casute**   | MVP suficient pentru tutorial — **(confirmed)**                                                                                                    |
-| **D203** | **Zar la F30**             | **A (confirmed)** — wire/counter extern în doc v1; **F34** aduce `random_between/3` în engine |
-| **D204** | **Choice pattern canonic** | **P1** choice code + **P4** list legal moves (subsecțiune P2)                                                                                      |
-| **D205** | **Turn advance**           | Mutatie: `- turn(P) + turn(P2)` sau rewrite fact `turn/1`                                                                                          |
+| **D203** | **Zar** | **✅** — **`random_between(1, 6, D)`** + **`randomSeed:`** (F34) |
+| **D204** | **Choice pattern canonic** | **✅ P1 + P4** (+ mențiune P2) |
+| **D205** | **Turn advance** | **✅** `- turn(P) + turn(P2)` |
 | **D206** | **Script final**           | Un singur bloc `logts-play` complet la final (ca mini-cpu-v2)                                                                                      |
 | **D207** | **Blocuri intermediare**   | `logts-play` per fază A–E (runnable incremental)                                                                                                   |
 | **D208** | **Verificare**             | `node/doc_verify/mini-monopoly-logic.js` — 3–5 scenarii (buy, rent, pass, next)                                                                    |
@@ -7231,13 +7235,13 @@ Logic-ul e **declarativ + determinist**; UI-ul e **imperativ** (butoane, dip). D
 11. **Full game script** (`logts-play`)
 12. **Test / verify** + **See also**
 
-### Livrabile F30
+### Livrabile F30 **(livrat)**
 
-- [ ] `doc/mini-monopoly-logic.md` (EN) — outline complet + snippet-uri + script final  
-- [ ] `doc-index.json` + regen doc-data  
-- [ ] Opțional: `node/doc_verify/mini-monopoly-logic.js`  
-- [ ] Cross-links din `inline-logic.md` / `comp-logic.md`  
-- [ ] **Fără** teste suite 38xx (doc-only) — unless script e extras ca test manual
+- [x] `doc/mini-monopoly-logic.md` (EN) — jail, Go, loop, start cash, 7× `logts-play` + script final
+- [x] `doc-index.json` + regen doc-data
+- [x] `node/doc_verify/mini-monopoly-logic.js` — turn swap
+- [x] Cross-links din `inline-logic.md` / `comp-logic.md`
+- [x] **Fără** teste suite — doc-only
 
 ### Estimare
 

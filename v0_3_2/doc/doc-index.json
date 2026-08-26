@@ -46,6 +46,7 @@
         { "file": "phz.md", "label": "PHZ (obj / gen / cont / types)", "searchExtra": "phz object generator container inside floor max spawn physical zone topology ownership philosophy Load Load and Run logts-play wave gen obj cont typedef collections move remove each type wheels toFloor motor distance laps" },
         { "file": "mini-cpu.md", "label": "Mini CPU demo", "searchExtra": "harvard alu cpu4 step" },
         { "file": "mini-cpu-v2.md", "label": "Mini CPU v2 demo", "searchExtra": "asm beq lut terminal cpu4v2" },
+        { "file": "mini-monopoly-logic.md", "label": "Mini Monopoly logic tutorial", "searchExtra": "monopoly board jail go turn dice random_between choice buy pass hot-seat tutorial" },
         { "file": "pocket-calc.md", "label": "Pocket calculator demo", "searchExtra": "keyboard calc terminal divider toAscii onlyDigits" },
         { "file": "mini-cpu-plan.md", "label": "Mini CPU plan", "searchExtra": "feasibility variant harvard" },
         { "file": "pcb.md", "label": "PCB (deprecated)" }
