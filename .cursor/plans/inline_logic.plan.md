@@ -224,6 +224,9 @@ todos:
   - id: logic-mutation-43e
     content: "F43e: float/<format> every + doc + trace/.check — teste 4421+"
     status: completed
+  - id: logic-inline-mut-44
+    content: "Faza 44 (2+p): inline +/− + retractall — D355–D372 decizii deschise"
+    status: pending
   - id: logic-float-40d
     content: "F40d: atom_number/2 — teste 4272+"
     status: completed
@@ -1516,6 +1519,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 41** IEEE **f32/f64** nativ LogTScript (**2+n**) | **F41a→F41e** — show, NFORMAT, builtins; codec unificat — [Faza 41](#faza-41--ieee-f32f64-nativ-logtscript-2n--completed) | **✅ completed** |
 | **Faza 42** `is/2` extins + random float (**2+m**) | **F42a→F42e✅** — [Faza 42](#faza-42--is2-extins--random-float-2m--completed) | **✅ completed** |
 | **Faza 43** Mutation **every** expansion (**2+o**) | **F43a→F43e✅** — D341–D354 — [Faza 43](#faza-43--mutation-every-expansion-2o--completed) | **✅ completed** |
+| **Faza 44** Inline **+/−** + **retractall** (**2+p**) | D355–D372 — [Faza 44](#faza-44--inline-assertretract--retractall-2p--planning) | **⏳ planning** |
 
 
 ---
@@ -6786,7 +6790,7 @@ Tabel master **2+a … 2+n** — faze **amânate** discutate/planificate, distin
 | ✅     | ~~**2+o**~~ | Mutation **`every`**        | **Livrat → Faza 43✅** — cartesian; mix `each`+`every`; compound nested; cap 10 000; teste **4411–4428** | **F43**    | F33, F25, F40b, D341–D354 **(completed)** |
 
 
-**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · ~~**2+o**~~ **→ F43✅** · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
+**Ordine recomandată:** ~~**2+h**~~ **→ F34✅** · ~~**2+g**~~ **→ F35✅** · ~~**2+c**~~ **→ F25✅** · ~~**2+e**~~ **→ F37✅** · ~~**2+i**~~ **→ F38✅** · ~~**2+k**~~ **→ F39✅** · ~~**2+l**~~ **→ F40✅** · ~~**2+n**~~ **→ F41✅** · ~~**2+m**~~ **→ F42✅** · ~~**2+o**~~ **→ F43✅** · **2+p** (inline assert/retract + retractall) · **2+j** (lazy streams) · **2+a** / **2+b** · **2+f**
 
 ### Note backlog 2+x — explicații
 
@@ -7033,11 +7037,15 @@ Query/redirect direct pe inline fără `comp [logic]` — **respins** (D1). Mode
 - `use once .mod` — skip idempotent.
 - Implementare în `logicResolveMerged`; teste **3620+**; doc `inline-logic.md`.
 
-#### ~~**1+m**~~ ❌ — respins (mutație doar pe comp)
+#### ~~**1+m**~~ 🔄 — redeschis ca **Faza 44** (planning)
 
-**Respins:** invoke inline `.warehouse:mutate({ … })` — inline rămâne **definiție** (facts/rules/queries), fără engine de mutație. Runtime: `comp [logic]` — `logic { + / - }`, overlay/tombstone, constraints, `indexFacts`, Signal Trace. Analogie ASM: inline = ISA, comp = execuție.
+**Istoric:** D49-A — mutație **comp-only**; `.world:mutate` pe inline respins.
 
-#### ~~**1+n**~~ 🟠✗ — închis (livrat ca `logic { ± }`)
+**Motivație nouă (2026-08-26):** jocuri tip Monopoly au nevoie de **reset KB** (`retractall(turn(_))`, …) fără zeci de linii `- fact(...)` ground în `logic { }` pe exec block. User cere **`+`/`-` în programul inline** (analog **assertz/retract**) + **`retractall`**.
+
+**Stare:** decizii **D355–D372** — vezi [Faza 44](#faza-44--inline-assertretract--retractall-2p--planning). **Nu** implementare încă.
+
+#### ~~**1+n**~~ 🟠✗ — parțial redeschis în F44
 
 **Nu** `assert`/`retract` în body de regulă (side-effects în backtracking). Livrat **Faza 11:** mutație tranzacțională în exec block comp — același rol practic, model ASM-like.
 

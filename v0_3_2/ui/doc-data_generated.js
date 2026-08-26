@@ -34007,13 +34007,13 @@ inline [logic] .mono:
         S is D1 + D2,
         passesGo(Old, S)
 
-    cashAfterRoll(Cash, Pos, Steps, G, NewCash) <-
-        passesGo(Pos, Steps),
-        NewCash is Cash + G
+    salaryIfGo(Pos, Steps, 0) <-
+        Sum is Pos + Steps,
+        Sum < 9
 
-    cashAfterRoll(Cash, Pos, Steps, G, NewCash) <-
-        \\+ passesGo(Pos, Steps),
-        NewCash = Cash
+    salaryIfGo(Pos, Steps, G) <-
+        passesGo(Pos, Steps),
+        goSalary(G)
 
     onCommunity(P) <-
         playerPos(P, Idx),
@@ -34053,8 +34053,8 @@ inline [logic] .mono:
         S is D1 + D2,
         nextPos(Pos, S, NewPos),
         playerCash(p1, Cash),
-        goSalary(G),
-        cashAfterRoll(Cash, Pos, S, G, NewCash),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
         show("Player 1 dice:", D1, D2)
 
     query rollPlanP2:
@@ -34066,8 +34066,8 @@ inline [logic] .mono:
         S is D1 + D2,
         nextPos(Pos, S, NewPos),
         playerCash(p2, Cash),
-        goSalary(G),
-        cashAfterRoll(Cash, Pos, S, G, NewCash),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
         show("Player 2 dice:", D1, D2)
 
     query showMoveP1:
@@ -34438,6 +34438,11 @@ comp [logic] .gameBuyP2:
 16wire ownerNewW := 0
 1wire failed = 0
 
+1wire rollStep = .key1
+1wire passStep = .key1
+1wire buyStep = .key2
+1wire resetStep = .keyReset
+
 .gameBoot:{
     logic {
         - phase(waitRoll)
@@ -34491,33 +34496,38 @@ comp [logic] .gameBuyP2:
     }
     query = bootGame
     mutationFailed >= failed
-    set = .keyReset
+    set = resetStep
 }
 
 .gameKey1:{
-    query = rollPlanP1, rollPlanP2
+    query = rollPlanP1
     rollPlanP1:0:0 >= oldPosW
     rollPlanP1:0:3 >= newPosW
     rollPlanP1:0:1 >= d1W
     rollPlanP1:0:2 >= d2W
     rollPlanP1:0:4 >= oldCashW
-    rollPlanP1:0:5 >= newCashW
+    rollPlanP1:0:6 >= newCashW
     rollPlanP1 >= rollP1
+    set = rollStep
+}
+
+.gameKey1:{
+    query = rollPlanP2
     rollPlanP2:0:0 >= oldPosW
     rollPlanP2:0:3 >= newPosW
     rollPlanP2:0:1 >= d1W
     rollPlanP2:0:2 >= d2W
     rollPlanP2:0:4 >= oldCashW
-    rollPlanP2:0:5 >= newCashW
+    rollPlanP2:0:6 >= newCashW
     rollPlanP2 >= rollP2
-    set = .key1
+    set = rollStep
 }
 
 .gameKey1:{
     query = canPassP1, canPassP2
     canPassP1 >= passP1
     canPassP2 >= passP2
-    set = .key1
+    set = passStep
 }
 
 .gameRollP1:{
@@ -34774,7 +34784,7 @@ comp [logic] .gameBuyP2:
     canBuyP2:0:3 >= oldCashW
     canBuyP2:0:4 >= newCashW
     canBuyP2 >= buyP2
-    set = .key2
+    set = buyStep
 }
 
 .gameBuyP1:{
