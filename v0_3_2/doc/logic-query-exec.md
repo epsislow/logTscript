@@ -21,6 +21,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Boolean** | `1wire` LHS + all vars bound → `1` / `0` |
 | **Scalar (1st sol.)** | `8wire` / `40wire` / `80wire` LHS + one free var → **first solution** on that width (ASCII atom + `\0` pad) |
 | **List I/O** | `Var=text list` (output hint) or `Var=text list wireIn` (input) — packed on vector wires |
+| **Random (`random_between/3`, etc.)** | **No** per-component save/restore — uses **global** engine RNG state; see [Random — `:query` / `:check`](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check) |
 
 ---
 
@@ -68,6 +69,20 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 ```
 
 **Not supported:** `.world:available(...)` per query name, or redirect selectors like `{ johnOwns:0 }` inside the block — only **goals**.
+
+---
+
+## Random builtins (`random_between/3`, `set_random/1`, …)
+
+**`.module:query({ … })` does not reset internal RNG state** and does not use **`randomSeed:`** on any **`comp [logic]`** (even when the same inline program is also attached to a component).
+
+Each invoke runs goals on the engine’s **global working generator**:
+
+- **Continues** from the internal state left by any prior logic call (**comp exec**, another **`:query`**, **`:check`**, etc.), whether or not a component exists in the script.
+- If nothing has used random yet, the default internal state is **`0`** until **`set_random/1`** or the first draw.
+- Put **`set_random(Seed)`** in the goal block when you need a **deterministic** starting point for that expression.
+
+Full table (including **`:check`** and **`comp [logic]`** exec): [logic-builtins.md — RNG state](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check).
 
 ---
 

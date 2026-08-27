@@ -12521,6 +12521,8 @@ Invoke on **\`comp [logic]\`** only (not on inline instances):
 | **\`0\`** | Constraints would **fail** (same rollback rules as mutation) |
 | **Error** | Empty block **\`check({ })\`**, **non-ground** fact (Prolog variable), or **\`data: static\`** |
 
+**Random during validation:** **\`:check\` does not reset internal RNG state** and does not save/restore **\`randomSeed:\`** / **\`comp._rngState\`**. It simulates **\`+\` / \`-\` / \`~\`** ops and runs the same **constraint validator** as a real commit; constraint **bodies** (and rules they call) may use **\`random_between/3\`**, **\`set_random/1\`**, etc. Those builtins use the engine’s **global working state** — whatever was left by earlier logic — default **\`0\`** if random has never run. See [logic-builtins.md — RNG state](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check).
+
 **Wire refs** (\`text w\`, \`text list w\`, \`number w\`, \`number list w\`, \`bool w\`, \`bool list w\`, bare atom id) resolve at eval time — identical to **\`logic { }\`**.
 
 \`\`\`logts-play
@@ -20714,7 +20716,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
 | **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`append/2\`**, **\`string_to_list/2\`**, **\`string_to_codes/2\`**, **\`atom_chars/2\`**, **\`atom_codes/2\`**, **\`between/3\`**, **\`lazy_list/2\`**, **\`lazy_list_materialize/1\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`** — [logic-builtins.md](logic-builtins.md) |
 | **Unique / keyed** | **\`pred$\`** single-valued · **\`pred$$\`** keyed by arg0 — [Unique facts (\`$\`) / (\`$$\`)](#unique-facts--and-keyed-facts-) |
-| **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
+| **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1). **\`:query\` / \`:check\`** use **global** RNG state (no **\`randomSeed:\`** reset) — [RNG state](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check) |
 | **Value kinds** | **\`atom\`**, **\`number\`**, **\`list\`**, **\`compound\`**; type tests **\`atom/1\`** … **\`compound/1\`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
 | **Doc helpers** | \`doc(inline.logic)\` — syntax template; \`doc(.myModule)\` — **summary** (counts, query/constraint names, predicate histogram) |
@@ -27657,6 +27659,26 @@ Random numbers for dice, jitter, simulation, and game logic. The engine uses one
 
 **Component seed:** optional **\`randomSeed:\`** on **\`comp [logic]\`** — integer literal or **number wire (≤ 32 bits)**. Applied on the component's **first** exec pass (or when a seed **wire** changes); later passes **continue** the stream. See [comp-logic.md — \`randomSeed:\`](comp-logic.md#component-attributes).
 
+### RNG state — \`comp [logic]\` exec vs \`:query\` / \`:check\`
+
+The engine keeps one **working** internal RNG state (mulberry32 **\`a\`**, exposed via **\`logicRngGetState\` / \`logicRngSetState\`**). Behaviour depends on **how** logic runs:
+
+| Path | Resets / restores per component? | Uses |
+|------|-----------------------------------|------|
+| **\`comp [logic]\` exec** (\`.logic:{ query=… set=trigger }\`, **\`logic { }\`**, named queries) | **Yes** — save/restore **\`comp._rngState\`** around each exec pass; **\`randomSeed:\`** sets the **initial** state on first pass | Per-component stream (F104) |
+| **\`.module:query({ … })\`** ([logic-query-exec.md](logic-query-exec.md)) | **No** | **Global** working state — continues from whatever the last logic call left |
+| **\`.logicComp:check({ … })\`** ([comp-logic.md — check](comp-logic.md#constraint-check---whlogiccheck---)) | **No** | **Global** working state — including **\`random_between/3\`** (or rules) in **constraint bodies** during validation of simulated **\`+\`** facts |
+
+**\`:query\` and \`:check\` do not reset internal seed/state** and do **not** apply **\`randomSeed:\`** on a component (even when the inline program is also wired through **\`comp [logic]\`**). Each **\`random_between/3\`**, **\`random/1\`**, or **\`set_random/1\`** in those paths reads/advances the **global** generator.
+
+- If logic (or **\`set_random/1\`**) ran before, the next **\`:query\`** or **\`:check\`** continues from that **remaining** internal state — with or without a **\`comp [logic]\`** in the script.
+- If nothing has touched the generator yet, the default internal state is **\`0\`** (same as **\`logicEnsureRng()\`** before the first draw).
+- **\`set_random(Seed)\`** inside a **\`:query\`** goal block resets the **global** stream for that invocation (and leaves the advanced state for the next call).
+
+To get a **deterministic** draw from **\`:query\`**, include **\`set_random(Seed)\`** in the goal block. For reproducible dice across **hot-seat triggers**, use **\`comp [logic]\`** with **\`randomSeed:\`** (and optionally **\`set_random/1\`** in **\`initGame()\`**-style rules for an explicit game reset).
+
+**Component exec after \`:query\` / \`:check\`:** the next **\`comp [logic]\`** exec **restores** its saved **\`comp._rngState\`**, not the global state left by **\`:query\`** / **\`:check\`**. Mixing both paths can advance the global stream without updating a component's saved state until that component runs again.
+
 ### Example — unit float with \`random/1\`
 
 \`\`\`logts-play
@@ -29081,6 +29103,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Boolean** | \`1wire\` LHS + all vars bound → \`1\` / \`0\` |
 | **Scalar (1st sol.)** | \`8wire\` / \`40wire\` / \`80wire\` LHS + one free var → **first solution** on that width (ASCII atom + \`\\0\` pad) |
 | **List I/O** | \`Var=text list\` (output hint) or \`Var=text list wireIn\` (input) — packed on vector wires |
+| **Random (\`random_between/3\`, etc.)** | **No** per-component save/restore — uses **global** engine RNG state; see [Random — \`:query\` / \`:check\`](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check) |
 
 ---
 
@@ -29128,6 +29151,20 @@ Syntax: trailing semicolon **after** optional bindings and limits:
 \`\`\`
 
 **Not supported:** \`.world:available(...)\` per query name, or redirect selectors like \`{ johnOwns:0 }\` inside the block — only **goals**.
+
+---
+
+## Random builtins (\`random_between/3\`, \`set_random/1\`, …)
+
+**\`.module:query({ … })\` does not reset internal RNG state** and does not use **\`randomSeed:\`** on any **\`comp [logic]\`** (even when the same inline program is also attached to a component).
+
+Each invoke runs goals on the engine’s **global working generator**:
+
+- **Continues** from the internal state left by any prior logic call (**comp exec**, another **\`:query\`**, **\`:check\`**, etc.), whether or not a component exists in the script.
+- If nothing has used random yet, the default internal state is **\`0\`** until **\`set_random/1\`** or the first draw.
+- Put **\`set_random(Seed)\`** in the goal block when you need a **deterministic** starting point for that expression.
+
+Full table (including **\`:check\`** and **\`comp [logic]\`** exec): [logic-builtins.md — RNG state](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check).
 
 ---
 
@@ -34744,7 +34781,7 @@ Hot-seat **two-player** game: three **\`comp [key]\`** buttons drive one **\`com
 
 Prerequisites: [key.md](key.md), [comp-logic.md](comp-logic.md), [logic-runtime.md](logic-runtime.md), [inline-logic.md](inline-logic.md).
 
-Open the script below in the doc viewer → **Load** → **RUN** → use panel keys **1**, **2**, **reset**. With **\`randomSeed: 42\`**, Player 1's first roll is always **4 + 3** → position **7** (**short**, buy **160**).
+Open the script below in the doc viewer → **Load** → **RUN** → use panel keys **1**, **2**, **reset**. With **\`randomSeed: 42\`**, Player 1's first roll is always **4 + 3** → position **7** (**avenue**, buy **180**). Board has **15** squares (indices **0–14**), including **two** community chests (**3**, **10**). After each roll, output names the square (e.g. \`7 avenue\`, \`10 community chest\`, \`12 jail (visiting)\`, \`13 market (owned by you)\`).
 
 ---
 
@@ -34752,7 +34789,7 @@ Open the script below in the doc viewer → **Load** → **RUN** → use panel k
 
 | Key | Label | When |
 |-----|-------|------|
-| **1** | \`1\` | **\`phase$(waitRoll)\`** — roll + land · **\`phase$(waitChoice)\`** — pass turn |
+| **1** | \`1\` | **\`phase$(waitRoll)\`** — roll + land · **\`phase$(waitChoice)\`** — pass turn (then the other player rolls on the same pulse) |
 | **2** | \`2\` | **\`phase$(waitChoice)\`** — buy offered property |
 | **reset** | \`reset\` | Any time — **\`initGame()\`** |
 
@@ -34764,24 +34801,26 @@ Use **\`type: 0\`** on keys (pulse). Logic uses **\`on: 1\`** (level-triggered e
 
 \`\`\`text
 comp [logic] .game  +  inline [logic] .mono
-  phase$ / turn$             — single-valued phase and active player
+  phase$ / turn$             — waitRoll | resolveLand | waitChoice
   playerPos$$ / playerCash$$ — keyed by p1 | p2
-  owns$$                     — keyed by square index
-  communityDeck/1            — list fact (deck)
+  owns$$ / inJail$$          — ownership / jail flag
+  communityDeck/1            — rotating card list (ground commits)
 
-Keys (separate exec blocks; guards inside queries):
-  .key1 → handlePassP1|P2  when phase$(waitChoice)
-  .key1 → handleRollP1|P2  when phase$(waitRoll)
-  .key2 → handleBuyP1|P2   when phase$(waitChoice)
+Keys (same pulse order on .key1):
+  handlePass*   when waitChoice  → waitRoll + other player
+  handleRoll*   when waitRoll    → move, showLandSpot, phase resolveLand
+  handleLand*   when resolveLand → tax / rent / community / jail / buy menu
+  .key2 → handleBuy*
   .resetGame → handleReset
 \`\`\`
 
 | Idea | Detail |
 |------|--------|
 | **Boot** | **\`welcomeBoot\`** + **\`bootStep\`** one-shot so keys are not blocked at load |
-| **Land vs buy** | **\`smart_or(landAfterRollP*(), buyLandP*())\`** |
+| **Two-pass land** | Roll sets **\`phase$(resolveLand)\`**; named land queries run in the **same** key pulse |
+| **Community** | **\`payTax\`** / **\`go200\`** / **\`goToJail\`** with ground deck rotations |
 | **Guards** | Each query starts with **\`phase$(…)\`** + **\`turn$(…)\`** |
-| **Show** | **\`show/N\`** in queries and rules → run output |
+| **Show** | **\`showLandSpot/1\`** + **\`show/N\`** → run output |
 
 Canonical verify copy: **\`node/doc_verify/mini-monopoly-interactive.logts\`**.
 
@@ -34791,10 +34830,10 @@ Canonical verify copy: **\`node/doc_verify/mini-monopoly-interactive.logts\`**.
 
 \`\`\`text
 [Load]  → Game Reset, current Player 1
-[key 1] → Player 1 dice: 4 3 · position 7 · buy menu (short / 160)
-[key 1] → pass → Player 2 roll · position 7 · buy menu
-[key 2] → Player 2 buys short
-[key 1] → Player 1 roll …
+[key 1] → Player 1 dice: 4 3 · position 7 avenue · buy menu (180)
+[key 1] → pass → Player 2 dice: 6 5 · position 11 plaza · buy menu (220)
+[key 2] → Player 2 buys plaza
+[key 1] → … later landings may hit community chest (payTax / go200 / goToJail)
 \`\`\`
 
 ---
@@ -34810,9 +34849,17 @@ inline [logic] .mono:
     square(3, communityCard, 0, 0)
     square(4, tax, 0, 0)
     square(5, broad, 140, 70)
-    square(6, jail, 0, 0)
-    square(7, short, 160, 80)
-    square(8, board, 200, 100)
+    square(6, station, 150, 75)
+    square(7, avenue, 180, 90)
+    square(8, short, 160, 80)
+    square(9, board, 200, 100)
+    square(10, communityCard, 0, 0)
+    square(11, plaza, 220, 110)
+    square(12, jail, 0, 0)
+    square(13, market, 190, 95)
+    square(14, harbor, 250, 125)
+
+    boardLen(15)
 
     goSalary(200)
     taxAmount(75)
@@ -34824,58 +34871,117 @@ inline [logic] .mono:
     otherPlayer(p1, p2)
     otherPlayer(p2, p1)
 
-    communityDeck([payTax, go200, goToJail, payTax, go200])
-
     roll(D) <- random_between(1, 6, D)
 
     nextPos(Pos, Steps, NewPos) <-
+        boardLen(L),
         Sum is Pos + Steps,
-        NewPos is Sum mod 9
+        NewPos is Sum mod L
 
     salaryIfGo(Pos, Steps, 0) <-
+        boardLen(L),
         Sum is Pos + Steps,
-        Sum < 9
+        Sum < L
 
     salaryIfGo(Pos, Steps, G) <-
+        boardLen(L),
         Sum is Pos + Steps,
-        Sum >= 9,
+        Sum >= L,
         goSalary(G)
 
     onCommunity(P) <-
-        playerPos$(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, communityCard, _, _)
 
     onTax(P) <-
-        playerPos$(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, tax, _, _)
 
+    onJail(P) <-
+        playerPos$$(P, Idx),
+        square(Idx, jail, _, _)
+
     canBuy(P, Idx, Price, Name) <-
-        playerPos$(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, Name, Price, _),
         Price > 0,
-        \\+ owns$(Idx, _)
+        \\+ owns$$(Idx, _)
 
     owesRent(P, Owner, Amount, _) <-
-        playerPos$(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, _, _, Amount),
-        owns$(Idx, Owner),
+        owns$$(Idx, Owner),
         Owner =\\= P
 
-    rotateDeck(Deck, NewDeck) <-
-        Deck = [H|T],
-        append(T, [H], NewDeck)
+    jailIdx(Idx) <-
+        square(Idx, jail, _, _)
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, go, _, _),
+        show("Player", LP, "position now:", Idx, "go")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, tax, _, _),
+        show("Player", LP, "position now:", Idx, "tax")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, communityCard, _, _),
+        show("Player", LP, "position now:", Idx, "community chest")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, jail, _, _),
+        inJail$$(P),
+        show("Player", LP, "position now:", Idx, "jail (inside)")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, jail, _, _),
+        \\+ inJail$$(P),
+        show("Player", LP, "position now:", Idx, "jail (visiting)")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        owns$$(Idx, P),
+        show("Player", LP, "position now:", Idx, Name, "(owned by you)")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        owns$$(Idx, Owner),
+        Owner =\\= P,
+        playerLabel(Owner, OL),
+        show("Player", LP, "position now:", Idx, Name, "(owned by Player", OL, ")")
+
+    showLandSpot(P) <-
+        playerLabel(P, LP),
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \\+ owns$$(Idx, _),
+        show("Player", LP, "position now:", Idx, Name)
 
     showGoPay(P, OldPos, Steps) <-
         salaryIfGo(OldPos, Steps, G),
         G > 0,
         playerLabel(P, LP),
-        playerCash$(P, Cash),
+        playerCash$$(P, Cash),
         show("Player", LP, "Go collected +200 . Money now:", Cash)
 
     showGoPay(_, _, _) <- true
-
-    smart_or(Cond1, _) <- call(Cond1), !
-    smart_or(_, Cond2) <- call(Cond2)
 
     initGame() <-
         set_random(42),
@@ -34883,16 +34989,17 @@ inline [logic] .mono:
             ~ greeted$(_),
             ~ phase$(_),
             ~ turn$(_),
-            ~ playerPos$(_, _),
-            ~ playerCash$(_, _),
-            ~ owns$(_, _),
+            ~ playerPos$$(_, _),
+            ~ playerCash$$(_, _),
+            ~ owns$$(_, _),
+            ~ inJail$$(_),
             ~ communityDeck(_),
             + phase$(waitRoll),
             + turn$(p1),
-            + playerPos$(p1, 0),
-            + playerPos$(p2, 0),
-            + playerCash$(p1, 1500),
-            + playerCash$(p2, 1500),
+            + playerPos$$(p1, 0),
+            + playerPos$$(p2, 0),
+            + playerCash$$(p1, 1500),
+            + playerCash$$(p2, 1500),
             + communityDeck([payTax, go200, goToJail, payTax, go200]),
             + greeted$()
         ),
@@ -34900,122 +35007,6 @@ inline [logic] .mono:
         show("Player 1 position 0. Money:", 1500),
         show("Player 2 position 0. Money:", 1500),
         show("current Player 1. Press 1 to roll dice")
-
-    landAfterRollP1() <-
-        onTax(p1),
-        playerCash$(p1, Cash),
-        taxAmount(T),
-        NC is Cash - T,
-        commit(+ playerCash$(p1, NC), + phase$(waitRoll), + turn$(p2)),
-        show("Player 1 payTax -75 to community . Money now:", NC),
-        show("current Player 2. Press 1 to roll dice")
-
-    landAfterRollP1() <-
-        owesRent(p1, p2, Amount, _),
-        playerCash$(p1, PC),
-        playerCash$(p2, OC),
-        NP is PC - Amount,
-        NO is OC + Amount,
-        commit(
-            + playerCash$(p1, NP),
-            + playerCash$(p2, NO),
-            + phase$(waitRoll),
-            + turn$(p2)
-        ),
-        show("Player 1 payRent -", Amount, "to Player 2 . Money now:", NP),
-        show("current Player 2. Press 1 to roll dice")
-
-    landAfterRollP1() <-
-        onCommunity(p1),
-        communityDeck(Deck),
-        rotateDeck(Deck, NewDeck),
-        Deck = [payTax|_],
-        playerCash$(p1, Cash),
-        communityTax(T),
-        NC is Cash - T,
-        commit(
-            + playerCash$(p1, NC),
-            + communityDeck(NewDeck),
-            + phase$(waitRoll),
-            + turn$(p2)
-        ),
-        show("Player 1 found Community Card: payTax"),
-        show("Player 1 payTax -", T, "to community . Money now:", NC),
-        show("current Player 2. Press 1 to roll dice")
-
-    landAfterRollP1() <-
-        playerPos$(p1, 0),
-        commit(+ phase$(waitRoll), + turn$(p2)),
-        show("current Player 2. Press 1 to roll dice")
-
-    landAfterRollP1() <-
-        playerPos$(p1, 6),
-        commit(+ phase$(waitRoll), + turn$(p2)),
-        show("current Player 2. Press 1 to roll dice")
-
-    buyLandP1() <-
-        canBuy(p1, Idx, Price, Name),
-        commit(+ phase$(waitChoice)),
-        show("1 pass turn"),
-        show("2 buy property", Name, ". cost:", Price)
-
-    landAfterRollP2() <-
-        onTax(p2),
-        playerCash$(p2, Cash),
-        taxAmount(T),
-        NC is Cash - T,
-        commit(+ playerCash$(p2, NC), + phase$(waitRoll), + turn$(p1)),
-        show("Player 2 payTax -75 to community . Money now:", NC),
-        show("current Player 1. Press 1 to roll dice")
-
-    landAfterRollP2() <-
-        owesRent(p2, p1, Amount, _),
-        playerCash$(p2, PC),
-        playerCash$(p1, OC),
-        NP is PC - Amount,
-        NO is OC + Amount,
-        commit(
-            + playerCash$(p2, NP),
-            + playerCash$(p1, NO),
-            + phase$(waitRoll),
-            + turn$(p1)
-        ),
-        show("Player 2 payRent -", Amount, "to Player 1 . Money now:", NP),
-        show("current Player 1. Press 1 to roll dice")
-
-    landAfterRollP2() <-
-        onCommunity(p2),
-        communityDeck(Deck),
-        rotateDeck(Deck, NewDeck),
-        Deck = [payTax|_],
-        playerCash$(p2, Cash),
-        communityTax(T),
-        NC is Cash - T,
-        commit(
-            + playerCash$(p2, NC),
-            + communityDeck(NewDeck),
-            + phase$(waitRoll),
-            + turn$(p1)
-        ),
-        show("Player 2 found Community Card: payTax"),
-        show("Player 2 payTax -", T, "to community . Money now:", NC),
-        show("current Player 1. Press 1 to roll dice")
-
-    landAfterRollP2() <-
-        playerPos$(p2, 0),
-        commit(+ phase$(waitRoll), + turn$(p1)),
-        show("current Player 1. Press 1 to roll dice")
-
-    landAfterRollP2() <-
-        playerPos$(p2, 6),
-        commit(+ phase$(waitRoll), + turn$(p1)),
-        show("current Player 1. Press 1 to roll dice")
-
-    buyLandP2() <-
-        canBuy(p2, Idx, Price, Name),
-        commit(+ phase$(waitChoice)),
-        show("1 pass turn"),
-        show("2 buy property", Name, ". cost:", Price)
 
     query welcomeBoot:
         \\+ greeted$(),
@@ -35039,46 +35030,256 @@ inline [logic] .mono:
     query handleRollP1:
         phase$(waitRoll),
         turn$(p1),
-        playerPos$(p1, Pos),
-        playerCash$(p1, Cash),
+        playerPos$$(p1, Pos),
+        playerCash$$(p1, Cash),
         roll(D1),
         roll(D2),
         S is D1 + D2,
         nextPos(Pos, S, NewPos),
         salaryIfGo(Pos, S, Bonus),
         NewCash is Cash + Bonus,
-        commit(+ playerPos$(p1, NewPos), + playerCash$(p1, NewCash)),
+        commit(+ playerPos$$(p1, NewPos), + playerCash$$(p1, NewCash), + phase$(resolveLand)),
         show("Player 1 dice:", D1, D2),
-        show("Player 1 position now:", NewPos),
-        showGoPay(p1, Pos, S),
-        smart_or(landAfterRollP1(), buyLandP1())
+        showLandSpot(p1),
+        showGoPay(p1, Pos, S)
 
     query handleRollP2:
         phase$(waitRoll),
         turn$(p2),
-        playerPos$(p2, Pos),
-        playerCash$(p2, Cash),
+        playerPos$$(p2, Pos),
+        playerCash$$(p2, Cash),
         roll(D1),
         roll(D2),
         S is D1 + D2,
         nextPos(Pos, S, NewPos),
         salaryIfGo(Pos, S, Bonus),
         NewCash is Cash + Bonus,
-        commit(+ playerPos$(p2, NewPos), + playerCash$(p2, NewCash)),
+        commit(+ playerPos$$(p2, NewPos), + playerCash$$(p2, NewCash), + phase$(resolveLand)),
         show("Player 2 dice:", D1, D2),
-        show("Player 2 position now:", NewPos),
-        showGoPay(p2, Pos, S),
-        smart_or(landAfterRollP2(), buyLandP2())
+        showLandSpot(p2),
+        showGoPay(p2, Pos, S)
+
+    query handleLandP1Tax:
+        phase$(resolveLand),
+        turn$(p1),
+        onTax(p1),
+        playerCash$$(p1, Cash),
+        taxAmount(T),
+        NC is Cash - T,
+        commit(+ playerCash$$(p1, NC), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 payTax -75 to community . Money now:", NC),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1Rent:
+        phase$(resolveLand),
+        turn$(p1),
+        owesRent(p1, p2, Amount, _),
+        playerCash$$(p1, PC),
+        playerCash$$(p2, OC),
+        NP is PC - Amount,
+        NO is OC + Amount,
+        commit(+ playerCash$$(p1, NP), + playerCash$$(p2, NO), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 payRent -", Amount, "to Player 2 . Money now:", NP),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1CommPayA:
+        phase$(resolveLand),
+        turn$(p1),
+        onCommunity(p1),
+        communityDeck([payTax, go200, goToJail, payTax, go200]),
+        playerCash$$(p1, Cash),
+        communityTax(TaxAmt),
+        NC is Cash - TaxAmt,
+        commit(+ playerCash$$(p1, NC), + communityDeck([go200, goToJail, payTax, go200, payTax]), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 Community Card: payTax -", TaxAmt, ". Money now:", NC),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1CommGoA:
+        phase$(resolveLand),
+        turn$(p1),
+        onCommunity(p1),
+        communityDeck([go200, goToJail, payTax, go200, payTax]),
+        goSalary(G),
+        playerCash$$(p1, Cash),
+        NC is Cash + G,
+        commit(+ playerPos$$(p1, 0), + playerCash$$(p1, NC), + communityDeck([goToJail, payTax, go200, payTax, go200]), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 Community Card: go200 . Go +", G, ". Money now:", NC),
+        showLandSpot(p1),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1CommJail:
+        phase$(resolveLand),
+        turn$(p1),
+        onCommunity(p1),
+        communityDeck([goToJail, payTax, go200, payTax, go200]),
+        jailIdx(JIdx),
+        commit(+ playerPos$$(p1, JIdx), + inJail$$(p1), + communityDeck([payTax, go200, payTax, go200, goToJail]), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 Community Card: goToJail"),
+        showLandSpot(p1),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1CommPayB:
+        phase$(resolveLand),
+        turn$(p1),
+        onCommunity(p1),
+        communityDeck([payTax, go200, payTax, go200, goToJail]),
+        playerCash$$(p1, Cash),
+        communityTax(TaxAmt),
+        NC is Cash - TaxAmt,
+        commit(+ playerCash$$(p1, NC), + communityDeck([go200, payTax, go200, goToJail, payTax]), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 Community Card: payTax -", TaxAmt, ". Money now:", NC),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1CommGoB:
+        phase$(resolveLand),
+        turn$(p1),
+        onCommunity(p1),
+        communityDeck([go200, payTax, go200, goToJail, payTax]),
+        goSalary(G),
+        playerCash$$(p1, Cash),
+        NC is Cash + G,
+        commit(+ playerPos$$(p1, 0), + playerCash$$(p1, NC), + communityDeck([payTax, go200, goToJail, payTax, go200]), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 Community Card: go200 . Go +", G, ". Money now:", NC),
+        showLandSpot(p1),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1Go:
+        phase$(resolveLand),
+        turn$(p1),
+        playerPos$$(p1, 0),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1Jail:
+        phase$(resolveLand),
+        turn$(p1),
+        onJail(p1),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleLandP1Buy:
+        phase$(resolveLand),
+        turn$(p1),
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("1 pass turn"),
+        show("2 buy property", Name, ". cost:", Price)
+
+    query handleLandP2Tax:
+        phase$(resolveLand),
+        turn$(p2),
+        onTax(p2),
+        playerCash$$(p2, Cash),
+        taxAmount(T),
+        NC is Cash - T,
+        commit(+ playerCash$$(p2, NC), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 payTax -75 to community . Money now:", NC),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2Rent:
+        phase$(resolveLand),
+        turn$(p2),
+        owesRent(p2, p1, Amount, _),
+        playerCash$$(p2, PC),
+        playerCash$$(p1, OC),
+        NP is PC - Amount,
+        NO is OC + Amount,
+        commit(+ playerCash$$(p2, NP), + playerCash$$(p1, NO), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 payRent -", Amount, "to Player 1 . Money now:", NP),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2CommPayA:
+        phase$(resolveLand),
+        turn$(p2),
+        onCommunity(p2),
+        communityDeck([payTax, go200, goToJail, payTax, go200]),
+        playerCash$$(p2, Cash),
+        communityTax(TaxAmt),
+        NC is Cash - TaxAmt,
+        commit(+ playerCash$$(p2, NC), + communityDeck([go200, goToJail, payTax, go200, payTax]), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 Community Card: payTax -", TaxAmt, ". Money now:", NC),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2CommGoA:
+        phase$(resolveLand),
+        turn$(p2),
+        onCommunity(p2),
+        communityDeck([go200, goToJail, payTax, go200, payTax]),
+        goSalary(G),
+        playerCash$$(p2, Cash),
+        NC is Cash + G,
+        commit(+ playerPos$$(p2, 0), + playerCash$$(p2, NC), + communityDeck([goToJail, payTax, go200, payTax, go200]), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 Community Card: go200 . Go +", G, ". Money now:", NC),
+        showLandSpot(p2),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2CommJail:
+        phase$(resolveLand),
+        turn$(p2),
+        onCommunity(p2),
+        communityDeck([goToJail, payTax, go200, payTax, go200]),
+        jailIdx(JIdx),
+        commit(+ playerPos$$(p2, JIdx), + inJail$$(p2), + communityDeck([payTax, go200, payTax, go200, goToJail]), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 Community Card: goToJail"),
+        showLandSpot(p2),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2CommPayB:
+        phase$(resolveLand),
+        turn$(p2),
+        onCommunity(p2),
+        communityDeck([payTax, go200, payTax, go200, goToJail]),
+        playerCash$$(p2, Cash),
+        communityTax(TaxAmt),
+        NC is Cash - TaxAmt,
+        commit(+ playerCash$$(p2, NC), + communityDeck([go200, payTax, go200, goToJail, payTax]), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 Community Card: payTax -", TaxAmt, ". Money now:", NC),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2CommGoB:
+        phase$(resolveLand),
+        turn$(p2),
+        onCommunity(p2),
+        communityDeck([go200, payTax, go200, goToJail, payTax]),
+        goSalary(G),
+        playerCash$$(p2, Cash),
+        NC is Cash + G,
+        commit(+ playerPos$$(p2, 0), + playerCash$$(p2, NC), + communityDeck([payTax, go200, goToJail, payTax, go200]), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 Community Card: go200 . Go +", G, ". Money now:", NC),
+        showLandSpot(p2),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2Go:
+        phase$(resolveLand),
+        turn$(p2),
+        playerPos$$(p2, 0),
+        commit(+ phase$(waitRoll), + turn$(p1)),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2Jail:
+        phase$(resolveLand),
+        turn$(p2),
+        onJail(p2),
+        commit(+ phase$(waitRoll), + turn$(p1)),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleLandP2Buy:
+        phase$(resolveLand),
+        turn$(p2),
+        canBuy(p2, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("1 pass turn"),
+        show("2 buy property", Name, ". cost:", Price)
 
     query handleBuyP1:
         phase$(waitChoice),
         turn$(p1),
         canBuy(p1, Idx, Price, Name),
-        playerCash$(p1, Cash),
+        playerCash$$(p1, Cash),
         NC is Cash - Price,
         commit(
-            + playerCash$(p1, NC),
-            + owns$(Idx, p1),
+            + playerCash$$(p1, NC),
+            + owns$$(Idx, p1),
             + phase$(waitRoll),
             + turn$(p2)
         ),
@@ -35089,11 +35290,11 @@ inline [logic] .mono:
         phase$(waitChoice),
         turn$(p2),
         canBuy(p2, Idx, Price, Name),
-        playerCash$(p2, Cash),
+        playerCash$$(p2, Cash),
         NC is Cash - Price,
         commit(
-            + playerCash$(p2, NC),
-            + owns$(Idx, p2),
+            + playerCash$$(p2, NC),
+            + owns$$(Idx, p2),
             + phase$(waitRoll),
             + turn$(p1)
         ),
@@ -35147,6 +35348,12 @@ comp [logic] .game:
 
 .game:{
     query = handleRollP1, handleRollP2
+    mutationFailed >= failed
+    set = .key1
+}
+
+.game:{
+    query = handleLandP1Tax, handleLandP1Rent, handleLandP1CommPayA, handleLandP1CommGoA, handleLandP1CommJail, handleLandP1CommPayB, handleLandP1CommGoB, handleLandP1Go, handleLandP1Jail, handleLandP1Buy, handleLandP2Tax, handleLandP2Rent, handleLandP2CommPayA, handleLandP2CommGoA, handleLandP2CommJail, handleLandP2CommPayB, handleLandP2CommGoB, handleLandP2Go, handleLandP2Jail, handleLandP2Buy
     mutationFailed >= failed
     set = .key1
 }

@@ -1168,6 +1168,8 @@ Invoke on **`comp [logic]`** only (not on inline instances):
 | **`0`** | Constraints would **fail** (same rollback rules as mutation) |
 | **Error** | Empty block **`check({ })`**, **non-ground** fact (Prolog variable), or **`data: static`** |
 
+**Random during validation:** **`:check` does not reset internal RNG state** and does not save/restore **`randomSeed:`** / **`comp._rngState`**. It simulates **`+` / `-` / `~`** ops and runs the same **constraint validator** as a real commit; constraint **bodies** (and rules they call) may use **`random_between/3`**, **`set_random/1`**, etc. Those builtins use the engine’s **global working state** — whatever was left by earlier logic — default **`0`** if random has never run. See [logic-builtins.md — RNG state](logic-builtins.md#rng-state--comp-logic-exec-vs-query--check).
+
 **Wire refs** (`text w`, `text list w`, `number w`, `number list w`, `bool w`, `bool list w`, bare atom id) resolve at eval time — identical to **`logic { }`**.
 
 ```logts-play

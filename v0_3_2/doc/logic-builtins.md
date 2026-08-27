@@ -2830,6 +2830,26 @@ Random numbers for dice, jitter, simulation, and game logic. The engine uses one
 
 **Component seed:** optional **`randomSeed:`** on **`comp [logic]`** — integer literal or **number wire (≤ 32 bits)**. Applied on the component's **first** exec pass (or when a seed **wire** changes); later passes **continue** the stream. See [comp-logic.md — `randomSeed:`](comp-logic.md#component-attributes).
 
+### RNG state — `comp [logic]` exec vs `:query` / `:check`
+
+The engine keeps one **working** internal RNG state (mulberry32 **`a`**, exposed via **`logicRngGetState` / `logicRngSetState`**). Behaviour depends on **how** logic runs:
+
+| Path | Resets / restores per component? | Uses |
+|------|-----------------------------------|------|
+| **`comp [logic]` exec** (`.logic:{ query=… set=trigger }`, **`logic { }`**, named queries) | **Yes** — save/restore **`comp._rngState`** around each exec pass; **`randomSeed:`** sets the **initial** state on first pass | Per-component stream (F104) |
+| **`.module:query({ … })`** ([logic-query-exec.md](logic-query-exec.md)) | **No** | **Global** working state — continues from whatever the last logic call left |
+| **`.logicComp:check({ … })`** ([comp-logic.md — check](comp-logic.md#constraint-check---whlogiccheck---)) | **No** | **Global** working state — including **`random_between/3`** (or rules) in **constraint bodies** during validation of simulated **`+`** facts |
+
+**`:query` and `:check` do not reset internal seed/state** and do **not** apply **`randomSeed:`** on a component (even when the inline program is also wired through **`comp [logic]`**). Each **`random_between/3`**, **`random/1`**, or **`set_random/1`** in those paths reads/advances the **global** generator.
+
+- If logic (or **`set_random/1`**) ran before, the next **`:query`** or **`:check`** continues from that **remaining** internal state — with or without a **`comp [logic]`** in the script.
+- If nothing has touched the generator yet, the default internal state is **`0`** (same as **`logicEnsureRng()`** before the first draw).
+- **`set_random(Seed)`** inside a **`:query`** goal block resets the **global** stream for that invocation (and leaves the advanced state for the next call).
+
+To get a **deterministic** draw from **`:query`**, include **`set_random(Seed)`** in the goal block. For reproducible dice across **hot-seat triggers**, use **`comp [logic]`** with **`randomSeed:`** (and optionally **`set_random/1`** in **`initGame()`**-style rules for an explicit game reset).
+
+**Component exec after `:query` / `:check`:** the next **`comp [logic]`** exec **restores** its saved **`comp._rngState`**, not the global state left by **`:query`** / **`:check`**. Mixing both paths can advance the global stream without updating a component's saved state until that component runs again.
+
 ### Example — unit float with `random/1`
 
 ```logts-play
