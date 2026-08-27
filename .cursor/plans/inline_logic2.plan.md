@@ -26,6 +26,9 @@ todos:
   - id: logic-unique-100f
     content: "F100f: doc EN (inline-logic, logic-runtime) + logts-play verify"
     status: pending
+  - id: f104-rng-per-comp
+    content: "F104a: randomSeed per comp — get/set state RNG, swap la exec pass — teste 4547+"
+    status: completed
 isProject: false
 ---
 
@@ -91,6 +94,7 @@ isProject: false
 | **Faza 101** Commit bound vars în `$`/`$$` (**post-F100 bugfix**) | **F101a ✅** | **P3 Monopoly** — normalize atom id→name la mutation deref |
 | **Faza 102** Re-read automat `$`/`$$` după commit | **F102a ✅** | **B Monopoly** — fără `refresh/1` |
 | **Faza 103** Fact read fără side-effect `$`/`$$` | **F103a ✅** | **C Monopoly** — guard `phase$(waitRoll)` nu mai rescrie store |
+| **Faza 104** `randomSeed:` per componentă (RNG context swap) | **F104a ✅** | Monopoly dice — stream continuu per comp |
 | *(rezervat)* | — | — |
 
 ---
@@ -1063,6 +1067,129 @@ Variabila legată la citire rămâne stale până la re-invocarea goal-ului `$`/
 
 ---
 
+## Faza 104 — `randomSeed:` per componentă (RNG context swap) **(post-F103)**
+
+> **Status:** **✅ F104a done** (2026-08-27). **Variantă B: get/set state** — fără closure pe componentă.  
+> **Legături:** [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — dice repetate 4+3 / 6+5; discuție Prolog-like seed.
+
+### Problemă
+
+| # | Simptom | Cauză |
+|---|---------|--------|
+| 1 | La fiecare tastă / exec pass, dice **4 3** din nou | `_applyCompRandomSeed` apelează `set_random(42)` **înainte de fiecare** `_runLogic` |
+| 2 | Două `comp [logic]` cu `randomSeed` diferit **nu** au stream-uri independente | Un singur `logicRngNext` global — ultimul `set_random` suprascrie pe toți |
+| 3 | Doc spune „reseeds at each exec pass” | Semantică utilă doar pentru trigger izolat identic; **nu** pentru jocuri / simulări multi-pas |
+
+**Ce NU e bug:** mulberry32 avansează starea internă (`a`) la fiecare `random_between` — problema e **resetarea** la fiecare pass, nu algoritmul.
+
+### Comportament țintă (decizie user)
+
+| Eveniment | RNG |
+|-----------|-----|
+| **Prima exec** a unei componente cu `randomSeed: N` | inițializare stream din **N** |
+| **Exec pass următor** (aceeași componentă) | **continuă** secvența (fără reset la N) |
+| **Exec altă componentă** | swap la stream-ul **ei** (salvat separat) |
+| **`set_random(M)` în query** | reset stream componentei curente la M; salvat la final pass |
+| **RUN / re-elaborare componentă** | `_rngState` null → iar din `randomSeed` |
+| **`.world:query` fără comp** | flux global fallback (get/set pe singleton global) |
+
+Model mental: **un generator global de lucru** + **stare serializată per componentă** (context switch), ca Prolog `set_random` o dată apoi `random_between` avansează.
+
+### Fix **F104a** — API get/set (fără closure pe comp)
+
+**Fișiere:** `logic-engine.js`, `components/logic.js`, doc.
+
+**1. Extindere mulberry32 / RNG global** (`logic-engine.js`):
+
+```text
+logicRngGetState()  → uint32   // starea internă a (mulberry32)
+logicRngSetState(a) → void     // reconstruiește logicRngNext din a (sau init + set a)
+```
+
+- Algoritmul mulberry32 **neschimbat** — doar expunem read/write pe `a`.
+- `logicSetRandomSeed(seed)` rămâne: `SetState(seed >>> 0)` echivalent cu init din seed literal.
+- `logicEnsureRng()`: dacă null, init cu `a = 0`.
+
+**2. Stare pe componentă** (`logic.js`):
+
+```text
+comp._rngState: uint32 | null     // null = neinițializat
+comp._rngSeedApplied: bool         // optional; sau _rngState === null ca sentinel
+comp._lastRandomSeedWire: uint32   // doar pentru randomSeed: wire — detect change
+```
+
+**3. Swap la `_runLogic`** (înlocuiește `_applyCompRandomSeed` per-pass):
+
+```text
+_beginCompRng(comp, ctx):
+  if comp.randomSeed && comp._rngState == null:
+      seed = literal sau read wire
+      comp._rngState = seed >>> 0
+  if comp._rngState != null:
+      logicRngSetState(comp._rngState)
+  else:
+      logicEnsureRng()                    // fără randomSeed — global continuu
+
+_runLogic ... exec queries ...
+
+_endCompRng(comp):
+  comp._rngState = logicRngGetState()       // mereu la final pass (și dacă random nu a rulat — idempotent)
+```
+
+**4. `set_random/1` în query:** modifică `a` global în timpul pass-ului → `_endCompRng` capturează starea nouă pe componentă.
+
+**5. `randomSeed: wire`:** la `_beginCompRng`, dacă valoarea wire ≠ `_lastRandomSeedWire` → re-init `comp._rngState = wireValue`, update `_lastRandomSeedWire`.
+
+**6. Șterge** comportamentul vechi: `_applyCompRandomSeed` → `set_random` la **fiecare** pass.
+
+### Ce rămâne neschimbat
+
+- `random_between/3`, backtracking impure (aceeași valoare la re-satisfacere în același choice point).
+- Atributul `randomSeed:` tot pe **`comp [logic]`**, nu pe inline.
+- Teste existente **3890–3895** (un singur trigger → die 4) — **regresie obligatorie**.
+
+### Migrare comportament vechi („același die la fiecare trigger”)
+
+Explicit în query, nu pe componentă:
+
+```logts
+query oneRoll:
+    set_random(42),
+    roll(D)
+```
+
+### Teste **4547+**
+
+| ID | Scenariu | Așteptat |
+|----|----------|----------|
+| 4547–4548 | `randomSeed: 42`, același comp, **2 trigger-e** `oneRoll` | die **4** apoi **3** (nu 4, 4) |
+| 4549–4550 | două comp cu seed **42** vs **99**, câte un roll fiecare | stream-uri **independente** (valorile diferă) |
+| 4551–4552 | walker, **2 trigger-e** `advance` de la 10 | **14** apoi **17** (10+4, 14+3) |
+| 4553–4554 | query cu `set_random(7)` apoi roll; al doilea pass fără set_random | al doilea die ≠ primul după secvența seed 7 |
+| — | **3890–3895** regression | unchanged |
+
+Pattern: legacy + wave ca F101–F103.
+
+### Doc **F104b**
+
+- `comp-logic.md` — `randomSeed:` = seed inițial + **continuare** per componentă (nu each exec pass).
+- `logic-builtins.md` — secțiune random: global de lucru + per-comp state; `set_random` în query.
+- `mini-monopoly-interactive.md` — primul roll 4+3; următoarele din secvență.
+
+### Criterii done
+
+- [x] `logicRngGetState` / `logicRngSetState` în engine
+- [x] `_beginCompRng` / `_endCompRng` în `logic.js`; `_applyCompRandomSeed` per-pass eliminat
+- [x] Teste 4547–4562 + 3890–3895 green
+- [x] Doc EN actualizat (`comp-logic.md`, `logic-builtins.md`)
+- [x] Monopoly verify — primul roll 4+3; p2 roll 6+5 (stream continuu)
+
+### Legături
+
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md)
+
+---
+
 ## Riscuri / neclarități plan 2
 
 | Topic | ID | Notă |
@@ -1074,6 +1201,7 @@ Variabila legată la citire rămâne stale până la re-invocarea goal-ului `$`/
 | Lazy streams | **3+e** | Migrate **2+j** |
 | TCO / stack depth | **3+f** | Discuție 2026-08 — `maxDepth` ≠ TCO |
 | Trig `is/2` | **3+g** | Post-F42 amânat |
+| RNG `randomSeed:` | **F104** | Per-comp get/set state; nu reseed each pass |
 
 ---
 
@@ -1084,3 +1212,4 @@ Variabila legată la citire rămâne stale până la re-invocarea goal-ului `$`/
 | 2026-08-27 | Creat **inline_logic2.plan.md** — handoff post-F45; **F100** draft din sketch unique/keyed; backlog **3+a …** |
 | 2026-08-27 | **D1004–D1007✅** — ordine secvențială commit; normalize+use; reguli |
 | 2026-08-27 | **D1014–D1017✅** — F100 **ready-to-implement**; D1014 wire refs păstrate |
+| 2026-08-27 | **F104 draft** — RNG per componentă via `logicRngGetState`/`SetState`; context swap la exec pass (Monopoly dice) |

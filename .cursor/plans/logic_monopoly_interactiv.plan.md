@@ -79,6 +79,7 @@ Predicat $/$$ (F100): [inline_logic2.plan.md](inline_logic2.plan.md)
 | **P4** | `if/3` + `canBuy` — variabile nelegate în `Then` | **Limitation script** — condiții inline / `smart_or` |
 | **P5** | `commit` regulă după `commit` query — `phase$` pierdut | **✅ F103a** |
 | **P6** | Roll automat la Load dacă key1=1 | **Mitigat** — `bootStep`, keys `type: 0` |
+| **P7** | Dice mereu **4+3** — `randomSeed` resetat la fiecare exec pass | **✅ F104a** — get/set state per componentă |
 
 ### Arhitectură script (implementată)
 

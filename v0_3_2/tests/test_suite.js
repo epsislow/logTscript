@@ -49812,5 +49812,386 @@ comp [logic] .gameLogic:
   reg(4545, 'logic', 'F103 fact read no $ side-effect (legacy)', runF103FactReadNoSideEffect);
   reg(4546, 'logic', 'F103 fact read no $ side-effect (wave)', runF103FactReadNoSideEffect, { propagation: 'wave' });
 
+  const F104_RNG_STATE_AFTER_ONE_ROLL_42 = 1831565855;
+  const F104_RNG_STATE_AFTER_TWO_ROLLS_42 = 3663131668;
+
+  function pulseWire(session, interp, wireName) {
+    session.setWire(interp, wireName, '1');
+    session.setWire(interp, wireName, '0');
+  }
+
+  function runF104TwoRollsSameComp(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+comp [logic] .diceLogic:
+    on: 1
+    randomSeed: 42
+    .dice { }
+:
+
+16wire die = 0000000000000000
+1wire trigger = 0
+
+.diceLogic:{
+    oneRoll >= die
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigger');
+    h.assert('die1 4', session.getWire(interp, 'die'), '0000000000000100');
+    const comp = interp.components.get('.diceLogic');
+    h.assert('rng state after roll 1', String(comp._rngState), String(F104_RNG_STATE_AFTER_ONE_ROLL_42));
+    pulseWire(session, interp, 'trigger');
+    h.assert('die2 3', session.getWire(interp, 'die'), '0000000000000011');
+    h.assert('rng state after roll 2', String(comp._rngState), String(F104_RNG_STATE_AFTER_TWO_ROLLS_42));
+  }
+
+  reg(4547, 'logic', 'F104 same comp two rolls continue stream (legacy)', runF104TwoRollsSameComp);
+  reg(4548, 'logic', 'F104 same comp two rolls continue stream (wave)', runF104TwoRollsSameComp, { propagation: 'wave' });
+
+  function runF104TwoCompsSameInlineDiffSeed(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+comp [logic] .diceA:
+    on: 1
+    randomSeed: 42
+    .dice { }
+
+:
+
+comp [logic] .diceB:
+    on: 1
+    randomSeed: 99
+    .dice { }
+:
+
+16wire dieA = 0000000000000000
+16wire dieB = 0000000000000000
+1wire trigA = 0
+1wire trigB = 0
+
+.diceA:{
+    oneRoll >= dieA
+    set = trigA
+}
+
+.diceB:{
+    oneRoll >= dieB
+    set = trigB
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigA');
+    pulseWire(session, interp, 'trigB');
+    h.assert('A first 4', session.getWire(interp, 'dieA'), '0000000000000100');
+    h.assert('B first 2', session.getWire(interp, 'dieB'), '0000000000000010');
+    pulseWire(session, interp, 'trigA');
+    pulseWire(session, interp, 'trigB');
+    h.assert('A second 3', session.getWire(interp, 'dieA'), '0000000000000011');
+    h.assert('B second 5', session.getWire(interp, 'dieB'), '0000000000000101');
+    const compA = interp.components.get('.diceA');
+    const compB = interp.components.get('.diceB');
+    h.assert('independent rng state', String(compA._rngState !== compB._rngState), 'true');
+  }
+
+  reg(4549, 'logic', 'F104 two comps same inline diff seed (legacy)', runF104TwoCompsSameInlineDiffSeed);
+  reg(4550, 'logic', 'F104 two comps same inline diff seed (wave)', runF104TwoCompsSameInlineDiffSeed, { propagation: 'wave' });
+
+  function runF104TwoCompsDiffInlineDiffSeed(h, session) {
+    const src = `inline [logic] .diceA:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+inline [logic] .diceB:
+
+    roll(X) <- random_between(1, 6, X)
+
+    query rollOnce:
+        roll(X)
+
+:
+
+comp [logic] .logicA:
+    on: 1
+    randomSeed: 42
+    .diceA { }
+
+:
+
+comp [logic] .logicB:
+    on: 1
+    randomSeed: 99
+    .diceB { }
+:
+
+16wire dieA = 0000000000000000
+16wire dieB = 0000000000000000
+1wire trigA = 0
+1wire trigB = 0
+
+.logicA:{
+    oneRoll >= dieA
+    set = trigA
+}
+
+.logicB:{
+    rollOnce >= dieB
+    set = trigB
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigA');
+    pulseWire(session, interp, 'trigB');
+    h.assert('inlineA die 4', session.getWire(interp, 'dieA'), '0000000000000100');
+    h.assert('inlineB die 2', session.getWire(interp, 'dieB'), '0000000000000010');
+    pulseWire(session, interp, 'trigA');
+    h.assert('inlineA die 3', session.getWire(interp, 'dieA'), '0000000000000011');
+    pulseWire(session, interp, 'trigB');
+    h.assert('inlineB die 5', session.getWire(interp, 'dieB'), '0000000000000101');
+  }
+
+  reg(4551, 'logic', 'F104 two comps diff inline diff seed (legacy)', runF104TwoCompsDiffInlineDiffSeed);
+  reg(4552, 'logic', 'F104 two comps diff inline diff seed (wave)', runF104TwoCompsDiffInlineDiffSeed, { propagation: 'wave' });
+
+  function runF104TwoCompsSameSeedIndependent(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+comp [logic] .diceA:
+    on: 1
+    randomSeed: 42
+    .dice { }
+
+:
+
+comp [logic] .diceB:
+    on: 1
+    randomSeed: 42
+    .dice { }
+:
+
+16wire dieA = 0000000000000000
+16wire dieB = 0000000000000000
+1wire trigA = 0
+1wire trigB = 0
+
+.diceA:{
+    oneRoll >= dieA
+    set = trigA
+}
+
+.diceB:{
+    oneRoll >= dieB
+    set = trigB
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigA');
+    pulseWire(session, interp, 'trigB');
+    h.assert('both first 4', session.getWire(interp, 'dieA'), '0000000000000100');
+    h.assert('both first B', session.getWire(interp, 'dieB'), '0000000000000100');
+    pulseWire(session, interp, 'trigA');
+    pulseWire(session, interp, 'trigB');
+    h.assert('both second 3', session.getWire(interp, 'dieA'), '0000000000000011');
+    h.assert('both second B', session.getWire(interp, 'dieB'), '0000000000000011');
+  }
+
+  reg(4553, 'logic', 'F104 two comps same seed independent streams (legacy)', runF104TwoCompsSameSeedIndependent);
+  reg(4554, 'logic', 'F104 two comps same seed independent streams (wave)', runF104TwoCompsSameSeedIndependent, { propagation: 'wave' });
+
+  function runF104WalkerTwoTriggers(h, session) {
+    const src = `inline [logic] .walker:
+
+    roll(D) <- random_between(1, 6, D)
+
+    step(P, S0, S1) <-
+        roll(D),
+        S1 is S0 + D
+
+    query advance:
+        step(p1, 10, NewSquare)
+
+:
+
+comp [logic] .walkerLogic:
+    on: 1
+    randomSeed: 42
+    .walker { }
+:
+
+16wire newPos = 0000000000000000
+1wire trigger = 0
+
+.walkerLogic:{
+    advance >= newPos
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigger');
+    h.assert('newPos 14', session.getWire(interp, 'newPos'), '0000000000001110');
+    pulseWire(session, interp, 'trigger');
+    h.assert('newPos 13 die3', session.getWire(interp, 'newPos'), '0000000000001101');
+  }
+
+  reg(4555, 'logic', 'F104 walker two triggers advance stream (legacy)', runF104WalkerTwoTriggers);
+  reg(4556, 'logic', 'F104 walker two triggers advance stream (wave)', runF104WalkerTwoTriggers, { propagation: 'wave' });
+
+  function runF104SetRandomThenContinue(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query seededRoll:
+        set_random(42),
+        roll(D)
+
+    query nextRoll:
+        roll(D)
+
+:
+
+comp [logic] .diceLogic:
+    on: 1
+    randomSeed: 99
+    .dice { }
+:
+
+16wire die = 0000000000000000
+1wire trigSeed = 0
+1wire trigNext = 0
+
+.diceLogic:{
+    seededRoll >= die
+    set = trigSeed
+}
+
+.diceLogic:{
+    nextRoll >= die
+    set = trigNext
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigSeed');
+    h.assert('seed42 die1', session.getWire(interp, 'die'), '0000000000000100');
+    pulseWire(session, interp, 'trigNext');
+    h.assert('seed42 die2', session.getWire(interp, 'die'), '0000000000000011');
+  }
+
+  reg(4557, 'logic', 'F104 set_random in query then continue (legacy)', runF104SetRandomThenContinue);
+  reg(4558, 'logic', 'F104 set_random in query then continue (wave)', runF104SetRandomThenContinue, { propagation: 'wave' });
+
+  function runF104WireSeedChange(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+32wire seedWire = 00000000000000000000000000101010
+
+comp [logic] .diceLogic:
+    on: 1
+    randomSeed: seedWire
+    .dice { }
+:
+
+16wire die = 0000000000000000
+1wire trigger = 0
+
+.diceLogic:{
+    oneRoll >= die
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigger');
+    h.assert('seed42 die 4', session.getWire(interp, 'die'), '0000000000000100');
+    session.setWire(interp, 'seedWire', '00000000000000000000000000000111');
+    pulseWire(session, interp, 'trigger');
+    h.assert('seed7 die 1', session.getWire(interp, 'die'), '0000000000000001');
+    const comp = interp.components.get('.diceLogic');
+    h.assert('wire seed tracked', String(comp._lastRandomSeedWireValue), '7');
+  }
+
+  reg(4559, 'logic', 'F104 randomSeed wire change re-inits (legacy)', runF104WireSeedChange);
+  reg(4560, 'logic', 'F104 randomSeed wire change re-inits (wave)', runF104WireSeedChange, { propagation: 'wave' });
+
+  function runF104InterleavedComps(h, session) {
+    const src = `inline [logic] .dice:
+
+    roll(D) <- random_between(1, 6, D)
+
+    query oneRoll:
+        roll(D)
+
+:
+
+comp [logic] .diceA:
+    on: 1
+    randomSeed: 42
+    .dice { }
+
+:
+
+comp [logic] .diceB:
+    on: 1
+    randomSeed: 99
+    .dice { }
+:
+
+16wire dieA = 0000000000000000
+16wire dieB = 0000000000000000
+1wire trigA = 0
+1wire trigB = 0
+
+.diceA:{
+    oneRoll >= dieA
+    set = trigA
+}
+
+.diceB:{
+    oneRoll >= dieB
+    set = trigB
+}`;
+    const { interp } = session.run(src);
+    pulseWire(session, interp, 'trigA');
+    h.assert('A1 4', session.getWire(interp, 'dieA'), '0000000000000100');
+    pulseWire(session, interp, 'trigB');
+    h.assert('B1 2', session.getWire(interp, 'dieB'), '0000000000000010');
+    pulseWire(session, interp, 'trigA');
+    h.assert('A2 3', session.getWire(interp, 'dieA'), '0000000000000011');
+    pulseWire(session, interp, 'trigB');
+    h.assert('B2 5', session.getWire(interp, 'dieB'), '0000000000000101');
+    if (typeof logicRngGetState === 'function') {
+      h.assert('global getState matches B', String(logicRngGetState() === interp.components.get('.diceB')._rngState), 'true');
+    }
+  }
+
+  reg(4561, 'logic', 'F104 interleaved comps preserve streams (legacy)', runF104InterleavedComps);
+  reg(4562, 'logic', 'F104 interleaved comps preserve streams (wave)', runF104InterleavedComps, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

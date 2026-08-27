@@ -102,23 +102,23 @@ inline [logic] .mono:
         goSalary(G)
 
     onCommunity(P) <-
-        playerPos$$(P, Idx),
+        playerPos$(P, Idx),
         square(Idx, communityCard, _, _)
 
     onTax(P) <-
-        playerPos$$(P, Idx),
+        playerPos$(P, Idx),
         square(Idx, tax, _, _)
 
     canBuy(P, Idx, Price, Name) <-
-        playerPos$$(P, Idx),
+        playerPos$(P, Idx),
         square(Idx, Name, Price, _),
         Price > 0,
-        \+ owns$$(Idx, _)
+        \+ owns$(Idx, _)
 
     owesRent(P, Owner, Amount, _) <-
-        playerPos$$(P, Idx),
+        playerPos$(P, Idx),
         square(Idx, _, _, Amount),
-        owns$$(Idx, Owner),
+        owns$(Idx, Owner),
         Owner =\= P
 
     rotateDeck(Deck, NewDeck) <-
@@ -129,7 +129,7 @@ inline [logic] .mono:
         salaryIfGo(OldPos, Steps, G),
         G > 0,
         playerLabel(P, LP),
-        playerCash$$(P, Cash),
+        playerCash$(P, Cash),
         show("Player", LP, "Go collected +200 . Money now:", Cash)
 
     showGoPay(_, _, _) <- true
@@ -138,20 +138,21 @@ inline [logic] .mono:
     smart_or(_, Cond2) <- call(Cond2)
 
     initGame() <-
+        set_random(42),
         commit(
             ~ greeted$(_),
             ~ phase$(_),
             ~ turn$(_),
-            ~ playerPos$$(_, _),
-            ~ playerCash$$(_, _),
-            ~ owns$$(_, _),
+            ~ playerPos$(_, _),
+            ~ playerCash$(_, _),
+            ~ owns$(_, _),
             ~ communityDeck(_),
             + phase$(waitRoll),
             + turn$(p1),
-            + playerPos$$(p1, 0),
-            + playerPos$$(p2, 0),
-            + playerCash$$(p1, 1500),
-            + playerCash$$(p2, 1500),
+            + playerPos$(p1, 0),
+            + playerPos$(p2, 0),
+            + playerCash$(p1, 1500),
+            + playerCash$(p2, 1500),
             + communityDeck([payTax, go200, goToJail, payTax, go200]),
             + greeted$()
         ),
@@ -162,22 +163,22 @@ inline [logic] .mono:
 
     landAfterRollP1() <-
         onTax(p1),
-        playerCash$$(p1, Cash),
+        playerCash$(p1, Cash),
         taxAmount(T),
         NC is Cash - T,
-        commit(+ playerCash$$(p1, NC), + phase$(waitRoll), + turn$(p2)),
+        commit(+ playerCash$(p1, NC), + phase$(waitRoll), + turn$(p2)),
         show("Player 1 payTax -75 to community . Money now:", NC),
         show("current Player 2. Press 1 to roll dice")
 
     landAfterRollP1() <-
         owesRent(p1, p2, Amount, _),
-        playerCash$$(p1, PC),
-        playerCash$$(p2, OC),
+        playerCash$(p1, PC),
+        playerCash$(p2, OC),
         NP is PC - Amount,
         NO is OC + Amount,
         commit(
-            + playerCash$$(p1, NP),
-            + playerCash$$(p2, NO),
+            + playerCash$(p1, NP),
+            + playerCash$(p2, NO),
             + phase$(waitRoll),
             + turn$(p2)
         ),
@@ -189,11 +190,11 @@ inline [logic] .mono:
         communityDeck(Deck),
         rotateDeck(Deck, NewDeck),
         Deck = [payTax|_],
-        playerCash$$(p1, Cash),
+        playerCash$(p1, Cash),
         communityTax(T),
         NC is Cash - T,
         commit(
-            + playerCash$$(p1, NC),
+            + playerCash$(p1, NC),
             + communityDeck(NewDeck),
             + phase$(waitRoll),
             + turn$(p2)
@@ -203,12 +204,12 @@ inline [logic] .mono:
         show("current Player 2. Press 1 to roll dice")
 
     landAfterRollP1() <-
-        playerPos$$(p1, 0),
+        playerPos$(p1, 0),
         commit(+ phase$(waitRoll), + turn$(p2)),
         show("current Player 2. Press 1 to roll dice")
 
     landAfterRollP1() <-
-        playerPos$$(p1, 6),
+        playerPos$(p1, 6),
         commit(+ phase$(waitRoll), + turn$(p2)),
         show("current Player 2. Press 1 to roll dice")
 
@@ -220,22 +221,22 @@ inline [logic] .mono:
 
     landAfterRollP2() <-
         onTax(p2),
-        playerCash$$(p2, Cash),
+        playerCash$(p2, Cash),
         taxAmount(T),
         NC is Cash - T,
-        commit(+ playerCash$$(p2, NC), + phase$(waitRoll), + turn$(p1)),
+        commit(+ playerCash$(p2, NC), + phase$(waitRoll), + turn$(p1)),
         show("Player 2 payTax -75 to community . Money now:", NC),
         show("current Player 1. Press 1 to roll dice")
 
     landAfterRollP2() <-
         owesRent(p2, p1, Amount, _),
-        playerCash$$(p2, PC),
-        playerCash$$(p1, OC),
+        playerCash$(p2, PC),
+        playerCash$(p1, OC),
         NP is PC - Amount,
         NO is OC + Amount,
         commit(
-            + playerCash$$(p2, NP),
-            + playerCash$$(p1, NO),
+            + playerCash$(p2, NP),
+            + playerCash$(p1, NO),
             + phase$(waitRoll),
             + turn$(p1)
         ),
@@ -247,11 +248,11 @@ inline [logic] .mono:
         communityDeck(Deck),
         rotateDeck(Deck, NewDeck),
         Deck = [payTax|_],
-        playerCash$$(p2, Cash),
+        playerCash$(p2, Cash),
         communityTax(T),
         NC is Cash - T,
         commit(
-            + playerCash$$(p2, NC),
+            + playerCash$(p2, NC),
             + communityDeck(NewDeck),
             + phase$(waitRoll),
             + turn$(p1)
@@ -261,12 +262,12 @@ inline [logic] .mono:
         show("current Player 1. Press 1 to roll dice")
 
     landAfterRollP2() <-
-        playerPos$$(p2, 0),
+        playerPos$(p2, 0),
         commit(+ phase$(waitRoll), + turn$(p1)),
         show("current Player 1. Press 1 to roll dice")
 
     landAfterRollP2() <-
-        playerPos$$(p2, 6),
+        playerPos$(p2, 6),
         commit(+ phase$(waitRoll), + turn$(p1)),
         show("current Player 1. Press 1 to roll dice")
 
@@ -298,15 +299,15 @@ inline [logic] .mono:
     query handleRollP1:
         phase$(waitRoll),
         turn$(p1),
-        playerPos$$(p1, Pos),
-        playerCash$$(p1, Cash),
+        playerPos$(p1, Pos),
+        playerCash$(p1, Cash),
         roll(D1),
         roll(D2),
         S is D1 + D2,
         nextPos(Pos, S, NewPos),
         salaryIfGo(Pos, S, Bonus),
         NewCash is Cash + Bonus,
-        commit(+ playerPos$$(p1, NewPos), + playerCash$$(p1, NewCash)),
+        commit(+ playerPos$(p1, NewPos), + playerCash$(p1, NewCash)),
         show("Player 1 dice:", D1, D2),
         show("Player 1 position now:", NewPos),
         showGoPay(p1, Pos, S),
@@ -315,15 +316,15 @@ inline [logic] .mono:
     query handleRollP2:
         phase$(waitRoll),
         turn$(p2),
-        playerPos$$(p2, Pos),
-        playerCash$$(p2, Cash),
+        playerPos$(p2, Pos),
+        playerCash$(p2, Cash),
         roll(D1),
         roll(D2),
         S is D1 + D2,
         nextPos(Pos, S, NewPos),
         salaryIfGo(Pos, S, Bonus),
         NewCash is Cash + Bonus,
-        commit(+ playerPos$$(p2, NewPos), + playerCash$$(p2, NewCash)),
+        commit(+ playerPos$(p2, NewPos), + playerCash$(p2, NewCash)),
         show("Player 2 dice:", D1, D2),
         show("Player 2 position now:", NewPos),
         showGoPay(p2, Pos, S),
@@ -333,11 +334,11 @@ inline [logic] .mono:
         phase$(waitChoice),
         turn$(p1),
         canBuy(p1, Idx, Price, Name),
-        playerCash$$(p1, Cash),
+        playerCash$(p1, Cash),
         NC is Cash - Price,
         commit(
-            + playerCash$$(p1, NC),
-            + owns$$(Idx, p1),
+            + playerCash$(p1, NC),
+            + owns$(Idx, p1),
             + phase$(waitRoll),
             + turn$(p2)
         ),
@@ -348,11 +349,11 @@ inline [logic] .mono:
         phase$(waitChoice),
         turn$(p2),
         canBuy(p2, Idx, Price, Name),
-        playerCash$$(p2, Cash),
+        playerCash$(p2, Cash),
         NC is Cash - Price,
         commit(
-            + playerCash$$(p2, NC),
-            + owns$$(Idx, p2),
+            + playerCash$(p2, NC),
+            + owns$(Idx, p2),
             + phase$(waitRoll),
             + turn$(p1)
         ),

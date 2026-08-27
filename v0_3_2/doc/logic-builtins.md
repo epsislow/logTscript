@@ -2805,7 +2805,7 @@ comp [logic] .worldLogic:
 
 ## `random/1`, `random_between/3`, and `set_random/1`
 
-Random numbers for dice, jitter, simulation, and game logic. One **global RNG** per run — use **`set_random/1`** or comp **`randomSeed:`** for reproducible tests.
+Random numbers for dice, jitter, simulation, and game logic. The engine uses one **working** mulberry32 generator; each **`comp [logic]`** with **`randomSeed:`** saves/restores the generator **internal state** (`logicRngGetState` / `logicRngSetState`) across exec passes so streams are **independent per component** and **continue** between triggers. Use **`set_random/1`** in a query for an explicit reset within that component's stream.
 
 | Builtin | Arguments | Result |
 |---------|-----------|--------|
@@ -2828,7 +2828,7 @@ Random numbers for dice, jitter, simulation, and game logic. One **global RNG** 
 - **`set_random/1`** in a query overrides the generator; later **`set_random/1`** in the same query wins.
 - **Reserved heads:** you cannot define **`random/1`**, **`random_between/3`**, or **`set_random/1`** as fact, rule, or constraint heads.
 
-**Component seed:** optional **`randomSeed:`** on **`comp [logic]`** — integer literal or **number wire (≤ 32 bits)** read at each exec pass. See [comp-logic.md — `randomSeed:`](comp-logic.md#component-attributes).
+**Component seed:** optional **`randomSeed:`** on **`comp [logic]`** — integer literal or **number wire (≤ 32 bits)**. Applied on the component's **first** exec pass (or when a seed **wire** changes); later passes **continue** the stream. See [comp-logic.md — `randomSeed:`](comp-logic.md#component-attributes).
 
 ### Example — unit float with `random/1`
 

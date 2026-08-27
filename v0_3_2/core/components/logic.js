@@ -312,19 +312,46 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return seed;
   }
 
-  _applyCompRandomSeed(comp, compName, ctx) {
-    if (!comp || !comp.randomSeed) return;
-    const setFn = typeof logicSetRandomSeed === 'function' ? logicSetRandomSeed : null;
-    if (!setFn) throw Error('Logic engine is not loaded');
-    let seed;
+  _resolveCompRandomSeedValue(comp, compName, ctx) {
+    if (!comp || !comp.randomSeed) return null;
     if (comp.randomSeed.kind === 'literal') {
-      seed = comp.randomSeed.value;
-    } else {
-      seed = this._readRandomSeedFromWire(compName, comp.randomSeed, ctx);
+      return comp.randomSeed.value;
     }
-    if (!setFn(seed)) {
-      throw Error(`logic ${compName}: randomSeed value out of range`);
+    return this._readRandomSeedFromWire(compName, comp.randomSeed, ctx);
+  }
+
+  _beginCompRng(comp, compName, ctx) {
+    const setFn = typeof logicRngSetState === 'function' ? logicRngSetState : null;
+    const ensureFn = typeof logicEnsureRng === 'function' ? logicEnsureRng : null;
+    if (!setFn) throw Error('Logic engine is not loaded');
+
+    if (comp.randomSeed) {
+      const seed = this._resolveCompRandomSeedValue(comp, compName, ctx);
+      if (comp.randomSeed.kind === 'wire') {
+        if (comp._lastRandomSeedWireValue !== seed) {
+          comp._rngState = null;
+          comp._lastRandomSeedWireValue = seed;
+        }
+      }
+      if (comp._rngState == null) {
+        comp._rngState = seed;
+      }
+      if (!setFn(comp._rngState)) {
+        throw Error(`logic ${compName}: randomSeed value out of range`);
+      }
+    } else if (comp._rngState != null) {
+      if (!setFn(comp._rngState)) {
+        throw Error(`logic ${compName}: saved RNG state out of range`);
+      }
+    } else if (ensureFn) {
+      ensureFn();
     }
+  }
+
+  _endCompRng(comp) {
+    const getFn = typeof logicRngGetState === 'function' ? logicRngGetState : null;
+    if (!getFn) throw Error('Logic engine is not loaded');
+    comp._rngState = getFn();
   }
 
   _parseIndexFacts(attributes, compName) {
@@ -387,7 +414,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         { name: 'indexFacts', value: '0 or 1 (default 1 — fact index on)' },
         { name: 'indexRebuild', value: 'full or delta (default full; ignored when indexFacts: 0)' },
         { name: 'data', value: 'overlay (default), static, or seed' },
-        { name: 'randomSeed', value: 'integer literal or number wire (≤32 bits) — reseed RNG at each exec pass' },
+        { name: 'randomSeed', value: 'integer literal or number wire (≤32 bits) — initial RNG seed per component; stream continues across exec passes' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -541,6 +568,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       indexFacts,
       indexRebuild,
       randomSeed,
+      _rngState: null,
+      _lastRandomSeedWireValue: null,
       factIndex: null,
       ruleClauses: ruleFn ? ruleFn(merged.clauses) : [],
       maxDepth,
@@ -1067,39 +1096,43 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
 
     const merged = resolveFn(inst, ctx.inlineInstances);
-    this._applyCompRandomSeed(comp, compName, ctx);
-    this._applyMutations(comp, compName, mutationBlocks, ctx, merged);
-    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
-    const buildOpts = this._buildDataOpts(comp);
-    const runtimeMerged = buildFn
-      ? { ...merged, clauses: buildFn(merged.clauses, comp.dynamicStore, buildOpts) }
-      : merged;
-    const inputEnv = this._readPinValues(comp, pending, reEvaluate, ctx);
-    const execOpts = {};
-    if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
-    if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
-    if (comp.indexFacts && comp.factIndex) {
-      execOpts.factIndex = comp.factIndex;
-      execOpts.ruleClauses = comp.ruleClauses || [];
-    }
-    if (queryOpts && queryOpts.queryNone) {
-      execOpts.queryNone = true;
-    } else if (queryOpts && queryOpts.queryNames && queryOpts.queryNames.length) {
-      execOpts.queryNames = queryOpts.queryNames;
-    }
-    if (ctx.out) {
-      execOpts.onShowLine = (line) => { ctx.out.push(line); };
-    }
-    execOpts.mutationRuntime = this._buildMutationRuntime(comp, compName, merged, ctx);
-    const raw = execFn(runtimeMerged, inputEnv, execOpts);
-    const meta = raw._logicMeta || {};
-    delete raw._logicMeta;
-    comp.queryResults = raw;
-    comp.truncated = meta.truncated ? 1 : 0;
-    comp.depthExceeded = meta.depthExceeded ? 1 : 0;
-    comp.execCount = (comp.execCount || 0) + 1;
+    try {
+      this._beginCompRng(comp, compName, ctx);
+      this._applyMutations(comp, compName, mutationBlocks, ctx, merged);
+      const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+      const buildOpts = this._buildDataOpts(comp);
+      const runtimeMerged = buildFn
+        ? { ...merged, clauses: buildFn(merged.clauses, comp.dynamicStore, buildOpts) }
+        : merged;
+      const inputEnv = this._readPinValues(comp, pending, reEvaluate, ctx);
+      const execOpts = {};
+      if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
+      if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+      if (comp.indexFacts && comp.factIndex) {
+        execOpts.factIndex = comp.factIndex;
+        execOpts.ruleClauses = comp.ruleClauses || [];
+      }
+      if (queryOpts && queryOpts.queryNone) {
+        execOpts.queryNone = true;
+      } else if (queryOpts && queryOpts.queryNames && queryOpts.queryNames.length) {
+        execOpts.queryNames = queryOpts.queryNames;
+      }
+      if (ctx.out) {
+        execOpts.onShowLine = (line) => { ctx.out.push(line); };
+      }
+      execOpts.mutationRuntime = this._buildMutationRuntime(comp, compName, merged, ctx);
+      const raw = execFn(runtimeMerged, inputEnv, execOpts);
+      const meta = raw._logicMeta || {};
+      delete raw._logicMeta;
+      comp.queryResults = raw;
+      comp.truncated = meta.truncated ? 1 : 0;
+      comp.depthExceeded = meta.depthExceeded ? 1 : 0;
+      comp.execCount = (comp.execCount || 0) + 1;
 
-    this._applyRedirects(comp, compName, redirects, ctx);
+      this._applyRedirects(comp, compName, redirects, ctx);
+    } finally {
+      this._endCompRng(comp);
+    }
   }
 
   _applyRedirects(comp, compName, redirects, ctx) {

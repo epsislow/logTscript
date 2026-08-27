@@ -162,21 +162,30 @@ const LOGIC_RANDOM_SEED_MAX = 4294967295;
 const LOGIC_RANDOM_INT_MIN = -2147483648;
 const LOGIC_RANDOM_INT_MAX = 2147483647;
 
-let logicRngNext = null;
+let logicRng = { a: 0 };
 
-function logicMulberry32(seed) {
-  let a = seed >>> 0;
-  return function logicRngStep() {
-    a |= 0;
-    a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function logicRngStepFn() {
+  let a = logicRng.a | 0;
+  a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  logicRng.a = a;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
 function logicEnsureRng() {
-  if (!logicRngNext) logicRngNext = logicMulberry32(0);
+  /* logicRng.a always valid (default 0) */
+}
+
+function logicRngGetState() {
+  return logicRng.a >>> 0;
+}
+
+function logicRngSetState(seed) {
+  const n = logicNormalizeRandomSeed(seed);
+  if (n == null) return false;
+  logicRng.a = n;
+  return true;
 }
 
 function logicNormalizeRandomSeed(n) {
@@ -192,17 +201,14 @@ function logicNormalizeRandomInt(n) {
 }
 
 function logicSetRandomSeed(seed) {
-  const n = logicNormalizeRandomSeed(seed);
-  if (n == null) return false;
-  logicRngNext = logicMulberry32(n);
-  return true;
+  return logicRngSetState(seed);
 }
 
 function logicRandomIntBetween(low, high) {
   logicEnsureRng();
   const range = high - low + 1;
   if (range <= 0) return null;
-  return low + Math.floor(logicRngNext() * range);
+  return low + Math.floor(logicRngStepFn() * range);
 }
 
 function logicNormalizeRandomFloat(n) {
@@ -212,7 +218,7 @@ function logicNormalizeRandomFloat(n) {
 
 function logicRandomFloatUnit() {
   logicEnsureRng();
-  return logicRngNext();
+  return logicRngStepFn();
 }
 
 function logicRandomFloatBetween(low, high) {
@@ -5847,6 +5853,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicTermsEqualGround = logicTermsEqualGround;
   globalThis.logicBindConstraintHead = logicBindConstraintHead;
   globalThis.logicSetRandomSeed = logicSetRandomSeed;
+  globalThis.logicRngGetState = logicRngGetState;
+  globalThis.logicRngSetState = logicRngSetState;
   globalThis.logicNormalizeRandomSeed = logicNormalizeRandomSeed;
   globalThis.logicNormalizeRandomInt = logicNormalizeRandomInt;
   globalThis.LOGIC_RANDOM_SEED_MAX = LOGIC_RANDOM_SEED_MAX;
@@ -5912,6 +5920,8 @@ if (typeof module !== 'undefined' && module.exports) {
     logicNormalizeUniqueClauses,
     logicTermIsGround,
     logicSetRandomSeed,
+    logicRngGetState,
+    logicRngSetState,
     logicNormalizeRandomSeed,
     logicNormalizeRandomInt,
     LOGIC_RANDOM_SEED_MAX,

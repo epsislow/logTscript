@@ -74,6 +74,7 @@ inline [logic] .mono:
     smart_or(_, Cond2) <- call(Cond2)
 
     initGame() <-
+        set_random(42),
         commit(
             ~ greeted$(_),
             ~ phase$(_),

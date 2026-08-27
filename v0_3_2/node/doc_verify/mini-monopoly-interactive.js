@@ -44,11 +44,12 @@ module.exports = {
         pulse(session, '.key1');
         const passRoll2 = sliceOut(session, t1);
         if (!passRoll2.includes('current Player 2')) return false;
-        if (!passRoll2.includes('Player 2 dice: 4 3')) return false;
+        if (!passRoll2.includes('Player 2 dice: 6 5')) return false;
+        if (!passRoll2.includes('2 buy property lake')) return false;
         const t2 = (session.out || []).length;
         pulse(session, '.key2');
         const buy = sliceOut(session, t2);
-        if (!buy.includes('Player 2 buyProperty short')) return false;
+        if (!buy.includes('Player 2 buyProperty lake')) return false;
         if (interp.getWireEffectiveValue('failed') !== '0') return false;
         return true;
       },
