@@ -202,7 +202,7 @@ function runCase(sandbox, caseDef) {
     }
   }
   if (pass && typeof caseDef.check === 'function') {
-    pass = caseDef.check(interp);
+    pass = caseDef.check(interp, session);
   }
   if (pass && caseDef.expect && caseDef.expect.length) {
     pass = caseDef.expect.every((s) => text.includes(s));

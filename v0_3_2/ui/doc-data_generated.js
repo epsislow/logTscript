@@ -11561,7 +11561,7 @@ comp [logic] .routeLogic:
 | **1 free** | \`johnOwns:count >= numRows\` | Solution count (capped at vector length) |
 | **1 free** | \`johnOwns;unique:count >= numRows\` | Count **after** \`;unique\` dedupe |
 | **2 free** | \`allAges >= table\` | **Matrix bulk** — row = solution, col = variable (\`32wire[R,C]\`) |
-| **N free (1…16)** | \`allCarInfos;sel(0,2) >= table\` | **Matrix bulk** on **two selected columns** (0-based indices) |
+| **N free (1…32)** | \`allCarInfos;sel(0,2) >= table\` | **Matrix bulk** on **two selected columns** (0-based indices) |
 | **N free** | \`allCarInfos >= table\` | **Error** at elaboration when **N > 2** — use **\`;sel(i,j)\`** |
 | **N free** | \`allCarInfos:0 >= rowAll\` | **Full row** vector \`wire[N]\` (all query variables) |
 | **N free** | \`allCarInfos;sel(0,2):0 >= pair\` | **Projected row** vector \`wire[2]\` |
@@ -11587,7 +11587,7 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 
 **Encoding:** atoms → **ASCII + \`\\0\` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or \`\\0\` per cell if undeclared).
 
-**Limits:** up to **16** free variables per query. **Matrix bulk** (\`query >= matrix\`) packs **two columns** — use **\`;sel(i,j)\`** when **N > 2**. **Vector bulk** on one column uses **\`;sel(i)\`** with a vector wire. At **N = 2**, matrix columns **0** and **1** are implicit (same as **\`;sel(0,1)\`**).
+**Limits:** up to **32** free variables per query. **Matrix bulk** (\`query >= matrix\`) packs **two columns** — use **\`;sel(i,j)\`** when **N > 2**. **Vector bulk** on one column uses **\`;sel(i)\`** with a vector wire. At **N = 2**, matrix columns **0** and **1** are implicit (same as **\`;sel(0,1)\`**).
 
 ### Column select (\`;sel(i)\` and \`;sel(i,j)\`)
 
@@ -22282,7 +22282,7 @@ query personWithoutAge:
 
 ## Queries and free variables
 
-Each \`query\` may expose up to **16** free variables. **Matrix bulk** on \`comp [logic]\` writes **two columns** per row — use **\`;sel(i,j)\`** when **N > 2**. **Vector bulk** on one column uses **\`;sel(i)\`** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside \`\\+\`) are not output columns.
+Each \`query\` may expose up to **32** free variables. **Matrix bulk** on \`comp [logic]\` writes **two columns** per row — use **\`;sel(i,j)\`** when **N > 2**. **Vector bulk** on one column uses **\`;sel(i)\`** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside \`\\+\`) are not output columns.
 
 | Free vars | Redirect pattern (on comp) |
 |-----------|----------------------------|
@@ -22653,6 +22653,40 @@ comp [logic] .scoreLogic:
 
 After **Load & Run**: **\`okAlice = 1\`** — alice’s score is **30**; **\`score$$(bob, 20)\`** remains.
 
+### Read after \`commit\` in the same query
+
+State variables bound **before** a mutation keep their old value until you **re-read** the **\`$\`/\`$$\`** goal. After **\`commit\`** (or **\`+\`** in the same query pass), calling the same slot again **refreshes** bound output arguments from the dynamic store:
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 0)
+
+    query roll:
+        playerPos$$(p1, Pos),
+        commit(+ playerPos$$(p1, 7)),
+        playerPos$$(p1, Pos),
+        show("pos", Pos)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 0
+
+.gameLogic:{
+    query = roll
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run** (pulse **\`trigger\`**): prints **\`pos 7\`**. Without the second **\`playerPos$$(p1, Pos)\`**, **\`Pos\`** would still be **\`0\`** in **\`show/1\`**.
+
+There is **no** **\`refresh/1\`** builtin — refresh is automatic on **re-invocation** of the **\`$\`/\`$$\`** goal for a slot that was just mutated.
+
 ### Example — rule side-effect on \`$\` head
 
 When a rule head ends with **\`$\`**, each successful proof **asserts** the ground head into the component dynamic store (same replacement rules as **\`+\`**).
@@ -22696,8 +22730,10 @@ After **Load & Run**: KB holds **\`turn$(carol)\`** (last player in discovery or
 | Topic | Behaviour |
 |-------|-----------|
 | **KB storage** | **\`$\`**: one fact per **\`pred$/N\`**. **\`$$\`**: one fact per ground key. |
+| **Read after \`commit\` in same query** | Re-invoking the same **\`$\`/\`$$\`** goal **refreshes** bound output args from the updated store (no **\`refresh/1\`** needed). Until you re-read, local variables keep the old binding. |
 | **Query on a stored \`$\` fact** | At most **one** binding (lookup). |
 | **Query through a rule** (e.g. **\`turn$(P) <- player(P)\`**) | Prolog backtracking — **N** solutions possible (up to **\`maxSolutions\`**, default 64). |
+| **Fact read \`$\` / \`$$\`** | **Read-only** — does **not** copy or assert into the dynamic store (side-effects apply only to **rules** with \`$\`/\`$$\` heads). |
 | **Redirect / pout** | Default exposes collected solutions (not automatically “last only”). Use **\`;first\`**, **\`;last\`**, or **\`commit(+ turn$(T))\`** when you want deterministic output. |
 
 **\`maxSolutions\`** caps engine backtracking during collection; it is not a separate pout limit. When truncated, observability flags apply as for any query.
@@ -29953,6 +29989,20 @@ Predicates ending with **\`$\`** or **\`$$\`** (see [inline-logic.md — Unique 
 
 Ops run **in order** inside **\`logic { }\`** and **\`commit(…)\`** — including **\`-\`** and **\`~\`** after **\`+\`**. There is no “last \`+\` only” optimisation.
 
+### Read after \`commit\` in the same query
+
+For **\`$\`** and **\`$$\`** predicates only: if a slot was mutated earlier in the **same query** solve pass, a later call to that slot **re-binds** already-bound output variables from the updated runtime KB (instead of failing unification on the stale value). Local variables are **not** updated implicitly — you must **re-read** the goal:
+
+\`\`\`prolog
+playerPos$$(p1, Pos),          % Pos = 0
+commit(+ playerPos$$(p1, 7)),
+show("old", Pos),              % still 0
+playerPos$$(p1, Pos),          % Pos = 7
+show("new", Pos)
+\`\`\`
+
+No **\`refresh/1\`** builtin — re-invocation of the **\`$\`/\`$$\`** goal is the refresh.
+
 ### Example — sequential \`commit\` on \`$\` slot
 
 \`\`\`logts-play
@@ -34688,13 +34738,13 @@ With an interactive panel: \`comp [key]\` on the instance \`.cpu\` \`set\` pin (
 - Automated tests: \`test_suite_ported.js\` (859–866)
 - Test constants: \`CHIP_ALU4\`, \`BOARD_CPU4\`
 `,
-    'mini-monopoly-interactive.md': `# Mini Monopoly — interactive (keys + show)
+    'mini-monopoly-interactive.md': `# Mini Monopoly — interactive (keys + \`$\`/\`$$\` state)
 
-Hot-seat **two-player** game on one screen: **\`comp [key]\`** buttons drive **\`comp [logic]\`** passes; messages go to the run output via logic **\`show/N\`**. Builds on [mini-monopoly-logic.md](mini-monopoly-logic.md) (9-square board, Community Chest, jail).
+Hot-seat **two-player** game: three **\`comp [key]\`** buttons drive one **\`comp [logic] .game\`**. Game state lives in dynamic **\`$\` / \`$$\`** facts ([inline-logic.md — Unique facts](inline-logic.md#unique-facts--and-keyed-facts-)); mutations use **\`commit(…)\`** inside named queries and rules. Builds on [mini-monopoly-logic.md](mini-monopoly-logic.md).
 
-Prerequisites: [key.md](key.md), [comp-logic.md](comp-logic.md), [logic-builtins.md — show](logic-builtins.md#shown), [interactive-components.md](interactive-components.md).
+Prerequisites: [key.md](key.md), [comp-logic.md](comp-logic.md), [logic-runtime.md](logic-runtime.md), [inline-logic.md](inline-logic.md).
 
-Open the script block in the doc viewer → **Load** → **RUN** → use the panel keys. Output appears in the console / output buffer (same as **\`show()\`** elsewhere).
+Open the script below in the doc viewer → **Load** → **RUN** → use panel keys **1**, **2**, **reset**. With **\`randomSeed: 42\`**, Player 1's first roll is always **4 + 3** → position **7** (**short**, buy **160**).
 
 ---
 
@@ -34702,104 +34752,54 @@ Open the script block in the doc viewer → **Load** → **RUN** → use the pan
 
 | Key | Label | When |
 |-----|-------|------|
-| **1** | \`1\` | **\`waitRoll\`** — roll dice and move · **\`waitChoice\`** — pass turn |
-| **2** | \`2\` | **\`waitChoice\`** — buy offered property |
-| **reset** | \`reset\` | Any time — new game |
+| **1** | \`1\` | **\`phase$(waitRoll)\`** — roll + land · **\`phase$(waitChoice)\`** — pass turn |
+| **2** | \`2\` | **\`phase$(waitChoice)\`** — buy offered property |
+| **reset** | \`reset\` | Any time — **\`initGame()\`** |
 
-Use **\`type: 0\`** (short pulse) on keys so each click is a **\`0→1\`** edge for **\`on: raise\`** logic components.
+Use **\`type: 0\`** on keys (pulse). Logic uses **\`on: 1\`** (level-triggered exec).
 
 ---
 
-## Architecture
+## Architecture (one logic component)
 
-\`\`\`mermaid
-flowchart LR
-  subgraph UI [Panel]
-    K1[key 1]
-    K2[key 2]
-    KR[reset]
-  end
-  subgraph Logic [comp logic on raise]
-    Boot[gameBoot on 1]
-    Key1[gameKey1 queries]
-    Roll[gameDoRoll mutate]
-    Land[gameLand mutate]
-    Buy[gameDoBuy]
-    Pass[gameDoPass]
-    RST[gameReset]
-  end
-  KB[(inline KB + phase)]
-  K1 --> Key1 --> Roll --> Land
-  K2 --> Buy
-  K1 --> Pass
-  KR --> RST
-  Boot --> KB
-  Roll --> KB
-  Land --> KB
+\`\`\`text
+comp [logic] .game  +  inline [logic] .mono
+  phase$ / turn$             — single-valued phase and active player
+  playerPos$$ / playerCash$$ — keyed by p1 | p2
+  owns$$                     — keyed by square index
+  communityDeck/1            — list fact (deck)
+
+Keys (separate exec blocks; guards inside queries):
+  .key1 → handlePassP1|P2  when phase$(waitChoice)
+  .key1 → handleRollP1|P2  when phase$(waitRoll)
+  .key2 → handleBuyP1|P2   when phase$(waitChoice)
+  .resetGame → handleReset
 \`\`\`
 
 | Idea | Detail |
 |------|--------|
-| **\`phase/1\`** | **\`waitRoll\`** · **\`waitChoice\`** · **\`gameOver\`** |
-| **One click → several blocks** | Same key triggers **query** block first (dice + wires), then **mutation** blocks (move, land) — exec blocks run **in source order** |
-| **Exec name = comp name** | **\`.gameKey1:{ … }\`** must live on **\`comp [logic] .gameKey1\`**, not on another comp name |
-| **Avoid query \`top\`** | Reserved — use **\`drawTop\`**, **\`planRoll\`**, etc. |
-| **\`show/N\`** | Inside **query** bodies; runs **after** mutations in the same block, **before** in earlier blocks on the same key |
+| **Boot** | **\`welcomeBoot\`** + **\`bootStep\`** one-shot so keys are not blocked at load |
+| **Land vs buy** | **\`smart_or(landAfterRollP*(), buyLandP*())\`** |
+| **Guards** | Each query starts with **\`phase$(…)\`** + **\`turn$(…)\`** |
+| **Show** | **\`show/N\`** in queries and rules → run output |
+
+Canonical verify copy: **\`node/doc_verify/mini-monopoly-interactive.logts\`**.
 
 ---
 
-## Board (9 squares)
-
-Rent ≈ **half** of purchase price (integer). Values align with the logic tutorial unless noted.
-
-| Idx | Name | Buy | Rent / effect |
-|-----|------|-----|----------------|
-| 0 | go | — | Salary **200** |
-| 1 | park | 100 | 50 |
-| 2 | lake | 120 | 60 |
-| 3 | communityCard | — | Community deck |
-| 4 | tax | — | Pay **75** |
-| 5 | broad | 140 | 70 |
-| 6 | jail | — | Visiting / **\`inJail\`** |
-| 7 | short | 160 | 80 |
-| 8 | board | 200 | 100 |
-
-Start: **1500** each, both at **Go (0)**, **\`turn(p1)\`**.
-
----
-
-## Message cheat sheet (show)
-
-Examples the script prints (wording may join terms with spaces):
+## Demo flow (seed 42)
 
 \`\`\`text
-Game Reset
-Player 1 position 0. Money: 1500
-Player 2 position 0. Money: 1500
-current Player 1. Press 1 to roll dice
-
-Player 1 dice: 4 3
-Player 1 position now: 7
-Player 1 Go collected +200 . Money now: 1700
-
-Player 2 payRent -70 to Player 1 . Money now: 1430
-1 pass turn
-2 buy property short . cost: 160
-
-Player 1 buyProperty short at position 7 cost -160 . Money now: 1540
-
-Player 1 found Community Card: payTax
-Player 1 payTax -75 to community . Money now: 1465
-
-Player 2 broke
-Player 1 won !
+[Load]  → Game Reset, current Player 1
+[key 1] → Player 1 dice: 4 3 · position 7 · buy menu (short / 160)
+[key 1] → pass → Player 2 roll · position 7 · buy menu
+[key 2] → Player 2 buys short
+[key 1] → Player 1 roll …
 \`\`\`
 
 ---
 
-## Full interactive script
-
-Copy or use **Load & Run** on this block. After **RUN**, press **reset** once if you need a clean boot (boot also runs on load).
+## Full script
 
 \`\`\`logts-play
 inline [logic] .mono:
@@ -34821,9 +34821,10 @@ inline [logic] .mono:
     playerLabel(p1, 1)
     playerLabel(p2, 2)
 
-    communityDeck([payTax, go200, goToJail, payTax, go200])
+    otherPlayer(p1, p2)
+    otherPlayer(p2, p1)
 
-    topCard(C) <- communityDeck([C|_])
+    communityDeck([payTax, go200, goToJail, payTax, go200])
 
     roll(D) <- random_between(1, 6, D)
 
@@ -34831,256 +34832,272 @@ inline [logic] .mono:
         Sum is Pos + Steps,
         NewPos is Sum mod 9
 
-    passesGo(Pos, Steps) <-
-        Sum is Pos + Steps,
-        Sum >= 9
-
-    passesGoWires(Old, D1, D2) <-
-        S is D1 + D2,
-        passesGo(Old, S)
-
     salaryIfGo(Pos, Steps, 0) <-
         Sum is Pos + Steps,
         Sum < 9
 
     salaryIfGo(Pos, Steps, G) <-
-        passesGo(Pos, Steps),
+        Sum is Pos + Steps,
+        Sum >= 9,
         goSalary(G)
 
     onCommunity(P) <-
-        playerPos(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, communityCard, _, _)
 
     onTax(P) <-
-        playerPos(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, tax, _, _)
 
     canBuy(P, Idx, Price, Name) <-
-        playerPos(P, Idx),
+        playerPos$$(P, Idx),
         square(Idx, Name, Price, _),
         Price > 0,
-        \\+ owns(_, Idx)
+        \\+ owns$$(Idx, _)
 
-    owesRent(P, Owner, Amount, Name) <-
-        playerPos(P, Idx),
-        square(Idx, Name, _, Amount),
-        owns(Owner, Idx),
+    owesRent(P, Owner, Amount, _) <-
+        playerPos$$(P, Idx),
+        square(Idx, _, _, Amount),
+        owns$$(Idx, Owner),
         Owner =\\= P
 
-    otherPlayer(p1, p2)
-    otherPlayer(p2, p1)
+    rotateDeck(Deck, NewDeck) <-
+        Deck = [H|T],
+        append(T, [H], NewDeck)
 
-    query bootGame:
+    showGoPay(P, OldPos, Steps) <-
+        salaryIfGo(OldPos, Steps, G),
+        G > 0,
+        playerLabel(P, LP),
+        playerCash$$(P, Cash),
+        show("Player", LP, "Go collected +200 . Money now:", Cash)
+
+    showGoPay(_, _, _) <- true
+
+    smart_or(Cond1, _) <- call(Cond1), !
+    smart_or(_, Cond2) <- call(Cond2)
+
+    initGame() <-
+        commit(
+            ~ greeted$(_),
+            ~ phase$(_),
+            ~ turn$(_),
+            ~ playerPos$$(_, _),
+            ~ playerCash$$(_, _),
+            ~ owns$$(_, _),
+            ~ communityDeck(_),
+            + phase$(waitRoll),
+            + turn$(p1),
+            + playerPos$$(p1, 0),
+            + playerPos$$(p2, 0),
+            + playerCash$$(p1, 1500),
+            + playerCash$$(p2, 1500),
+            + communityDeck([payTax, go200, goToJail, payTax, go200]),
+            + greeted$()
+        ),
         show("Game Reset"),
         show("Player 1 position 0. Money:", 1500),
         show("Player 2 position 0. Money:", 1500),
         show("current Player 1. Press 1 to roll dice")
 
-    query rollPlanP1:
-        phase(waitRoll),
-        turn(p1),
-        playerPos(p1, Pos),
-        roll(D1),
-        roll(D2),
-        S is D1 + D2,
-        nextPos(Pos, S, NewPos),
-        playerCash(p1, Cash),
-        salaryIfGo(Pos, S, Bonus),
-        NewCash is Cash + Bonus,
-        show("Player 1 dice:", D1, D2)
-
-    query rollPlanP2:
-        phase(waitRoll),
-        turn(p2),
-        playerPos(p2, Pos),
-        roll(D1),
-        roll(D2),
-        S is D1 + D2,
-        nextPos(Pos, S, NewPos),
-        playerCash(p2, Cash),
-        salaryIfGo(Pos, S, Bonus),
-        NewCash is Cash + Bonus,
-        show("Player 2 dice:", D1, D2)
-
-    query showMoveP1:
-        playerPos(p1, Pos),
-        show("Player 1 position now:", Pos)
-
-    query showMoveP2:
-        playerPos(p2, Pos),
-        show("Player 2 position now:", Pos)
-
-    query showGoP1:
-        playerCash(p1, Cash),
-        passesGo(OldPos, Steps),
-        Steps is D1 + D2,
-        show("Player 1 Go collected +200 . Money now:", Cash)
-
-    query showGoP2:
-        playerCash(p2, Cash),
-        passesGo(OldPos, Steps),
-        Steps is D1 + D2,
-        show("Player 2 Go collected +200 . Money now:", Cash)
-
-    query landTaxPlanP1:
-        phase(landed),
-        turn(p1),
+    landAfterRollP1() <-
         onTax(p1),
-        playerCash(p1, Cash),
+        playerCash$$(p1, Cash),
         taxAmount(T),
-        NC is Cash - T
-
-    query landTaxPlanP2:
-        phase(landed),
-        turn(p2),
-        onTax(p2),
-        playerCash(p2, Cash),
-        taxAmount(T),
-        NC is Cash - T
-
-    query landRentPlanP1:
-        phase(landed),
-        turn(p1),
-        owesRent(p1, p2, Amount, _),
-        playerCash(p1, PC),
-        playerCash(p2, OC),
-        NP is PC - Amount,
-        NO is OC + Amount
-
-    query landRentPlanP2:
-        phase(landed),
-        turn(p2),
-        owesRent(p2, p1, Amount, _),
-        playerCash(p2, PC),
-        playerCash(p1, OC),
-        NP is PC - Amount,
-        NO is OC + Amount
-
-    query landBuyPlanP1:
-        phase(landed),
-        turn(p1),
-        canBuy(p1, Idx, Price, Name)
-
-    query landBuyPlanP2:
-        phase(landed),
-        turn(p2),
-        canBuy(p2, Idx, Price, Name)
-
-    query landCommPlanP1:
-        phase(landed),
-        turn(p1),
-        onCommunity(p1),
-        topCard(payTax),
-        playerCash(p1, Cash),
-        NC is Cash - 50
-
-    query landCommPlanP2:
-        phase(landed),
-        turn(p2),
-        onCommunity(p2),
-        topCard(payTax),
-        playerCash(p2, Cash),
-        NC is Cash - 50
-
-    query landFreePlanP1:
-        phase(landed),
-        turn(p1),
-        \\+ onTax(p1),
-        \\+ onCommunity(p1),
-        \\+ canBuy(p1, _, _, _),
-        \\+ owesRent(p1, _, _, _)
-
-    query landFreePlanP2:
-        phase(landed),
-        turn(p2),
-        \\+ onTax(p2),
-        \\+ onCommunity(p2),
-        \\+ canBuy(p2, _, _, _),
-        \\+ owesRent(p2, _, _, _)
-
-    query showTaxP1:
-        playerCash(p1, Cash),
-        show("Player 1 payTax -75 to community . Money now:", Cash)
-
-    query showTaxP2:
-        playerCash(p2, Cash),
-        show("Player 2 payTax -75 to community . Money now:", Cash)
-
-    query showRentP1:
-        playerCash(p1, Cash),
-        show("Player 1 payRent -", RentAmt, "to Player 2 . Money now:", Cash)
-
-    query showRentP2:
-        playerCash(p2, Cash),
-        show("Player 2 payRent -", RentAmt, "to Player 1 . Money now:", Cash)
-
-    query showCommunityP1:
-        show("Player 1 found Community Card: payTax")
-
-    query showCommunityP2:
-        show("Player 2 found Community Card: payTax")
-
-    query showBuyMenuP1:
-        canBuy(p1, _, Price, Name),
-        show("1 pass turn"),
-        show("2 buy property", Name, ". cost:", Price)
-
-    query showBuyMenuP2:
-        canBuy(p2, _, Price, Name),
-        show("1 pass turn"),
-        show("2 buy property", Name, ". cost:", Price)
-
-    query showBuyDoneP1:
-        playerPos(p1, Idx),
-        square(Idx, Name, Price, _),
-        playerCash(p1, Cash),
-        show("Player 1 buyProperty", Name, "at position", Idx, "cost -", Price, ". Money now:", Cash)
-
-    query showBuyDoneP2:
-        playerPos(p2, Idx),
-        square(Idx, Name, Price, _),
-        playerCash(p2, Cash),
-        show("Player 2 buyProperty", Name, "at position", Idx, "cost -", Price, ". Money now:", Cash)
-
-    query showBrokeP1:
-        playerCash(p1, Cash),
-        Cash < 0,
-        show("Player 1 broke"),
-        show("Player 2 won !")
-
-    query showBrokeP2:
-        playerCash(p2, Cash),
-        Cash < 0,
-        show("Player 2 broke"),
-        show("Player 1 won !")
-
-    query showPromptP1:
-        show("current Player 1. Press 1 to roll dice")
-
-    query showPromptP2:
+        NC is Cash - T,
+        commit(+ playerCash$$(p1, NC), + phase$(waitRoll), + turn$(p2)),
+        show("Player 1 payTax -75 to community . Money now:", NC),
         show("current Player 2. Press 1 to roll dice")
 
-    query canPassP1:
-        phase(waitChoice),
-        turn(p1)
+    landAfterRollP1() <-
+        owesRent(p1, p2, Amount, _),
+        playerCash$$(p1, PC),
+        playerCash$$(p2, OC),
+        NP is PC - Amount,
+        NO is OC + Amount,
+        commit(
+            + playerCash$$(p1, NP),
+            + playerCash$$(p2, NO),
+            + phase$(waitRoll),
+            + turn$(p2)
+        ),
+        show("Player 1 payRent -", Amount, "to Player 2 . Money now:", NP),
+        show("current Player 2. Press 1 to roll dice")
 
-    query canPassP2:
-        phase(waitChoice),
-        turn(p2)
+    landAfterRollP1() <-
+        onCommunity(p1),
+        communityDeck(Deck),
+        rotateDeck(Deck, NewDeck),
+        Deck = [payTax|_],
+        playerCash$$(p1, Cash),
+        communityTax(T),
+        NC is Cash - T,
+        commit(
+            + playerCash$$(p1, NC),
+            + communityDeck(NewDeck),
+            + phase$(waitRoll),
+            + turn$(p2)
+        ),
+        show("Player 1 found Community Card: payTax"),
+        show("Player 1 payTax -", T, "to community . Money now:", NC),
+        show("current Player 2. Press 1 to roll dice")
 
-    query canBuyP1:
-        phase(waitChoice),
-        turn(p1),
+    landAfterRollP1() <-
+        playerPos$$(p1, 0),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("current Player 2. Press 1 to roll dice")
+
+    landAfterRollP1() <-
+        playerPos$$(p1, 6),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("current Player 2. Press 1 to roll dice")
+
+    buyLandP1() <-
         canBuy(p1, Idx, Price, Name),
-        playerCash(p1, Cash),
-        NC is Cash - Price
+        commit(+ phase$(waitChoice)),
+        show("1 pass turn"),
+        show("2 buy property", Name, ". cost:", Price)
 
-    query canBuyP2:
-        phase(waitChoice),
-        turn(p2),
+    landAfterRollP2() <-
+        onTax(p2),
+        playerCash$$(p2, Cash),
+        taxAmount(T),
+        NC is Cash - T,
+        commit(+ playerCash$$(p2, NC), + phase$(waitRoll), + turn$(p1)),
+        show("Player 2 payTax -75 to community . Money now:", NC),
+        show("current Player 1. Press 1 to roll dice")
+
+    landAfterRollP2() <-
+        owesRent(p2, p1, Amount, _),
+        playerCash$$(p2, PC),
+        playerCash$$(p1, OC),
+        NP is PC - Amount,
+        NO is OC + Amount,
+        commit(
+            + playerCash$$(p2, NP),
+            + playerCash$$(p1, NO),
+            + phase$(waitRoll),
+            + turn$(p1)
+        ),
+        show("Player 2 payRent -", Amount, "to Player 1 . Money now:", NP),
+        show("current Player 1. Press 1 to roll dice")
+
+    landAfterRollP2() <-
+        onCommunity(p2),
+        communityDeck(Deck),
+        rotateDeck(Deck, NewDeck),
+        Deck = [payTax|_],
+        playerCash$$(p2, Cash),
+        communityTax(T),
+        NC is Cash - T,
+        commit(
+            + playerCash$$(p2, NC),
+            + communityDeck(NewDeck),
+            + phase$(waitRoll),
+            + turn$(p1)
+        ),
+        show("Player 2 found Community Card: payTax"),
+        show("Player 2 payTax -", T, "to community . Money now:", NC),
+        show("current Player 1. Press 1 to roll dice")
+
+    landAfterRollP2() <-
+        playerPos$$(p2, 0),
+        commit(+ phase$(waitRoll), + turn$(p1)),
+        show("current Player 1. Press 1 to roll dice")
+
+    landAfterRollP2() <-
+        playerPos$$(p2, 6),
+        commit(+ phase$(waitRoll), + turn$(p1)),
+        show("current Player 1. Press 1 to roll dice")
+
+    buyLandP2() <-
         canBuy(p2, Idx, Price, Name),
-        playerCash(p2, Cash),
-        NC is Cash - Price
+        commit(+ phase$(waitChoice)),
+        show("1 pass turn"),
+        show("2 buy property", Name, ". cost:", Price)
+
+    query welcomeBoot:
+        \\+ greeted$(),
+        initGame()
+
+    query handleReset:
+        initGame()
+
+    query handlePassP1:
+        phase$(waitChoice),
+        turn$(p1),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handlePassP2:
+        phase$(waitChoice),
+        turn$(p2),
+        commit(+ phase$(waitRoll), + turn$(p1)),
+        show("current Player 1. Press 1 to roll dice")
+
+    query handleRollP1:
+        phase$(waitRoll),
+        turn$(p1),
+        playerPos$$(p1, Pos),
+        playerCash$$(p1, Cash),
+        roll(D1),
+        roll(D2),
+        S is D1 + D2,
+        nextPos(Pos, S, NewPos),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
+        commit(+ playerPos$$(p1, NewPos), + playerCash$$(p1, NewCash)),
+        show("Player 1 dice:", D1, D2),
+        show("Player 1 position now:", NewPos),
+        showGoPay(p1, Pos, S),
+        smart_or(landAfterRollP1(), buyLandP1())
+
+    query handleRollP2:
+        phase$(waitRoll),
+        turn$(p2),
+        playerPos$$(p2, Pos),
+        playerCash$$(p2, Cash),
+        roll(D1),
+        roll(D2),
+        S is D1 + D2,
+        nextPos(Pos, S, NewPos),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
+        commit(+ playerPos$$(p2, NewPos), + playerCash$$(p2, NewCash)),
+        show("Player 2 dice:", D1, D2),
+        show("Player 2 position now:", NewPos),
+        showGoPay(p2, Pos, S),
+        smart_or(landAfterRollP2(), buyLandP2())
+
+    query handleBuyP1:
+        phase$(waitChoice),
+        turn$(p1),
+        canBuy(p1, Idx, Price, Name),
+        playerCash$$(p1, Cash),
+        NC is Cash - Price,
+        commit(
+            + playerCash$$(p1, NC),
+            + owns$$(Idx, p1),
+            + phase$(waitRoll),
+            + turn$(p2)
+        ),
+        show("Player 1 buyProperty", Name, "at position", Idx, "cost -", Price, ". Money now:", NC),
+        show("current Player 2. Press 1 to roll dice")
+
+    query handleBuyP2:
+        phase$(waitChoice),
+        turn$(p2),
+        canBuy(p2, Idx, Price, Name),
+        playerCash$$(p2, Cash),
+        NC is Cash - Price,
+        commit(
+            + playerCash$$(p2, NC),
+            + owns$$(Idx, p2),
+            + phase$(waitRoll),
+            + turn$(p1)
+        ),
+        show("Player 2 buyProperty", Name, "at position", Idx, "cost -", Price, ". Money now:", NC),
+        show("current Player 1. Press 1 to roll dice")
 
 :
 
@@ -35096,599 +35113,60 @@ comp [key] .key2:
     nl
     :
 
-comp [key] .keyReset:
+comp [key] .resetGame:
     label: 'reset'
     type: 0
     nl
     :
 
-comp [logic] .gameBoot:
+comp [logic] .game:
     on: 1
-    .mono { }
-:
-
-comp [logic] .gameReset:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameKey1:
-    on: raise
     randomSeed: 42
     .mono { }
 :
 
-comp [logic] .gameRollP1:
-    on: raise
-    .mono {
-        OldPos is number oldPosW
-        D1 is number d1W
-        D2 is number d2W
-        RentAmt is number rentW
-    }
-:
-
-comp [logic] .gameRollP2:
-    on: raise
-    .mono {
-        OldPos is number oldPosW
-        D1 is number d1W
-        D2 is number d2W
-        RentAmt is number rentW
-    }
-:
-
-comp [logic] .gameLandPlan:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandTaxP1:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandTaxP2:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandRentP1:
-    on: raise
-    .mono {
-        PayerOld is number oldCashW
-        PayerNew is number newCashW
-        OwnerOld is number ownerOldW
-        OwnerNew is number ownerNewW
-        RentAmt is number rentW
-    }
-:
-
-comp [logic] .gameLandRentP2:
-    on: raise
-    .mono {
-        PayerOld is number oldCashW
-        PayerNew is number newCashW
-        OwnerOld is number ownerOldW
-        OwnerNew is number ownerNewW
-        RentAmt is number rentW
-    }
-:
-
-comp [logic] .gameLandBuyP1:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandBuyP2:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandCommP1:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandCommP2:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandFreeP1:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameLandFreeP2:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gamePassP1:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gamePassP2:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameKey2:
-    on: raise
-    .mono { }
-:
-
-comp [logic] .gameBuyP1:
-    on: raise
-    .mono {
-        BuyIdx is number idxW
-        BuyPrice is number priceW
-        OldCash is number oldCashW
-        NewCash is number newCashW
-    }
-:
-
-comp [logic] .gameBuyP2:
-    on: raise
-    .mono {
-        BuyIdx is number idxW
-        BuyPrice is number priceW
-        OldCash is number oldCashW
-        NewCash is number newCashW
-    }
-:
-
-1wire rollP1 = 0
-1wire rollP2 = 0
-1wire landPending = 0
-1wire landTaxP1 = 0
-1wire landTaxP2 = 0
-1wire landRentP1 = 0
-1wire landRentP2 = 0
-1wire landBuyP1 = 0
-1wire landBuyP2 = 0
-1wire landCommP1 = 0
-1wire landCommP2 = 0
-1wire landFreeP1 = 0
-1wire landFreeP2 = 0
-1wire passP1 = 0
-1wire passP2 = 0
-1wire buyP1 = 0
-1wire buyP2 = 0
-16wire oldPosW := 0
-16wire newPosW := 0
-16wire oldCashW := 0
-16wire newCashW := 0
-16wire d1W := 0
-16wire d2W := 0
-16wire rentW := 0
-16wire idxW := 0
-16wire priceW := 0
-16wire ownerOldW := 0
-16wire ownerNewW := 0
 1wire failed = 0
+1wire bootStep = 1
 
-1wire rollStep = .key1
-1wire passStep = .key1
-1wire buyStep = .key2
-1wire resetStep = .keyReset
+.game:{
+    query = welcomeBoot
+    set = bootStep
+}
 
-.gameBoot:{
-    logic {
-        - phase(waitRoll)
-        - phase(waitChoice)
-        - phase(landed)
-        - phase(gameOver)
-        - turn(p1)
-        - turn(p2)
-        - playerPos(p1, 0)
-        - playerPos(p2, 0)
-        - playerCash(p1, 1500)
-        - playerCash(p2, 1500)
-        - inJail(p1)
-        - inJail(p2)
-        - communityDeck([payTax, go200, goToJail, payTax, go200])
-        + phase(waitRoll)
-        + turn(p1)
-        + playerPos(p1, 0)
-        + playerPos(p2, 0)
-        + playerCash(p1, 1500)
-        + playerCash(p2, 1500)
-        + communityDeck([payTax, go200, goToJail, payTax, go200])
-    }
-    query = bootGame
-    mutationFailed >= failed
+.game:{
+    bootStep = 0
     set = 1
 }
 
-.gameReset:{
-    logic {
-        - phase(waitRoll)
-        - phase(waitChoice)
-        - phase(landed)
-        - phase(gameOver)
-        - turn(p1)
-        - turn(p2)
-        - playerPos(p1, 0)
-        - playerPos(p2, 0)
-        - playerCash(p1, 1500)
-        - playerCash(p2, 1500)
-        - inJail(p1)
-        - inJail(p2)
-        - communityDeck([payTax, go200, goToJail, payTax, go200])
-        + phase(waitRoll)
-        + turn(p1)
-        + playerPos(p1, 0)
-        + playerPos(p2, 0)
-        + playerCash(p1, 1500)
-        + playerCash(p2, 1500)
-        + communityDeck([payTax, go200, goToJail, payTax, go200])
-    }
-    query = bootGame
+.game:{
+    query = handlePassP1, handlePassP2
     mutationFailed >= failed
-    set = resetStep
+    set = .key1
 }
 
-.gameKey1:{
-    query = rollPlanP1
-    rollPlanP1:0:0 >= oldPosW
-    rollPlanP1:0:3 >= newPosW
-    rollPlanP1:0:1 >= d1W
-    rollPlanP1:0:2 >= d2W
-    rollPlanP1:0:4 >= oldCashW
-    rollPlanP1:0:6 >= newCashW
-    rollPlanP1 >= rollP1
-    set = rollStep
-}
-
-.gameKey1:{
-    query = rollPlanP2
-    rollPlanP2:0:0 >= oldPosW
-    rollPlanP2:0:3 >= newPosW
-    rollPlanP2:0:1 >= d1W
-    rollPlanP2:0:2 >= d2W
-    rollPlanP2:0:4 >= oldCashW
-    rollPlanP2:0:6 >= newCashW
-    rollPlanP2 >= rollP2
-    set = rollStep
-}
-
-.gameKey1:{
-    query = canPassP1, canPassP2
-    canPassP1 >= passP1
-    canPassP2 >= passP2
-    set = passStep
-}
-
-.gameRollP1:{
-    rollP1 = rollP1
-    logic {
-        - phase(waitRoll)
-        + phase(landed)
-        - playerPos(p1, number oldPosW)
-        + playerPos(p1, number newPosW)
-        - playerCash(p1, number oldCashW)
-        + playerCash(p1, number newCashW)
-    }
-    query = showMoveP1, showGoP1, showBrokeP1
+.game:{
+    query = handleRollP1, handleRollP2
     mutationFailed >= failed
-    landPending = rollP1
-    set = rollP1
+    set = .key1
 }
 
-.gameRollP2:{
-    rollP2 = rollP2
-    logic {
-        - phase(waitRoll)
-        + phase(landed)
-        - playerPos(p2, number oldPosW)
-        + playerPos(p2, number newPosW)
-        - playerCash(p2, number oldCashW)
-        + playerCash(p2, number newCashW)
-    }
-    query = showMoveP2, showGoP2, showBrokeP2
+.game:{
+    query = handleBuyP1, handleBuyP2
     mutationFailed >= failed
-    landPending = rollP2
-    set = rollP2
+    set = .key2
 }
 
-.gameLandPlan:{
-    query = landTaxPlanP1, landTaxPlanP2, landRentPlanP1, landRentPlanP2, landBuyPlanP1, landBuyPlanP2, landCommPlanP1, landCommPlanP2, landFreePlanP1, landFreePlanP2
-    landPending = landPending
-    landTaxPlanP1:0:4 >= oldCashW
-    landTaxPlanP1:0:5 >= newCashW
-    landTaxPlanP1 >= landTaxP1
-    landTaxPlanP2:0:4 >= oldCashW
-    landTaxPlanP2:0:5 >= newCashW
-    landTaxPlanP2 >= landTaxP2
-    landRentPlanP1:0:0 >= rentW
-    landRentPlanP1:0:1 >= oldCashW
-    landRentPlanP1:0:2 >= ownerOldW
-    landRentPlanP1:0:3 >= newCashW
-    landRentPlanP1:0:4 >= ownerNewW
-    landRentPlanP1 >= landRentP1
-    landRentPlanP2:0:0 >= rentW
-    landRentPlanP2:0:1 >= oldCashW
-    landRentPlanP2:0:2 >= ownerOldW
-    landRentPlanP2:0:3 >= newCashW
-    landRentPlanP2:0:4 >= ownerNewW
-    landRentPlanP2 >= landRentP2
-    landBuyPlanP1:0:0 >= idxW
-    landBuyPlanP1:0:1 >= priceW
-    landBuyPlanP1 >= landBuyP1
-    landBuyPlanP2:0:0 >= idxW
-    landBuyPlanP2:0:1 >= priceW
-    landBuyPlanP2 >= landBuyP2
-    landCommPlanP1:0:3 >= oldCashW
-    landCommPlanP1:0:4 >= newCashW
-    landCommPlanP1 >= landCommP1
-    landCommPlanP2:0:3 >= oldCashW
-    landCommPlanP2:0:4 >= newCashW
-    landCommPlanP2 >= landCommP2
-    landFreePlanP1 >= landFreeP1
-    landFreePlanP2 >= landFreeP2
-    set = landPending
-}
-
-.gameLandTaxP1:{
-    landTaxP1 = landTaxP1
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - playerCash(p1, number oldCashW)
-        + playerCash(p1, number newCashW)
-        - turn(p1)
-        + turn(p2)
-    }
-    query = showTaxP1, showBrokeP1, showPromptP2
+.game:{
+    query = handleReset
     mutationFailed >= failed
-    set = landTaxP1
+    set = .resetGame
 }
 
-.gameLandTaxP2:{
-    landTaxP2 = landTaxP2
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - playerCash(p2, number oldCashW)
-        + playerCash(p2, number newCashW)
-        - turn(p2)
-        + turn(p1)
-    }
-    query = showTaxP2, showBrokeP2, showPromptP1
-    mutationFailed >= failed
-    set = landTaxP2
-}
-
-.gameLandRentP1:{
-    landRentP1 = landRentP1
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - playerCash(p1, number oldCashW)
-        + playerCash(p1, number newCashW)
-        - playerCash(p2, number ownerOldW)
-        + playerCash(p2, number ownerNewW)
-        - turn(p1)
-        + turn(p2)
-    }
-    query = showRentP1, showBrokeP1, showPromptP2
-    mutationFailed >= failed
-    set = landRentP1
-}
-
-.gameLandRentP2:{
-    landRentP2 = landRentP2
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - playerCash(p2, number oldCashW)
-        + playerCash(p2, number newCashW)
-        - playerCash(p1, number ownerOldW)
-        + playerCash(p1, number ownerNewW)
-        - turn(p2)
-        + turn(p1)
-    }
-    query = showRentP2, showBrokeP2, showPromptP1
-    mutationFailed >= failed
-    set = landRentP2
-}
-
-.gameLandBuyP1:{
-    landBuyP1 = landBuyP1
-    logic {
-        - phase(landed)
-        + phase(waitChoice)
-    }
-    query = showBuyMenuP1
-    mutationFailed >= failed
-    set = landBuyP1
-}
-
-.gameLandBuyP2:{
-    landBuyP2 = landBuyP2
-    logic {
-        - phase(landed)
-        + phase(waitChoice)
-    }
-    query = showBuyMenuP2
-    mutationFailed >= failed
-    set = landBuyP2
-}
-
-.gameLandCommP1:{
-    landCommP1 = landCommP1
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - playerCash(p1, number oldCashW)
-        + playerCash(p1, number newCashW)
-        - communityDeck([payTax, go200, goToJail, payTax, go200])
-        + communityDeck([go200, goToJail, payTax, go200, payTax])
-        - turn(p1)
-        + turn(p2)
-    }
-    query = showCommunityP1, showTaxP1, showBrokeP1, showPromptP2
-    mutationFailed >= failed
-    set = landCommP1
-}
-
-.gameLandCommP2:{
-    landCommP2 = landCommP2
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - playerCash(p2, number oldCashW)
-        + playerCash(p2, number newCashW)
-        - communityDeck([payTax, go200, goToJail, payTax, go200])
-        + communityDeck([go200, goToJail, payTax, go200, payTax])
-        - turn(p2)
-        + turn(p1)
-    }
-    query = showCommunityP2, showTaxP2, showBrokeP2, showPromptP1
-    mutationFailed >= failed
-    set = landCommP2
-}
-
-.gameLandFreeP1:{
-    landFreeP1 = landFreeP1
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - turn(p1)
-        + turn(p2)
-    }
-    query = showPromptP2
-    mutationFailed >= failed
-    set = landFreeP1
-}
-
-.gameLandFreeP2:{
-    landFreeP2 = landFreeP2
-    logic {
-        - phase(landed)
-        + phase(waitRoll)
-        - turn(p2)
-        + turn(p1)
-    }
-    query = showPromptP1
-    mutationFailed >= failed
-    set = landFreeP2
-}
-
-.gamePassP1:{
-    passP1 = passP1
-    logic {
-        - phase(waitChoice)
-        + phase(waitRoll)
-        - turn(p1)
-        + turn(p2)
-    }
-    query = showPromptP2
-    mutationFailed >= failed
-    set = passP1
-}
-
-.gamePassP2:{
-    passP2 = passP2
-    logic {
-        - phase(waitChoice)
-        + phase(waitRoll)
-        - turn(p2)
-        + turn(p1)
-    }
-    query = showPromptP1
-    mutationFailed >= failed
-    set = passP2
-}
-
-.gameKey2:{
-    query = canBuyP1, canBuyP2
-    canBuyP1:0:0 >= idxW
-    canBuyP1:0:1 >= priceW
-    canBuyP1:0:3 >= oldCashW
-    canBuyP1:0:4 >= newCashW
-    canBuyP1 >= buyP1
-    canBuyP2:0:0 >= idxW
-    canBuyP2:0:1 >= priceW
-    canBuyP2:0:3 >= oldCashW
-    canBuyP2:0:4 >= newCashW
-    canBuyP2 >= buyP2
-    set = buyStep
-}
-
-.gameBuyP1:{
-    buyP1 = buyP1
-    logic {
-        - phase(waitChoice)
-        + phase(waitRoll)
-        - playerCash(p1, number oldCashW)
-        + playerCash(p1, number newCashW)
-        + owns(p1, number idxW)
-        - turn(p1)
-        + turn(p2)
-    }
-    query = showBuyDoneP1, showBrokeP1, showPromptP2
-    mutationFailed >= failed
-    set = buyP1
-}
-
-.gameBuyP2:{
-    buyP2 = buyP2
-    logic {
-        - phase(waitChoice)
-        + phase(waitRoll)
-        - playerCash(p2, number oldCashW)
-        + playerCash(p2, number newCashW)
-        + owns(p2, number idxW)
-        - turn(p2)
-        + turn(p1)
-    }
-    query = showBuyDoneP2, showBrokeP2, showPromptP1
-    mutationFailed >= failed
-    set = buyP2
-}
 \`\`\`
 
----
-
-## How to play (manual test)
-
-1. **Load & Run** — boot lines + prompt for Player 1.
-2. Press **1** — dice, move, land effects (Go / rent / tax / community / buy menu).
-3. On buy offer, **1** = pass, **2** = buy (demo wiring uses **\`p1\`** paths in **\`gameDoRoll\`** — extend with **\`turn(P)\`** pins for full **\`p1\`/\`p2\`** symmetry).
-4. Press **reset** anytime.
+**Load & Run**, then pulse keys. Extra checks: \`node _verify_doc_examples.js mini-monopoly-interactive\`.
 
 ---
-
-## Limits (honest)
-
-| Topic | Status in this script |
-|-------|------------------------|
-| **Both players** | KB supports **\`p1\`/\`p2\`**; sample **\`gameDoRoll\`** mutations show **\`p1\`** wiring — extend with **\`P is text turnPin\`** for production |
-| **Jail roll** | **\`planJailRoll\`** + **\`gameDoJail\`** sketched; wire **\`inJail\`** branch like normal roll |
-| **Community rotate** | **\`showCommunity\`** only on **\`payTax\`** path; add **\`gameCommApply\`** comp for **\`go200\`/\`goToJail\`** (see [mini-monopoly-logic.md — Phase F](mini-monopoly-logic.md#phase-f--community-chest-square-3)) |
-| **Automated verify** | Interactive keys are **manual**; boot block is load-checked below |
-
----
-
-## Verify (boot only)
-
-\`\`\`text
-node node/_verify_doc_examples.js mini-monopoly-interactive
-\`\`\`
-
-Checks the script **elaborates** and the **boot** pass runs; full gameplay is tested in the doc viewer with keys.
-
----
-
-## See also
-
-- [mini-monopoly-logic.md](mini-monopoly-logic.md) — static tutorial, Community Chest, jail rules
-- [key.md](key.md) · [comp-logic.md — on: raise](comp-logic.md#on-modes)
-- [logic-builtins.md — show/N](logic-builtins.md#shown)
 `,
     'mini-monopoly-logic.md': `# Mini Monopoly — logic tutorial (board, jail, Go, choices)
 

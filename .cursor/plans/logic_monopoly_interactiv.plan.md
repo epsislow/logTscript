@@ -1,6 +1,6 @@
 ---
 name: inline logic monopoly interactive
-overview: "Mini Monopoly hot-seat — starea în KB dinamic ($/$$), 3 taste, un comp [logic] .game. MVP aproape funcțional; blocate de limite/comportamente mutation + control-flow. Pauză implementare până la clarificare engine (A/B/C)."
+overview: "Mini Monopoly hot-seat — starea în KB dinamic ($/$$), 3 taste, un comp [logic] .game. MVP funcțional după fix-uri F101–F103."
 todos:
   - id: doc-plan-state
     content: Document stare curentă + probleme identificate (acest fișier)
@@ -15,14 +15,14 @@ todos:
     content: "Investigare C: commit în regulă după commit în query — fix F103a fact read side-effect"
     status: completed
   - id: script-workaround-if3
-    content: "Workaround script: if/3 + commit doar în query + chei literale p1/p2 (fără așteptare fix engine)"
-    status: pending
+    content: "Workaround script if/3 — anulat (F101–F103 rezolvă engine)"
+    status: cancelled
   - id: doc-interactive
     content: Rescriere mini-monopoly-interactive.md cu script stabil + arhitectură simplă
-    status: pending
+    status: completed
   - id: verify-interactive
     content: doc_verify mini-monopoly-interactive.js (boot, roll seed 42, pass, buy, reset)
-    status: pending
+    status: completed
 isProject: true
 ---
 
@@ -32,7 +32,7 @@ Document țintă: [mini-monopoly-interactive.md](../v0_3_2/doc/mini-monopoly-int
 Tutorial static: [mini-monopoly-logic.md](../v0_3_2/doc/mini-monopoly-logic.md)  
 Predicat $/$$ (F100): [inline_logic2.plan.md](inline_logic2.plan.md)
 
-**Status:** ⏸ pauză implementare — investigăm probleme engine (secțiunea [Probleme identificate](#probleme-identificate)) înainte de script final + doc.
+**Status:** ✅ MVP funcțional — engine A/B/C (F101–F103) + script/doc/verify livrate.
 
 ---
 
@@ -55,34 +55,32 @@ Predicat $/$$ (F100): [inline_logic2.plan.md](inline_logic2.plan.md)
 
 | Fișier | Rol |
 |--------|-----|
-| `v0_3_2/node/doc_verify/_mono_interactive_scratch.logts` | **WIP** — cea mai recentă versiune script |
-| `v0_3_3/node/doc_verify/_mono_minimal.logts` | Minimal funcțional: roll + buy menu + key pulse |
-| `v0_3_2/doc/mini-monopoly-interactive.md` | Doc **neactualizat** — script vechi multi-comp, nu merge interactiv |
-| `v0_3_2/node/doc_verify/mini-monopoly-interactive.js` | **Lipsă** |
-| `v0_3_2/node/_scratch_mono_test.js` | Test manual pulse key |
+| `v0_3_2/node/doc_verify/mini-monopoly-interactive.logts` | **Script MVP canonic** |
+| `v0_3_2/doc/mini-monopoly-interactive.md` | Doc rescris — arhitectură simplă + embed script |
+| `v0_3_2/node/doc_verify/mini-monopoly-interactive.js` | Verify: boot + seed 42 flow (2/2 OK) |
+| `v0_3_2/node/_gen_mono_doc.js` | Generator doc (evită `$()` în PowerShell) |
+| `v0_3_2/node/doc_verify/_mono_*.logts` | Repro-uri engine (F101–F103) — păstrate pentru regresie |
 
-### Ce merge (confirmat în teste)
+### Ce merge (confirmat)
 
 - **Boot** `welcomeBoot` → `initGame()` — mesaje reset, `greeted$()`, `phase$(waitRoll)`, `turn$(p1)`
 - **Reset** `.resetGame` → `initGame()`
 - **Roll** cu `randomSeed: 42`: p1 de la Go → dice 4+3 → poziția 7
-- **Buy menu** (mesaje corecte `short` / `160`) când `canBuy` + `show` sunt **în query**, nu în `if(Cond, …)` pe `canBuy`
-- **`LOGIC_MAX_QUERY_VARS`** mărit **16 → 32** (`logic-engine.js`) — query-uri roll+land combinate încap
-- **`smart_or`** + reguli `landAfterRollP1` / `buyLandP1` — routing land vs buy OK
-- **`initGame()` / `reset()` în regulă** cu `commit` — funcționează când e singurul lanț de mutație
+- **Buy menu** + **pass** + **buy** — flux complet p1 → p2
+- **Verify** `node _verify_doc_examples.js mini-monopoly-interactive` — **2/2 OK**
 
-### Ce nu merge încă (blockere MVP)
+### Probleme (rezolvate / limitation)
 
-| # | Simptom | Impact joc |
-|---|---------|------------|
-| **P1** | După roll + meniu buy, **`phase$` rămâne `waitRoll`**, nu `waitChoice` | Key1 rerulează zarul; pass/buy nu se activează |
-| **P2** | **`handleBuy` / key2** — fără output | Nu se poate cumpăra |
-| **P3** | **`commit(+ playerPos$$(P, NewPos))`** cu `P` din `turn$(P)` — store neschimbat | **✅ fix F101a** — atom id-only în cheie `$$`; workaround literali încă OK |
-| **P4** | **`if/3`** cu `canBuy` în condiție — `Then` vede `Name`/`Price` nelegate (literal în show) | Nu folosim `canBuy` în condiția `if` |
-| **P5** | **`commit` în regulă** după **`commit` în query** — `phase$(waitChoice)` pierdut | **✅ fix F103a** — fact read `$`/`$$` nu mai face side-effect |
-| **P6** | Load-time: dacă `.key1` e 1 la elaborare, roll automat la Load | Deranjant în viewer; testele clears + reset |
+| # | Simptom | Status |
+|---|---------|--------|
+| **P1** | `phase$` rămâne `waitRoll` după buy menu | **✅ F103a** |
+| **P2** | `handleBuy` / key2 fără output | **✅** cu F103a |
+| **P3** | `commit(+ playerPos$$(P, …))` cu `P` din `turn$(P)` | **✅ F101a** |
+| **P4** | `if/3` + `canBuy` — variabile nelegate în `Then` | **Limitation script** — condiții inline / `smart_or` |
+| **P5** | `commit` regulă după `commit` query — `phase$` pierdut | **✅ F103a** |
+| **P6** | Roll automat la Load dacă key1=1 | **Mitigat** — `bootStep`, keys `type: 0` |
 
-### Arhitectură script țintă (când P1–P5 rezolvate)
+### Arhitectură script (implementată)
 
 ```text
 .game:{ welcomeBoot; set=bootStep }
@@ -275,14 +273,14 @@ Dacă reluăm implementarea înainte de fix C:
 
 ---
 
-## Livrabile (când deblocăm)
+## Livrabile ✅
 
-| Livrabil | Criteriu done |
-|----------|----------------|
-| Script în `mini-monopoly-interactive.md` | Load & Run: reset → roll (42) → buy menu → pass **sau** buy → tur p2 |
-| `mini-monopoly-interactive.js` | cases: boot, roll, waitChoice, pass, buy, reset |
-| Plan actualizat | P1–P5 închise sau documentate ca limitation |
-| (opțional) teste engine | inv-A, inv-B, inv-C în `test_suite.js` |
+| Livrabil | Status |
+|----------|--------|
+| `mini-monopoly-interactive.logts` + doc | Load & Run: reset → roll (42) → buy menu → pass/buy → p2 |
+| `mini-monopoly-interactive.js` | boot + seed 42 flow — **2/2 OK** |
+| Plan actualizat | P1–P5 închise; P4 = limitation script |
+| Teste engine F101–F103 | teste **4535–4546** în `test_suite.js` |
 
 ---
 

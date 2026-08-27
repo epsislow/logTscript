@@ -11,7 +11,7 @@ for (const script of TEST_RUNTIME_SCRIPTS) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, script), 'utf8'), sandbox, { filename: script });
 }
 const session = sandbox.LogTScriptTestSuite.createSession();
-session.run(fs.readFileSync(path.join(__dirname, 'doc_verify/_mono_interactive_scratch.logts'), 'utf8'));
+session.run(fs.readFileSync(path.join(__dirname, 'doc_verify/mini-monopoly-interactive.logts'), 'utf8'));
 (session.out || []).length = 0;
 function pulse(name) {
   const b = (session.out || []).length;
@@ -24,5 +24,3 @@ pulse('.resetGame');
 pulse('.key1');
 pulse('.key1');
 pulse('.key2');
-pulse('.key1');
-pulse('.resetGame');
