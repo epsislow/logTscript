@@ -34911,7 +34911,7 @@ inline [logic] .mono:
         playerPos$$(P, Idx),
         square(Idx, _, _, Amount),
         owns$$(Idx, Owner),
-        Owner =\\= P
+        \\+ Owner = P
 
     ownsHere(P) <-
         playerPos$$(P, Idx),
@@ -34966,7 +34966,7 @@ inline [logic] .mono:
         square(Idx, Name, Price, _),
         Price > 0,
         owns$$(Idx, Owner),
-        Owner =\\= P,
+        \\+ Owner = P,
         playerLabel(Owner, OL),
         show("Player", LP, "position now:", Idx, Name, "(owned by Player", OL, ")")
 

@@ -92,5 +92,25 @@ module.exports = {
         return true;
       },
     },
+    {
+      name: 'pay rent on opponent property',
+      src: LOGTS.replace(
+        '+ turn$(p1),\n            + playerPos$$(p1, 0),\n            + playerPos$$(p2, 0),\n            + playerCash$$(p1, 1500),\n            + playerCash$$(p2, 1500),',
+        () =>
+          '+ turn$(p1),\n            + playerPos$$(p1, 9),\n            + playerPos$$(p2, 0),\n            + playerCash$$(p1, 1500),\n            + playerCash$$(p2, 1500),\n            + owns$$(1, p2),'
+      ),
+      check: (interp, session) => {
+        (session.out || []).length = 0;
+        pulse(session, '.resetGame');
+        const t0 = (session.out || []).length;
+        pulse(session, '.key1');
+        const chunk = sliceOut(session, t0);
+        if (!chunk.includes('park (owned by Player 2')) return false;
+        if (!chunk.includes('Player 1 payRent -')) return false;
+        if (!chunk.includes('current Player 2')) return false;
+        if (interp.getWireEffectiveValue('failed') !== '0') return false;
+        return true;
+      },
+    },
   ],
 };
