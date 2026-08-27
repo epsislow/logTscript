@@ -73,5 +73,24 @@ module.exports = {
         return false;
       },
     },
+    {
+      name: 'own property auto-passes turn',
+      src: LOGTS.replace(
+        '+ turn$(p1),\n            + playerPos$$(p1, 0),\n            + playerPos$$(p2, 0),\n            + playerCash$$(p1, 1500),\n            + playerCash$$(p2, 1500),',
+        () =>
+          '+ turn$(p2),\n            + playerPos$$(p1, 0),\n            + playerPos$$(p2, 6),\n            + playerCash$$(p1, 1500),\n            + playerCash$$(p2, 1500),\n            + owns$$(13, p2),'
+      ),
+      check: (interp, session) => {
+        (session.out || []).length = 0;
+        pulse(session, '.resetGame');
+        const t0 = (session.out || []).length;
+        pulse(session, '.key1');
+        const chunk = sliceOut(session, t0);
+        if (!chunk.includes('Player 2 position now: 13 market (owned by you)')) return false;
+        if (!chunk.includes('current Player 1. Press 1 to roll dice')) return false;
+        if (interp.getWireEffectiveValue('failed') !== '0') return false;
+        return true;
+      },
+    },
   ],
 };

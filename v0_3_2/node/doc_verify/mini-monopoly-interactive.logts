@@ -70,6 +70,10 @@ inline [logic] .mono:
         owns$$(Idx, Owner),
         Owner =\= P
 
+    ownsHere(P) <-
+        playerPos$$(P, Idx),
+        owns$$(Idx, P)
+
     jailIdx(Idx) <-
         square(Idx, jail, _, _)
 
@@ -314,6 +318,13 @@ inline [logic] .mono:
         commit(+ phase$(waitRoll), + turn$(p2)),
         show("current Player 2. Press 1 to roll dice")
 
+    query handleLandP1Own:
+        phase$(resolveLand),
+        turn$(p1),
+        ownsHere(p1),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("current Player 2. Press 1 to roll dice")
+
     query handleLandP1Buy:
         phase$(resolveLand),
         turn$(p1),
@@ -420,6 +431,13 @@ inline [logic] .mono:
         commit(+ phase$(waitRoll), + turn$(p1)),
         show("current Player 1. Press 1 to roll dice")
 
+    query handleLandP2Own:
+        phase$(resolveLand),
+        turn$(p2),
+        ownsHere(p2),
+        commit(+ phase$(waitRoll), + turn$(p1)),
+        show("current Player 1. Press 1 to roll dice")
+
     query handleLandP2Buy:
         phase$(resolveLand),
         turn$(p2),
@@ -510,7 +528,7 @@ comp [logic] .game:
 }
 
 .game:{
-    query = handleLandP1Tax, handleLandP1Rent, handleLandP1CommPayA, handleLandP1CommGoA, handleLandP1CommJail, handleLandP1CommPayB, handleLandP1CommGoB, handleLandP1Go, handleLandP1Jail, handleLandP1Buy, handleLandP2Tax, handleLandP2Rent, handleLandP2CommPayA, handleLandP2CommGoA, handleLandP2CommJail, handleLandP2CommPayB, handleLandP2CommGoB, handleLandP2Go, handleLandP2Jail, handleLandP2Buy
+    query = handleLandP1Tax, handleLandP1Rent, handleLandP1CommPayA, handleLandP1CommGoA, handleLandP1CommJail, handleLandP1CommPayB, handleLandP1CommGoB, handleLandP1Go, handleLandP1Jail, handleLandP1Own, handleLandP1Buy, handleLandP2Tax, handleLandP2Rent, handleLandP2CommPayA, handleLandP2CommGoA, handleLandP2CommJail, handleLandP2CommPayB, handleLandP2CommGoB, handleLandP2Go, handleLandP2Jail, handleLandP2Own, handleLandP2Buy
     mutationFailed >= failed
     set = .key1
 }
