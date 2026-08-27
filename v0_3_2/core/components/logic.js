@@ -366,7 +366,8 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (!buildFn || !indexFn) return;
     const buildOpts = this._buildDataOpts(comp);
     const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore, buildOpts);
-    if (comp.indexRebuild === 'delta') {
+    const hasRetractAll = (ops || []).some((o) => o && o.op === 'retract_all');
+    if (comp.indexRebuild === 'delta' && !hasRetractAll) {
       if (!deltaFn || !verifyFn || !comp.factIndex) {
         throw Error(`logic ${comp.name}: fact index delta requires initialized index`);
       }
@@ -787,10 +788,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       const parsed = parseFn(block.raw);
       const expanded = expandFn ? expandFn(parsed, ctx, runtimeClauses, comp.factIndex && comp.factIndex.table) : parsed;
       for (const item of expanded) {
-        ops.push({
-          op: item.op,
-          head: this._resolveMutationTerm(item.head, ctx, compName),
-        });
+        if (item.op === 'retract_all') {
+          ops.push({ op: 'retract_all', template: item.template });
+        } else {
+          ops.push({
+            op: item.op,
+            head: this._resolveMutationTerm(item.head, ctx, compName),
+          });
+        }
       }
     }
     return ops;
@@ -862,7 +867,20 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     };
 
     for (const op of ops) {
-      if (!op || !op.head || !logicTermIsGround(op.head)) {
+      if (!op) {
+        comp.mutationFailed = 1;
+        emitTry();
+        return;
+      }
+      if (op.op === 'retract_all') {
+        if (!op.template) {
+          comp.mutationFailed = 1;
+          emitTry();
+          return;
+        }
+        continue;
+      }
+      if (!op.head || !logicTermIsGround(op.head)) {
         comp.mutationFailed = 1;
         emitTry();
         const bad = op && op.head ? formatOpFn(op) : '?';
@@ -881,7 +899,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const buildOpts = this._buildDataOpts(comp);
     const constraints = (merged && merged.constraints) || [];
     if (constraints.length && simFn && buildFn && validateFactsFn && deltaFn) {
-      const proposedStore = simFn(comp.dynamicStore, ops, buildOpts);
+      const proposedStore = simFn(comp.dynamicStore, ops, { ...buildOpts, staticClauses: merged.clauses });
       if (!proposedStore) {
         comp.mutationFailed = 1;
         const msg = 'simulate store failed';
@@ -913,8 +931,33 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       }
     }
 
-    const net = netFn ? netFn(comp.dynamicStore, ops, buildOpts) : ops.length;
-    const result = applyFn(comp.dynamicStore, ops, buildOpts);
+    const net = netFn ? netFn(comp.dynamicStore, ops, { ...buildOpts, staticClauses: merged.clauses }) : ops.length;
+    const stepFn = typeof logicApplyMutationOpStep === 'function'
+      ? logicApplyMutationOpStep : null;
+    const table = comp.factIndex && comp.factIndex.table;
+    if (stepFn) {
+      for (const op of ops) {
+        const result = stepFn(comp.dynamicStore, merged.clauses, op, {
+          ...buildOpts,
+          staticClauses: merged.clauses,
+        }, table);
+        if (!result || !result.success) {
+          comp.mutationFailed = 1;
+          const msg = 'apply transaction failed';
+          if (rollbackFmtFn) {
+            this._traceLogicMut(ctx, compName, rollbackFmtFn({ ok: false, code: 'store', message: msg }), null);
+          } else {
+            this._traceLogicMut(ctx, compName, `rollback — store: ${msg}`, null);
+          }
+          return;
+        }
+      }
+      this._updateFactIndexAfterCommit(comp, merged, ops);
+      comp.mutationFailed = 0;
+      this._traceLogicMut(ctx, compName, `commit (${ops.length} ops, ${net} net)`, null);
+      return;
+    }
+    const result = applyFn(comp.dynamicStore, ops, { ...buildOpts, staticClauses: merged.clauses });
     if (result && result.success) {
       this._updateFactIndexAfterCommit(comp, merged, ops);
       comp.mutationFailed = 0;
@@ -997,6 +1040,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           execOpts,
           ops: execOps,
           atomic,
+          table,
         });
         if (!result || !result.ok) {
           comp.mutationFailed = 1;

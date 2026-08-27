@@ -153,6 +153,24 @@ function logicIsAtomName(name) {
   return ch >= 'a' && ch <= 'z';
 }
 
+function logicPredicateUniqueKind(name) {
+  if (!name || typeof name !== 'string') return null;
+  if (name.endsWith('$$')) return 'keyed';
+  if (name.endsWith('$')) return 'single';
+  return null;
+}
+
+function logicValidatePredicateName(name, line) {
+  if (!name) return;
+  const kind = logicPredicateUniqueKind(name);
+  if (!kind) return;
+  const base = kind === 'keyed' ? name.slice(0, -2) : name.slice(0, -1);
+  if (!base.length) logicError(`predicate '${name}' must have a name before $ suffix`, line);
+  if (!logicIsAtomName(base)) {
+    logicError(`predicate '${name}' must start with a lowercase letter`, line);
+  }
+}
+
 function logicTokenize(src) {
   const tokens = [];
   let line = 1;
@@ -271,6 +289,18 @@ function logicTokenize(src) {
     if (/[A-Za-z_]/.test(ch)) {
       let id = '';
       while (i < src.length && /[A-Za-z0-9_]/.test(src[i])) id += src[i++];
+      if (logicIsAtomName(id)) {
+        if (i + 1 < src.length && src[i] === '$' && src[i + 1] === '$') {
+          id += '$$';
+          i += 2;
+        } else if (i < src.length && src[i] === '$') {
+          id += '$';
+          i += 1;
+        }
+        if (i < src.length && src[i] === '$') {
+          logicError(`invalid predicate suffix in '${id}$'`, startLine);
+        }
+      }
       if (LOGIC_KEYWORDS.has(id)) tokens.push({ type: 'KW', value: id, line: startLine });
       else tokens.push({ type: 'ID', value: id, line: startLine });
       continue;
@@ -363,6 +393,7 @@ class LogicParser {
   parseClause() {
     const line = this.peek().line;
     let predicate = this.expect('ID').value;
+    logicValidatePredicateName(predicate, line);
     if (predicate === LOGIC_MUTATION_COMMIT_PRED) {
       logicError('commit is reserved for atomic mutation transactions', line);
     }
@@ -585,6 +616,7 @@ class LogicParser {
   parseCompound() {
     const startLine = this.peek().line;
     let predicate = this.expect('ID').value;
+    logicValidatePredicateName(predicate, startLine);
     while (this.at('DOT')) {
       this.advance();
       if (!this.at('ID')) {
@@ -865,7 +897,9 @@ class LogicParser {
   }
 
   parseMutationCompound() {
+    const startLine = this.peek().line;
     let predicate = this.expect('ID').value;
+    logicValidatePredicateName(predicate, startLine);
     while (this.at('DOT')) {
       this.advance();
       if (!this.at('ID')) {
@@ -931,7 +965,9 @@ class LogicParser {
   }
 
   parseMutationTemplateHead() {
+    const startLine = this.peek().line;
     let predicate = this.expect('ID').value;
+    logicValidatePredicateName(predicate, startLine);
     while (this.at('DOT')) {
       this.advance();
       if (!this.at('ID')) {
@@ -1878,10 +1914,13 @@ function logicResolveMerged(inlineInst, inlineInstances) {
 
   const root = expandModule(inlineInst.name, [inlineInst.name]);
 
+  const normalizeFn = typeof logicNormalizeUniqueClauses === 'function'
+    ? logicNormalizeUniqueClauses : null;
+
   return {
     uses: inlineInst.uses || [],
     queries: inlineInst.queries || [],
-    clauses: root.clauses,
+    clauses: normalizeFn ? normalizeFn(root.clauses) : root.clauses,
     constraints: root.constraints,
   };
 }

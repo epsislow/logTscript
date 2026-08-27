@@ -20713,6 +20713,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
 | **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`append/2\`**, **\`string_to_list/2\`**, **\`string_to_codes/2\`**, **\`atom_chars/2\`**, **\`atom_codes/2\`**, **\`between/3\`**, **\`lazy_list/2\`**, **\`lazy_list_materialize/1\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`** — [logic-builtins.md](logic-builtins.md) |
+| **Unique / keyed** | **\`pred$\`** single-valued · **\`pred$$\`** keyed by arg0 — [Unique facts (\`$\`) / (\`$$\`)](#unique-facts--and-keyed-facts-) |
 | **Random builtins** | **\`random_between/3\`**, **\`set_random/1\`** — [logic-builtins.md](logic-builtins.md#random_between3-and-set_random1) |
 | **Value kinds** | **\`atom\`**, **\`number\`**, **\`list\`**, **\`compound\`**; type tests **\`atom/1\`** … **\`compound/1\`** — [logic-value-types.md](logic-value-types.md) |
 | **Constraints** | \`constraint Head <= Body\` — see [logic-constraints.md](logic-constraints.md) |
@@ -22578,6 +22579,179 @@ show(ok)
 \`\`\`
 
 Both modules merge once each — no error. Plain **\`use\`** on both sides would fail at elaboration.
+
+---
+
+## Unique facts (\`$\`) and keyed facts (\`$$\`)
+
+Predicate names may end with **\`$\`** (single-valued) or **\`$$\`** (keyed). The suffix is part of the atom name — **\`pos\`**, **\`pos$\`**, and **\`pos$$\`** are three different predicates.
+
+| Form | Semantics |
+|------|-----------|
+| **\`name$\`** | At most **one** ground fact per **\`name$/N\`** (any arity **N**). A new fact **replaces** the previous one in the same slot, regardless of argument values. |
+| **\`name$$\`** | First argument is a **ground key** (atom, number, float, or ground compound). One fact per key; re-assert overwrites payload (remaining args). |
+
+Static facts, **\`use\`** merge, and mutations all follow **last wins** for the same slot or key. Multiple **\`$\`** arities are independent slots (e.g. **\`pos$/1\`** and **\`pos$/3\`** may coexist).
+
+### Example — static collapse (\`$\`)
+
+\`\`\`logts-play
+inline [logic] .pos:
+
+    pos$(10)
+    pos$(22)
+    pos$(35)
+
+    query current:
+        pos$(35)
+
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+:
+
+.posLogic:{
+    current >= ok
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`** — effective KB holds **\`pos$(35)\`** only (last static fact wins).
+
+### Example — keyed facts (\`$$\`)
+
+\`\`\`logts-play
+inline [logic] .scores:
+
+    score$$(alice, 10)
+    score$$(bob, 20)
+    score$$(alice, 30)
+
+    query aliceScore:
+        score$$(alice, 30)
+
+:
+
+1wire okAlice = 0
+1wire trigger = 1
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+:
+
+.scoreLogic:{
+    aliceScore >= okAlice
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`okAlice = 1\`** — alice’s score is **30**; **\`score$$(bob, 20)\`** remains.
+
+### Example — rule side-effect on \`$\` head
+
+When a rule head ends with **\`$\`**, each successful proof **asserts** the ground head into the component dynamic store (same replacement rules as **\`+\`**).
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    player(alice)
+    player(bob)
+    player(carol)
+
+    turn$(P) <- player(P)
+
+    query pick:
+        turn$(T)
+
+    query hasCarol:
+        turn$(carol)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.gameLogic:{
+    query = pick, hasCarol
+    hasCarol >= ok
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: KB holds **\`turn$(carol)\`** (last player in discovery order). Query **\`pick\`** may yield three solutions for **\`T\`**, but the KB stores only one turn fact.
+
+### Pitfalls — KB vs query solutions
+
+| Topic | Behaviour |
+|-------|-----------|
+| **KB storage** | **\`$\`**: one fact per **\`pred$/N\`**. **\`$$\`**: one fact per ground key. |
+| **Query on a stored \`$\` fact** | At most **one** binding (lookup). |
+| **Query through a rule** (e.g. **\`turn$(P) <- player(P)\`**) | Prolog backtracking — **N** solutions possible (up to **\`maxSolutions\`**, default 64). |
+| **Redirect / pout** | Default exposes collected solutions (not automatically “last only”). Use **\`;first\`**, **\`;last\`**, or **\`commit(+ turn$(T))\`** when you want deterministic output. |
+
+**\`maxSolutions\`** caps engine backtracking during collection; it is not a separate pout limit. When truncated, observability flags apply as for any query.
+
+### Example — deterministic turn via \`commit\`
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    player(alice)
+    player(bob)
+
+    setTurn(T) <- commit(+ turn$(T))
+
+    query applyBob:
+        setTurn(bob)
+
+    query hasBob:
+        turn$(bob)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.gameLogic:{
+    query = applyBob, hasBob
+    hasBob >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+Mutation variables in **\`commit(+ turn$(T))\`** are resolved from the rule environment (**\`T = bob\`**) before the ground check.
+
+### Example — \`.world:query\` reads static \`$\` facts
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    gameEnded$(yes)
+
+:
+
+1wire ok = .world:query({ gameEnded$(X) }, X=text)
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`**. Inline **\`:query\`** remains read-only; it sees static facts including **\`$\`** / **\`$$\`**.
 
 ---
 
@@ -29466,6 +29640,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Effective KB** | Mode-dependent — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
 | **Dynamic overlay** | Per-component store: **adds** (\`+\`) and **tombstones** (\`-\`) — **\`overlay\`** mode |
 | **Mutation syntax** | \`logic { + / - / ~ fact }\` in exec block; **\`commit(…)\`** and bare **\`+\` / \`-\` / \`~\`** in query/rule bodies on **\`comp [logic]\`** |
+| **\`$\` / \`$$\` facts** | Single-valued / keyed replacement on **\`+\`** and rule heads — see [Unique & keyed replacement](#unique--keyed-replacement) |
 | **Prolog mapping** | **\`+\`** ≈ assertz · **\`-\`** ≈ retract (one ground fact) · **\`~ Template\`** ≈ retractall · **\`commit(…)\`** = one atomic batch |
 | **Transaction** | All ops in one \`logic { }\` block **or** one **\`commit(…)\`** — succeed together or roll back |
 | **\`mutationFailed\`** | Pout **\`1\`** if the transaction failed (non-ground fact, etc.) |
@@ -29764,6 +29939,124 @@ inline [logic] .turns:
 \`\`\`
 
 Wire **\`query = resetGame\`** on **\`comp [logic]\`**, or rely on default “run all queries” and redirect **\`hasP1\`**, **\`hasP2\`**, etc.
+
+---
+
+## Unique & keyed replacement
+
+Predicates ending with **\`$\`** or **\`$$\`** (see [inline-logic.md — Unique facts](inline-logic.md#unique-facts--and-keyed-facts-)) use **replacement** instead of accumulation:
+
+| Form | On **\`+\`** / rule head success | On **\`-\`** | On **\`~ Template\`** |
+|------|-------------------------------|------------|---------------------|
+| **\`pred$\`** | Replaces any existing fact on **\`pred$/N\`** | Removes one ground fact | Retracts all facts matching template (wildcard **\`_\`** only in template positions) |
+| **\`pred$$\`** | Replaces fact with same ground **key** (arg0) | Removes one ground fact | Per-key or all-slot retract like normal |
+
+Ops run **in order** inside **\`logic { }\`** and **\`commit(…)\`** — including **\`-\`** and **\`~\`** after **\`+\`**. There is no “last \`+\` only” optimisation.
+
+### Example — sequential \`commit\` on \`$\` slot
+
+\`\`\`logts-play
+inline [logic] .pos:
+
+    resetPos() <- commit(+ pos$(1), + pos$(2), ~ pos$(_))
+
+    query runReset:
+        resetPos()
+
+    query hasPos:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    query = runReset, hasPos
+    hasPos >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 0\`**, **\`ok = 0\`** — slot ends empty (\`~\` runs after the two **\`+\`** ops).
+
+### Example — overlay mutation overwrites \`$\` fact
+
+\`\`\`logts-play
+inline [logic] .pos:
+
+    pos$(1)
+
+    query current:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    logic { + pos$(99) }
+    current >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`failed = 0\`**, **\`ok = 1\`** — static **\`pos$(1)\`** is tombstoned; dynamic **\`pos$(99)\`** is the only active fact.
+
+### Example — wire refs in keyed mutation
+
+\`\`\`logts-play
+inline [logic] .scores:
+
+    query scoreOf:
+        score$$(P, S)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+:
+
+8wire playerPin = 00000001
+8wire scorePin = 00001010
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.scoreLogic:{
+    logic { + score$$(text playerPin, number scorePin) }
+    scoreOf >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+Wire values decode to ground terms before the ground check; **\`$$\`** uses decoded arg0 as the key.
+
+### Ground rules
+
+| Case | Result |
+|------|--------|
+| **\`+\` / \`-\`** with Prolog variable (not bound) | **\`mutationFailed = 1\`**, transaction rolled back |
+| **\`+\` / \`-\`** with bound variable in rule/\`commit\` | OK after dereferencing |
+| **\`~ pred$(K, _)\`** with named **\`K\`** | **0** matches (only **\`_\`** wildcard) |
+| **\`~\`** in template | No wire refs |
 
 ---
 

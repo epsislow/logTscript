@@ -16,6 +16,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Effective KB** | Mode-dependent — see [logic-runtime.md — data modes](logic-runtime.md#data-modes) |
 | **Dynamic overlay** | Per-component store: **adds** (`+`) and **tombstones** (`-`) — **`overlay`** mode |
 | **Mutation syntax** | `logic { + / - / ~ fact }` in exec block; **`commit(…)`** and bare **`+` / `-` / `~`** in query/rule bodies on **`comp [logic]`** |
+| **`$` / `$$` facts** | Single-valued / keyed replacement on **`+`** and rule heads — see [Unique & keyed replacement](#unique--keyed-replacement) |
 | **Prolog mapping** | **`+`** ≈ assertz · **`-`** ≈ retract (one ground fact) · **`~ Template`** ≈ retractall · **`commit(…)`** = one atomic batch |
 | **Transaction** | All ops in one `logic { }` block **or** one **`commit(…)`** — succeed together or roll back |
 | **`mutationFailed`** | Pout **`1`** if the transaction failed (non-ground fact, etc.) |
@@ -314,6 +315,124 @@ inline [logic] .turns:
 ```
 
 Wire **`query = resetGame`** on **`comp [logic]`**, or rely on default “run all queries” and redirect **`hasP1`**, **`hasP2`**, etc.
+
+---
+
+## Unique & keyed replacement
+
+Predicates ending with **`$`** or **`$$`** (see [inline-logic.md — Unique facts](inline-logic.md#unique-facts--and-keyed-facts-)) use **replacement** instead of accumulation:
+
+| Form | On **`+`** / rule head success | On **`-`** | On **`~ Template`** |
+|------|-------------------------------|------------|---------------------|
+| **`pred$`** | Replaces any existing fact on **`pred$/N`** | Removes one ground fact | Retracts all facts matching template (wildcard **`_`** only in template positions) |
+| **`pred$$`** | Replaces fact with same ground **key** (arg0) | Removes one ground fact | Per-key or all-slot retract like normal |
+
+Ops run **in order** inside **`logic { }`** and **`commit(…)`** — including **`-`** and **`~`** after **`+`**. There is no “last `+` only” optimisation.
+
+### Example — sequential `commit` on `$` slot
+
+```logts-play
+inline [logic] .pos:
+
+    resetPos() <- commit(+ pos$(1), + pos$(2), ~ pos$(_))
+
+    query runReset:
+        resetPos()
+
+    query hasPos:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    query = runReset, hasPos
+    hasPos >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 0`**, **`ok = 0`** — slot ends empty (`~` runs after the two **`+`** ops).
+
+### Example — overlay mutation overwrites `$` fact
+
+```logts-play
+inline [logic] .pos:
+
+    pos$(1)
+
+    query current:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    logic { + pos$(99) }
+    current >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+After **Load & Run**: **`failed = 0`**, **`ok = 1`** — static **`pos$(1)`** is tombstoned; dynamic **`pos$(99)`** is the only active fact.
+
+### Example — wire refs in keyed mutation
+
+```logts-play
+inline [logic] .scores:
+
+    query scoreOf:
+        score$$(P, S)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+:
+
+8wire playerPin = 00000001
+8wire scorePin = 00001010
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.scoreLogic:{
+    logic { + score$$(text playerPin, number scorePin) }
+    scoreOf >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+```
+
+Wire values decode to ground terms before the ground check; **`$$`** uses decoded arg0 as the key.
+
+### Ground rules
+
+| Case | Result |
+|------|--------|
+| **`+` / `-`** with Prolog variable (not bound) | **`mutationFailed = 1`**, transaction rolled back |
+| **`+` / `-`** with bound variable in rule/`commit` | OK after dereferencing |
+| **`~ pred$(K, _)`** with named **`K`** | **0** matches (only **`_`** wildcard) |
+| **`~`** in template | No wire refs |
 
 ---
 

@@ -48955,5 +48955,639 @@ comp [logic] .smartOrLogic:
   reg(4483, 'logic', 'F45 smart_or two clauses + ! like if (legacy)', runF45SmartOrCut);
   reg(4484, 'logic', 'F45 smart_or two clauses + ! like if (wave)', runF45SmartOrCut, { propagation: 'wave' });
 
+  function f100Facts(session, ref) {
+    const inst = session.interp.inlineInstances.get(ref);
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    return (merged.clauses || []).filter((c) => !c.body || !c.body.length);
+  }
+
+  function runF100ParseSingle(h) {
+    const prog = parseLogicBody('pos$(10)');
+    h.assert('predicate', prog.clauses[0].head.predicate, 'pos$');
+    h.assert('arg', String(prog.clauses[0].head.args[0].value), '10');
+  }
+
+  reg(4485, 'logic', 'F100 parse pos$ token (legacy)', runF100ParseSingle);
+  reg(4486, 'logic', 'F100 parse pos$ token (wave)', runF100ParseSingle, { propagation: 'wave' });
+
+  function runF100ParseKeyed(h) {
+    const prog = parseLogicBody('position$$(john, 10)');
+    h.assert('predicate', prog.clauses[0].head.predicate, 'position$$');
+    h.assert('key', prog.clauses[0].head.args[0].name, 'john');
+  }
+
+  reg(4487, 'logic', 'F100 parse pos$$ token (legacy)', runF100ParseKeyed);
+  reg(4488, 'logic', 'F100 parse pos$$ token (wave)', runF100ParseKeyed, { propagation: 'wave' });
+
+  function runF100StaticCollapseSingle(h, session) {
+    session.run(`inline [logic] .pos:
+    pos$(10)
+    pos$(22)
+    pos$(35)
+:`);
+    const facts = f100Facts(session, '.pos');
+    h.assert('one fact', String(facts.length), '1');
+    h.assert('last wins', String(facts[0].head.args[0].value), '35');
+  }
+
+  reg(4489, 'logic', 'F100 static collapse pos$ last wins (legacy)', runF100StaticCollapseSingle);
+  reg(4490, 'logic', 'F100 static collapse pos$ last wins (wave)', runF100StaticCollapseSingle, { propagation: 'wave' });
+
+  function runF100StaticCollapseKeyed(h, session) {
+    session.run(`inline [logic] .pos:
+    position$$(j, 10)
+    position$$(m, 20)
+    position$$(j, 30)
+:`);
+    const facts = f100Facts(session, '.pos');
+    h.assert('two keys', String(facts.length), '2');
+    const byKey = {};
+    for (const f of facts) byKey[f.head.args[0].name] = f.head.args[1].value;
+    h.assert('j payload', String(byKey.j), '30');
+    h.assert('m payload', String(byKey.m), '20');
+  }
+
+  reg(4491, 'logic', 'F100 static collapse keyed $$ (legacy)', runF100StaticCollapseKeyed);
+  reg(4492, 'logic', 'F100 static collapse keyed $$ (wave)', runF100StaticCollapseKeyed, { propagation: 'wave' });
+
+  function runF100DistinctPredicates(h, session) {
+    session.run(`inline [logic] .mix:
+    foo(a)
+    foo$(b)
+:`);
+    const facts = f100Facts(session, '.mix');
+    h.assert('two facts', String(facts.length), '2');
+    const preds = facts.map((f) => f.head.predicate).sort();
+    h.assert('foo', preds[0], 'foo');
+    h.assert('foo$', preds[1], 'foo$');
+  }
+
+  reg(4493, 'logic', 'F100 foo vs foo$ distinct (legacy)', runF100DistinctPredicates);
+  reg(4494, 'logic', 'F100 foo vs foo$ distinct (wave)', runF100DistinctPredicates, { propagation: 'wave' });
+
+  reg(4495, 'logic', 'F100 Pos$ parse error (legacy)', function(h) {
+    let err = '';
+    try { parseLogicBody('Pos$(1)'); } catch (e) { err = e.message || String(e); }
+    h.assert('parse error', err.length > 0 ? '1' : '0', '1');
+  });
+  reg(4496, 'logic', 'F100 Pos$ parse error (wave)', function(h) {
+    let err = '';
+    try { parseLogicBody('Pos$(1)'); } catch (e) { err = e.message || String(e); }
+    h.assert('parse error', err.length > 0 ? '1' : '0', '1');
+  }, { propagation: 'wave' });
+
+  function runF100AritySlots(h, session) {
+    session.run(`inline [logic] .pos:
+    pos$(10)
+    pos$(20, 30, 40)
+:`);
+    const facts = f100Facts(session, '.pos');
+    h.assert('two slots', String(facts.length), '2');
+  }
+
+  reg(4497, 'logic', 'F100 pos$/1 and pos$/3 coexist (legacy)', runF100AritySlots);
+  reg(4498, 'logic', 'F100 pos$/1 and pos$/3 coexist (wave)', runF100AritySlots, { propagation: 'wave' });
+
+  function runF100CompoundKey(h, session) {
+    session.run(`inline [logic] .pos:
+    position$$(player(id(1)), 10)
+    position$$(player(id(2)), 20)
+    position$$(player(id(1)), 30)
+:`);
+    const facts = f100Facts(session, '.pos');
+    h.assert('two keys', String(facts.length), '2');
+    const p1 = facts.find((f) => {
+      const k = f.head.args[0];
+      return k.kind === 'compound' && k.predicate === 'player'
+        && k.args[0].kind === 'compound' && k.args[0].args[0].value === 1;
+    });
+    h.assert('p1 found', p1 ? '1' : '0', '1');
+    h.assert('p1 payload', String(p1.head.args[1].value), '30');
+  }
+
+  reg(4499, 'logic', 'F100 compound key $$ replace (legacy)', runF100CompoundKey);
+  reg(4500, 'logic', 'F100 compound key $$ replace (wave)', runF100CompoundKey, { propagation: 'wave' });
+
+  function runF100CommitOverwrite(h, session) {
+    const src = `inline [logic] .pos:
+
+    resetPos() <- commit(+ pos$(10), + pos$(20))
+
+    query runReset:
+        resetPos()
+
+    query hasPos:
+        pos$(20)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    query = runReset, hasPos
+    hasPos >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('pos=20', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4501, 'logic', 'F100 commit overwrite pos$ (legacy)', runF100CommitOverwrite);
+  reg(4502, 'logic', 'F100 commit overwrite pos$ (wave)', runF100CommitOverwrite, { propagation: 'wave' });
+
+  function runF100CommitSequentialTilde(h, session) {
+    const src = `inline [logic] .pos:
+
+    resetPos() <- commit(+ pos$(1), + pos$(2), ~ pos$(_))
+
+    query runReset:
+        resetPos()
+
+    query hasPos:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    query = runReset, hasPos
+    hasPos >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('slot empty', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(4503, 'logic', 'F100 commit + + ~ sequential (legacy)', runF100CommitSequentialTilde);
+  reg(4504, 'logic', 'F100 commit + + ~ sequential (wave)', runF100CommitSequentialTilde, { propagation: 'wave' });
+
+  function runF100LogicBlockOverwrite(h, session) {
+    const src = `inline [logic] .pos:
+
+    pos$(1)
+
+    query current:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    logic { + pos$(99) }
+    current >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('pos=99', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4505, 'logic', 'F100 logic block overwrite pos$ (legacy)', runF100LogicBlockOverwrite);
+  reg(4506, 'logic', 'F100 logic block overwrite pos$ (wave)', runF100LogicBlockOverwrite, { propagation: 'wave' });
+
+  function runF100WireMutationKeyed(h, session) {
+    const src = `inline [logic] .scores:
+
+    query scoreOf:
+        score$$(P, S)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+
+:
+
+8wire playerPin = 00000001
+8wire scorePin = 00001010
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.scoreLogic:{
+    logic { + score$$(text playerPin, number scorePin) }
+    scoreOf >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('score ok', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4507, 'logic', 'F100 wire ref mutation $$ (legacy)', runF100WireMutationKeyed);
+  reg(4508, 'logic', 'F100 wire ref mutation $$ (wave)', runF100WireMutationKeyed, { propagation: 'wave' });
+
+  function runF100NonGroundMutation(h, session) {
+    const src = `inline [logic] .pos:
+
+    query current:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.posLogic:{
+    logic { + pos$(K) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+  }
+
+  reg(4509, 'logic', 'F100 non-ground var mutation fails (legacy)', runF100NonGroundMutation);
+  reg(4510, 'logic', 'F100 non-ground var mutation fails (wave)', runF100NonGroundMutation, { propagation: 'wave' });
+
+  function runF100RetractAllSlot(h, session) {
+    const src = `inline [logic] .scores:
+
+    score$(10)
+    score$(20)
+
+    query hasScore:
+        score$(X)
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+    .scores { }
+
+:
+
+1wire failed = 0
+1wire ok = 1
+1wire trigger = 1
+
+.scoreLogic:{
+    logic { ~ score$(_) }
+    hasScore >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('slot empty', interp.getWireEffectiveValue('ok'), '0');
+  }
+
+  reg(4511, 'logic', 'F100 ~ score$(_) clears slot (legacy)', runF100RetractAllSlot);
+  reg(4512, 'logic', 'F100 ~ score$(_) clears slot (wave)', runF100RetractAllSlot, { propagation: 'wave' });
+
+  function runF100RuleSideEffect(h, session) {
+    const src = `inline [logic] .game:
+
+    player(alice)
+    player(bob)
+    player(carol)
+
+    turn$(P) <- player(P)
+
+    query pick:
+        turn$(T)
+
+    query hasCarol:
+        turn$(carol)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.gameLogic:{
+    query = pick, hasCarol
+    hasCarol >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('last player carol', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4513, 'logic', 'F100 rule turn$(P) side-effect (legacy)', runF100RuleSideEffect);
+  reg(4514, 'logic', 'F100 rule turn$(P) side-effect (wave)', runF100RuleSideEffect, { propagation: 'wave' });
+
+  function runF100RuleCommitSetTurn(h, session) {
+    const src = `inline [logic] .game:
+
+    query hasBob:
+        turn$(bob)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + turn$(bob) }
+    hasBob >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('bob turn', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4515, 'logic', 'F100 turn$ logic block bob (legacy)', runF100RuleCommitSetTurn);
+  reg(4516, 'logic', 'F100 turn$ logic block bob (wave)', runF100RuleCommitSetTurn, { propagation: 'wave' });
+
+  function runF100FactQuerySingle(h, session) {
+    const src = `inline [logic] .game:
+
+    turn$(carol)
+
+    query who:
+        turn$(T)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.gameLogic:{
+    who >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('one solution', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4517, 'logic', 'F100 fact turn$ query single (legacy)', runF100FactQuerySingle);
+  reg(4518, 'logic', 'F100 fact turn$ query single (wave)', runF100FactQuerySingle, { propagation: 'wave' });
+
+  function runF100CountKeyed(h, session) {
+    const src = `inline [logic] .pos:
+
+    position$$(a, 1)
+    position$$(b, 2)
+    position$$(c, 3)
+
+    query numKeys:
+        count(position$$(_, _), 3)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    indexFacts: 1
+    indexRebuild: delta
+    .pos { }
+
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    numKeys >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('count=3', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4519, 'logic', 'F100 count/2 on position$$ (legacy)', runF100CountKeyed);
+  reg(4520, 'logic', 'F100 count/2 on position$$ (wave)', runF100CountKeyed, { propagation: 'wave' });
+
+  function runF100ConstraintPos(h, session) {
+    const src = `inline [logic] .pos:
+
+    constraint pos$(X) <= X >= 0, X =< 100
+
+    query current:
+        pos$(X)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.posLogic:{
+    logic { + pos$(50) }
+    current >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('valid pos', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4521, 'logic', 'F100 constraint on pos$ (legacy)', runF100ConstraintPos);
+  reg(4522, 'logic', 'F100 constraint on pos$ (wave)', runF100ConstraintPos, { propagation: 'wave' });
+
+  function runF100WorldQueryRead(h, session) {
+    const src = `inline [logic] .world:
+
+    gameEnded$(yes)
+
+:
+
+1wire ok = .world:query({ gameEnded$(X) }, X=text)`;
+    const { interp } = session.run(src);
+    h.assert('read static', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4523, 'logic', 'F100 .world:query read gameEnded$ (legacy)', runF100WorldQueryRead);
+  reg(4524, 'logic', 'F100 .world:query read gameEnded$ (wave)', runF100WorldQueryRead, { propagation: 'wave' });
+
+  function runF100GlobalFlag(h, session) {
+    const src = `inline [logic] .flags:
+
+    gameEnded$(no)
+
+    endGame() <- commit(+ gameEnded$(yes))
+
+    query runEnd:
+        endGame()
+
+    query ended:
+        gameEnded$(yes)
+
+:
+
+comp [logic] .flagLogic:
+    on: 1
+    .flags { }
+
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.flagLogic:{
+    query = runEnd, ended
+    ended >= ok
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('ended yes', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4525, 'logic', 'F100 gameEnded$ global flag (legacy)', runF100GlobalFlag);
+  reg(4526, 'logic', 'F100 gameEnded$ global flag (wave)', runF100GlobalFlag, { propagation: 'wave' });
+
+  function runF100QueryKeyedMulti(h, session) {
+    const src = `inline [logic] .pos:
+
+    position$$(a, 1)
+    position$$(b, 2)
+
+    query allPos:
+        position$$(a, V)
+
+    query allPosB:
+        position$$(b, V)
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire okA = 0
+1wire okB = 0
+1wire trigger = 1
+
+.posLogic:{
+    allPos >= okA
+    allPosB >= okB
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('key a', interp.getWireEffectiveValue('okA'), '1');
+    h.assert('key b', interp.getWireEffectiveValue('okB'), '1');
+  }
+
+  reg(4527, 'logic', 'F100 query position$$ N keys (legacy)', runF100QueryKeyedMulti);
+  reg(4528, 'logic', 'F100 query position$$ N keys (wave)', runF100QueryKeyedMulti, { propagation: 'wave' });
+
+  function runF100DcgHead(h) {
+    const prog = parseLogicBody('flag$ --> []');
+    const rule = prog.clauses.find((c) => c.head.predicate === 'flag$');
+    h.assert('found rule', rule ? '1' : '0', '1');
+    h.assert('expanded arity 2', String(rule.head.args.length), '2');
+  }
+
+  reg(4529, 'logic', 'F100 DCG head token$$ parse (legacy)', runF100DcgHead);
+  reg(4530, 'logic', 'F100 DCG head token$$ parse (wave)', runF100DcgHead, { propagation: 'wave' });
+
+  function runF100ConstraintFail(h, session) {
+    const src = `inline [logic] .pos:
+
+    constraint pos$(X) <= X >= 0, X =< 10
+
+:
+
+comp [logic] .posLogic:
+    on: 1
+    .pos { }
+
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.posLogic:{
+    logic { + pos$(99) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+  }
+
+  reg(4531, 'logic', 'F100 constraint fail rollback (legacy)', runF100ConstraintFail);
+  reg(4532, 'logic', 'F100 constraint fail rollback (wave)', runF100ConstraintFail, { propagation: 'wave' });
+
+  function runF100UseMergeNormalize(h) {
+    h.assert('normalize fn', typeof logicNormalizeUniqueClauses === 'function' ? '1' : '0', '1');
+    const clauses = [
+      { head: { kind: 'compound', predicate: 'pos$', args: [{ kind: 'number', value: 1 }] }, body: [] },
+      { head: { kind: 'compound', predicate: 'pos$', args: [{ kind: 'number', value: 5 }] }, body: [] },
+      { head: { kind: 'compound', predicate: 'pos$', args: [{ kind: 'number', value: 9 }] }, body: [] },
+    ];
+    const normalized = logicNormalizeUniqueClauses(clauses);
+    h.assert('one pos$', String(normalized.length), '1');
+    h.assert('last wins', String(normalized[0].head.args[0].value), '9');
+  }
+
+  reg(4533, 'logic', 'F100 normalize unique clauses unit (legacy)', runF100UseMergeNormalize);
+  reg(4534, 'logic', 'F100 normalize unique clauses unit (wave)', runF100UseMergeNormalize, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

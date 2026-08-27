@@ -488,12 +488,16 @@ class LogicEngine {
     return this._solveGoals(nextGoals, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
-  _applyMutationGoal(goal, atomic) {
+  _applyMutationGoal(goal, atomic, env) {
     const rt = this.mutationRuntime;
     if (!rt || typeof rt.applyGoal !== 'function') {
       throw Error('mutation is forbidden in inline :query (use comp [logic])');
     }
-    const denormed = logicDenormGoal(goal, this.table);
+    let denormed = logicDenormGoal(goal, this.table);
+    if (env) {
+      denormed = logicDerefMutationGoal(denormed, env, this.table);
+      if (!denormed) return false;
+    }
     const result = rt.applyGoal(denormed, { atomic });
     if (!result || !result.ok) return false;
     this._mutationDirty = true;
@@ -778,15 +782,15 @@ class LogicEngine {
       return this._solveGoals((g0.goals || []).concat(rest), env, depth + 1, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'mut_add' || g0.kind === 'mut_remove') {
-      if (!this._applyMutationGoal(g0, false)) return false;
+      if (!this._applyMutationGoal(g0, false, env)) return false;
       return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'mut_retract_all') {
-      if (!this._applyMutationGoal(g0, false)) return false;
+      if (!this._applyMutationGoal(g0, false, env)) return false;
       return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'mut_commit') {
-      if (!this._applyMutationGoal(g0, true)) return false;
+      if (!this._applyMutationGoal(g0, true, env)) return false;
       return this._continueAfterMutation(rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call') {
@@ -1165,7 +1169,21 @@ class LogicEngine {
       env.cutDepth = cutParent;
       env.cutCommitted = false;
 
-      const ok = this._solveGoals(newGoals, env, depth + 1, onSuccess, onDepthExceeded);
+      const uniqueHead = renamed.head
+        && renamed.head.kind === 'compound'
+        && logicPredicateUniqueKind(renamed.head.predicate);
+      const bodyOnSuccess = uniqueHead && this.mutationRuntime
+        ? (solEnv) => {
+          const groundHead = logicDerefCompound(renamed.head, solEnv);
+          if (groundHead && logicTermIsGround(groundHead)) {
+            const denormed = logicDenormTerm(groundHead, this.table);
+            this._applyMutationGoal({ kind: 'mut_add', head: denormed }, false, solEnv);
+          }
+          return onSuccess(solEnv);
+        }
+        : onSuccess;
+
+      const ok = this._solveGoals(newGoals, env, depth + 1, bodyOnSuccess, onDepthExceeded);
 
       const cutCommitted = env.cutCommitted;
       env.cutDepth = savedCut;
@@ -4119,6 +4137,77 @@ function logicFactClauseKey(clause) {
   return `${head.predicate}/${arity}\0${args}`;
 }
 
+function logicPredicateUniqueKind(name) {
+  if (!name || typeof name !== 'string') return null;
+  if (name.endsWith('$$')) return 'keyed';
+  if (name.endsWith('$')) return 'single';
+  return null;
+}
+
+function logicUniqueSlotKeyFromHead(head) {
+  if (!head || head.kind !== 'compound') return null;
+  const kind = logicPredicateUniqueKind(head.predicate);
+  if (!kind) return null;
+  const arity = head.arity != null ? head.arity : (head.args || []).length;
+  if (kind === 'single') return `$:${head.predicate}/${arity}`;
+  if (kind === 'keyed') {
+    const k0 = head.args && head.args[0];
+    if (!k0 || !logicTermIsGround(k0)) return null;
+    return `$$:${head.predicate}/${arity}:${logicGroundTermKey(k0)}`;
+  }
+  return null;
+}
+
+function logicNormalizeUniqueClauses(clauses) {
+  const lastIndex = new Map();
+  for (let i = 0; i < (clauses || []).length; i++) {
+    const c = clauses[i];
+    if (c.body && c.body.length) continue;
+    const slot = c.head && c.head.kind === 'compound' ? logicUniqueSlotKeyFromHead(c.head) : null;
+    if (slot) lastIndex.set(slot, i);
+  }
+  const out = [];
+  for (let i = 0; i < (clauses || []).length; i++) {
+    const c = clauses[i];
+    if (c.body && c.body.length) {
+      out.push(c);
+      continue;
+    }
+    const slot = c.head && c.head.kind === 'compound' ? logicUniqueSlotKeyFromHead(c.head) : null;
+    if (slot) {
+      if (lastIndex.get(slot) === i) out.push(c);
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
+function logicClearUniqueSlotInTransaction(slotKey, nextAdds, nextTombs, staticClauses, mode) {
+  if (!slotKey) return;
+  for (const [k, clause] of [...nextAdds.entries()]) {
+    if (logicUniqueSlotKeyFromHead(clause.head) === slotKey) nextAdds.delete(k);
+  }
+  if (mode !== 'seed' && staticClauses && staticClauses.length) {
+    for (const c of staticClauses) {
+      if (c.body && c.body.length) continue;
+      if (!c.head || c.head.kind !== 'compound') continue;
+      if (logicUniqueSlotKeyFromHead(c.head) === slotKey) {
+        nextTombs.add(logicFactClauseKey(c));
+      }
+    }
+  }
+}
+
+function logicFactIndexClearUniqueSlot(factIndex, slotKey) {
+  if (!factIndex || !slotKey) return;
+  const toRemove = [];
+  for (const [fKey, ic] of factIndex.keys.entries()) {
+    if (logicUniqueSlotKeyFromHead(ic.head) === slotKey) toRemove.push(fKey);
+  }
+  for (const fKey of toRemove) logicFactIndexRemove(factIndex, fKey);
+}
+
 function logicTermIsGround(term) {
   if (!term) return true;
   if (term.kind === 'wireRef') return false;
@@ -4176,9 +4265,67 @@ function logicSeedDynamicStore(clauses, store) {
   store.tombstones = new Set();
 }
 
+function logicDerefMutationTerm(term, env, table) {
+  if (!term) return term;
+  const d = logicDeref(term, env);
+  if (d.kind === 'var') {
+    if (d.name === '_') return d;
+    return null;
+  }
+  if (d.kind === 'compound') {
+    const args = (d.args || []).map((a) => logicDerefMutationTerm(a, env, table));
+    if (args.some((a) => a === null)) return null;
+    return {
+      kind: 'compound',
+      predicate: d.predicate,
+      arity: args.length,
+      args,
+    };
+  }
+  if (d.kind === 'list') {
+    if (logicListIsNil(d)) return { kind: 'list', nil: true };
+    const head = logicDerefMutationTerm(d.head, env, table);
+    const tail = logicDerefMutationTerm(d.tail, env, table);
+    if (head === null || tail === null) return null;
+    return { kind: 'list', head, tail };
+  }
+  return d;
+}
+
+function logicDerefMutationGoal(goal, env, table) {
+  if (!goal || !env) return goal;
+  if (goal.kind === 'mut_add' || goal.kind === 'mut_remove') {
+    const head = logicDerefMutationTerm(goal.head, env, table);
+    if (!head || !logicTermIsGround(head)) return null;
+    return { kind: goal.kind, head };
+  }
+  if (goal.kind === 'mut_retract_all') {
+    const template = logicDerefMutationTerm(goal.template, env, table);
+    if (!template) return null;
+    return { kind: goal.kind, template };
+  }
+  if (goal.kind === 'mut_commit') {
+    const ops = [];
+    for (const op of goal.ops || []) {
+      if (op.op === 'retract_all') {
+        const template = logicDerefMutationTerm(op.template, env, table);
+        if (!template) return null;
+        ops.push({ op: 'retract_all', template });
+      } else {
+        const head = logicDerefMutationTerm(op.head, env, table);
+        if (!head || !logicTermIsGround(head)) return null;
+        ops.push({ op: op.op, head });
+      }
+    }
+    return { kind: 'mut_commit', ops };
+  }
+  return goal;
+}
+
 function logicApplyMutationTransaction(store, ops, options) {
   if (!store) return { success: false };
   const mode = (options && options.dataMode) || 'overlay';
+  const staticClauses = (options && options.staticClauses) || [];
   for (const op of ops || []) {
     if (!op || !op.head || !logicTermIsGround(op.head)) return { success: false };
   }
@@ -4188,6 +4335,8 @@ function logicApplyMutationTransaction(store, ops, options) {
     const clause = { head: op.head, body: [] };
     const key = logicFactClauseKey(clause);
     if (op.op === 'add') {
+      const slot = logicUniqueSlotKeyFromHead(op.head);
+      if (slot) logicClearUniqueSlotInTransaction(slot, nextAdds, nextTombs, staticClauses, mode);
       if (mode !== 'seed') nextTombs.delete(key);
       nextAdds.set(key, clause);
     } else if (op.op === 'remove') {
@@ -4210,6 +4359,14 @@ function logicCloneDynamicStore(store) {
 
 function logicSimulateMutationStore(store, ops, options) {
   const sim = logicCloneDynamicStore(store);
+  const stepFn = typeof logicApplyMutationOpStep === 'function' ? logicApplyMutationOpStep : null;
+  if (stepFn) {
+    for (const op of ops || []) {
+      const result = stepFn(sim, (options && options.staticClauses) || [], op, options, options && options.table);
+      if (!result || !result.success) return null;
+    }
+    return sim;
+  }
   const result = logicApplyMutationTransaction(sim, ops, options);
   if (!result || !result.success) return null;
   return sim;
@@ -4217,7 +4374,8 @@ function logicSimulateMutationStore(store, ops, options) {
 
 function logicSimulateCheckTransaction(staticClauses, store, ops, constraints, options) {
   const opts = options || {};
-  const buildOpts = opts.dataMode ? { dataMode: opts.dataMode } : undefined;
+  const buildOpts = { staticClauses };
+  if (opts.dataMode) buildOpts.dataMode = opts.dataMode;
   const proposedStore = logicSimulateMutationStore(store, ops, buildOpts);
   if (!proposedStore) return { pass: 0 };
   const proposedClauses = logicBuildRuntimeClauses(staticClauses, proposedStore, buildOpts);
@@ -4451,9 +4609,10 @@ function logicMutationOpIsNet(store, op, options) {
 function logicCountMutationNetOps(store, ops, options) {
   const sim = logicCloneDynamicStore(store);
   let net = 0;
+  const table = options && options.table;
   for (const op of ops || []) {
     if (logicMutationOpIsNet(sim, op, options)) net++;
-    logicApplyMutationTransaction(sim, [op], options);
+    logicApplyMutationOpStep(sim, (options && options.staticClauses) || [], op, options, table);
   }
   return net;
 }
@@ -4588,6 +4747,8 @@ function logicApplyFactIndexDelta(factIndex, ops) {
     if (op.op === 'remove') {
       logicFactIndexRemove(factIndex, fKey);
     } else if (op.op === 'add') {
+      const slot = logicUniqueSlotKeyFromHead(op.head);
+      if (slot) logicFactIndexClearUniqueSlot(factIndex, slot);
       logicFactIndexAdd(factIndex, clause);
     } else {
       throw Error(`logic fact index delta: unknown op '${op.op}'`);
@@ -5049,16 +5210,26 @@ function logicExpandRetractAllOps(template, runtimeClauses, table) {
 }
 
 function logicExpandMutationItemsToOps(items, ctx, runtimeClauses, table) {
-  let expanded = logicExpandMutationEachOps(items, ctx);
-  const out = [];
-  for (const item of expanded) {
-    if (item.op === 'retract_all') {
-      out.push(...logicExpandRetractAllOps(item.template, runtimeClauses, table));
-    } else {
-      out.push(item);
+  const expanded = logicExpandMutationEachOps(items, ctx);
+  return expanded || [];
+}
+
+function logicApplyMutationOpStep(store, staticClauses, op, options, table) {
+  const buildOpts = options || {};
+  const applyFn = typeof logicApplyMutationTransaction === 'function'
+    ? logicApplyMutationTransaction : null;
+  const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+  if (!applyFn || !buildFn) return { success: false };
+  if (op && op.op === 'retract_all') {
+    const runtimeClauses = buildFn(staticClauses, store, buildOpts);
+    const removes = logicExpandRetractAllOps(op.template, runtimeClauses, table);
+    for (const rem of removes) {
+      const r = applyFn(store, [rem], { ...buildOpts, staticClauses });
+      if (!r || !r.success) return { success: false };
     }
+    return { success: true };
   }
-  return out;
+  return applyFn(store, [op], { ...buildOpts, staticClauses });
 }
 
 function logicExpandMutationGoalToOps(goal, ctx, runtimeClauses, table) {
@@ -5107,6 +5278,7 @@ function logicExecuteMutationOps(params) {
   const execOpts = p.execOpts || {};
   const ops = p.ops || [];
   const atomic = !!p.atomic;
+  const applyOpts = { ...buildOpts, staticClauses, table: p.table };
   const applyFn = typeof logicApplyMutationTransaction === 'function'
     ? logicApplyMutationTransaction : null;
   const simFn = typeof logicSimulateMutationStore === 'function'
@@ -5125,17 +5297,21 @@ function logicExecuteMutationOps(params) {
     if (op.op === 'add' || op.op === 'remove') {
       if (!op.head || !logicTermIsGround(op.head)) return { ok: false, code: 'ground' };
     } else if (op.op === 'retract_all') {
+      if (!op.template) return { ok: false, code: 'expand' };
+    } else {
       return { ok: false, code: 'expand' };
     }
   }
 
   if (atomic) {
     if (simCheckFn && constraints.length) {
-      const check = simCheckFn(staticClauses, store, ops, constraints, { ...buildOpts, execOpts });
+      const check = simCheckFn(staticClauses, store, ops, constraints, { ...applyOpts, execOpts });
       if (!check || !check.pass) return { ok: false, code: 'constraint' };
     }
-    const result = applyFn(store, ops, buildOpts);
-    if (!result || !result.success) return { ok: false, code: 'store' };
+    for (const op of ops) {
+      const result = logicApplyMutationOpStep(store, staticClauses, op, applyOpts, p.table);
+      if (!result || !result.success) return { ok: false, code: 'store' };
+    }
     return {
       ok: true,
       ops,
@@ -5145,18 +5321,20 @@ function logicExecuteMutationOps(params) {
 
   for (const op of ops) {
     const batch = [op];
-    if (constraints.length && simCheckFn) {
-      const check = simCheckFn(staticClauses, store, batch, constraints, { ...buildOpts, execOpts });
-      if (!check || !check.pass) return { ok: false, code: 'constraint' };
-    } else if (constraints.length && simFn && validateFactsFn && deltaFn) {
-      const proposedStore = simFn(store, batch, buildOpts);
-      if (!proposedStore) return { ok: false, code: 'store' };
-      const proposedClauses = buildFn(staticClauses, proposedStore, buildOpts);
-      const deltaFacts = deltaFn(batch);
-      const vResult = validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts);
-      if (!vResult.ok) return { ok: false, code: 'constraint' };
+    if (op && op.op !== 'retract_all') {
+      if (constraints.length && simCheckFn) {
+        const check = simCheckFn(staticClauses, store, batch, constraints, { ...applyOpts, execOpts });
+        if (!check || !check.pass) return { ok: false, code: 'constraint' };
+      } else if (constraints.length && simFn && validateFactsFn && deltaFn) {
+        const proposedStore = simFn(store, batch, applyOpts);
+        if (!proposedStore) return { ok: false, code: 'store' };
+        const proposedClauses = buildFn(staticClauses, proposedStore, buildOpts);
+        const deltaFacts = deltaFn(batch);
+        const vResult = validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts);
+        if (!vResult.ok) return { ok: false, code: 'constraint' };
+      }
     }
-    const result = applyFn(store, batch, buildOpts);
+    const result = logicApplyMutationOpStep(store, staticClauses, op, applyOpts, p.table);
     if (!result || !result.success) return { ok: false, code: 'store' };
   }
   return {
@@ -5493,6 +5671,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicExpandMutationOps = logicExpandMutationOps;
   globalThis.logicExpandRetractAllOps = logicExpandRetractAllOps;
   globalThis.logicExpandMutationGoalToOps = logicExpandMutationGoalToOps;
+  globalThis.logicApplyMutationOpStep = logicApplyMutationOpStep;
   globalThis.logicExpandMutationItemsToOps = logicExpandMutationItemsToOps;
   globalThis.logicExecuteMutationOps = logicExecuteMutationOps;
   globalThis.logicTermMatchesRetractTemplate = logicTermMatchesRetractTemplate;
@@ -5536,6 +5715,9 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicMutationDeltaPlusFacts = logicMutationDeltaPlusFacts;
   globalThis.logicCollectStaticGroundFacts = logicCollectStaticGroundFacts;
   globalThis.logicFactClauseKey = logicFactClauseKey;
+  globalThis.logicPredicateUniqueKind = logicPredicateUniqueKind;
+  globalThis.logicUniqueSlotKeyFromHead = logicUniqueSlotKeyFromHead;
+  globalThis.logicNormalizeUniqueClauses = logicNormalizeUniqueClauses;
   globalThis.logicTermIsGround = logicTermIsGround;
   globalThis.logicTermsEqualGround = logicTermsEqualGround;
   globalThis.logicBindConstraintHead = logicBindConstraintHead;
@@ -5600,6 +5782,9 @@ if (typeof module !== 'undefined' && module.exports) {
     logicMutationDeltaPlusFacts,
     logicCollectStaticGroundFacts,
     logicFactClauseKey,
+    logicPredicateUniqueKind,
+    logicUniqueSlotKeyFromHead,
+    logicNormalizeUniqueClauses,
     logicTermIsGround,
     logicSetRandomSeed,
     logicNormalizeRandomSeed,
