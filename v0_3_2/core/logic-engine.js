@@ -429,6 +429,7 @@ class LogicEngine {
     this._ruleClauses = opts.ruleClauses || null;
     this._factIndexRef = opts.factIndex || null;
     this._mutationDirty = false;
+    this._mutatedUniqueSlots = new Set();
     if (opts.factIndex) {
       const rules = opts.ruleClauses || (clauses || []).filter((c) => c.body && c.body.length);
       for (const c of rules) {
@@ -501,6 +502,10 @@ class LogicEngine {
     const result = rt.applyGoal(denormed, { atomic });
     if (!result || !result.ok) return false;
     this._mutationDirty = true;
+    if (!this._mutatedUniqueSlots) this._mutatedUniqueSlots = new Set();
+    for (const slotKey of logicCollectMutatedSlotsFromMutationGoal(denormed, this.table)) {
+      this._mutatedUniqueSlots.add(slotKey);
+    }
     if (result.factIndex !== undefined) {
       this._reloadFactIndex(result.factIndex, result.ruleClauses || this._ruleClauses);
     } else if (result.runtimeClauses) {
@@ -538,6 +543,7 @@ class LogicEngine {
     let queryDepthExceeded = false;
     const self = this;
     this._solutionCapReached = false;
+    this._mutatedUniqueSlots = new Set();
     this._solveGoals(igGoals, env, 0, (solEnv) => {
       if (self._solutionCapReached) return false;
       const freeVars = logicCollectFreeVarsInGoals(igGoals);
@@ -1143,7 +1149,22 @@ class LogicEngine {
     return any;
   }
 
+  _maybeRefreshUniqueCallGoal(goal, env) {
+    if (!this._mutatedUniqueSlots || !this._mutatedUniqueSlots.size) return;
+    const kind = logicPredicateUniqueKind(goal.predicate);
+    if (!kind) return;
+    const slotKey = logicUniqueSlotKeyFromCallGoal(goal, env, this.table);
+    if (!slotKey || !this._mutatedUniqueSlots.has(slotKey)) return;
+    const args = goal.args || [];
+    const start = kind === 'keyed' ? 1 : 0;
+    for (let i = start; i < args.length; i++) {
+      const a = args[i];
+      if (a && a.kind === 'var' && a.name !== '_') logicUnbindVar(env, a.name);
+    }
+  }
+
   _solveCall(goal, rest, env, depth, onSuccess, onDepthExceeded) {
+    this._maybeRefreshUniqueCallGoal(goal, env);
     const key = logicPredicateKey(goal.predicate, goal.arity);
     const clauses = this.index.get(key) || [];
     let any = false;
@@ -1172,7 +1193,8 @@ class LogicEngine {
       const uniqueHead = renamed.head
         && renamed.head.kind === 'compound'
         && logicPredicateUniqueKind(renamed.head.predicate);
-      const bodyOnSuccess = uniqueHead && this.mutationRuntime
+      const isRuleClause = renamed.body && renamed.body.length > 0;
+      const bodyOnSuccess = uniqueHead && isRuleClause && this.mutationRuntime
         ? (solEnv) => {
           const groundHead = logicDerefCompound(renamed.head, solEnv);
           if (groundHead && logicTermIsGround(groundHead)) {
@@ -3968,7 +3990,7 @@ function logicInferBindType(bitWidth) {
   return 'number';
 }
 
-const LOGIC_MAX_QUERY_VARS = 16;
+const LOGIC_MAX_QUERY_VARS = 32;
 
 function logicValidateQueryVarCount(count, context) {
   if (count < 0 || count > LOGIC_MAX_QUERY_VARS) {
@@ -4111,22 +4133,56 @@ function logicApplyResultPolicy(solutions, policy, freeVars) {
   return list;
 }
 
-function logicGroundTermKey(term) {
+function logicGroundTermKey(term, table) {
   if (!term) return '';
-  if (term.kind === 'atom') return `a:${term.name != null ? term.name : ''}`;
+  if (term.kind === 'atom') {
+    let n = term.name;
+    if (n == null && term.id != null && table) n = table.name(term.id);
+    return `a:${n != null ? n : ''}`;
+  }
   if (term.kind === 'number') return `n:${term.value}`;
   if (term.kind === 'float') return `f:${term.value}`;
   if (term.kind === 'var') return `v:${term.name}`;
   if (term.kind === 'compound') {
-    const args = (term.args || []).map(logicGroundTermKey).join('\1');
+    const args = (term.args || []).map((a) => logicGroundTermKey(a, table)).join('\1');
     const arity = term.arity != null ? term.arity : (term.args || []).length;
     return `c:${term.predicate}/${arity}:${args}`;
   }
   if (term.kind === 'list') {
     if (logicListIsNil(term)) return 'l:[]';
-    return `l:${logicGroundTermKey(term.head)}${'\x01'}${logicGroundTermKey(term.tail)}`;
+    return `l:${logicGroundTermKey(term.head, table)}${'\x01'}${logicGroundTermKey(term.tail, table)}`;
   }
   return '?';
+}
+
+function logicNormalizeMutationTerm(term, table) {
+  if (!term || !table) return term;
+  if (term.kind === 'atom') {
+    if (term.name != null) return term;
+    if (term.id != null) {
+      const name = table.name(term.id);
+      if (name != null) return { kind: 'atom', id: term.id, name };
+    }
+    return term;
+  }
+  if (term.kind === 'compound') {
+    const args = (term.args || []).map((a) => logicNormalizeMutationTerm(a, table));
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      arity: term.arity != null ? term.arity : args.length,
+      args,
+    };
+  }
+  if (term.kind === 'list') {
+    if (logicListIsNil(term)) return { kind: 'list', nil: true };
+    return {
+      kind: 'list',
+      head: logicNormalizeMutationTerm(term.head, table),
+      tail: logicNormalizeMutationTerm(term.tail, table),
+    };
+  }
+  return term;
 }
 
 function logicFactClauseKey(clause) {
@@ -4142,6 +4198,75 @@ function logicPredicateUniqueKind(name) {
   if (name.endsWith('$$')) return 'keyed';
   if (name.endsWith('$')) return 'single';
   return null;
+}
+
+function logicUnbindVar(env, name) {
+  if (!env || !name || name === '_') return;
+  if (!env.bindings.has(name)) return;
+  env.bindings.delete(name);
+  if (env.trail) {
+    for (let i = env.trail.length - 1; i >= 0; i--) {
+      if (env.trail[i] === name) env.trail.splice(i, 1);
+    }
+  }
+}
+
+function logicUniqueSlotKeyFromCallGoal(goal, env, table) {
+  if (!goal || goal.kind !== 'call') return null;
+  const kind = logicPredicateUniqueKind(goal.predicate);
+  if (!kind) return null;
+  const args = (goal.args || []).map((a) => logicDeref(a, env));
+  const compound = {
+    kind: 'compound',
+    predicate: goal.predicate,
+    arity: args.length,
+    args,
+  };
+  const norm = logicNormalizeMutationTerm(compound, table);
+  if (!norm) return null;
+  if (kind === 'keyed') {
+    const k0 = norm.args && norm.args[0];
+    if (!k0 || !logicTermIsGround(k0)) return null;
+  }
+  return logicUniqueSlotKeyFromHead(norm);
+}
+
+function logicUniqueSlotKeyFromRetractTemplate(template, table) {
+  if (!template || template.kind !== 'compound') return null;
+  const kind = logicPredicateUniqueKind(template.predicate);
+  if (!kind) return null;
+  if (kind === 'keyed') {
+    const k0 = template.args && template.args[0];
+    if (!k0 || k0.kind === 'var') return null;
+  }
+  const norm = logicNormalizeMutationTerm(template, table);
+  return logicUniqueSlotKeyFromHead(norm);
+}
+
+function logicCollectMutatedSlotsFromMutationGoal(goal, table) {
+  const out = [];
+  if (!goal) return out;
+  const addHead = (head) => {
+    if (!head) return;
+    const norm = logicNormalizeMutationTerm(head, table);
+    const sk = logicUniqueSlotKeyFromHead(norm);
+    if (sk) out.push(sk);
+  };
+  if (goal.kind === 'mut_add' || goal.kind === 'mut_remove') {
+    addHead(goal.head);
+  } else if (goal.kind === 'mut_commit') {
+    for (const op of goal.ops || []) {
+      if (op.op === 'add' || op.op === 'remove') addHead(op.head);
+      else if (op.op === 'retract_all') {
+        const sk = logicUniqueSlotKeyFromRetractTemplate(op.template, table);
+        if (sk) out.push(sk);
+      }
+    }
+  } else if (goal.kind === 'mut_retract_all') {
+    const sk = logicUniqueSlotKeyFromRetractTemplate(goal.template, table);
+    if (sk) out.push(sk);
+  }
+  return out;
 }
 
 function logicUniqueSlotKeyFromHead(head) {
@@ -4275,21 +4400,21 @@ function logicDerefMutationTerm(term, env, table) {
   if (d.kind === 'compound') {
     const args = (d.args || []).map((a) => logicDerefMutationTerm(a, env, table));
     if (args.some((a) => a === null)) return null;
-    return {
+    return logicNormalizeMutationTerm({
       kind: 'compound',
       predicate: d.predicate,
       arity: args.length,
       args,
-    };
+    }, table);
   }
   if (d.kind === 'list') {
     if (logicListIsNil(d)) return { kind: 'list', nil: true };
     const head = logicDerefMutationTerm(d.head, env, table);
     const tail = logicDerefMutationTerm(d.tail, env, table);
     if (head === null || tail === null) return null;
-    return { kind: 'list', head, tail };
+    return logicNormalizeMutationTerm({ kind: 'list', head, tail }, table);
   }
-  return d;
+  return logicNormalizeMutationTerm(d, table);
 }
 
 function logicDerefMutationGoal(goal, env, table) {

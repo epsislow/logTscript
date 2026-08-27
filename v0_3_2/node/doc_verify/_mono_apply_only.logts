@@ -1,0 +1,36 @@
+inline [logic] .mono:
+
+    square(7, short, 160, 80)
+    phase$(landed)
+    turn$(p1)
+    playerPos$$(p1, 7)
+
+    canBuy(p1, Idx, Price, Name) <-
+        playerPos$$(p1, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \+ owns$$(Idx, _)
+
+    query applyLand:
+        phase$(landed),
+        turn$(p1),
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("1 pass turn"),
+        show("2 buy property", Name, ". cost:", Price)
+
+:
+
+comp [logic] .game:
+    on: 1
+    .mono { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.game:{
+    query = applyLand
+    mutationFailed >= failed
+    set = trigger
+}

@@ -49589,5 +49589,228 @@ comp [logic] .posLogic:
   reg(4533, 'logic', 'F100 normalize unique clauses unit (legacy)', runF100UseMergeNormalize);
   reg(4534, 'logic', 'F100 normalize unique clauses unit (wave)', runF100UseMergeNormalize, { propagation: 'wave' });
 
+  function runF101CommitBoundVarKeyed(h, session) {
+    const src = `inline [logic] .game:
+
+    turn$(p1)
+    playerPos$$(p1, 0)
+
+    query moved:
+        turn$(P),
+        commit(+ playerPos$$(P, 7)),
+        playerPos$$(p1, 7)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire trigger = 0
+
+.gameLogic:{
+    moved >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    session.setWire(interp, 'trigger', '1');
+    h.assert('pos=7', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4535, 'logic', 'F101 commit bound var keyed $$ (legacy)', runF101CommitBoundVarKeyed);
+  reg(4536, 'logic', 'F101 commit bound var keyed $$ (wave)', runF101CommitBoundVarKeyed, { propagation: 'wave' });
+
+  function runF101CommitBoundVarSingle(h, session) {
+    const src = `inline [logic] .game:
+
+    phase$(waitRoll)
+
+    query setWait:
+        phase$(Old),
+        commit(+ phase$(waitChoice)),
+        phase$(waitChoice)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire trigger = 0
+
+.gameLogic:{
+    setWait >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    session.setWire(interp, 'trigger', '1');
+    h.assert('waitChoice', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4537, 'logic', 'F101 commit bound var single $ (legacy)', runF101CommitBoundVarSingle);
+  reg(4538, 'logic', 'F101 commit bound var single $ (wave)', runF101CommitBoundVarSingle, { propagation: 'wave' });
+
+  function runF102ReadAfterCommitSameVar(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0)
+
+    query moved:
+        playerPos$$(p1, Pos),
+        commit(+ playerPos$$(p1, 7)),
+        playerPos$$(p1, Pos),
+        Pos = 7
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire trigger = 0
+
+.gameLogic:{
+    moved >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    session.setWire(interp, 'trigger', '1');
+    h.assert('pos=7', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4539, 'logic', 'F102 read after commit same var $$ (legacy)', runF102ReadAfterCommitSameVar);
+  reg(4540, 'logic', 'F102 read after commit same var $$ (wave)', runF102ReadAfterCommitSameVar, { propagation: 'wave' });
+
+  function runF102ReadAfterCommitBoundKey(h, session) {
+    const src = `inline [logic] .game:
+
+    turn$(p1)
+    playerPos$$(p1, 0)
+
+    query moved:
+        turn$(P),
+        playerPos$$(P, Pos),
+        commit(+ playerPos$$(P, 7)),
+        playerPos$$(P, Pos),
+        Pos = 7
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire trigger = 0
+
+.gameLogic:{
+    moved >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    session.setWire(interp, 'trigger', '1');
+    h.assert('pos=7', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4541, 'logic', 'F102 read after commit bound key $$ (legacy)', runF102ReadAfterCommitBoundKey);
+  reg(4542, 'logic', 'F102 read after commit bound key $$ (wave)', runF102ReadAfterCommitBoundKey, { propagation: 'wave' });
+
+  function runF102StaleUntilReread(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0)
+
+    query stale:
+        playerPos$$(p1, Pos),
+        commit(+ playerPos$$(p1, 7)),
+        Pos = 0
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire trigger = 0
+
+.gameLogic:{
+    stale >= ok
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    session.setWire(interp, 'trigger', '1');
+    h.assert('still 0 until reread', interp.getWireEffectiveValue('ok'), '1');
+  }
+
+  reg(4543, 'logic', 'F102 stale binding until reread (legacy)', runF102StaleUntilReread);
+  reg(4544, 'logic', 'F102 stale binding until reread (wave)', runF102StaleUntilReread, { propagation: 'wave' });
+
+  function runF103FactReadNoSideEffect(h, session) {
+    const src = `inline [logic] .game:
+
+    phase$(waitRoll)
+    playerPos$$(p1, 0)
+    square(7, short, 160, 80)
+
+    canBuy(P, Idx, Price, Name) <-
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \\+ owns$$(Idx, _)
+
+    buyLandP1() <-
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("menu")
+
+    query rollThenBuy:
+        phase$(waitRoll),
+        commit(+ playerPos$$(p1, 7)),
+        buyLandP1(),
+        phase$(waitChoice)
+
+    query readPhase:
+        phase$(waitChoice)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+
+:
+
+1wire ok = 0
+1wire ok2 = 0
+1wire trigger = 0
+
+.gameLogic:{
+    rollThenBuy >= ok
+    readPhase >= ok2
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    session.setWire(interp, 'trigger', '1');
+    h.assert('roll+buy ok', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('phase waitChoice persisted', interp.getWireEffectiveValue('ok2'), '1');
+  }
+
+  reg(4545, 'logic', 'F103 fact read no $ side-effect (legacy)', runF103FactReadNoSideEffect);
+  reg(4546, 'logic', 'F103 fact read no $ side-effect (wave)', runF103FactReadNoSideEffect, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

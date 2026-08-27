@@ -507,7 +507,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           free = [...acc];
         }
         free = free.filter((v) => !inputVars.has(v) || (pinByLogicVar[v] && pinByLogicVar[v].listFlag));
-        const maxVars = typeof LOGIC_MAX_QUERY_VARS === 'number' ? LOGIC_MAX_QUERY_VARS : 16;
+        const maxVars = typeof LOGIC_MAX_QUERY_VARS === 'number' ? LOGIC_MAX_QUERY_VARS : 32;
         if (free.length > maxVars) {
           throw Error(`logic ${name}: query '${q.name}' has ${free.length} output variables (maximum ${maxVars})`);
         }

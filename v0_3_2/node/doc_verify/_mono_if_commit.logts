@@ -1,0 +1,31 @@
+inline [logic] .mono:
+
+    turn$(p1)
+    phase$(waitRoll)
+    playerPos$$(p1, 0)
+    playerCash$$(p1, 1500)
+
+    query testIf:
+        turn$(P),
+        playerPos$$(P, Pos),
+        Pos = 0,
+        NewPos = 7,
+        if(P = p1, commit(+ playerPos$$(p1, NewPos)), commit(+ playerPos$$(p2, NewPos))),
+        playerPos$$(p1, NowPos),
+        show("now", NowPos)
+
+:
+
+comp [logic] .game:
+    on: 1
+    .mono { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.game:{
+    query = testIf
+    mutationFailed >= failed
+    set = trigger
+}

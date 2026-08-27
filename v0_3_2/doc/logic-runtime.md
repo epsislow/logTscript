@@ -329,6 +329,20 @@ Predicates ending with **`$`** or **`$$`** (see [inline-logic.md — Unique fact
 
 Ops run **in order** inside **`logic { }`** and **`commit(…)`** — including **`-`** and **`~`** after **`+`**. There is no “last `+` only” optimisation.
 
+### Read after `commit` in the same query
+
+For **`$`** and **`$$`** predicates only: if a slot was mutated earlier in the **same query** solve pass, a later call to that slot **re-binds** already-bound output variables from the updated runtime KB (instead of failing unification on the stale value). Local variables are **not** updated implicitly — you must **re-read** the goal:
+
+```prolog
+playerPos$$(p1, Pos),          % Pos = 0
+commit(+ playerPos$$(p1, 7)),
+show("old", Pos),              % still 0
+playerPos$$(p1, Pos),          % Pos = 7
+show("new", Pos)
+```
+
+No **`refresh/1`** builtin — re-invocation of the **`$`/`$$`** goal is the refresh.
+
 ### Example — sequential `commit` on `$` slot
 
 ```logts-play

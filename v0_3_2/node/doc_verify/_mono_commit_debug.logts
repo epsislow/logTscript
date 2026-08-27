@@ -1,0 +1,51 @@
+inline [logic] .mono:
+
+    turn$(p1)
+    phase$(waitRoll)
+    playerPos$$(p1, 0)
+    playerCash$$(p1, 1500)
+
+    roll(D) <- random_between(1, 6, D)
+
+    nextPos(Pos, Steps, NewPos) <-
+        Sum is Pos + Steps,
+        NewPos is Sum mod 9
+
+    salaryIfGo(Pos, Steps, 0) <-
+        Sum is Pos + Steps,
+        Sum < 9
+
+    query handleRoll:
+        phase$(waitRoll),
+        turn$(p1),
+        playerPos$$(p1, Pos),
+        playerCash$$(p1, Cash),
+        roll(D1),
+        roll(D2),
+        S is D1 + D2,
+        nextPos(Pos, S, NewPos),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
+        commit(
+            + playerPos$$(p1, NewPos),
+            + playerCash$$(p1, NewCash),
+            + phase$(landed)
+        ),
+        playerPos$$(p1, NowPos),
+        phase$(Ph),
+        show("pos", NowPos, "phase", Ph)
+
+:
+
+comp [logic] .game:
+    on: 1
+    randomSeed: 42
+    .mono { }
+:
+
+1wire trigger = 1
+
+.game:{
+    query = handleRoll
+    set = trigger
+}

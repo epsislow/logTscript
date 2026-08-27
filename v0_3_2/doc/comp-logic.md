@@ -208,7 +208,7 @@ comp [logic] .routeLogic:
 | **1 free** | `johnOwns:count >= numRows` | Solution count (capped at vector length) |
 | **1 free** | `johnOwns;unique:count >= numRows` | Count **after** `;unique` dedupe |
 | **2 free** | `allAges >= table` | **Matrix bulk** — row = solution, col = variable (`32wire[R,C]`) |
-| **N free (1…16)** | `allCarInfos;sel(0,2) >= table` | **Matrix bulk** on **two selected columns** (0-based indices) |
+| **N free (1…32)** | `allCarInfos;sel(0,2) >= table` | **Matrix bulk** on **two selected columns** (0-based indices) |
 | **N free** | `allCarInfos >= table` | **Error** at elaboration when **N > 2** — use **`;sel(i,j)`** |
 | **N free** | `allCarInfos:0 >= rowAll` | **Full row** vector `wire[N]` (all query variables) |
 | **N free** | `allCarInfos;sel(0,2):0 >= pair` | **Projected row** vector `wire[2]` |
@@ -234,7 +234,7 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 
 **Encoding:** atoms → **ASCII + `\0` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or `\0` per cell if undeclared).
 
-**Limits:** up to **16** free variables per query. **Matrix bulk** (`query >= matrix`) packs **two columns** — use **`;sel(i,j)`** when **N > 2**. **Vector bulk** on one column uses **`;sel(i)`** with a vector wire. At **N = 2**, matrix columns **0** and **1** are implicit (same as **`;sel(0,1)`**).
+**Limits:** up to **32** free variables per query. **Matrix bulk** (`query >= matrix`) packs **two columns** — use **`;sel(i,j)`** when **N > 2**. **Vector bulk** on one column uses **`;sel(i)`** with a vector wire. At **N = 2**, matrix columns **0** and **1** are implicit (same as **`;sel(0,1)`**).
 
 ### Column select (`;sel(i)` and `;sel(i,j)`)
 

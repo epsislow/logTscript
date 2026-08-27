@@ -88,7 +88,9 @@ isProject: false
 | Fază | Decizii | Status |
 | ---- | ------- | ------ |
 | *(rezervat)* | — | — |
-| **Faza 100** Predicate **`$`** / **`$$`** unique & keyed (**3+a** promovat) | **D1000–D1017✅** | **(ready-to-implement)** |
+| **Faza 101** Commit bound vars în `$`/`$$` (**post-F100 bugfix**) | **F101a ✅** | **P3 Monopoly** — normalize atom id→name la mutation deref |
+| **Faza 102** Re-read automat `$`/`$$` după commit | **F102a ✅** | **B Monopoly** — fără `refresh/1` |
+| **Faza 103** Fact read fără side-effect `$`/`$$` | **F103a ✅** | **C Monopoly** — guard `phase$(waitRoll)` nu mai rescrie store |
 | *(rezervat)* | — | — |
 
 ---
@@ -979,6 +981,85 @@ backtracking explorează
 - [Faza 44 — commit](inline_logic.plan.md#faza-44--inline--retractall-via-2p--completed)
 - [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — `turn$`, `position$$` pentru game state
 - **Următor backlog:** **3+b** scope blocks (după F100)
+
+---
+
+**Verdict:** **✅ rezolvat (A1 / F101a)** — bug la cheie slot, nu la ground check strict.
+
+---
+
+## Faza 101 — Commit cu variabile legate în `$` / `$$` **(post-F100 bugfix)**
+
+> **Sursă:** [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — problema **A** / **P3**.  
+> **Status:** **✅ F101a done** (2026-08-27).
+
+### Problemă
+
+```prolog
+turn$(P),                         % P = p1 (atom id-only în env)
+commit(+ playerPos$$(P, NewPos))  % mutationFailed=0 dar poziția rămâne 0
+commit(+ playerPos$$(p1, NewPos)) % merge — literal parsează cu .name
+```
+
+**Root cause:** `logicUnify` leagă variabile la termeni din KB (atomi **id-only**). `logicDerefMutationTerm` dereferenția corect, dar `logicGroundTermKey` / `logicUniqueSlotKeyFromHead` foloseau `term.name` gol → slot `$$:playerPos$$/2:a:` în loc de `a:p1`.
+
+### Fix **F101a**
+
+| Fișier | Schimbare |
+|--------|-----------|
+| `core/logic-engine.js` | `logicNormalizeMutationTerm(term, table)` — completează `.name` din `.id` |
+| `core/logic-engine.js` | `logicDerefMutationTerm` — normalizează termenul dereferențiat |
+| `core/logic-engine.js` | `logicGroundTermKey(term, table?)` — fallback `table.name(id)` |
+| `tests/test_suite.js` | **4535–4538** — commit cu var legată pe `$$` și `$` |
+
+### Teste
+
+| ID | Titlu |
+|----|-------|
+| 4535–4536 | F101 commit bound var keyed $$ (legacy/wave) |
+| 4537–4538 | F101 commit bound var single $ (legacy/wave) |
+
+### Criterii done
+
+- [x] Repro scratch: `turn$(P), commit(+ playerPos$$(P, 7))` → poziția 7
+- [x] Teste 4535–4538 green
+- [x] F100 non-ground (4509–4510) încă eșuează corect (var **neligată**)
+
+### Legături
+
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — P3 închis; B/C rămân deschise
+
+---
+
+**Verdict:** **✅ B2/F102a** — re-read automat; **`refresh/1` amânat** (redundant).
+
+---
+
+## Faza 102 — Re-read automat `$`/`$$` după `commit` **(post-F101)**
+
+> **Status:** **✅ F102a done** (2026-08-27). **Fără `refresh/1`.**
+
+### Problemă B
+
+Variabila legată la citire rămâne stale până la re-invocarea goal-ului `$`/`$$`; re-invocarea cu aceeași variabilă eșua (unificare 0 vs 7).
+
+### Fix **F102a**
+
+- `_mutatedUniqueSlots` — set de slot keys atinse de mutație în query pass
+- `_maybeRefreshUniqueCallGoal` — în `_solveCall`, unbind output args înainte de unificare dacă slotul a fost mutat
+- Doc: `inline-logic.md`, `logic-runtime.md`
+
+### Teste **4539–4544**
+
+| ID | Scenariu |
+|----|----------|
+| 4539–4540 | Același `Pos` după `commit` → 7 |
+| 4541–4542 | Cheie legată `P` după `commit` |
+| 4543–4544 | Fără re-read, `Pos` rămâne 0 |
+
+### Legături
+
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — B închis
 
 ---
 

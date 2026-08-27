@@ -1,0 +1,53 @@
+inline [logic] .mono:
+
+    square(7, short, 160, 80)
+    turn$(p1)
+    phase$(waitRoll)
+    playerPos$$(p1, 0)
+    playerCash$$(p1, 1500)
+
+    canBuy(P, Idx, Price, Name) <-
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \+ owns$$(Idx, _)
+
+    buyLandP1() <-
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("menu")
+
+    query rollThenBuy:
+        phase$(waitRoll),
+        turn$(p1),
+        commit(
+            + playerPos$$(p1, 7),
+            + playerCash$$(p1, 1500)
+        ),
+        buyLandP1(),
+        phase$(Ph),
+        show("end", Ph)
+
+    query readPhase:
+        phase$(Ph),
+        show("read", Ph)
+
+:
+
+comp [logic] .game:
+    on: 1
+    .mono { }
+:
+
+1wire trigger = 0
+1wire ok = 0
+
+.game:{
+    rollThenBuy >= ok
+    set = trigger
+}
+
+.game:{
+    query = readPhase
+    set = trigger
+}

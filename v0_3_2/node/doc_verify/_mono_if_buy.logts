@@ -1,0 +1,31 @@
+inline [logic] .mono:
+
+    square(7, short, 160, 80)
+    turn$(p1)
+    playerPos$$(p1, 0)
+
+    canBuy(P, Idx, Price, Name) <-
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \+ owns$$(Idx, _)
+
+    query test:
+        commit(+ playerPos$$(p1, 7)),
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("menu", Name, Price)
+
+:
+
+comp [logic] .game:
+    on: 1
+    .mono { }
+:
+
+1wire t = 1
+
+.game:{
+    query = test
+    set = t
+}

@@ -1,0 +1,21 @@
+inline [logic] .mono:
+    onTax(p1) <- playerPos$$(p1, 4), square(4, tax, _, _)
+    playerPos$$(p1, 4)
+    playerCash$$(p1, 1000)
+    square(4, tax, 0, 0)
+    taxAmount(75)
+    query q:
+        if(onTax(p1),
+           ( playerCash$$(p1, Cash),
+             NC is Cash - 75,
+             commit(+ playerCash$$(p1, NC)),
+             show("tax", NC) ),
+           show("free"))
+:
+comp [logic] .g:
+    on: 1
+    .mono { }
+:
+1wire t = 1
+.g:{ query = q
+    set = t }

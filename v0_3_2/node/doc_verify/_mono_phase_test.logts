@@ -1,0 +1,85 @@
+inline [logic] .mono:
+
+    square(7, short, 160, 80)
+    goSalary(200)
+    turn$(p1)
+    phase$(waitRoll)
+    playerPos$$(p1, 0)
+    playerCash$$(p1, 1500)
+
+    roll(D) <- random_between(1, 6, D)
+
+    nextPos(Pos, Steps, NewPos) <-
+        Sum is Pos + Steps,
+        NewPos is Sum mod 9
+
+    salaryIfGo(Pos, Steps, 0) <-
+        Sum is Pos + Steps,
+        Sum < 9
+
+    showGoPay(P, OldPos, Steps) <-
+        salaryIfGo(OldPos, Steps, G),
+        G > 0,
+        playerLabel(P, LP),
+        playerCash$$(P, Cash),
+        show("go pay")
+
+    showGoPay(_, _, _) <- true
+
+    playerLabel(p1, 1)
+
+    canBuy(P, Idx, Price, Name) <-
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \+ owns$$(Idx, _)
+
+    smart_or(Cond1, _) <- call(Cond1), !
+    smart_or(_, Cond2) <- call(Cond2)
+
+    landAfterRollP1() <- playerPos$$(p1, 0), commit(+ phase$(waitRoll), + turn$(p2))
+
+    buyLandP1() <-
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("menu")
+
+    query handleRollP1:
+        phase$(waitRoll),
+        turn$(p1),
+        playerPos$$(p1, Pos),
+        playerCash$$(p1, Cash),
+        roll(D1),
+        roll(D2),
+        S is D1 + D2,
+        nextPos(Pos, S, NewPos),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
+        commit(+ playerPos$$(p1, NewPos), + playerCash$$(p1, NewCash)),
+        show("dice", D1, D2),
+        showGoPay(p1, Pos, S),
+        smart_or(landAfterRollP1(), buyLandP1())
+
+    query debugPhase:
+        phase$(Ph),
+        show("phase", Ph)
+
+:
+
+comp [logic] .game:
+    on: 1
+    randomSeed: 42
+    .mono { }
+:
+
+1wire t = 1
+
+.game:{
+    query = handleRollP1
+    set = t
+}
+
+.game:{
+    query = debugPhase
+    set = t
+}

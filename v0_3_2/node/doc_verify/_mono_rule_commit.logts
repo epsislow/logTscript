@@ -1,0 +1,37 @@
+inline [logic] .mono:
+
+    square(7, short, 160, 80)
+    turn$(p1)
+    phase$(waitRoll)
+    playerPos$$(p1, 0)
+    playerCash$$(p1, 1500)
+
+    canBuy(P, Idx, Price, Name) <-
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \+ owns$$(Idx, _)
+
+    query test:
+        turn$(P),
+        commit(+ playerPos$$(P, 7)),
+        landBuy(P)
+
+    landBuy(P) <-
+        canBuy(P, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("rule", Name)
+
+:
+
+comp [logic] .game:
+    on: 1
+    .mono { }
+:
+
+1wire trigger = 1
+
+.game:{
+    query = test
+    set = trigger
+}

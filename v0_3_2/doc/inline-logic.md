@@ -1591,7 +1591,7 @@ query personWithoutAge:
 
 ## Queries and free variables
 
-Each `query` may expose up to **16** free variables. **Matrix bulk** on `comp [logic]` writes **two columns** per row — use **`;sel(i,j)`** when **N > 2**. **Vector bulk** on one column uses **`;sel(i)`** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside `\+`) are not output columns.
+Each `query` may expose up to **32** free variables. **Matrix bulk** on `comp [logic]` writes **two columns** per row — use **`;sel(i,j)`** when **N > 2**. **Vector bulk** on one column uses **`;sel(i)`** (see [comp-logic.md](comp-logic.md)). Variables bound in earlier goals (including inside `\+`) are not output columns.
 
 | Free vars | Redirect pattern (on comp) |
 |-----------|----------------------------|
@@ -1962,6 +1962,40 @@ comp [logic] .scoreLogic:
 
 After **Load & Run**: **`okAlice = 1`** — alice’s score is **30**; **`score$$(bob, 20)`** remains.
 
+### Read after `commit` in the same query
+
+State variables bound **before** a mutation keep their old value until you **re-read** the **`$`/`$$`** goal. After **`commit`** (or **`+`** in the same query pass), calling the same slot again **refreshes** bound output arguments from the dynamic store:
+
+```logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 0)
+
+    query roll:
+        playerPos$$(p1, Pos),
+        commit(+ playerPos$$(p1, 7)),
+        playerPos$$(p1, Pos),
+        show("pos", Pos)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 0
+
+.gameLogic:{
+    query = roll
+    set = trigger
+}
+```
+
+After **Load & Run** (pulse **`trigger`**): prints **`pos 7`**. Without the second **`playerPos$$(p1, Pos)`**, **`Pos`** would still be **`0`** in **`show/1`**.
+
+There is **no** **`refresh/1`** builtin — refresh is automatic on **re-invocation** of the **`$`/`$$`** goal for a slot that was just mutated.
+
 ### Example — rule side-effect on `$` head
 
 When a rule head ends with **`$`**, each successful proof **asserts** the ground head into the component dynamic store (same replacement rules as **`+`**).
@@ -2005,8 +2039,10 @@ After **Load & Run**: KB holds **`turn$(carol)`** (last player in discovery orde
 | Topic | Behaviour |
 |-------|-----------|
 | **KB storage** | **`$`**: one fact per **`pred$/N`**. **`$$`**: one fact per ground key. |
+| **Read after `commit` in same query** | Re-invoking the same **`$`/`$$`** goal **refreshes** bound output args from the updated store (no **`refresh/1`** needed). Until you re-read, local variables keep the old binding. |
 | **Query on a stored `$` fact** | At most **one** binding (lookup). |
 | **Query through a rule** (e.g. **`turn$(P) <- player(P)`**) | Prolog backtracking — **N** solutions possible (up to **`maxSolutions`**, default 64). |
+| **Fact read `$` / `$$`** | **Read-only** — does **not** copy or assert into the dynamic store (side-effects apply only to **rules** with `$`/`$$` heads). |
 | **Redirect / pout** | Default exposes collected solutions (not automatically “last only”). Use **`;first`**, **`;last`**, or **`commit(+ turn$(T))`** when you want deterministic output. |
 
 **`maxSolutions`** caps engine backtracking during collection; it is not a separate pout limit. When truncated, observability flags apply as for any query.

@@ -1,0 +1,133 @@
+inline [logic] .mono:
+
+    square(7, short, 160, 80)
+    goSalary(200)
+    playerLabel(p1, 1)
+
+    roll(D) <- random_between(1, 6, D)
+
+    nextPos(Pos, Steps, NewPos) <-
+        Sum is Pos + Steps,
+        NewPos is Sum mod 9
+
+    salaryIfGo(Pos, Steps, 0) <-
+        Sum is Pos + Steps,
+        Sum < 9
+
+    salaryIfGo(Pos, Steps, G) <-
+        Sum is Pos + Steps,
+        Sum >= 9,
+        goSalary(G)
+
+    showGoPay(P, OldPos, Steps) <-
+        salaryIfGo(OldPos, Steps, G),
+        G > 0,
+        playerLabel(P, LP),
+        playerCash$$(P, Cash),
+        show("Player", LP, "Go collected +200 . Money now:", Cash)
+
+    showGoPay(_, _, _) <- true
+
+    canBuy(P, Idx, Price, Name) <-
+        playerPos$$(P, Idx),
+        square(Idx, Name, Price, _),
+        Price > 0,
+        \+ owns$$(Idx, _)
+
+    landAfterRollP1() <-
+        canBuy(p1, Idx, Price, Name),
+        commit(+ phase$(waitChoice)),
+        show("1 pass turn"),
+        show("2 buy property", Name, ". cost:", Price)
+
+    initGame() <-
+        commit(
+            ~ greeted$(_),
+            ~ phase$(_),
+            ~ turn$(_),
+            ~ playerPos$$(_, _),
+            ~ playerCash$$(_, _),
+            + phase$(waitRoll),
+            + turn$(p1),
+            + playerPos$$(p1, 0),
+            + playerCash$$(p1, 1500),
+            + greeted$()
+        ),
+        show("Game Reset")
+
+    query welcomeBoot:
+        \+ greeted$(),
+        initGame()
+
+    query handleReset:
+        initGame()
+
+    query handlePass:
+        phase$(waitChoice),
+        turn$(p1),
+        commit(+ phase$(waitRoll), + turn$(p2)),
+        show("pass ok")
+
+    query handleRoll:
+        phase$(waitRoll),
+        turn$(p1),
+        playerPos$$(p1, Pos),
+        playerCash$$(p1, Cash),
+        roll(D1),
+        roll(D2),
+        S is D1 + D2,
+        nextPos(Pos, S, NewPos),
+        salaryIfGo(Pos, S, Bonus),
+        NewCash is Cash + Bonus,
+        commit(+ playerPos$$(p1, NewPos), + playerCash$$(p1, NewCash)),
+        show("Player 1 dice:", D1, D2),
+        show("Player 1 position now:", NewPos),
+        showGoPay(p1, Pos, S),
+        landAfterRollP1()
+
+:
+
+comp [key] .key1:
+    label: '1'
+    type: 0
+    nl
+    :
+
+comp [key] .resetGame:
+    label: 'reset'
+    type: 0
+    nl
+    :
+
+comp [logic] .game:
+    on: 1
+    randomSeed: 42
+    .mono { }
+:
+
+1wire bootStep = 1
+
+.game:{
+    query = welcomeBoot
+    set = bootStep
+}
+
+.game:{
+    bootStep = 0
+    set = 1
+}
+
+.game:{
+    query = handlePass
+    set = .key1
+}
+
+.game:{
+    query = handleRoll
+    set = .key1
+}
+
+.game:{
+    query = handleReset
+    set = .resetGame
+}
