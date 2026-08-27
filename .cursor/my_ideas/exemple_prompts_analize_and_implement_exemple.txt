@@ -81,3 +81,22 @@ sa te asiguri ca toate testele trec cu success, si ca blocurile din paginiile de
 nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline logic si comp logic nu sunt in productie inca.
 
 probabil e nevoie de mai multe exemple 
+
+
+=====
+vreau sa imi adaugi un plan nou inline_logic2.plan.md pe aceasi structura si reguli ca @.cursor/plans/inline_logic.plan.md care continua planul din inline_logic.plan.md dar cu alte subiecte, si continua numarul fazelor de la Faza 100 si cu numarul deciziilor de la D1000 iar fazele amanate sa inceapa de la 3+a, 3+b, 3+c, 3+d, ... cu tabel nou de faze amanate cand creezi noul plan poti crea tabelele goale ca sa existe si sa explici regulile planului in plan. 
+
+In noul plan inline_logic2.plan.md as vrea sa adaugam o faza noua vezi documentatia sketch @.cursor/my_ideas/logic_predicates_unique_n_keyed 
+
+
+
+nu imi pune intrebari iti dau in scris pt fiecare decizie neconfirmata,
+
+necesar, si de adaugat si in plan daca nu este deja ca legenda:
+daca ai recomandari notezi optinile cu (recommended) 
+daca gasesti ca daca facem altfel are mai mult sens, poti pune optiunile tale cu (change)
+cand e o faza gata de implementare poti sa scrii (ready-to-implement)
+daca o faza e implementata poti sa scrii (completed)
+
+ as vrea sa analizezi sa vezi directia, sa vezi cam ce se doreste, este un sketch deci e posibil sa fie si greseli, ce ti se pare neclar sau daca vezi modificari de la directie da-mi optiuni, cu decizii in tabel adica sa continuam de la numarul Dx la care suntem in plan, si pt fiecare decizie poti sa imi dai optiunile detaliate sub tabelul deciziilor, vezi cum am facut la ultimele faze din planul @.cursor/plans/inline_logic.plan.md 
+====
