@@ -10884,6 +10884,7 @@ Component-level and per-symbol \`color\` / \`bgColor\` accept hex \`^RRGGBB\` or
 | \`bits\` | one of | Inclusive range \`N-M\` (e.g. \`digit7\`) |
 | \`bitOut\` | no | Touch output bit index (optional; symbol omitted from \`:out\` if absent) |
 | \`touchType\` | with \`bitOut\` | \`1\` momentary (default), \`2\` pulse, \`3\` latch/toggle |
+| \`hotkey\` | with \`bitOut\` | Keyboard shortcut while Devices panel is focused — requires \`touch: 1\` on the component ([ui-focus-hotkeys.md](ui-focus-hotkeys.md)) |
 | \`width\`, \`height\` | no | Touch hit box size (px); defaults from \`size\` or per kind (FA 22×22, \`digit7\` 28×44, …) |
 | \`padding\` | no | Extra margin (px) around hit box; defaults to \`touchPadding\` or \`0\` |
 | \`color\` | no | Override ON color for this symbol (\`^hex\` or wire name) |
@@ -10974,6 +10975,28 @@ Reset latched bits:
 \`\`\`
 
 Property blocks can also assign \`touchReset\` when the component has \`on: 1\` (or use direct assignment as above).
+
+### Symbol hotkeys
+
+Per symbol with \`bitOut\`, add a quoted **\`hotkey\`** string. While the **Devices** panel has focus, the key triggers the same \`:out\` update as a click on that symbol (respecting \`touchType\`). Requires \`touch: 1\`. See [ui-focus-hotkeys.md](ui-focus-hotkeys.md).
+
+**Load & Run**, focus Devices, press **w** / **p** — \`:out\` updates like a panel click.
+
+\`\`\`logts-play
+comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :
+    power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
+  }
+  :
+
+2wire out = .panel:out
+
+show(out)
+\`\`\`
+
+Only one symbol with **\`touchType: 1\`** may use the same hotkey (parse error on duplicate). Multiple **\`touchType: 2\`/\`3\`** symbols may share a hotkey — all fire in symbol order.
 
 ---
 
@@ -51908,6 +51931,16 @@ After **Load & Run**: focus Devices → **F2** → type digits → watch \`:get\
 
 ---
 
+## CLCD touch symbol hotkeys
+
+On \`comp [clcd]\` with **\`touch: 1\`**, each symbol with **\`bitOut\`** may define **\`hotkey: "…"\`** in its symbol block. Dispatch mirrors **\`touchType\`** (see [clcd.md](clcd.md)).
+
+**Load & Run**, focus Devices, press the configured keys — \`:out\` updates without clicking the canvas.
+
+Full detail and examples: [clcd.md — Symbol hotkeys](clcd.md#symbol-hotkeys).
+
+---
+
 ## Quick reference
 
 | Goal | Setup |
@@ -51915,11 +51948,12 @@ After **Load & Run**: focus Devices → **F2** → type digits → watch \`:get\
 | Toggle switch from keyboard | \`hotkey: "…"\` on \`switch\` + Devices focus |
 | Fire / hold / latch a key | \`hotkey: "…"\` on \`key\` (respect \`type\`) |
 | Flip one DIP bit | \`hotkeyFor.N: "…"\` on \`dip\` |
+| Hotkey on CLCD touch symbol | \`hotkey: "…"\` in symbol block + \`touch: 1\` |
 | Jump to keyboard input | \`focuskey: "…"\` on \`keyboard\` |
 | Jump to scanner field | \`focuskey: "…"\` on \`scanner\` |
 | Leave widget / Devices | **Escape** (built-in) |
 
-Tests: **4609–4638** (legacy + wave pairs for runtime behaviour).
+Tests: **4609–4638** (panel hotkeys), **4650–4663** (CLCD touch hotkeys).
 `,
     'user-functions.md': `# User-defined functions (\`def\`)
 

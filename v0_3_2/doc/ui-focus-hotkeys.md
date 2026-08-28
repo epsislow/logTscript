@@ -212,6 +212,16 @@ After **Load & Run**: focus Devices → **F2** → type digits → watch `:get` 
 
 ---
 
+## CLCD touch symbol hotkeys
+
+On `comp [clcd]` with **`touch: 1`**, each symbol with **`bitOut`** may define **`hotkey: "…"`** in its symbol block. Dispatch mirrors **`touchType`** (see [clcd.md](clcd.md)).
+
+**Load & Run**, focus Devices, press the configured keys — `:out` updates without clicking the canvas.
+
+Full detail and examples: [clcd.md — Symbol hotkeys](clcd.md#symbol-hotkeys).
+
+---
+
 ## Quick reference
 
 | Goal | Setup |
@@ -219,8 +229,9 @@ After **Load & Run**: focus Devices → **F2** → type digits → watch `:get` 
 | Toggle switch from keyboard | `hotkey: "…"` on `switch` + Devices focus |
 | Fire / hold / latch a key | `hotkey: "…"` on `key` (respect `type`) |
 | Flip one DIP bit | `hotkeyFor.N: "…"` on `dip` |
+| Hotkey on CLCD touch symbol | `hotkey: "…"` in symbol block + `touch: 1` |
 | Jump to keyboard input | `focuskey: "…"` on `keyboard` |
 | Jump to scanner field | `focuskey: "…"` on `scanner` |
 | Leave widget / Devices | **Escape** (built-in) |
 
-Tests: **4609–4638** (legacy + wave pairs for runtime behaviour).
+Tests: **4609–4638** (panel hotkeys), **4650–4663** (CLCD touch hotkeys).

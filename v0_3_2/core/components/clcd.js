@@ -265,6 +265,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       'bits: N-M',
       'bitOut: N',
       'touchType: 1|2|3',
+      'hotkey: string',
       'width: integer',
       'height: integer',
       'padding: integer',
@@ -280,6 +281,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       'bits: N-M',
       'bitOut: N',
       'touchType: 1|2|3',
+      'hotkey: string',
       'width: integer',
       'height: integer',
       'padding: integer',
@@ -297,6 +299,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       'weight: normal|bold|italic|boldItalic',
       'bitOut: N',
       'touchType: 1|2|3',
+      'hotkey: string',
       'width: integer',
       'height: integer',
       'padding: integer',
@@ -340,6 +343,9 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     if (sym.bitOut !== undefined) {
       lines.push(`      bitOut: ${sym.bitOut}`);
       lines.push(`      touchType: ${sym.touchType !== undefined ? sym.touchType : 1}`);
+      if (sym.hotkey !== undefined) {
+        lines.push(`      hotkey: ${ClcdComponent.formatDocString(sym.hotkey)}`);
+      }
     }
 
     if (kind === 'icon') {
@@ -640,6 +646,24 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       ctx.showlog(1);
     };
 
+    const invokeHotkey = (bitOut, phase) => {
+      if (!touch) return;
+      const comp = ctx.components.get(name);
+      if (!comp) return;
+      const syms = comp.clcdSymbols || symbols;
+      const sym = syms.find((s) => s.bitOut === bitOut);
+      if (!sym || sym.bitOut === undefined) return;
+      if (phase === 'release') {
+        ctx.clog('onRelease');
+        self._applyTouchRelease(comp, name, [sym], ctx);
+      } else {
+        comp._lastTouchHits = [sym];
+        ctx.clog('onPress');
+        self._applyTouchPress(comp, name, [sym], ctx);
+      }
+      ctx.showlog(1);
+    };
+
     if (typeof addClcd === 'function') {
       addClcd({
         id: clcdId,
@@ -666,8 +690,20 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       touchLatchState: outW > 0 ? '0'.repeat(outW) : undefined,
       activeTouchPress: outW > 0 ? new Set() : undefined,
       clcdSymbols: symbols,
-      touchHandler: { onPress, onRelease, touchDefaults, symbols, touch },
+      touchHandler: { onPress, onRelease, invokeHotkey, touchDefaults, symbols, touch },
     };
+  }
+
+  registerHotkeys(ctx, compName, compInfo, attributes) {
+    ClcdComponent._registerHotkeysImpl(ctx, compName, compInfo, attributes);
+  }
+
+  static _registerHotkeysImpl(ctx, compName, compInfo, attributes) {
+    const reg = typeof LogTScriptHotkeyRegister !== 'undefined' ? LogTScriptHotkeyRegister : null;
+    if (!reg || !compInfo || !compInfo.touchHandler) return;
+    const touch = parseInt(attributes && attributes.touch, 10) === 1;
+    const symbols = compInfo.clcdSymbols || [];
+    reg.registerClcdHotkeys(ctx, compName, symbols, compInfo.touchHandler, touch);
   }
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {

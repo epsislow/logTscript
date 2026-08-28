@@ -242,6 +242,21 @@
         return this.triggerHotkeyDown(interp, { key: 'Escape' });
       },
 
+      triggerClcdHotkey(interp, compName, opts) {
+        const i = interp || this.interp;
+        if (!i) return false;
+        const comp = i.components.get(compName);
+        if (!comp || !comp.touchHandler || typeof comp.touchHandler.invokeHotkey !== 'function') {
+          return false;
+        }
+        const bitOut = opts && opts.bitOut !== undefined ? parseInt(opts.bitOut, 10) : NaN;
+        if (isNaN(bitOut)) return false;
+        const phase = (opts && opts.phase) || 'press';
+        comp.touchHandler.invokeHotkey(bitOut, phase === 'release' ? 'release' : 'press');
+        this._propagateIfNeeded(i);
+        return true;
+      },
+
       triggerKeyboardKey(interp, compName, opts) {
         const i = interp || this.interp;
         if (!i) return false;

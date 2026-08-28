@@ -13346,6 +13346,9 @@ if (s.assignment) {
           compInfo.ref = `&${storageIdx}`;
         }
         handler.finalizeCompInfo(compInfo, attributes, initialValue, bits);
+        if (type === 'clcd' && typeof handler.registerHotkeys === 'function') {
+          handler.registerHotkeys(this, name, compInfo, attributes);
+        }
         this.components.set(name, compInfo);
         return;
       }

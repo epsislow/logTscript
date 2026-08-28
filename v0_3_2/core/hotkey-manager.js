@@ -432,6 +432,56 @@
     });
   }
 
+  function touchTypeToKeyType(touchType) {
+    const tt = touchType != null ? parseInt(touchType, 10) : 1;
+    if (tt === 1) return 1;
+    if (tt === 2) return 0;
+    if (tt === 3) return 2;
+    return 0;
+  }
+
+  function registerClcdHotkeys(ctx, compName, symbols, touchHandler, touchEnabled) {
+    const mgr = ctx.getHotkeyManager && ctx.getHotkeyManager();
+    if (!mgr) return;
+    const list = symbols || [];
+    if (!touchEnabled) {
+      for (const sym of list) {
+        if (sym && sym.hotkey) {
+          throw Error(`hotkey on CLCD symbol requires touch: 1 on ${compName}`);
+        }
+      }
+      return;
+    }
+    for (const sym of list) {
+      if (!sym || !sym.hotkey) continue;
+      if (sym.bitOut === undefined) {
+        throw Error(`hotkey on CLCD symbol requires bitOut on ${compName}`);
+      }
+      const tt = sym.touchType || 1;
+      const keyType = touchTypeToKeyType(tt);
+      const bitOut = sym.bitOut;
+      const invokeDown = () => {
+        if (touchHandler && typeof touchHandler.invokeHotkey === 'function') {
+          touchHandler.invokeHotkey(bitOut, 'press');
+        }
+      };
+      const invokeUp = () => {
+        if (touchHandler && typeof touchHandler.invokeHotkey === 'function') {
+          touchHandler.invokeHotkey(bitOut, 'release');
+        }
+      };
+      mgr.registerAction({
+        hotkey: sym.hotkey,
+        compName,
+        compType: 'clcd',
+        keyType,
+        dipIndex: bitOut,
+        invokeDown,
+        invokeUp: keyType === 1 ? invokeUp : null,
+      });
+    }
+  }
+
   function registerScannerFocusKey(ctx, compName, scannerId, focuskey, focusHandler) {
     const mgr = ctx.getHotkeyManager && ctx.getHotkeyManager();
     if (!mgr || focuskey === undefined || focuskey === null || focuskey === '') return;
@@ -456,6 +506,8 @@
     registerDipHotkeys,
     registerKeyboardFocusKey,
     registerScannerFocusKey,
+    registerClcdHotkeys,
+    touchTypeToKeyType,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

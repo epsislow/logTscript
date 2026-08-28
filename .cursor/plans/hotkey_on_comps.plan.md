@@ -1,39 +1,36 @@
 ---
 name: hotkey on comps
-overview: Atribute `hotkey` / `hotkeyFor.N` / **`focuskey`**; focus Devices + keyboard/scanner; **D1077–D1113✅** — **F108 (ready-to-implement)**
+overview: F108✅ livrat; **F109 (1+j)** — hotkey pe simboluri CLCD touch; decizii draft **D1114–D1118**
 todos:
   - id: hotkey-deferred-table
-    content: Menține tabel backlog 1+a … (sloturi viitoare hotkey)
+    content: Menține tabel backlog 1+b … 1+i (sloturi viitoare hotkey)
     status: pending
-  - id: hotkey-f108-draft
-    content: "F108 (1+a): hotkey comps — D1077–D1113✅ (ready-to-implement)"
-    status: pending
-  - id: hotkey-f108a
-    content: "F108a: parser hotkey + hotkeyFor — teste 4609+"
-    status: pending
-  - id: hotkey-f108b
-    content: "F108b: HotkeyManager + focus Devices — teste 4619+"
-    status: pending
-  - id: hotkey-f108c
-    content: "F108c: handlers comp (key/switch/dip) + înregistrare bindings — teste 4629+"
-    status: pending
-  - id: hotkey-f108d
-    content: "F108d: integrare browser keydown + panel sync — teste 4639+"
-    status: pending
-  - id: hotkey-f108f
-    content: "F108f: focuskey keyboard/scanner + Escape built-in — teste 4624+"
-    status: pending
-  - id: hotkey-f108e
-    content: "F108e: doc EN + test_session API + logts-play verify"
-    status: pending
+  - id: hotkey-f108-done
+    content: "F108 (1+a) ✅ — hotkey key/switch/dip + focuskey keyboard/scanner"
+    status: completed
+  - id: hotkey-f109-draft
+    content: "F109 (1+j) ✅ — CLCD touch hotkey — D1114–D1118"
+    status: completed
+  - id: hotkey-f109a
+    content: "F109a: parser hotkey în symbol block CLCD — teste 4650+"
+    status: completed
+  - id: hotkey-f109b
+    content: "F109b: register + dispatch touchType 1/2/3 via HotkeyManager — teste 4651+"
+    status: completed
+  - id: hotkey-f109c
+    content: "F109c: test_session triggerClcdHotkey + legacy/wave — teste 4650–4663"
+    status: completed
+  - id: hotkey-f109d
+    content: "F109d: doc EN clcd.md + ui-focus-hotkeys — logts-play verify"
+    status: completed
 isProject: false
 ---
 
 # Plan: hotkey pe componente input (`comp key` / `switch` / `dip`)
 
 > **Continuare decizii:** [inline_logic2.plan.md](inline_logic2.plan.md) — ultima decizie **D1076✅** (F107); acest plan pornește de la **D1077**.  
-> **Continuare faze:** plan 2 la **F107✅** → prima fază aici **F108**.  
-> **Teste:** ID max **4608** (post-F107); alocare draft **4609+**.  
+> **Continuare faze:** plan 2 la **F107✅** → **F108✅** → următoarea **F109 (1+j)** CLCD touch hotkey.  
+> **Teste:** F108 **4609–4638**; F109 draft alocare **4650+**.  
 > **Pattern existent:** focus keyboard (`window.focusedKeyboardId`) — [comp_keyboard.plan.md](comp_keyboard.plan.md); `colorFor.N` pe dip — model pentru `hotkeyFor.N`.
 
 ---
@@ -90,7 +87,9 @@ isProject: false
 
 | Fază | Decizii | Status |
 | ---- | ------- | ------ |
-| **F108** Hotkey comps + focus stack (**1+a**) | **D1077–D1113✅** | **(ready-to-implement)** user 2026-08-28 |
+| **F108** Hotkey comps + focus stack (**1+a**) | **D1077–D1113✅** | **✅ completed** |
+| **F108a–F108f, F108e** | — | **✅ completed** (teste 4609–4638, doc ui-focus-hotkeys.md) |
+| **F109** CLCD touch hotkey (**1+j**) | **D1114–D1118✅** | **✅ completed** |
 | **F108a** Parser `hotkey` + `hotkeyFor` | D1078, D1079, D1080, D1081, D1106 | ✅ |
 | **F108b** HotkeyManager + focus Devices | D1083–D1087, D1100–D1101, D1105, D1092 | ✅ |
 | **F108c** Handlers + bindings comp | D1088–D1091, D1096 | ✅ |
@@ -106,7 +105,7 @@ Tabel master — itemi **amânați** pentru hotkey / input panel. **Stare:** ⏳
 
 | Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
 | ----- | -- | ------- | ------- | ---------- | -------- |
-| ⏳ | **1+a** | Hotkey MVP `key` / `switch` / `dip` | `hotkey:` + `hotkeyFor.N`; manager + focus Devices | **F108** | key.js, switch.js, dip.js |
+| ✅ | **1+a** | Hotkey MVP `key` / `switch` / `dip` | `hotkey:` + `hotkeyFor.N`; manager + focus Devices | **F108** | key.js, switch.js, dip.js |
 | ⏸ | **1+b** | Badge vizual hotkey în panou | Hint lângă label (`[1]`) — UX, nu logică | — | renderers, panel-key |
 | ⏸ | **1+c** | Modificatori (`Ctrl+1`, `Shift+A`) | Combos multi-key | — | D1080 extins |
 | ⏸ | **1+i** | Numpad + `event.code` names | `"Numpad1"`, `"ArrowUp"`, … — distinct de `"1"` | — | D1080 |
@@ -115,9 +114,9 @@ Tabel master — itemi **amânați** pentru hotkey / input panel. **Stare:** ⏳
 | ⏸ | **1+f** | Repeat / key hold | Auto-repeat cât ține tasta | — | panel-key type 0 |
 | ⏸ | **1+g** | Conflict la load | Eroare parse dacă același hotkey pe același switch dip | — | D1081 |
 | ⏸ | **1+h** | *(slot liber)* | — | — | — |
-| ⏸ | **1+j** | Hotkey pe **`comp [clcd]`** touch symbols | `hotkeyFor.bitOut` + `touchType` 1/2/3 — vezi [Faza amânată 1+j](#faza-amânată-1j--clcd-touch-hotkey) | **F109?** | clcd.js, [clcd_touch.plan.md](clcd_touch.plan.md) |
+| ⏳ | **1+j** | Hotkey pe **`comp [clcd]`** touch symbols | `hotkey` în symbol block + `touchType` 1/2/3 | **F109✅** | clcd.js, [clcd_touch.plan.md](clcd_touch.plan.md) |
 
-**Ordine recomandată (draft):** **1+a** (**F108**) → **1+b** (UX) → **1+c** / **1+d** / **1+j** la cerere.
+**Ordine recomandată (actualizat 2026-08-28):** **F108✅** → **F109 (1+j)** → **1+b** / **1+c** / **1+d** la cerere.
 
 ---
 
@@ -853,11 +852,21 @@ Pattern: ca `triggerKeyPress` / `triggerKeyboardKey` existente — **force** byp
 
 ---
 
-## Faza amânată **1+j** — CLCD touch hotkey **(draft)**
+## Faza 109 — CLCD touch hotkey **(1+j — next)**
+
+> **Promovat:** user 2026-08-28 — următoarea fază după **F108✅**.  
+> **Extinde:** [clcd.md](../../v0_3_2/doc/clcd.md), [clcd_touch.plan.md](clcd_touch.plan.md), **F108** HotkeyManager.  
+> **Status:** **(ready-to-implement)** — **D1114–D1118✅** user 2026-08-28.
+
+*(Conținut tehnic identic cu secțiunea [1+j](#faza-amânată-1j--clcd-touch-hotkey-draft) de mai jos.)*
+
+---
+
+## Faza amânată **1+j** — CLCD touch hotkey **(draft → F109)**
 
 > **Cerință user 2026-08-28:** hotkey pe simboluri CLCD cu `touch:` + `touchType` (0/1/2 user memory → de fapt **`touchType` 1/2/3** în doc/code).  
 > **Extinde:** [clcd.md](../../v0_3_2/doc/clcd.md), [clcd_touch.plan.md](clcd_touch.plan.md), **F108** HotkeyManager.  
-> **Status:** ⏸ amânat — decizii draft **D1114+** neconfirmate.
+> **Status:** ⏳ **F109 (ready-to-implement)** — **D1114–D1118✅** user 2026-08-28.
 
 ### Mapare `touchType` CLCD vs `type` `comp [key]`
 
@@ -907,21 +916,22 @@ comp [clcd] .panel:
 | `hotkey` pe CLCD vs `focuskey` | **D1112** — mutual exclusive global |
 | `hotkey` CLCD vs `hotkey` key/switch/dip | **Permis** cross-comp (**D1082**) cu pipeline F108 |
 
-### Decizii draft **D1114–D1118**
+### Decizii **D1114–D1118**
 
-| ID | Subiect | Draft |
-| -- | ------- | ----- |
-| **D1114** | Unde stă attr hotkey | **A** — în block simbol `{ … hotkey: "w" }` · **B (change)** — `hotkeyFor.bitOut` la nivel comp |
-| **D1115** | Gate Devices | **A** — ca F108 (`devicesPanelFocused`) |
-| **D1116** | `touchType: 1` duplicate hotkey | **A** — parse error (extinde **D1113**) |
-| **D1117** | Handler | **A** — reutilizează `comp.touchHandler` + synthetic hit pe `bitOut` |
-| **D1118** | Teste | **A** — `triggerClcdHotkey(comp, bitOut, phase)` + suite **4650+** |
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D1114** | Unde stă attr hotkey | **A ✅** — în block simbol `{ … hotkey: "w" }` (user 2026-08-28) |
+| **D1115** | Gate Devices | **A ✅** — hotkey CLCD rulează doar când `devicesPanelFocused === true`; blocat când keyboard/scanner widget focusat (user 2026-08-28) |
+| **D1116** | `touchType: 1` duplicate hotkey | **A ✅** — parse error (extinde **D1113**; user 2026-08-28) |
+| **D1117** | Handler | **A ✅** — reutilizează `comp.touchHandler` + synthetic hit pe `bitOut` |
+| **D1118** | Teste | **A ✅** — `triggerClcdHotkey(comp, bitOut, phase)` + suite **4650+** |
 
-### Criterii done (când se promovează din 1+j)
+### Criterii done (F109)
 
-- [ ] **D1114–D1118✅**
-- [ ] Doc [clcd.md](../../v0_3_2/doc/clcd.md) — secțiune hotkey touch
-- [ ] Regresie touch mouse neschimbat
+- [x] **D1114–D1118✅**
+- [x] Doc [clcd.md](../../v0_3_2/doc/clcd.md) — secțiune hotkey touch
+- [x] Teste **4650–4663** legacy + wave
+- [x] Regresie touch mouse neschimbat
 
 ---
 
@@ -934,3 +944,6 @@ comp [clcd] .panel:
 | 2026-08-28 | **D1077–D1113✅** — F108 **(ready-to-implement)**; `focuskey`; D1113 hold parse error |
 | 2026-08-28 | **D1113✅** confirmat explicit — al doilea `key` `type: 1` cu același `hotkey` → parse error |
 | 2026-08-28 | Backlog **1+j** — CLCD touch hotkey; mapare `touchType` 1/2/3 vs key `type` 0/1/2 |
+| 2026-08-28 | **F108✅** livrat (4609–4638, ui-focus-hotkeys.md) |
+| 2026-08-28 | User: următoarea fază **F109 (1+j)** CLCD touch hotkey — nu **1+b** |
+| 2026-08-28 | **D1114–D1118✅** — F109 **(ready-to-implement)**; D1114 symbol block; D1115 gate Devices; D1116 hold parse error |

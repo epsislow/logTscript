@@ -6085,6 +6085,8 @@ isBuiltinFunction(name) {
             throw Error(`CLCD touchType must be 1, 2, or 3 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
           }
           sym.touchType = tt;
+        } else if (key === 'hotkey') {
+          sym.hotkey = readQuotedString();
         } else {
           throw Error(`Unknown attribute '${key}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
         }
@@ -6150,6 +6152,9 @@ isBuiltinFunction(name) {
       }
       if (sym.touchType !== undefined && sym.bitOut === undefined) {
         throw Error(`CLCD symbol '${symName}' touchType requires bitOut at ${this.c.line}:${this.c.col}`);
+      }
+      if (sym.hotkey !== undefined && sym.bitOut === undefined) {
+        throw Error(`CLCD symbol '${symName}' hotkey requires bitOut at ${this.c.line}:${this.c.col}`);
       }
 
       symbols.push(sym);

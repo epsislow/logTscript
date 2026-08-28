@@ -51159,5 +51159,156 @@ comp [logic] .gameLogic:
   reg(4637, 'hotkey', 'Escape unfocus keyboard (legacy)', runHotkeyEscapeUnfocusKeyboard);
   reg(4638, 'hotkey', 'Escape unfocus keyboard (wave)', runHotkeyEscapeUnfocusKeyboard, { propagation: 'wave' });
 
+  function runClcdHotkeyMomentary(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  touch: 1',
+      '  = {',
+      '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :',
+      '  }',
+      '  :',
+      '1wire t = .panel:out',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    h.assert('initial', session.getCompProperty(interp, '.panel', 'out'), '0');
+    session.triggerHotkeyDown(interp, { key: 'w' });
+    h.assert('press', session.getCompProperty(interp, '.panel', 'out'), '1');
+    session.triggerHotkeyUp(interp, { key: 'w' });
+    h.assert('release', session.getCompProperty(interp, '.panel', 'out'), '0');
+  }
+
+  function runClcdHotkeyPulse(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  touch: 1',
+      '  = {',
+      '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 2 hotkey: "p" width: 22 height: 22 :',
+      '  }',
+      '  :',
+      '1wire t = .panel:out',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    session.triggerHotkeyDown(interp, { key: 'p' });
+    h.assert('pulse 0', session.getCompProperty(interp, '.panel', 'out'), '0');
+  }
+
+  function runClcdHotkeyLatch(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  touch: 1',
+      '  = {',
+      '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "l" width: 22 height: 22 :',
+      '  }',
+      '  :',
+      '1wire t = .panel:out',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    session.triggerHotkeyDown(interp, { key: 'l' });
+    h.assert('on', session.getCompProperty(interp, '.panel', 'out'), '1');
+    session.triggerHotkeyDown(interp, { key: 'l' });
+    h.assert('off', session.getCompProperty(interp, '.panel', 'out'), '0');
+  }
+
+  function runClcdHotkeyTwoLatch(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  touch: 1',
+      '  = {',
+      '    power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 3 hotkey: "x" width: 20 height: 20 :',
+      '    wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 3 hotkey: "x" width: 20 height: 20 :',
+      '  }',
+      '  :',
+      '2wire t = .panel:out',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    session.triggerHotkeyDown(interp, { key: 'x' });
+    h.assert('both', session.getCompProperty(interp, '.panel', 'out'), '11');
+  }
+
+  function runClcdHotkeyGate(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  touch: 1',
+      '  = {',
+      '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "g" width: 22 height: 22 :',
+      '  }',
+      '  :',
+      '1wire t = .panel:out',
+    ].join('\n');
+    const { interp } = session.run(src);
+    h.assert('noop', String(session.triggerHotkeyDown(interp, { key: 'g' })), 'false');
+    h.assert('unchanged', session.getCompProperty(interp, '.panel', 'out'), '0');
+  }
+
+  reg(4650, 'clcd', 'parse symbol hotkey in CLCD block', function(h, session) {
+    const stmts = session.parse(`comp [clcd] .p:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 hotkey: "w" width: 22 height: 22 :
+  }
+  :`);
+    const iv = stmts[0].comp.initialValue;
+    h.assert('kind', iv && iv.kind, 'clcdSymbols');
+    h.assert('hotkey', iv.symbols[0].hotkey, 'w');
+  });
+
+  reg(4651, 'clcd', 'CLCD hotkey touchType 1 hold (legacy)', runClcdHotkeyMomentary);
+  reg(4652, 'clcd', 'CLCD hotkey touchType 1 hold (wave)', runClcdHotkeyMomentary, { propagation: 'wave' });
+  reg(4653, 'clcd', 'CLCD hotkey touchType 2 pulse (legacy)', runClcdHotkeyPulse);
+  reg(4654, 'clcd', 'CLCD hotkey touchType 2 pulse (wave)', runClcdHotkeyPulse, { propagation: 'wave' });
+  reg(4655, 'clcd', 'CLCD hotkey touchType 3 latch (legacy)', runClcdHotkeyLatch);
+  reg(4656, 'clcd', 'CLCD hotkey touchType 3 latch (wave)', runClcdHotkeyLatch, { propagation: 'wave' });
+
+  reg(4657, 'clcd', 'parse error duplicate touchType 1 hotkey', function(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  touch: 1',
+      '  = {',
+      '    power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 1 hotkey: "h" width: 20 height: 20 :',
+      '    wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 1 hotkey: "h" width: 20 height: 20 :',
+      '  }',
+      '  :',
+    ].join('\n');
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('hold type')), 'true');
+  });
+
+  reg(4658, 'clcd', 'parse error hotkey without touch:1', function(h, session) {
+    const src = [
+      'comp [clcd] .panel:',
+      '  = {',
+      '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 hotkey: "w" width: 22 height: 22 :',
+      '  }',
+      '  :',
+    ].join('\n');
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('touch: 1')), 'true');
+  });
+
+  reg(4659, 'clcd', 'same hotkey two latch symbols (legacy)', runClcdHotkeyTwoLatch);
+  reg(4660, 'clcd', 'same hotkey two latch symbols (wave)', runClcdHotkeyTwoLatch, { propagation: 'wave' });
+  reg(4661, 'clcd', 'CLCD hotkey gate without devices focus (legacy)', runClcdHotkeyGate);
+  reg(4662, 'clcd', 'CLCD hotkey gate without devices focus (wave)', runClcdHotkeyGate, { propagation: 'wave' });
+
+  reg(4663, 'clcd', 'triggerClcdHotkey direct invoke', function(h, session) {
+    const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :
+  }
+  :
+1wire t = .panel:out`);
+    session.triggerClcdHotkey(interp, '.panel', { bitOut: 0, phase: 'press' });
+    h.assert('press', session.getCompProperty(interp, '.panel', 'out'), '1');
+    session.triggerClcdHotkey(interp, '.panel', { bitOut: 0, phase: 'release' });
+    h.assert('release', session.getCompProperty(interp, '.panel', 'out'), '0');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

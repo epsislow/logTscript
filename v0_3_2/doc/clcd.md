@@ -63,6 +63,7 @@ Component-level and per-symbol `color` / `bgColor` accept hex `^RRGGBB` or a wir
 | `bits` | one of | Inclusive range `N-M` (e.g. `digit7`) |
 | `bitOut` | no | Touch output bit index (optional; symbol omitted from `:out` if absent) |
 | `touchType` | with `bitOut` | `1` momentary (default), `2` pulse, `3` latch/toggle |
+| `hotkey` | with `bitOut` | Keyboard shortcut while Devices panel is focused — requires `touch: 1` on the component ([ui-focus-hotkeys.md](ui-focus-hotkeys.md)) |
 | `width`, `height` | no | Touch hit box size (px); defaults from `size` or per kind (FA 22×22, `digit7` 28×44, …) |
 | `padding` | no | Extra margin (px) around hit box; defaults to `touchPadding` or `0` |
 | `color` | no | Override ON color for this symbol (`^hex` or wire name) |
@@ -153,6 +154,28 @@ Reset latched bits:
 ```
 
 Property blocks can also assign `touchReset` when the component has `on: 1` (or use direct assignment as above).
+
+### Symbol hotkeys
+
+Per symbol with `bitOut`, add a quoted **`hotkey`** string. While the **Devices** panel has focus, the key triggers the same `:out` update as a click on that symbol (respecting `touchType`). Requires `touch: 1`. See [ui-focus-hotkeys.md](ui-focus-hotkeys.md).
+
+**Load & Run**, focus Devices, press **w** / **p** — `:out` updates like a panel click.
+
+```logts-play
+comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :
+    power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
+  }
+  :
+
+2wire out = .panel:out
+
+show(out)
+```
+
+Only one symbol with **`touchType: 1`** may use the same hotkey (parse error on duplicate). Multiple **`touchType: 2`/`3`** symbols may share a hotkey — all fire in symbol order.
 
 ---
 
