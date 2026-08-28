@@ -126,12 +126,13 @@ function scrollOutputToBottom(preservePage) {
   }
 }
 
-function appendOutputLine(text, className) {
+function appendOutputLine(text, className, style) {
   const el = document.getElementById('out');
   if (!el) return null;
   const div = document.createElement('div');
   div.className = 'output-line' + (className ? ' ' + className : '');
   div.textContent = text;
+  if (style && style.color) div.style.color = style.color;
   el.appendChild(div);
   return div;
 }
@@ -201,7 +202,7 @@ function fingerprintFromOutputPlan(plan) {
   for (let i = 0; i < plan.length; i++) {
     const seg = plan[i];
     if (seg.kind === 'line') {
-      parts.push('L\x1f' + (seg.className || '') + '\x1f' + seg.text);
+      parts.push('L\x1f' + (seg.className || '') + '\x1f' + (seg.styleColor || '') + '\x1f' + seg.text);
     } else if (seg.kind === 'copy') {
       parts.push('C\x1f' + seg.text);
     } else if (seg.kind === 'error') {
@@ -235,6 +236,16 @@ function buildOutputPlan(lines, blocks, interp, src) {
       i = block.end;
       continue;
     }
+    if (block && block.kind === 'styledLine' && block.start === i) {
+      plan.push({
+        kind: 'line',
+        text: lines[i],
+        className: '',
+        styleColor: block.color || ''
+      });
+      i++;
+      continue;
+    }
 
     const line = lines[i];
     if (line.startsWith('Error:')) {
@@ -265,7 +276,8 @@ function paintOutputFromPlan(plan, src) {
     if (seg.kind === 'copy') {
       appendOutputCopyBlock(seg.text);
     } else if (seg.kind === 'line') {
-      appendOutputLine(seg.text, seg.className || undefined);
+      const style = seg.styleColor ? { color: seg.styleColor } : undefined;
+      appendOutputLine(seg.text, seg.className || undefined, style);
     } else if (seg.kind === 'error') {
       const display = seg.display;
       appendOutputLine('Error: ' + display.message, 'output-line--error');

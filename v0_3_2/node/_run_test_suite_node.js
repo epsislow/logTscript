@@ -288,9 +288,9 @@ if (dmErrors.length) {
 if (sandbox.LogTScriptSession && typeof sandbox.LogTScriptSession.cleanupAllTestSessions === 'function') {
   sandbox.LogTScriptSession.cleanupAllTestSessions();
 }
-if (failures.length) {
-  console.log('Failures:', failures.slice(0, 40).join('\n'));
-  if (failures.length > 40) console.log('... and', failures.length - 40, 'more');
-  process.exit(1);
-}
+  if (failures.length) {
+    console.log('Failures:', failures.slice(0, 40).join('\n'));
+    if (failures.length > 40) console.log('... and', failures.length - 40, 'more');
+    process.exit(1);
+  }
 process.exit(0);

@@ -1118,7 +1118,11 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         execOpts.queryNames = queryOpts.queryNames;
       }
       if (ctx.out) {
-        execOpts.onShowLine = (line) => { ctx.out.push(line); };
+        const bindFn = typeof logicCreateOnShowLineHandler === 'function'
+          ? logicCreateOnShowLineHandler : null;
+        execOpts.onShowLine = bindFn
+          ? bindFn(ctx)
+          : (line) => { ctx.out.push(line); };
       }
       execOpts.mutationRuntime = this._buildMutationRuntime(comp, compName, merged, ctx);
       const raw = execFn(runtimeMerged, inputEnv, execOpts);

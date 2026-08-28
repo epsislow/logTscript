@@ -13,6 +13,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | Builtin | Arity | Reserved head | Side effects | Summary |
 |---------|-------|---------------|--------------|---------|
 | **`show/N`** | 1–32 | yes | yes (output buffer) | Print logic terms |
+| **`showx/N`** | 2–32 | yes | yes (output buffer + line color) | Print logic terms with optional **Style** color |
 | **`count/2`** | 2 | no¹ | no | Number of solutions to a goal |
 | **`nth0/3`** | 3 | yes | no | List element at **0-based** index |
 | **`nth1/3`** | 3 | yes | no | List element at **1-based** index |
@@ -142,6 +143,141 @@ comp [logic] .worldLogic:
 inside: inside(john, johnsCar)
 inside: inside(mary, marysBike)
 ```
+
+---
+
+## `showx/N`
+
+Print logic terms to the run **output buffer** with an optional **line color** from the first argument **`Style`**. Same formatting rules as **`show/N`** for the remaining arguments. Not the top-level script **`show(wire)`** statement.
+
+| | **Logic `showx/N`** | **Logic `show/N`** |
+|--|---------------------|---------------------|
+| First argument | **`Style`** — hex color when ground (not printed) | First term to print |
+| Remaining args | Terms to print (space-separated) | Terms to print |
+| Invalid / unbound `Style` | Plain line (same text as `show` on those terms) | — |
+| `show("fff")` | — | Prints text **`fff`** (not a color) |
+
+**Behaviour:**
+
+- **`N`** from **2** to **32** — **`Style`** plus at least one term to print.
+- **`showx(Style)`** alone → **parse error**.
+- Always **succeeds**; does not fail the surrounding query when `Style` is invalid or unbound.
+- **`Style`** accepts a ground **atom** or **string literal** with **3** or **6** hexadecimal digits (`fff`, `ff0000`, case-insensitive). Normalized to CSS `#rgb` / `#rrggbb` in the Output panel.
+- Atoms whose spelling starts with a **digit** (for example **`00f`**) are read as numbers, not colors — use a **string literal** (`"00f"`) or a letter-first atom (`f00`).
+- **`Style`** is never printed. Content terms join with a single space (no leading space before the first printed term).
+- Each line’s color is independent — a following **`show/…`** does not inherit color from **`showx/…`**.
+- On **backtracking**, prints again for each branch (color re-evaluated when `Style` is a variable).
+- Cannot be used as a fact, rule, or constraint **head**. Not allowed inside **`commit/…`**.
+
+### Example — ground atom Style
+
+```logts-play
+inline [logic] .game:
+
+    query banner:
+        showx(fff, "=== START ===")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = banner
+    set = trigger
+}
+```
+
+**Load & Run:** one Output line **`=== START ===`** displayed in color **`#fff`**.
+
+### Example — ground string Style
+
+```logts-play
+inline [logic] .game:
+
+    query err:
+        showx("ff0000", "error:", Code),
+        show("detail:", Msg)
+
+    error(code(404), "not found")
+
+    query run:
+        error(Code, Msg)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = run
+    set = trigger
+}
+```
+
+**Load & Run:** first line **`error: code(404)`** in **`#ff0000`**; second line **`detail: not found`** in the default Output color.
+
+### Example — variable `MyColor` (dynamic Style)
+
+```logts-play
+inline [logic] .game:
+
+    player_color(p1, fff)
+    player_color(p2, "00f")
+
+    query turn:
+        player_color(P, MyColor),
+        showx(MyColor, "turn:", P)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = turn
+    set = trigger
+}
+```
+
+**Load & Run:** two lines — **`turn: p1`** in **`#fff`**, **`turn: p2`** in **`#00f`** (one line per backtracking solution).
+
+### Example — non-hex Style (plain fallback)
+
+```logts-play
+inline [logic] .game:
+
+    query q:
+        showx(red, "status:", ok)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}
+```
+
+**Load & Run:** **`status: ok`** in the default Output color — atom **`red`** is not a hex code, so **`showx`** behaves like **`show("status:", ok)`** for the text.
 
 ---
 

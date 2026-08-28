@@ -595,6 +595,9 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'show' && g0.arity >= 1) {
       return this._solveShow(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
+    if (g0.kind === 'call' && g0.predicate === 'showx' && g0.arity >= 2) {
+      return this._solveShowx(g0, rest, env, depth, onSuccess, onDepthExceeded);
+    }
     if (g0.kind === 'call' && g0.predicate === 'nth0' && g0.arity === 3) {
       return this._solveNth(g0, rest, env, depth, onSuccess, onDepthExceeded, false, null);
     }
@@ -917,6 +920,26 @@ class LogicEngine {
     }
     const line = parts.join(' ');
     if (typeof this.onShowLine === 'function') this.onShowLine(line);
+    return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+  }
+
+  _solveShowx(goal, rest, env, depth, onSuccess, onDepthExceeded) {
+    const args = goal.args || [];
+    const styleTerm = args[0];
+    const contentArgs = args.slice(1);
+    const parts = [];
+    for (const arg of contentArgs) {
+      parts.push(logicFormatShowTerm(arg, env, this.table));
+    }
+    const line = parts.join(' ');
+    const color = logicResolveStyleColor(styleTerm, env, this.table);
+    if (typeof this.onShowLine === 'function') {
+      if (color) {
+        this.onShowLine(line, { style: { color } });
+      } else {
+        this.onShowLine(line);
+      }
+    }
     return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
   }
 
@@ -4583,6 +4606,39 @@ function logicValidateConstraintBody(bodyGoals, proposedClauses, inputEnv, optio
   return solutions && solutions.length > 0;
 }
 
+function logicHexColorFromString(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s)) return null;
+  return '#' + s.toLowerCase();
+}
+
+function logicResolveStyleColor(term, env, table) {
+  const d = logicDeref(term, env);
+  if (!d) return null;
+  if (d.kind === 'var') return null;
+  if (d.kind === 'atom') {
+    const name = d.name != null ? String(d.name) : (d.id != null && table ? table.name(d.id) : '');
+    return logicHexColorFromString(name);
+  }
+  return null;
+}
+
+function logicCreateOnShowLineHandler(target) {
+  if (!target || !target.out) return null;
+  return function onShowLine(line, meta) {
+    const idx = target.out.length;
+    target.out.push(line);
+    const color = meta && meta.style && meta.style.color ? meta.style.color : null;
+    if (color) {
+      if (!target.outBlocks) target.outBlocks = [];
+      target.outBlocks.push({ kind: 'styledLine', start: idx, color });
+      if (!target.logicShowMeta) target.logicShowMeta = [];
+      target.logicShowMeta.push({ line, style: { color } });
+    }
+  };
+}
+
 function logicFormatShowTerm(term, env, table) {
   const d = logicDeref(term, env);
   if (!d) return '?';
@@ -5855,6 +5911,9 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicSetRandomSeed = logicSetRandomSeed;
   globalThis.logicRngGetState = logicRngGetState;
   globalThis.logicRngSetState = logicRngSetState;
+  globalThis.logicResolveStyleColor = logicResolveStyleColor;
+  globalThis.logicCreateOnShowLineHandler = logicCreateOnShowLineHandler;
+  globalThis.logicHexColorFromString = logicHexColorFromString;
   globalThis.logicNormalizeRandomSeed = logicNormalizeRandomSeed;
   globalThis.logicNormalizeRandomInt = logicNormalizeRandomInt;
   globalThis.LOGIC_RANDOM_SEED_MAX = LOGIC_RANDOM_SEED_MAX;
@@ -5922,6 +5981,9 @@ if (typeof module !== 'undefined' && module.exports) {
     logicSetRandomSeed,
     logicRngGetState,
     logicRngSetState,
+    logicResolveStyleColor,
+    logicCreateOnShowLineHandler,
+    logicHexColorFromString,
     logicNormalizeRandomSeed,
     logicNormalizeRandomInt,
     LOGIC_RANDOM_SEED_MAX,

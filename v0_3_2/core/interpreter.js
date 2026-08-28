@@ -1804,7 +1804,11 @@ class Interpreter {
       execOpts[opt.name] = n;
     }
     if (this.out) {
-      execOpts.onShowLine = (line) => { this.out.push(line); };
+      const bindFn = typeof logicCreateOnShowLineHandler === 'function'
+        ? logicCreateOnShowLineHandler : null;
+      execOpts.onShowLine = bindFn
+        ? bindFn(this)
+        : (line) => { this.out.push(line); };
     }
     const execResult = execFn(merged, goals, inputEnv, execOpts);
     let solutions = execResult.solutions || [];

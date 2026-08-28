@@ -100,3 +100,19 @@ daca o faza e implementata poti sa scrii (completed)
 
  as vrea sa analizezi sa vezi directia, sa vezi cam ce se doreste, este un sketch deci e posibil sa fie si greseli, ce ti se pare neclar sau daca vezi modificari de la directie da-mi optiuni, cu decizii in tabel adica sa continuam de la numarul Dx la care suntem in plan, si pt fiecare decizie poti sa imi dai optiunile detaliate sub tabelul deciziilor, vezi cum am facut la ultimele faze din planul @.cursor/plans/inline_logic.plan.md 
 ====
+
+in planul @.cursor/plans/inline_logic2.plan.md  as vrea sa adaugam o faza noua care are ca scop modificarea lui show din logic nu din logTscript prin care sa putem specifica o culoare, outputul sa fie afisat cu culoarea respectiva,
+
+da-mi te rog niste sugestii despre cum am putea face asta ca sa putem desena textele afisate cu culori alese de utiliator, pentru culoare putem folosii coduri hex scurte precum fff sau coduri hex lungi precum ff0000 
+
+te rog citeste planul @.cursor/plans/inline_logic2.plan.md ca sa vezi structural cum se scrie o faza in plan cu decizii optiuni vezi legenda 
+te poti lua dupa ultima faza F104
+
+
+nu imi pune intrebari iti dau in scris pt fiecare decizie neconfirmata,
+
+ as vrea sa analizezi sa vezi directia, ce ti se pare neclar sau daca vezi modificari de la directie da-mi optiuni,  si pt fiecare decizie Dx poti sa imi dai optiunile detaliate, cu exemple de scripturi daca e necesar
+
+
+-----
+

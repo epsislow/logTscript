@@ -29,6 +29,9 @@ todos:
   - id: f104-rng-per-comp
     content: "F104a: randomSeed per comp — get/set state RNG, swap la exec pass — teste 4547+"
     status: completed
+  - id: f105-showx-style
+    content: "F105: showx/N — styled logic output (color în style) — D1050–D1060✅ — teste 4563+"
+    status: completed
 isProject: false
 ---
 
@@ -95,6 +98,7 @@ isProject: false
 | **Faza 102** Re-read automat `$`/`$$` după commit | **F102a ✅** | **B Monopoly** — fără `refresh/1` |
 | **Faza 103** Fact read fără side-effect `$`/`$$` | **F103a ✅** | **C Monopoly** — guard `phase$(waitRoll)` nu mai rescrie store |
 | **Faza 104** `randomSeed:` per componentă (RNG context swap) | **F104a ✅** | Monopoly dice — stream continuu per comp |
+| **Faza 105** `showx/N` — output logic cu **style** (culoare) | **F105 ✅** | **D1050–D1060✅** — teste 4563–4583 |
 | *(rezervat)* | — | — |
 
 ---
@@ -1190,6 +1194,195 @@ Pattern: legacy + wave ca F101–F103.
 
 ---
 
+## Faza 105 — `showx/N` — output logic cu **style** (culoare) **(post-F104)**
+
+> **Status:** **✅ F105 done** (2026-08-28). **D1050–D1060✅**.  
+> **Extinde:** builtin `show/N` (F11+ doc); **nu** modifică `show/N`.  
+> **Viitor:** `showx` = „show extra” — același API pentru **clear output**, **font**, etc.; F105 livrează doar **color** în `style`.
+
+### Problemă
+
+| Situație | Comportament dorit |
+| -------- | ------------------ |
+| `show("fff")`, `show("000")` | Text literal — **nu** culoare |
+| User vrea linii colorate din logic | Predicat separat, primul arg = **style** |
+| `show(MyStyle, "msg")` cu style non-hex | Afișare **plain** ca `show` — fără fail |
+| Extensibilitate | Un singur builtin `showx`, nu familie `showc`/`showclr`/`show_c` |
+
+**Pipeline azi:** `onShowLine(line)` → `ctx.out.push(string)` → UI `.output-line` fără culoare inline.
+
+### Sintaxă țintă (F105 MVP)
+
+```logts
+showx(Style, Term1, …, TermK)    % K ≥ 1 — Style = primul arg (style); rest = conținut ca show/N
+```
+
+| Apel | Text linie | Culoare |
+| ---- | ---------- | ------- |
+| `showx(fff, "status:", S)` | `status: S` | `#fff` |
+| `showx("ff0000", "error")` | `error` | `#ff0000` |
+| `showx(red, "plain")` | `plain` | none (fallback plain) |
+| `showx(StyleVar, "x")` — `StyleVar` neligat / non-hex | `x` | none |
+| `show("fff")` | `fff` | unchanged |
+
+**Min args:** 2 (`Style` + ≥1 term). **`showx(Style)`** singur → parse error.
+
+### Decizii confirmate **D1050–D1060** **(user 2026-08-28)**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D1050** | API | **A ✅** — predicat separat **`showx/N`** („show extra”); primul arg = **`Style`**; **nu** extindere `show/N` |
+| **D1051** | Formă `Style` (MVP) | **A ✅** — atom sau string ground, **3** sau **6** hex digits (`fff`, `ff0000`); **fără** `^`, **fără** wire (backlog) |
+| **D1052** | Granularitate | **A ✅** — o culoare pe **linie**; join `Term1…TermK` cu spațiu (ca `_solveShow`) |
+| **D1053** | `Style` invalid / neligat | **B ✅** — **nu fail**, **nu eroare**; linie plain ca `show`; `Style` **nu** apare în text |
+| **D1054** | Pipeline UI | **A ✅** — `onShowLine(line, meta?)`; `meta.style.color` CSS hex; `ctx.out` rămâne string; `outBlocks` `{ kind: 'styledLine', start, color }` |
+| **D1055** | Default culoare | **A ✅** — fallback plain = inherit CSS (ca `show` azi) |
+| **D1056** | Reserved + commit | **A ✅** — `showx/N` reserved head + **interzis în `commit`** (identic `show/N`) |
+| **D1057** | Backtracking | **A ✅** — reprintează pe ramuri (ca `show`) |
+| **D1058** | Scope | **A ✅** — doar logic `showx/N`; nu script `show(wire)` |
+| **D1059** | Teste | **A ✅** — hook capture `{ line, style }`; teste **4563+** legacy+wave |
+| **D1060** | Doc | **A ✅** — `logic-builtins.md`, `inline-logic.md`; secțiune viitor extensii `style` |
+
+### D1056 — „reserved head” vs cum e `show` azi
+
+**Nu există două categorii diferite** — `show/N` și `showx/N` folosesc **același mecanism**:
+
+| Regulă | `show/N` | `showx/N` (F105) |
+| ------ | -------- | ---------------- |
+| **Apel în body** query/rule/constraint | ✅ builtin engine | ✅ builtin engine |
+| **Fact** `showx(...).` | ❌ | ❌ |
+| **Rule head** `showx(...) <- …` | ❌ | ❌ |
+| **Constraint head** `showx(...) <= …` | ❌ | ❌ |
+| **În `commit(…)`** | ❌ parse error | ❌ parse error |
+| **Arity** | 1–32, validare `logicValidateShowCall` | 2–32, validare `logicValidateShowxCall` |
+
+„Reserved” = **nu poți redefine predicate-ul în KB**; implementarea e **fixă în engine** (`_solveShow` / `_solveShowx`), nu clauze user.
+
+**Extra la `show` (nu alt tip de reserved):** listă `LOGIC_BUILTIN_RESERVED_HEADS` + mesaje explicite la constraint/commit — `showx` primește **aceleași hook-uri**.
+
+### D1053 — fallback plain (detaliu)
+
+La exec, pentru `Style`:
+
+1. Dereferențiază `Style`.
+2. Dacă ground atom/string și match `^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$` → normalize CSS `#…`, linie colorată.
+3. **Orice alt caz** (var neligată, atom `red`, `ff`, wire viitor, etc.) → `onShowLine(line)` **fără** meta; text = join termeni după `Style` (identic formatare `show`).
+
+**Parse:** literal `showx(ff, "x")` — **nu** parse error; la runtime → plain `x`.
+
+### Note comportament (confirmat chat 2026-08-28)
+
+**1. Fără spațiu înainte de primul term afișat**
+
+`Style` (arg0) **nu** intră în textul liniei și **nu** adaugă separator. Conținutul = join cu spațiu doar între `Term1…TermK` (arg1…), identic cu `_solveShow` pe acești termeni:
+
+| Apel | Linie output |
+| ---- | ------------ |
+| `showx(fff, "x")` | `x` (fără spațiu leading) |
+| `showx(fff, "turn:", P)` | `turn: P` |
+| `showx(fff, A, B, C)` | `A B C` |
+
+**2. Fără propagare culoare între linii**
+
+Fiecare apel `showx` / `show` e **independent**. Culoarea din `showx` se aplică **doar** liniei curente (meta + `styledLine` la indexul ei). Un `show(...)` imediat după **nu** moștenește culoarea — plain, inherit CSS (ca `show` azi). **Nu** există „current style” persistent în engine (F105). Extensii viitoare (`clear`, default color) → decizie separată (**4+h…**).
+
+```logts
+showx(fff, "colorat"),
+show("plain")
+% → linia 1: #fff; linia 2: fără meta color
+```
+
+### D1054 — pipeline (decizie analiză)
+
+```text
+_solveShowx:
+  styleTerm = args[0]; content = args[1..]
+  line = join(logicFormatShowTerm(content…))
+  color = logicResolveStyleColor(styleTerm, env)   % null dacă D1053 fallback
+  if color:
+      onShowLine(line, { style: { color } })
+      outBlocks.push({ kind: 'styledLine', start: out.length, color })
+  else:
+      onShowLine(line)    % identic show
+  out.push(line)          % mereu plain string — teste text unchanged
+```
+
+**UI (`app.js`):** `buildOutputPlan` — la `styledLine` block → `appendOutputLine(text, '', { color })`.
+
+**Viitor F106+:** `meta.style.clear`, `meta.style.font` — același `onShowLine` / `outBlocks`, extindere obiect `style`.
+
+### Fix **F105a** — assembler
+
+**Fișier:** `logic-assembler.js`
+
+- `LOGIC_BUILTIN_SHOWX_PRED = 'showx'`
+- `LOGIC_SHOWX_MAX_ARGS = 32` (1 style + max 31 content, sau 32 total ca show)
+- `logicValidateShowxCall` — min 2 args, max 32
+- `logicResolveStyleColorLiteral` — helper parse-time optional (doar doc); runtime resolve în engine
+- Reserved: `LOGIC_BUILTIN_RESERVED_HEADS` + `LOGIC_BUILTIN_RESERVED_ARITIES` + `logicReservedHeadError` + constraint head + `commit` guard (ca `show`)
+
+### Fix **F105b** — engine
+
+**Fișier:** `logic-engine.js`
+
+- `_solveShowx(goal, …)` — branch în `_solveGoals`
+- `logicResolveStyleColor(term, env, table)` → `#rgb` | `null`
+- Callback: `onShowLine(line, meta?)`
+
+**Fișiere bridge:** `logic.js`, `interpreter.js` — propagare meta la `ctx.out` / `outBlocks`
+
+### Fix **F105c** — UI
+
+**Fișiere:** `ui/app.js`, `script_editor_v0_3_2.html` (dacă trebuie CSS)
+
+- `styledLine` în `buildOutputPlan`
+- `appendOutputLine(text, className, style?)` cu `style.color`
+
+### Doc **F105d**
+
+- `logic-builtins.md` — secțiune **`showx/N`** vs **`show/N`**
+- `inline-logic.md` — exemple Monopoly / status colorat
+- Notă **forward-compat:** `Style` va include și non-color (clear, font) — F105 doar color
+
+### Teste **4563+**
+
+| ID | Scenariu | Așteptat |
+| ---- | -------- | -------- |
+| 4563–4564 | `showx(fff, "hi")` | line `hi`, style.color `#fff` |
+| 4565–4566 | `showx("ff0000", "ok")` | `#ff0000` |
+| 4567–4568 | `showx(red, "plain")` | plain, no meta |
+| 4569–4570 | `showx(StyleVar, "x")` — var neligată | plain `x`, goal **succeeds** |
+| 4571–4572 | `showx(Col, "p", P)` — `Col` legat `00f` | color `#00f` |
+| 4573–4574 | `show("fff")` regression | text `fff`, no color |
+| 4575–4576 | `showx` în `commit` | parse error |
+| 4577–4578 | rule head `showx(...)` | parse/validate error |
+| — | show/showx backtrack | 2 linii colorate diferite |
+
+Pattern: legacy + wave ca F101–F104.
+
+### Criterii done
+
+- [x] **D1050–D1060✅**
+- [x] **F105a…F105d** livrate
+- [x] Teste **4563–4583** green + regresie `show/N`
+- [x] Doc EN + verify blocks (`logic-builtins.md`, `inline-logic.md`)
+- [x] **Fără** breaking change pe `show/N`
+
+### Backlog post-F105 (showx extensii)
+
+| ID | Subiect | Notă |
+| -- | ------- | ---- |
+| **4+h** | `showx(clear, …)` sau atom style `clear` | șterge Output panel înainte de print |
+| **4+i** | `showx` + wire/`^` hex | reutilizare `color-wire-resolve` |
+| **4+j** | `style` font / bold | extindere `meta.style` |
+
+### Legături
+
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — mesaje UI colorate per player
+- [inline_logic.plan.md](inline_logic.plan.md) — `show/N` original
+
+---
+
 ## Riscuri / neclarități plan 2
 
 | Topic | ID | Notă |
@@ -1202,6 +1395,7 @@ Pattern: legacy + wave ca F101–F103.
 | TCO / stack depth | **3+f** | Discuție 2026-08 — `maxDepth` ≠ TCO |
 | Trig `is/2` | **3+g** | Post-F42 amânat |
 | RNG `randomSeed:` | **F104** | Per-comp get/set state; nu reseed each pass |
+| `showx/N` style color | **F105** | **D1050–D1060✅**; fallback plain; extensii clear/font backlog **4+h…** |
 
 ---
 
@@ -1213,3 +1407,4 @@ Pattern: legacy + wave ca F101–F103.
 | 2026-08-27 | **D1004–D1007✅** — ordine secvențială commit; normalize+use; reguli |
 | 2026-08-27 | **D1014–D1017✅** — F100 **ready-to-implement**; D1014 wire refs păstrate |
 | 2026-08-27 | **F104 draft** — RNG per componentă via `logicRngGetState`/`SetState`; context swap la exec pass (Monopoly dice) |
+| 2026-08-28 | **F105 done** — `showx/N` + Style color; teste 4563–4583; doc verify OK |

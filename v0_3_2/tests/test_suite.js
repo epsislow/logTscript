@@ -50193,5 +50193,307 @@ comp [logic] .diceB:
   reg(4561, 'logic', 'F104 interleaved comps preserve streams (legacy)', runF104InterleavedComps);
   reg(4562, 'logic', 'F104 interleaved comps preserve streams (wave)', runF104InterleavedComps, { propagation: 'wave' });
 
+  function logicShowMeta(interp) {
+    return (interp && interp.logicShowMeta) ? interp.logicShowMeta : [];
+  }
+
+  const INLINE_LOGIC_SHOWX_COLOR = `inline [logic] .game:
+
+    query banner:
+        showx(fff, "hello")
+
+:`;
+
+  function runLogicShowxAtomColor(h, session) {
+    const src = INLINE_LOGIC_SHOWX_COLOR + `
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = banner
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('line text', String(session.outIncludes(interp, 'hello')), 'true');
+    const meta = logicShowMeta(interp);
+    h.assert('one styled meta', String(meta.length), '1');
+    h.assert('color fff', meta[0].style.color, '#fff');
+  }
+
+  reg(4563, 'logic', 'showx/N atom hex Style colors line (legacy)', runLogicShowxAtomColor);
+  reg(4564, 'logic', 'showx/N atom hex Style colors line (wave)', runLogicShowxAtomColor, { propagation: 'wave' });
+
+  function runLogicShowxStringColor(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        showx("ff0000", "error")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('line', String(session.outIncludes(interp, 'error')), 'true');
+    const meta = logicShowMeta(interp);
+    h.assert('color ff0000', meta[0].style.color, '#ff0000');
+  }
+
+  reg(4565, 'logic', 'showx/N string hex Style (legacy)', runLogicShowxStringColor);
+  reg(4566, 'logic', 'showx/N string hex Style (wave)', runLogicShowxStringColor, { propagation: 'wave' });
+
+  function runLogicShowxPlainFallback(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        showx(red, "plain")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('plain line', String(session.outIncludes(interp, 'plain')), 'true');
+    h.assert('no styled meta', String(logicShowMeta(interp).length), '0');
+  }
+
+  reg(4567, 'logic', 'showx/N non-hex Style plain fallback (legacy)', runLogicShowxPlainFallback);
+  reg(4568, 'logic', 'showx/N non-hex Style plain fallback (wave)', runLogicShowxPlainFallback, { propagation: 'wave' });
+
+  function runLogicShowxUnboundStyle(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        showx(StyleVar, "x")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('line x', String(session.outIncludes(interp, 'x')), 'true');
+    h.assert('no color meta', String(logicShowMeta(interp).length), '0');
+  }
+
+  reg(4569, 'logic', 'showx/N unbound Style plain succeeds (legacy)', runLogicShowxUnboundStyle);
+  reg(4570, 'logic', 'showx/N unbound Style plain succeeds (wave)', runLogicShowxUnboundStyle, { propagation: 'wave' });
+
+  const INLINE_LOGIC_SHOWX_DYNAMIC = `inline [logic] .game:
+
+    player_color(p1, fff)
+    player_color(p2, "00f")
+
+    query turn:
+        player_color(P, MyColor),
+        showx(MyColor, "player", P)
+
+:`;
+
+  function runLogicShowxDynamicColor(h, session) {
+    const src = INLINE_LOGIC_SHOWX_DYNAMIC + `
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = turn
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const meta = logicShowMeta(interp);
+    h.assert('two styled lines', String(meta.length), '2');
+    h.assert('p1 line', String(session.outIncludes(interp, 'player p1')), 'true');
+    h.assert('p2 line', String(session.outIncludes(interp, 'player p2')), 'true');
+    const colors = meta.map((m) => m.style.color).sort();
+    h.assert('colors', colors.join(','), '#00f,#fff');
+  }
+
+  reg(4571, 'logic', 'showx/N MyColor variable Style (legacy)', runLogicShowxDynamicColor);
+  reg(4572, 'logic', 'showx/N MyColor variable Style (wave)', runLogicShowxDynamicColor, { propagation: 'wave' });
+
+  function runLogicShowxThenShowPlain(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        showx(fff, "colorat"),
+        show("plain")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const meta = logicShowMeta(interp);
+    h.assert('one styled only', String(meta.length), '1');
+    h.assert('styled line', meta[0].line, 'colorat');
+    h.assert('plain after', String(session.outIncludes(interp, 'plain')), 'true');
+  }
+
+  reg(4573, 'logic', 'showx then show no color bleed (legacy)', runLogicShowxThenShowPlain);
+  reg(4574, 'logic', 'showx then show no color bleed (wave)', runLogicShowxThenShowPlain, { propagation: 'wave' });
+
+  reg(4575, 'logic', 'showx/1 parse error', function(h, session) {
+    h.assertThrows(
+      'showx/1',
+      () => parseLogicBody('query q: showx(fff)'),
+      'showx requires at least 2 arguments',
+    );
+  });
+
+  reg(4576, 'logic', 'showx max 32 args parse error', function(h, session) {
+    const args = ['fff'].concat(Array.from({ length: 32 }, (_, i) => `a${i}`)).join(', ');
+    h.assertThrows(
+      'showx arity cap',
+      () => parseLogicBody(`query q: showx(${args})`),
+      'showx accepts at most 32 arguments',
+    );
+  });
+
+  reg(4577, 'logic', 'showx reserved as fact head', function(h, session) {
+    h.assertThrows(
+      'reserved showx fact',
+      () => parseLogicBody('showx(fff, test)'),
+      'showx/N',
+    );
+  });
+
+  reg(4578, 'logic', 'showx not allowed inside commit', function(h, session) {
+    h.assertThrows(
+      'commit showx',
+      () => parseLogicGoalsBlock('commit(showx(fff, "x"), + status(a))'),
+      'showx is not allowed inside commit',
+    );
+  });
+
+  reg(4579, 'logic', 'show("fff") unchanged — text not color (legacy)', function(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        show("fff")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('text fff', String(session.outIncludes(interp, 'fff')), 'true');
+    h.assert('no styled meta', String(logicShowMeta(interp).length), '0');
+  });
+
+  reg(4580, 'logic', 'show("fff") unchanged — text not color (wave)', function(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        show("fff")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('text fff', String(session.outIncludes(interp, 'fff')), 'true');
+    h.assert('no styled meta', String(logicShowMeta(interp).length), '0');
+  }, { propagation: 'wave' });
+
+  reg(4581, 'logic', 'logicHexColorFromString unit', function(h, session) {
+    h.assert('3 digit', logicHexColorFromString('fff'), '#fff');
+    h.assert('6 digit', logicHexColorFromString('FF0000'), '#ff0000');
+    h.assert('invalid 2', String(logicHexColorFromString('ff')), 'null');
+    h.assert('invalid name', String(logicHexColorFromString('red')), 'null');
+  });
+
+  reg(4582, 'logic', 'showx via .world:query output (legacy)', function(h, session) {
+    const src = `inline [logic] .world:
+
+    player_color(p1, fff)
+    player_color(p2, "00f")
+
+    banner(P) <- player_color(P, C), showx(C, "go", P)
+
+:
+
+8wire[4] who = .world:query({ banner(P) }, P=text)`;
+    const { interp } = session.run(src);
+    h.assert('go p1', String(session.outIncludes(interp, 'go p1')), 'true');
+    h.assert('go p2', String(session.outIncludes(interp, 'go p2')), 'true');
+  });
+
+  reg(4583, 'logic', 'showx via .world:query output (wave)', function(h, session) {
+    const src = `inline [logic] .world:
+
+    player_color(p1, fff)
+    player_color(p2, "00f")
+
+    banner(P) <- player_color(P, C), showx(C, "go", P)
+
+:
+
+8wire[4] who = .world:query({ banner(P) }, P=text)`;
+    const { interp } = session.run(src);
+    h.assert('go p1', String(session.outIncludes(interp, 'go p1')), 'true');
+    h.assert('go p2', String(session.outIncludes(interp, 'go p2')), 'true');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

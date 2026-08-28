@@ -18,7 +18,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts, rules, and constraints (not queries); `use once` skips revisits; **`use .mod as alias`** prefixes imported predicates |
-| **Debug output** | Built-in **`show/N`** — see [logic-builtins.md](logic-builtins.md) |
+| **Debug output** | Built-in **`show/N`** and **`showx/N`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | `[H|T]`, `[_, X, _]`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | `functor(Arg, …)`, nested `prop(N, rents(…))` — see [Compound terms](#compound-terms) |
 | **List builtins** | **`member/2`**, **`append/3`**, **`append/2`**, **`string_to_list/2`**, **`string_to_codes/2`**, **`atom_chars/2`**, **`atom_codes/2`**, **`between/3`**, **`lazy_list/2`**, **`lazy_list_materialize/1`**, **`length/2`**, **`last/2`**, **`select/3`**, **`selectchk/3`**, **`flatten/2`**, **`same_length/2`**, **`reverse/2`**, **`sort/2`**, **`keysort/2`**, **`msort/2`**, **`prefix/2`**, **`suffix/2`**, **`is_set/1`**, **`list_to_set/2`**, **`union/3`**, **`intersection/3`**, **`subtract/3`**, **`numlist/3`**, **`sum_list/2`**, **`max_list/2`**, **`min_list/2`**, **`sublist/3`**, **`permutation/2`**, **`combinations/3`**, **`call/1`**, **`include/3`**, **`exclude/3`**, **`partition/4`**, **`convlist/3`**, **`maplist/2`**, **`maplist/3`**, **`foldl/4`**, **`foldl/5`**, **`findall/3`**, **`bagof/3`**, **`setof/3`**, **`nth0/3`**, **`nth1/3`**, **`nth1/4`** — [logic-builtins.md](logic-builtins.md) |
@@ -2100,9 +2100,9 @@ After **Load & Run**: **`ok = 1`**. Inline **`:query`** remains read-only; it se
 
 ---
 
-## Built-in `show/N` (logic debug output)
+## Built-in `show/N` and `showx/N` (logic debug output)
 
-**`show/N`** is a reserved logic predicate for printing terms during query execution — not script **`show(wire)`**. Full reference (semantics, limits, examples): [logic-builtins.md — `show/N`](logic-builtins.md#shown).
+**`show/N`** is a reserved logic predicate for printing terms during query execution — not script **`show(wire)`**. **`showx/N`** adds an optional line color via the first **`Style`** argument (hex atom or string). Full reference: [logic-builtins.md — `show/N`](logic-builtins.md#shown) · [`showx/N`](logic-builtins.md#showxn).
 
 Also see **`count/2`** in [logic-builtins.md](logic-builtins.md#count2) and [logic-indexing.md](logic-indexing.md) (index attributes).
 

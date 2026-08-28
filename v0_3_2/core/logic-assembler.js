@@ -3,6 +3,7 @@
 const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as']);
 const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number', 'float']);
 const LOGIC_BUILTIN_SHOW_PRED = 'show';
+const LOGIC_BUILTIN_SHOWX_PRED = 'showx';
 const LOGIC_BUILTIN_NTH0_PRED = 'nth0';
 const LOGIC_BUILTIN_NTH1_PRED = 'nth1';
 const LOGIC_BUILTIN_IS_PRED = 'is';
@@ -72,6 +73,7 @@ const LOGIC_BUILTIN_TYPE_PREDS = new Set([
 ]);
 const LOGIC_BUILTIN_RESERVED_HEADS = new Set([
   LOGIC_BUILTIN_SHOW_PRED,
+  LOGIC_BUILTIN_SHOWX_PRED,
   LOGIC_BUILTIN_NTH0_PRED,
   LOGIC_BUILTIN_NTH1_PRED,
 ]);
@@ -134,6 +136,8 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
   [LOGIC_BUILTIN_LAZY_LIST_MATERIALIZE_PRED]: [1],
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
+const LOGIC_SHOWX_MAX_ARGS = 32;
+const LOGIC_SHOWX_MIN_ARGS = 2;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
 
 function logicError(msg, line) {
@@ -641,6 +645,7 @@ class LogicParser {
     this.expect('RP');
     const compound = { kind: 'compound', predicate, args, line: startLine };
     if (predicate === LOGIC_BUILTIN_SHOW_PRED) logicValidateShowCall(args, startLine);
+    if (predicate === LOGIC_BUILTIN_SHOWX_PRED) logicValidateShowxCall(args, startLine);
     if (predicate === LOGIC_BUILTIN_IF_PRED) logicValidateIfCall(args, startLine);
     return compound;
   }
@@ -960,6 +965,9 @@ class LogicParser {
     }
     if (this.at('ID', LOGIC_BUILTIN_SHOW_PRED) && this.looksLikeCompound()) {
       logicError('show is not allowed inside commit', line);
+    }
+    if (this.at('ID', LOGIC_BUILTIN_SHOWX_PRED) && this.looksLikeCompound()) {
+      logicError('showx is not allowed inside commit', line);
     }
     logicError('commit op must be +, -, or ~', line);
   }
@@ -1309,6 +1317,16 @@ function logicValidateShowCall(args, line) {
   }
 }
 
+function logicValidateShowxCall(args, line) {
+  const n = (args || []).length;
+  if (n < LOGIC_SHOWX_MIN_ARGS) {
+    logicError('showx requires at least 2 arguments (Style and one term to print)', line);
+  }
+  if (n > LOGIC_SHOWX_MAX_ARGS) {
+    logicError(`showx accepts at most ${LOGIC_SHOWX_MAX_ARGS} arguments`, line);
+  }
+}
+
 function logicValidateListElementCount(count, line) {
   if (count > LOGIC_LIST_MAX_ELEMENTS) {
     logicError(`list literal accepts at most ${LOGIC_LIST_MAX_ELEMENTS} elements`, line);
@@ -1331,6 +1349,7 @@ function logicIsReservedPredicateHead(head) {
 
 function logicReservedHeadError(predicate, arity) {
   if (predicate === LOGIC_BUILTIN_SHOW_PRED) return "'show/N' is reserved — cannot define show as fact or rule head";
+  if (predicate === LOGIC_BUILTIN_SHOWX_PRED) return "'showx/N' is reserved — cannot define showx as fact or rule head";
   if (predicate === LOGIC_BUILTIN_NTH0_PRED || predicate === LOGIC_BUILTIN_NTH1_PRED) {
     return `'${predicate}/${arity}' is reserved — cannot define ${predicate} as fact or rule head`;
   }
@@ -1543,6 +1562,8 @@ function logicValidateProgram(prog) {
       const arity = (c.head.args || []).length;
       if (pred === LOGIC_BUILTIN_SHOW_PRED) {
         logicError("'show/N' is reserved — cannot define show as constraint head", c.line);
+      } else if (pred === LOGIC_BUILTIN_SHOWX_PRED) {
+        logicError("'showx/N' is reserved — cannot define showx as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_IS_PRED && arity === 2) {
         logicError("'is/2' is reserved — cannot define is as constraint head", c.line);
       } else if (pred === LOGIC_BUILTIN_MEMBER_PRED && arity === 2) {
