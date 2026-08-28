@@ -41,14 +41,48 @@ textarea {
 .CodeMirror .cm-error-context-token {
   background: rgba(255, 160, 180, 0.2);
 }
+.output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.output-head h3 { margin: 0; font-size: 14px; }
+.output-height-toggle-btn {
+  flex-shrink: 0;
+  min-width: 2rem;
+  width: 2rem;
+  text-align: center;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: inherit;
+  background: #333;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1.2;
+  margin: 0;
+}
+.output-height-toggle-btn:hover { background: #444; border-color: #777; }
+.output-height-toggle-btn--active {
+  background: #1f66e0;
+  border-color: #5a9fff;
+}
 .output-panel {
+  --output-panel-max-height: 260px;
   background: #000;
   padding: 10px;
-  max-height: 260px;
+  max-height: var(--output-panel-max-height);
   overflow: auto;
   overflow-anchor: none;
   font-family: monospace;
   font-size: inherit;
+}
+.output-panel.output-panel--fixed-height {
+  height: var(--output-panel-max-height);
 }
 .output-line { white-space: pre; min-height: 1em; }
 .output-line--error { color: #f55; }
@@ -3377,7 +3411,10 @@ show(a,b,c)
       <div id="waveListenOut" class="wave-listen-out"></div>
     </div>
     <div class="panel" id="outputPanel" style="flex:1; min-height:100px;">
-      <h3>Output</h3>
+      <div class="output-head">
+        <h3>Output</h3>
+        <button type="button" id="outputHeightToggleBtn" class="output-height-toggle-btn" title="Fix height at max" aria-pressed="false">↕</button>
+      </div>
       <div id="out" class="output-panel"></div>
     </div>
   </div>

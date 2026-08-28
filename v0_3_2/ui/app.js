@@ -111,6 +111,25 @@ function clearOutput() {
   if (el) el.innerHTML = '';
 }
 
+function initOutputPanelHeightToggle() {
+  const btn = document.getElementById('outputHeightToggleBtn');
+  const panel = document.getElementById('out');
+  if (!btn || !panel) return;
+
+  function setOutputPanelHeightFixed(fixed) {
+    panel.classList.toggle('output-panel--fixed-height', fixed);
+    btn.classList.toggle('output-height-toggle-btn--active', fixed);
+    btn.setAttribute('aria-pressed', fixed ? 'true' : 'false');
+    btn.title = fixed ? 'Use max-height only' : 'Fix height at max';
+    btn.textContent = fixed ? '⇕' : '↕';
+  }
+
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    setOutputPanelHeightFixed(!panel.classList.contains('output-panel--fixed-height'));
+  });
+}
+
 function scrollOutputToBottom(preservePage) {
   const el = document.getElementById('out');
   if (!el) return;
@@ -640,6 +659,7 @@ async function init() {
 
   initTimelineAnalyzer();
   if (typeof initSelectionPanel === 'function') initSelectionPanel();
+  initOutputPanelHeightToggle();
   updateInstSelectorUI();
   updateStepControlsUI();
 }
