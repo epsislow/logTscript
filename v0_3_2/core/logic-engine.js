@@ -932,10 +932,13 @@ class LogicEngine {
       parts.push(logicFormatShowTerm(arg, env, this.table));
     }
     const line = parts.join(' ');
-    const color = logicResolveStyleColor(styleTerm, env, this.table);
+    const parsed = logicParseShowxStyle(styleTerm, env, this.table);
     if (typeof this.onShowLine === 'function') {
-      if (color) {
-        this.onShowLine(line, { style: { color } });
+      if (parsed && (parsed.clear || parsed.color)) {
+        const style = {};
+        if (parsed.clear) style.clear = true;
+        if (parsed.color) style.color = parsed.color;
+        this.onShowLine(line, { style });
       } else {
         this.onShowLine(line);
       }
@@ -4613,28 +4616,63 @@ function logicHexColorFromString(raw) {
   return '#' + s.toLowerCase();
 }
 
-function logicResolveStyleColor(term, env, table) {
+function logicGroundStringFromStyleTerm(term, env, table) {
   const d = logicDeref(term, env);
   if (!d) return null;
   if (d.kind === 'var') return null;
   if (d.kind === 'atom') {
-    const name = d.name != null ? String(d.name) : (d.id != null && table ? table.name(d.id) : '');
-    return logicHexColorFromString(name);
+    return d.name != null ? String(d.name) : (d.id != null && table ? table.name(d.id) : '');
   }
+  if (d.value != null && typeof d.value === 'string') return String(d.value);
   return null;
+}
+
+function logicParseShowxStyleString(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s === 'x') return { clear: true, color: null };
+  if (/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(s)) {
+    return { clear: false, color: logicHexColorFromString(s) };
+  }
+  const m = /^x([0-9a-fA-F]{3}([0-9a-fA-F]{3})?)$/.exec(s);
+  if (m) return { clear: true, color: logicHexColorFromString(m[1]) };
+  return null;
+}
+
+function logicParseShowxStyle(term, env, table) {
+  const s = logicGroundStringFromStyleTerm(term, env, table);
+  if (s == null) return null;
+  return logicParseShowxStyleString(s);
+}
+
+function logicResolveStyleColor(term, env, table) {
+  const parsed = logicParseShowxStyle(term, env, table);
+  return parsed && parsed.color ? parsed.color : null;
 }
 
 function logicCreateOnShowLineHandler(target) {
   if (!target || !target.out) return null;
   return function onShowLine(line, meta) {
+    const style = meta && meta.style ? meta.style : null;
+    if (style && style.clear) {
+      target.out.length = 0;
+      if (target.outBlocks) target.outBlocks.length = 0;
+      if (target.logicShowMeta) target.logicShowMeta.length = 0;
+      target.outputClearCount = (target.outputClearCount || 0) + 1;
+    }
     const idx = target.out.length;
     target.out.push(line);
-    const color = meta && meta.style && meta.style.color ? meta.style.color : null;
+    const color = style && style.color ? style.color : null;
+    if (style && (style.clear || color)) {
+      if (!target.logicShowMeta) target.logicShowMeta = [];
+      const entry = { line, style: {} };
+      if (style.clear) entry.style.clear = true;
+      if (color) entry.style.color = color;
+      target.logicShowMeta.push(entry);
+    }
     if (color) {
       if (!target.outBlocks) target.outBlocks = [];
       target.outBlocks.push({ kind: 'styledLine', start: idx, color });
-      if (!target.logicShowMeta) target.logicShowMeta = [];
-      target.logicShowMeta.push({ line, style: { color } });
     }
   };
 }
@@ -5912,6 +5950,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicRngGetState = logicRngGetState;
   globalThis.logicRngSetState = logicRngSetState;
   globalThis.logicResolveStyleColor = logicResolveStyleColor;
+  globalThis.logicParseShowxStyle = logicParseShowxStyle;
+  globalThis.logicParseShowxStyleString = logicParseShowxStyleString;
   globalThis.logicCreateOnShowLineHandler = logicCreateOnShowLineHandler;
   globalThis.logicHexColorFromString = logicHexColorFromString;
   globalThis.logicNormalizeRandomSeed = logicNormalizeRandomSeed;
@@ -5982,6 +6022,8 @@ if (typeof module !== 'undefined' && module.exports) {
     logicRngGetState,
     logicRngSetState,
     logicResolveStyleColor,
+    logicParseShowxStyle,
+    logicParseShowxStyleString,
     logicCreateOnShowLineHandler,
     logicHexColorFromString,
     logicNormalizeRandomSeed,

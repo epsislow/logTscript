@@ -32,6 +32,9 @@ todos:
   - id: f105-showx-style
     content: "F105: showx/N — styled logic output (color în style) — D1050–D1060✅ — teste 4563+"
     status: completed
+  - id: f106-showx-clear
+    content: "F106: showx Style prefix x — clear Output panel — D1061–D1068✅ — teste 4584+"
+    status: completed
 isProject: false
 ---
 
@@ -99,6 +102,7 @@ isProject: false
 | **Faza 103** Fact read fără side-effect `$`/`$$` | **F103a ✅** | **C Monopoly** — guard `phase$(waitRoll)` nu mai rescrie store |
 | **Faza 104** `randomSeed:` per componentă (RNG context swap) | **F104a ✅** | Monopoly dice — stream continuu per comp |
 | **Faza 105** `showx/N` — output logic cu **style** (culoare) | **F105 ✅** | **D1050–D1060✅** — teste 4563–4583 |
+| **Faza 106** `showx` — **Style** prefix **`x`** (clear Output panel) | **F106 ✅** | **D1061–D1068✅** — teste 4584–4596 |
 | *(rezervat)* | — | — |
 
 ---
@@ -1198,7 +1202,7 @@ Pattern: legacy + wave ca F101–F103.
 
 > **Status:** **✅ F105 done** (2026-08-28). **D1050–D1060✅**.  
 > **Extinde:** builtin `show/N` (F11+ doc); **nu** modifică `show/N`.  
-> **Viitor:** `showx` = „show extra” — același API pentru **clear output**, **font**, etc.; F105 livrează doar **color** în `style`.
+> **Viitor:** `showx` = „show extra” — extensii **`style`** post-F105: **clear** → **F106**; font etc. backlog **4+j**.
 
 ### Problemă
 
@@ -1284,7 +1288,7 @@ La exec, pentru `Style`:
 
 **2. Fără propagare culoare între linii**
 
-Fiecare apel `showx` / `show` e **independent**. Culoarea din `showx` se aplică **doar** liniei curente (meta + `styledLine` la indexul ei). Un `show(...)` imediat după **nu** moștenește culoarea — plain, inherit CSS (ca `show` azi). **Nu** există „current style” persistent în engine (F105). Extensii viitoare (`clear`, default color) → decizie separată (**4+h…**).
+Fiecare apel `showx` / `show` e **independent**. Culoarea din `showx` se aplică **doar** liniei curente (meta + `styledLine` la indexul ei). Un `show(...)` imediat după **nu** moștenește culoarea — plain, inherit CSS (ca `show` azi). **Nu** există „current style” persistent în engine (F105). **Clear** → **F106**.
 
 ```logts
 showx(fff, "colorat"),
@@ -1309,7 +1313,7 @@ _solveShowx:
 
 **UI (`app.js`):** `buildOutputPlan` — la `styledLine` block → `appendOutputLine(text, '', { color })`.
 
-**Viitor F106+:** `meta.style.clear`, `meta.style.font` — același `onShowLine` / `outBlocks`, extindere obiect `style`.
+**Viitor F106:** `meta.style.clear` — vezi [Faza 106](#faza-106--showx--style-prefix-x-clear-output-panel-post-f105).
 
 ### Fix **F105a** — assembler
 
@@ -1342,7 +1346,7 @@ _solveShowx:
 
 - `logic-builtins.md` — secțiune **`showx/N`** vs **`show/N`**
 - `inline-logic.md` — exemple Monopoly / status colorat
-- Notă **forward-compat:** `Style` va include și non-color (clear, font) — F105 doar color
+- Notă **forward-compat:** extensii **`style`** — clear (**F106**), font (**4+j**)
 
 ### Teste **4563+**
 
@@ -1372,13 +1376,151 @@ Pattern: legacy + wave ca F101–F104.
 
 | ID | Subiect | Notă |
 | -- | ------- | ---- |
-| **4+h** | `showx(clear, …)` sau atom style `clear` | șterge Output panel înainte de print |
-| **4+i** | `showx` + wire/`^` hex | reutilizare `color-wire-resolve` |
-| **4+j** | `style` font / bold | extindere `meta.style` |
+| ✅ | **4+h** clear Output | **Promovat → F106** |
+| ⏸ | **4+i** | `showx` + wire/`^` hex — reutilizare `color-wire-resolve` |
+| ⏸ | **4+j** | `style` font / bold — extindere `meta.style` |
 
 ### Legături
 
 - [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — mesaje UI colorate per player
+- [inline_logic.plan.md](inline_logic.plan.md) — `show/N` original
+- [Faza 106](#faza-106--showx--style-prefix-x-clear-output-panel-post-f105) — clear în `Style`
+
+---
+
+## Faza 106 — `showx` — **Style** prefix **`x`** (clear Output panel) **(post-F105)**
+
+> **Status:** **(completed)** — **D1061–D1068✅**; teste **4584–4596** green; doc verify OK.  
+> **Extinde:** [Faza 105](#faza-105--shown--output-logic-cu-style-culoare-post-f104) — același predicat **`showx/N`**; extindere **`logicResolveStyle*`** + UI clear.  
+> **Nu** modifică `show/N`.
+
+### Problemă
+
+| Situație | Comportament dorit |
+| -------- | ------------------ |
+| Banner Monopoly / ecran nou | Golește Output panel **înainte** de linia colorată |
+| User vrea API simplu | **`x`** în **`Style`**, prefix-only — nu builtin separat |
+| `fffx`, `xxfff`, `Xfff` | **Invalid** — ignoră **tot** style-ul (plain, **fără** clear) |
+| `showx(x, "msg")` | Clear + linie plain |
+| Backtrack | La fiecare apel `showx` cu clear — clear din nou (user controlează) |
+
+**F105 azi:** `Style` = hex 3/6 digits → culoare; altfel plain. **Fără** clear.
+
+### Sintaxă țintă — forme **`Style`** valide (ground atom/string)
+
+| Formă | Clear | Culoare | Exemplu |
+| ----- | ----- | ------- | ------- |
+| **`fff`** / **`ff0000`** | nu | `#fff` / `#ff0000` | `showx(fff, "hi")` — ca F105 |
+| **`xfff`** / **`xff0000`** | **da** (înainte de print) | după prefix | `showx(xfff, "=== START ===")` |
+| **`x`** | **da** | none | `showx(x, "separator")` → plain după clear |
+
+**Prefix-only:** `x` **doar** la început — fie singur, fie urmat imediat de hex 3/6. **Nu** `fffx`, `fxff`, `xxfff`.
+
+**Min args:** neschimbat F105 — **`showx(Style)`** singur → **parse error**; clear-only = `showx(x, Term1, …)`.
+
+### Decizii confirmate **D1061–D1068** **(user 2026-08-28)**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D1061** | Marker clear | **A ✅** — litera **`x` lowercase** singură; **`X` majuscule ≠ clear** |
+| **D1062** | Gramatică `Style` | **A ✅** — **3 forme** valide: **`hex`**, **`x`**, **`x`+`hex`** (prefix); **fără** `fffx` / ordine arbitrară |
+| **D1063** | Format invalid | **A ✅** — **ignoră tot style-ul**: **nu** clear, **nu** culoare; linie **plain** ca `show` (extinde D1053) |
+| **D1064** | Arity | **A ✅** — **`showx(Style)`** fără termeni conținut → **parse error** (ca F105) |
+| **D1065** | Backtracking | **A ✅** — fiecare apel `showx` cu clear valid → **clear din nou**; fără dedup |
+| **D1066** | Scope clear | **A ✅** — **doar Output panel** (`#out`); nu probe, Wave Listen, terminal |
+| **D1067** | Pipeline | **A ✅** — `meta.style.clear: true`; UI golește panel **înainte** de linia curentă; `ctx.out` / text linie ca F105; **legacy = wave** pe text |
+| **D1068** | Teste + doc | **A ✅** — teste **4584+** legacy+wave; doc EN `logic-builtins.md` |
+
+### D1063 — invalid → ignoră tot style-ul (detaliu)
+
+| `Style` (ground) | Clear | Culoare | Linie |
+| ---------------- | ----- | ------- | ----- |
+| `xxfff` | — | — | plain |
+| `fffx` | — | — | plain |
+| `xf0f0f` | — | — | plain |
+| `xff` | — | — | plain (2 hex după `x`) |
+| `Xfff` | — | — | plain |
+| `red` | — | — | plain (F105) |
+| `xfff` | da | `#fff` | colorată |
+| `x` | da | — | plain după clear |
+
+Variabilă neligată → plain, fără clear (ca F105).
+
+### Algoritm **`logicParseShowxStyle(s)`** (draft)
+
+```text
+s = ground string from atom/string Style
+if s === "x"                    → { clear: true,  color: null }
+if match ^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$  → { clear: false, color: normalize(hex) }
+if match ^x[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$ → { clear: true,  color: normalize(rest) }
+else                            → null   % D1063 — plain, no clear
+```
+
+Exec în `_solveShowx`:
+
+```text
+parsed = logicParseShowxStyle(styleTerm, env, table)
+line = join(content terms)
+if parsed?.clear → onClearOutput?.() sau flag meta + UI sync
+if parsed?.color → onShowLine(line, { style: { clear?, color } })
+else             → onShowLine(line)
+out.push(line)
+```
+
+**Ordine:** clear panel → append linie (colorată sau plain).
+
+### D1067 — UI clear
+
+- **`app.js`:** callback `onClearOutput` sau handler în `logicCreateOnShowLineHandler` când `meta.style.clear`
+- **`syncOutputPanel` / `render`:** la clear — `clearOutput()` + reset `ctx.out` / `interp.out` / `outBlocks` **înainte** de linia nouă (sau atomic cu linia)
+- Teste Node: hook `interp.outputCleared` sau inspect `out.length === 0` înainte de push
+
+### Fix **F106a** — engine
+
+**Fișier:** `logic-engine.js`
+
+- Înlocuiește / extinde `logicResolveStyleColor` → **`logicParseShowxStyle(term, env, table)`** → `{ clear, color }` | `null`
+- `_solveShowx` — clear branch + meta `style.clear`
+- `logicCreateOnShowLineHandler` — suport `meta.style.clear`; opțional `onClearOutput` separat
+
+### Fix **F106b** — UI
+
+**Fișiere:** `ui/app.js`, `ui/run-context.js` (dacă snapshot `out`)
+
+- Clear Output panel + buffer `interp.out` / `outBlocks` sincron
+- Fingerprint output plan — include clear events
+
+### Fix **F106c** — doc
+
+- `logic-builtins.md` — secțiune **`x` prefix** în **`showx/N`**; tabel 3 forme; invalid → plain
+- Exemple **Load & Run**: banner `xfff`, reset `x`, Monopoly turn
+
+### Teste **4584+**
+
+| ID | Scenariu | Așteptat |
+| ---- | -------- | -------- |
+| 4584–4585 | `showx(xfff, "banner")` | panel cleared; line + `#fff`; meta clear+color |
+| 4586–4587 | `showx(x, "only")` | clear; plain `only` |
+| 4588–4589 | `showx(fffx, "bad")` | **no** clear; plain `bad` |
+| 4590–4591 | `showx(xxfff, "bad")` | **no** clear; plain |
+| 4592–4593 | `showx(x, "a"), show("b")` legacy/wave | după `a`, `b` vizibil; text identic L/W |
+| 4594–4595 | backtrack cu `xfff` | clear+print per ramură |
+| — | regresie **4563–4583** | green |
+
+Pattern: legacy + wave.
+
+### Criterii done
+
+- [x] **D1061–D1068✅**
+- [x] **F106a…F106c** livrate
+- [x] Teste **4584+** + regresie F105 green
+- [x] Doc verify `logic-builtins` blocks noi
+- [x] **Fără** breaking change pe F105 `fff`-only scripts
+
+### Legături
+
+- [Faza 105](#faza-105--shown--output-logic-cu-style-culoare-post-f104)
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — ecran turn / banner
 - [inline_logic.plan.md](inline_logic.plan.md) — `show/N` original
 
 ---
@@ -1395,7 +1537,8 @@ Pattern: legacy + wave ca F101–F104.
 | TCO / stack depth | **3+f** | Discuție 2026-08 — `maxDepth` ≠ TCO |
 | Trig `is/2` | **3+g** | Post-F42 amânat |
 | RNG `randomSeed:` | **F104** | Per-comp get/set state; nu reseed each pass |
-| `showx/N` style color | **F105** | **D1050–D1060✅**; fallback plain; extensii clear/font backlog **4+h…** |
+| `showx/N` style color | **F105** | **D1050–D1060✅**; fallback plain; teste 4563–4583 |
+| `showx/N` clear prefix `x` | **F106** | **D1061–D1068✅** draft; clear Output panel; teste **4584+**; font backlog **4+j** |
 
 ---
 
@@ -1408,3 +1551,5 @@ Pattern: legacy + wave ca F101–F104.
 | 2026-08-27 | **D1014–D1017✅** — F100 **ready-to-implement**; D1014 wire refs păstrate |
 | 2026-08-27 | **F104 draft** — RNG per componentă via `logicRngGetState`/`SetState`; context swap la exec pass (Monopoly dice) |
 | 2026-08-28 | **F105 done** — `showx/N` + Style color; teste 4563–4583; doc verify OK |
+| 2026-08-28 | **F106 draft** — **D1061–D1068✅** user confirm; Style prefix **`x`** clear Output; **4+h** promovat; teste **4584+** |
+| 2026-08-28 | **F106 done** — `logicParseShowxStyle`; clear în handler; teste 4584–4596; doc verify OK |

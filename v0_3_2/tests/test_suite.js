@@ -50495,5 +50495,211 @@ comp [logic] .gameLogic:
     h.assert('go p2', String(session.outIncludes(interp, 'go p2')), 'true');
   }, { propagation: 'wave' });
 
+  function logicOutputClearCount(interp) {
+    return (interp && interp.outputClearCount) ? interp.outputClearCount : 0;
+  }
+
+  function runLogicShowxClearColor(h, session) {
+    const src = `inline [logic] .game:
+
+    query banner:
+        show("old"),
+        showx(xfff, "banner")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = banner
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('only banner line', String(interp.out.length), '1');
+    h.assert('banner text', String(session.outIncludes(interp, 'banner')), 'true');
+    h.assert('old gone', String(session.outIncludes(interp, 'old')), 'false');
+    h.assert('cleared once', String(logicOutputClearCount(interp)), '1');
+    const meta = logicShowMeta(interp);
+    h.assert('one meta', String(meta.length), '1');
+    h.assert('clear flag', String(!!meta[0].style.clear), 'true');
+    h.assert('color fff', meta[0].style.color, '#fff');
+  }
+
+  reg(4584, 'logic', 'showx/N xfff clears then colors (legacy)', runLogicShowxClearColor);
+  reg(4585, 'logic', 'showx/N xfff clears then colors (wave)', runLogicShowxClearColor, { propagation: 'wave' });
+
+  function runLogicShowxClearPlain(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        show("before"),
+        showx(x, "only")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('one line', String(interp.out.length), '1');
+    h.assert('only text', interp.out[0], 'only');
+    h.assert('cleared', String(logicOutputClearCount(interp)), '1');
+    const meta = logicShowMeta(interp);
+    h.assert('clear meta', String(!!meta[0].style.clear), 'true');
+    h.assert('no color', String(meta[0].style.color == null), 'true');
+  }
+
+  reg(4586, 'logic', 'showx/N x clears plain line (legacy)', runLogicShowxClearPlain);
+  reg(4587, 'logic', 'showx/N x clears plain line (wave)', runLogicShowxClearPlain, { propagation: 'wave' });
+
+  function runLogicShowxInvalidNoClear(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        show("keep"),
+        showx(fffx, "bad")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('two lines', String(interp.out.length), '2');
+    h.assert('keep', String(session.outIncludes(interp, 'keep')), 'true');
+    h.assert('bad', String(session.outIncludes(interp, 'bad')), 'true');
+    h.assert('no clear', String(logicOutputClearCount(interp)), '0');
+    h.assert('no meta', String(logicShowMeta(interp).length), '0');
+  }
+
+  reg(4588, 'logic', 'showx/N fffx invalid no clear (legacy)', runLogicShowxInvalidNoClear);
+  reg(4589, 'logic', 'showx/N fffx invalid no clear (wave)', runLogicShowxInvalidNoClear, { propagation: 'wave' });
+
+  function runLogicShowxInvalidXHexNoClear(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        showx(xxfff, "bad")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('plain bad', interp.out[0], 'bad');
+    h.assert('no clear', String(logicOutputClearCount(interp)), '0');
+    h.assert('no meta', String(logicShowMeta(interp).length), '0');
+  }
+
+  reg(4590, 'logic', 'showx/N xxfff invalid no clear (legacy)', runLogicShowxInvalidXHexNoClear);
+  reg(4591, 'logic', 'showx/N xxfff invalid no clear (wave)', runLogicShowxInvalidXHexNoClear, { propagation: 'wave' });
+
+  function runLogicShowxClearThenShow(h, session) {
+    const src = `inline [logic] .game:
+
+    query q:
+        showx(x, "a"),
+        show("b")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('two lines', String(interp.out.length), '2');
+    h.assert('a', String(session.outIncludes(interp, 'a')), 'true');
+    h.assert('b', String(session.outIncludes(interp, 'b')), 'true');
+    h.assert('join', interp.out.join('\n'), 'a\nb');
+  }
+
+  reg(4592, 'logic', 'showx/N x then show both visible (legacy)', runLogicShowxClearThenShow);
+  reg(4593, 'logic', 'showx/N x then show both visible (wave)', runLogicShowxClearThenShow, { propagation: 'wave' });
+
+  function runLogicShowxClearBacktrack(h, session) {
+    const src = `inline [logic] .game:
+
+    player_color(p1, xfff)
+    player_color(p2, xfff)
+
+    query turn:
+        player_color(P, C),
+        showx(C, "go", P)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = turn
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('clear per branch', String(logicOutputClearCount(interp)), '2');
+    h.assert('last branch only', String(interp.out.length), '1');
+    h.assert('go p2', interp.out[0], 'go p2');
+    const meta = logicShowMeta(interp);
+    h.assert('one meta after last clear', String(meta.length), '1');
+    h.assert('clear+color', String(!!meta[0].style.clear && meta[0].style.color === '#fff'), 'true');
+  }
+
+  reg(4594, 'logic', 'showx/N xfff clear per backtrack branch (legacy)', runLogicShowxClearBacktrack);
+  reg(4595, 'logic', 'showx/N xfff clear per backtrack branch (wave)', runLogicShowxClearBacktrack, { propagation: 'wave' });
+
+  reg(4596, 'logic', 'logicParseShowxStyleString unit', function(h, session) {
+    h.assert('x only', JSON.stringify(logicParseShowxStyleString('x')), '{"clear":true,"color":null}');
+    h.assert('hex', JSON.stringify(logicParseShowxStyleString('fff')), '{"clear":false,"color":"#fff"}');
+    h.assert('xhex', JSON.stringify(logicParseShowxStyleString('xfff')), '{"clear":true,"color":"#fff"}');
+    h.assert('xff0000', JSON.stringify(logicParseShowxStyleString('xff0000')), '{"clear":true,"color":"#ff0000"}');
+    h.assert('fffx invalid', String(logicParseShowxStyleString('fffx')), 'null');
+    h.assert('xxfff invalid', String(logicParseShowxStyleString('xxfff')), 'null');
+    h.assert('xf0f0f invalid', String(logicParseShowxStyleString('xf0f0f')), 'null');
+    h.assert('xff invalid', String(logicParseShowxStyleString('xff')), 'null');
+    h.assert('Xfff invalid', String(logicParseShowxStyleString('Xfff')), 'null');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

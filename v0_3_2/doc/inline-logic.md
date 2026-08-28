@@ -2102,7 +2102,7 @@ After **Load & Run**: **`ok = 1`**. Inline **`:query`** remains read-only; it se
 
 ## Built-in `show/N` and `showx/N` (logic debug output)
 
-**`show/N`** is a reserved logic predicate for printing terms during query execution — not script **`show(wire)`**. **`showx/N`** adds an optional line color via the first **`Style`** argument (hex atom or string). Full reference: [logic-builtins.md — `show/N`](logic-builtins.md#shown) · [`showx/N`](logic-builtins.md#showxn).
+**`show/N`** is a reserved logic predicate for printing terms during query execution — not script **`show(wire)`**. **`showx/N`** adds optional line **color** and **Output clear** via the first **`Style`** argument (hex, **`x`**, or **`x`+hex**). Full reference: [logic-builtins.md — `show/N`](logic-builtins.md#shown) · [`showx/N`](logic-builtins.md#showxn).
 
 Also see **`count/2`** in [logic-builtins.md](logic-builtins.md#count2) and [logic-indexing.md](logic-indexing.md) (index attributes).
 

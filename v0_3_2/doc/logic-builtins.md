@@ -163,6 +163,7 @@ Print logic terms to the run **output buffer** with an optional **line color** f
 - **`showx(Style)`** alone → **parse error**.
 - Always **succeeds**; does not fail the surrounding query when `Style` is invalid or unbound.
 - **`Style`** accepts a ground **atom** or **string literal** with **3** or **6** hexadecimal digits (`fff`, `ff0000`, case-insensitive). Normalized to CSS `#rgb` / `#rrggbb` in the Output panel.
+- Optional **clear** prefix **`x`** (lowercase only) in **`Style`** clears the **Output panel** before printing the line. Valid forms: **`hex`**, **`x`** (clear, plain line), **`x`+`hex`** (clear then color). Examples: `xfff`, `x`, `xff0000`. Invalid spellings (`fffx`, `xxfff`, `xf0f0f`, `Xfff`, …) ignore the entire style — plain line, **no** clear.
 - Atoms whose spelling starts with a **digit** (for example **`00f`**) are read as numbers, not colors — use a **string literal** (`"00f"`) or a letter-first atom (`f00`).
 - **`Style`** is never printed. Content terms join with a single space (no leading space before the first printed term).
 - Each line’s color is independent — a following **`show/…`** does not inherit color from **`showx/…`**.
@@ -278,6 +279,57 @@ comp [logic] .gameLogic:
 ```
 
 **Load & Run:** **`status: ok`** in the default Output color — atom **`red`** is not a hex code, so **`showx`** behaves like **`show("status:", ok)`** for the text.
+
+### Example — clear Output then color (`xfff`)
+
+```logts-play
+inline [logic] .game:
+
+    query banner:
+        show("old"),
+        showx(xfff, "=== START ===")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = banner
+    set = trigger
+}
+```
+
+**Load & Run:** Output panel is cleared first; only **`=== START ===`** remains, in color **`#fff`**. The earlier **`old`** line is removed.
+
+### Example — clear plain line (`x`)
+
+```logts-play
+inline [logic] .game:
+
+    query reset:
+        showx(x, "ready")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = reset
+    set = trigger
+}
+```
+
+**Load & Run:** Output cleared; one plain line **`ready`**.
 
 ---
 
