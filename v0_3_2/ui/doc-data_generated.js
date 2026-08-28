@@ -20711,7 +20711,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries and runtime fact overlay on [comp-logic.md](comp-logic.md) / [logic-runtime.md](logic-runtime.md) |
 | **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
 | **Composition** | \`use .otherModule\` merges facts, rules, and constraints (not queries); \`use once\` skips revisits; **\`use .mod as alias\`** prefixes imported predicates |
-| **Debug output** | Built-in **\`show/N\`** — see [logic-builtins.md](logic-builtins.md) |
+| **Debug output** | Built-in **\`show/N\`** and **\`showx/N\`** — see [logic-builtins.md](logic-builtins.md) |
 | **List patterns** | \`[H|T]\`, \`[_, X, _]\`, recursive rules — see [Prolog lists](#prolog-lists) |
 | **Compounds** | \`functor(Arg, …)\`, nested \`prop(N, rents(…))\` — see [Compound terms](#compound-terms) |
 | **List builtins** | **\`member/2\`**, **\`append/3\`**, **\`append/2\`**, **\`string_to_list/2\`**, **\`string_to_codes/2\`**, **\`atom_chars/2\`**, **\`atom_codes/2\`**, **\`between/3\`**, **\`lazy_list/2\`**, **\`lazy_list_materialize/1\`**, **\`length/2\`**, **\`last/2\`**, **\`select/3\`**, **\`selectchk/3\`**, **\`flatten/2\`**, **\`same_length/2\`**, **\`reverse/2\`**, **\`sort/2\`**, **\`keysort/2\`**, **\`msort/2\`**, **\`prefix/2\`**, **\`suffix/2\`**, **\`is_set/1\`**, **\`list_to_set/2\`**, **\`union/3\`**, **\`intersection/3\`**, **\`subtract/3\`**, **\`numlist/3\`**, **\`sum_list/2\`**, **\`max_list/2\`**, **\`min_list/2\`**, **\`sublist/3\`**, **\`permutation/2\`**, **\`combinations/3\`**, **\`call/1\`**, **\`include/3\`**, **\`exclude/3\`**, **\`partition/4\`**, **\`convlist/3\`**, **\`maplist/2\`**, **\`maplist/3\`**, **\`foldl/4\`**, **\`foldl/5\`**, **\`findall/3\`**, **\`bagof/3\`**, **\`setof/3\`**, **\`nth0/3\`**, **\`nth1/3\`**, **\`nth1/4\`** — [logic-builtins.md](logic-builtins.md) |
@@ -22793,9 +22793,9 @@ After **Load & Run**: **\`ok = 1\`**. Inline **\`:query\`** remains read-only; i
 
 ---
 
-## Built-in \`show/N\` (logic debug output)
+## Built-in \`show/N\` and \`showx/N\` (logic debug output)
 
-**\`show/N\`** is a reserved logic predicate for printing terms during query execution — not script **\`show(wire)\`**. Full reference (semantics, limits, examples): [logic-builtins.md — \`show/N\`](logic-builtins.md#shown).
+**\`show/N\`** is a reserved logic predicate for printing terms during query execution — not script **\`show(wire)\`**. **\`showx/N\`** adds optional line **color** and **Output clear** via the first **\`Style\`** argument (hex, **\`x\`**, or **\`x\`+hex**). Full reference: [logic-builtins.md — \`show/N\`](logic-builtins.md#shown) · [\`showx/N\`](logic-builtins.md#showxn).
 
 Also see **\`count/2\`** in [logic-builtins.md](logic-builtins.md#count2) and [logic-indexing.md](logic-indexing.md) (index attributes).
 
@@ -24842,6 +24842,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | Builtin | Arity | Reserved head | Side effects | Summary |
 |---------|-------|---------------|--------------|---------|
 | **\`show/N\`** | 1–32 | yes | yes (output buffer) | Print logic terms |
+| **\`showx/N\`** | 1–32 | yes | yes (output buffer + line color) | Print logic terms with optional **Style** color |
 | **\`count/2\`** | 2 | no¹ | no | Number of solutions to a goal |
 | **\`nth0/3\`** | 3 | yes | no | List element at **0-based** index |
 | **\`nth1/3\`** | 3 | yes | no | List element at **1-based** index |
@@ -24971,6 +24972,295 @@ comp [logic] .worldLogic:
 inside: inside(john, johnsCar)
 inside: inside(mary, marysBike)
 \`\`\`
+
+---
+
+## \`showx/N\`
+
+Print logic terms to the run **output buffer** with an optional **line color** from the first argument **\`Style\`**. Same formatting rules as **\`show/N\`** for the remaining arguments. Not the top-level script **\`show(wire)\`** statement.
+
+| | **Logic \`showx/N\`** | **Logic \`show/N\`** |
+|--|---------------------|---------------------|
+| First argument | **\`Style\`** — hex color when ground (not printed) | First term to print |
+| Remaining args | Terms to print (space-separated) | Terms to print |
+| Invalid / unbound \`Style\` | Plain line (same text as \`show\` on those terms) | — |
+| \`show("fff")\` | — | Prints text **\`fff\`** (not a color) |
+
+**Behaviour:**
+
+- **\`N\`** from **1** to **32**. With **\`N ≥ 2\`**, first argument is **\`Style\`**, remaining arguments are terms to print.
+- **\`showx()\`** with zero arguments → **parse error**.
+- **\`showx(Style)\`** alone (style-only, no content terms):
+  - **\`x\`** or **\`x\`+\`hex\`** (\`xfff\`, \`xff0000\`, …) → **clear Output panel**, **no** new line (color ignored when hex follows **\`x\`**).
+  - ground **hex** only (\`fff\`, \`ff0000\`, …) → **no-op** (succeeds, no output change).
+  - invalid / unbound **\`Style\`** → **no-op**.
+- Always **succeeds**; does not fail the surrounding query when \`Style\` is invalid or unbound.
+- **\`Style\`** accepts a ground **atom** or **string literal** with **3** or **6** hexadecimal digits (\`fff\`, \`ff0000\`, case-insensitive). Normalized to CSS \`#rgb\` / \`#rrggbb\` in the Output panel.
+- Optional **clear** prefix **\`x\`** (lowercase only) in **\`Style\`** clears the **Output panel** before printing the line. Valid forms: **\`hex\`**, **\`x\`** (clear, plain line), **\`x\`+\`hex\`** (clear then color). Examples: \`xfff\`, \`x\`, \`xff0000\`. Invalid spellings (\`fffx\`, \`xxfff\`, \`xf0f0f\`, \`Xfff\`, …) ignore the entire style — plain line, **no** clear.
+- Atoms whose spelling starts with a **digit** (for example **\`00f\`**) are read as numbers, not colors — use a **string literal** (\`"00f"\`) or a letter-first atom (\`f00\`).
+- **\`Style\`** is never printed. Content terms join with a single space (no leading space before the first printed term).
+- Each line’s color is independent — a following **\`show/…\`** does not inherit color from **\`showx/…\`**.
+- On **backtracking**, prints again for each branch (color re-evaluated when \`Style\` is a variable).
+- Cannot be used as a fact, rule, or constraint **head**. Not allowed inside **\`commit/…\`**.
+
+### Example — ground atom Style
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    query banner:
+        showx(fff, "=== START ===")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = banner
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** one Output line **\`=== START ===\`** displayed in color **\`#fff\`**.
+
+### Example — ground string Style
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    query err:
+        showx("ff0000", "error:", Code),
+        show("detail:", Msg)
+
+    error(code(404), "not found")
+
+    query run:
+        error(Code, Msg)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = run
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** first line **\`error: code(404)\`** in **\`#ff0000\`**; second line **\`detail: not found\`** in the default Output color.
+
+### Example — variable \`MyColor\` (dynamic Style)
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    player_color(p1, fff)
+    player_color(p2, "00f")
+
+    query turn:
+        player_color(P, MyColor),
+        showx(MyColor, "turn:", P)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = turn
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** two lines — **\`turn: p1\`** in **\`#fff\`**, **\`turn: p2\`** in **\`#00f\`** (one line per backtracking solution).
+
+**Dynamic \`Style\`:** bind **\`Style\`** in a **separate goal** before **\`showx/…\`**. There is no conditional **expression** inside arguments — **\`if/3\`** is control flow, not a term (see [logic-builtins — \`if/3\`](#if3--soft-if-then-else)). Use a **\`color_style/2\`** fact table or **multiple rule clauses** (below).
+
+### Example — \`color_style/2\` map (controlled Style per atom)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+    color_style(red, f00)
+    color_style(green, ff0)
+    color_style(blue, "00f")
+    walk([]) <- show("done")
+    walk([H | T]) <- color_style(H, C), showx(C, H), walk(T)
+
+    query demo:
+        colors(L),
+        walk(L)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = demo
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** three colored lines — **\`red\`** in **\`#f00\`**, **\`green\`** in **\`#ff0\`**, **\`blue\`** in **\`#00f\`** — then plain **\`done\`**.
+
+### Example — multiple clauses (one \`showx\` Style per color)
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+
+    walk([]) <- show("done")
+
+    walk([H | T]) <- H = red, showx(f00, H), walk(T)
+    walk([H | T]) <- H = green, showx(ff0, H), walk(T)
+    walk([H | T]) <- H = blue, showx("00f", H), walk(T)
+
+    query demo:
+        colors(L),
+        walk(L)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = demo
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** same Output as the **\`color_style/2\`** example — three colored atom names, then **\`done\`**.
+
+### Example — non-hex Style (plain fallback)
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    query q:
+        showx(red, "status:", ok)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = q
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** **\`status: ok\`** in the default Output color — atom **\`red\`** is not a hex code, so **\`showx\`** behaves like **\`show("status:", ok)\`** for the text.
+
+### Example — clear Output then color (\`xfff\`)
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    query banner:
+        show("old"),
+        showx(xfff, "=== START ===")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = banner
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** Output panel is cleared first; only **\`=== START ===\`** remains, in color **\`#fff\`**. The earlier **\`old\`** line is removed.
+
+### Example — clear plain line (\`x\`)
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    query reset:
+        showx(x, "ready")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = reset
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** Output cleared; one plain line **\`ready\`**.
+
+### Example — clear Output only (\`showx/1\`)
+
+Use **\`showx(x)\`** or **\`showx(xfff)\`** when you need to reset the Output panel **without** printing a line (UI control before later **\`showx/…\`** or **\`show/…\`** goals).
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    query screen:
+        show("old"),
+        showx(x),
+        showx(fff, "fresh")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = screen
+    set = trigger
+}
+\`\`\`
+
+**Load & Run:** **\`old\`** is removed; one line **\`fresh\`** in color **\`#fff\`**. **\`showx(fff)\`** alone (hex **\`Style\`**, no content) would be a **no-op**.
 
 ---
 
