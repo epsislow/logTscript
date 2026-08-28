@@ -13,7 +13,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | Builtin | Arity | Reserved head | Side effects | Summary |
 |---------|-------|---------------|--------------|---------|
 | **`show/N`** | 1–32 | yes | yes (output buffer) | Print logic terms |
-| **`showx/N`** | 2–32 | yes | yes (output buffer + line color) | Print logic terms with optional **Style** color |
+| **`showx/N`** | 1–32 | yes | yes (output buffer + line color) | Print logic terms with optional **Style** color |
 | **`count/2`** | 2 | no¹ | no | Number of solutions to a goal |
 | **`nth0/3`** | 3 | yes | no | List element at **0-based** index |
 | **`nth1/3`** | 3 | yes | no | List element at **1-based** index |
@@ -159,8 +159,12 @@ Print logic terms to the run **output buffer** with an optional **line color** f
 
 **Behaviour:**
 
-- **`N`** from **2** to **32** — **`Style`** plus at least one term to print.
-- **`showx(Style)`** alone → **parse error**.
+- **`N`** from **1** to **32**. With **`N ≥ 2`**, first argument is **`Style`**, remaining arguments are terms to print.
+- **`showx()`** with zero arguments → **parse error**.
+- **`showx(Style)`** alone (style-only, no content terms):
+  - **`x`** or **`x`+`hex`** (`xfff`, `xff0000`, …) → **clear Output panel**, **no** new line (color ignored when hex follows **`x`**).
+  - ground **hex** only (`fff`, `ff0000`, …) → **no-op** (succeeds, no output change).
+  - invalid / unbound **`Style`** → **no-op**.
 - Always **succeeds**; does not fail the surrounding query when `Style` is invalid or unbound.
 - **`Style`** accepts a ground **atom** or **string literal** with **3** or **6** hexadecimal digits (`fff`, `ff0000`, case-insensitive). Normalized to CSS `#rgb` / `#rrggbb` in the Output panel.
 - Optional **clear** prefix **`x`** (lowercase only) in **`Style`** clears the **Output panel** before printing the line. Valid forms: **`hex`**, **`x`** (clear, plain line), **`x`+`hex`** (clear then color). Examples: `xfff`, `x`, `xff0000`. Invalid spellings (`fffx`, `xxfff`, `xf0f0f`, `Xfff`, …) ignore the entire style — plain line, **no** clear.
@@ -399,6 +403,35 @@ comp [logic] .gameLogic:
 ```
 
 **Load & Run:** Output cleared; one plain line **`ready`**.
+
+### Example — clear Output only (`showx/1`)
+
+Use **`showx(x)`** or **`showx(xfff)`** when you need to reset the Output panel **without** printing a line (UI control before later **`showx/…`** or **`show/…`** goals).
+
+```logts-play
+inline [logic] .game:
+
+    query screen:
+        show("old"),
+        showx(x),
+        showx(fff, "fresh")
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game { }
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    query = screen
+    set = trigger
+}
+```
+
+**Load & Run:** **`old`** is removed; one line **`fresh`** in color **`#fff`**. **`showx(fff)`** alone (hex **`Style`**, no content) would be a **no-op**.
 
 ---
 

@@ -137,7 +137,7 @@ const LOGIC_BUILTIN_RESERVED_ARITIES = {
 };
 const LOGIC_SHOW_MAX_ARGS = 32;
 const LOGIC_SHOWX_MAX_ARGS = 32;
-const LOGIC_SHOWX_MIN_ARGS = 2;
+const LOGIC_SHOWX_MIN_ARGS = 1;
 const LOGIC_LIST_MAX_ELEMENTS = 1024;
 
 function logicError(msg, line) {
@@ -1320,7 +1320,7 @@ function logicValidateShowCall(args, line) {
 function logicValidateShowxCall(args, line) {
   const n = (args || []).length;
   if (n < LOGIC_SHOWX_MIN_ARGS) {
-    logicError('showx requires at least 2 arguments (Style and one term to print)', line);
+    logicError('showx requires at least 1 argument (Style)', line);
   }
   if (n > LOGIC_SHOWX_MAX_ARGS) {
     logicError(`showx accepts at most ${LOGIC_SHOWX_MAX_ARGS} arguments`, line);

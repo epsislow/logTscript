@@ -35,6 +35,9 @@ todos:
   - id: f106-showx-clear
     content: "F106: showx Style prefix x — clear Output panel — D1061–D1068✅ — teste 4584+"
     status: completed
+  - id: f107-showx-style-only
+    content: "F107: showx/1 — clear silent (x) sau noop (hex/invalid) — D1071–D1076✅ — teste 4597+"
+    status: completed
 isProject: false
 ---
 
@@ -103,6 +106,7 @@ isProject: false
 | **Faza 104** `randomSeed:` per componentă (RNG context swap) | **F104a ✅** | Monopoly dice — stream continuu per comp |
 | **Faza 105** `showx/N` — output logic cu **style** (culoare) | **F105 ✅** | **D1050–D1060✅** — teste 4563–4583 |
 | **Faza 106** `showx` — **Style** prefix **`x`** (clear Output panel) | **F106 ✅** | **D1061–D1068✅** — teste 4584–4596 |
+| **Faza 107** `showx/1` — style-only (clear silent / noop) | **F107 ✅** | **D1071–D1076✅** — teste 4597–4608 |
 | *(rezervat)* | — | — |
 
 ---
@@ -1416,7 +1420,7 @@ Pattern: legacy + wave ca F101–F104.
 
 **Prefix-only:** `x` **doar** la început — fie singur, fie urmat imediat de hex 3/6. **Nu** `fffx`, `fxff`, `xxfff`.
 
-**Min args:** neschimbat F105 — **`showx(Style)`** singur → **parse error**; clear-only = `showx(x, Term1, …)`.
+**Min args:** **`showx()`** → parse error. **`showx/1`** → [F107](#faza-107--showx1-style-only-clear-silent--noop-post-f106). **`N ≥ 2`** — **`Style`** + ≥1 term; clear-only cu conținut = `showx(x, Term1, …)`.
 
 ### Decizii confirmate **D1061–D1068** **(user 2026-08-28)**
 
@@ -1525,6 +1529,47 @@ Pattern: legacy + wave.
 
 ---
 
+## Faza 107 — `showx/1` style-only (clear silent / noop) **(post-F106)**
+
+> **Status:** **(completed)** — **D1071–D1076✅**; teste **4597–4608** green; doc verify OK.  
+> **Extinde:** [Faza 106](#faza-106--showx--style-prefix-x-clear-output-panel-post-f105) — același **`showx/N`**; **`N = 1`** permis.
+
+### Problemă
+
+| Situație | Comportament |
+| -------- | ------------ |
+| Reset UI fără linie | **`showx(x)`** — clear Output, fără append |
+| Clear fără conținut | **`showx(xfff)`** — clear; culoarea ignorată |
+| Hex fără termeni | **`showx(fff)`** — noop (succes, fără efect) |
+| Invalid / neligat | **`showx(red)`**, **`showx(Var)`** — noop |
+| Zero args | **`showx()`** — parse error (neschimbat) |
+
+### Decizii **D1071–D1076** **(user 2026-08-28)**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D1071** | Arity min | **`showx/1`** valid; **`showx()`** → parse error |
+| **D1072** | **`showx(x)`** | Clear Output; **fără** linie nouă |
+| **D1073** | **`showx(x`+hex`)`** | Clear; **fără** linie; culoare ignorată |
+| **D1074** | **`showx(hex)`** ground | **Noop** — fără clear, fără linie |
+| **D1075** | Invalid / unbound | **Noop** |
+| **D1076** | **`N ≥ 2`** | Comportament F105/F106 neschimbat |
+
+### Implementare
+
+- **`logic-assembler`:** `LOGIC_SHOWX_MIN_ARGS = 1`
+- **`logic-engine`:** `_solveShowx` branch `contentArgs.length === 0`; `clearOnly` în handler
+- Teste **4597–4608**; test **4575** → **`showx/0`** parse error
+- Doc EN **`logic-builtins.md`**
+
+### Criterii done
+
+- [x] **D1071–D1076✅**
+- [x] Teste **4597–4608** + regresie F105/F106
+- [x] Doc verify
+
+---
+
 ## Riscuri / neclarități plan 2
 
 | Topic | ID | Notă |
@@ -1538,7 +1583,8 @@ Pattern: legacy + wave.
 | Trig `is/2` | **3+g** | Post-F42 amânat |
 | RNG `randomSeed:` | **F104** | Per-comp get/set state; nu reseed each pass |
 | `showx/N` style color | **F105** | **D1050–D1060✅**; fallback plain; teste 4563–4583 |
-| `showx/N` clear prefix `x` | **F106** | **D1061–D1068✅** draft; clear Output panel; teste **4584+**; font backlog **4+j** |
+| `showx/N` clear prefix `x` | **F106** | **D1061–D1068✅**; clear Output panel; teste 4584–4596 |
+| `showx/1` style-only | **F107** | **D1071–D1076✅**; clear silent / noop; teste 4597–4608 |
 
 ---
 
@@ -1553,3 +1599,4 @@ Pattern: legacy + wave.
 | 2026-08-28 | **F105 done** — `showx/N` + Style color; teste 4563–4583; doc verify OK |
 | 2026-08-28 | **F106 draft** — **D1061–D1068✅** user confirm; Style prefix **`x`** clear Output; **4+h** promovat; teste **4584+** |
 | 2026-08-28 | **F106 done** — `logicParseShowxStyle`; clear în handler; teste 4584–4596; doc verify OK |
+| 2026-08-28 | **F107 done** — `showx/1` style-only; clear silent (`x`); hex noop; teste 4597–4608 |

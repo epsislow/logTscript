@@ -595,7 +595,7 @@ class LogicEngine {
     if (g0.kind === 'call' && g0.predicate === 'show' && g0.arity >= 1) {
       return this._solveShow(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
-    if (g0.kind === 'call' && g0.predicate === 'showx' && g0.arity >= 2) {
+    if (g0.kind === 'call' && g0.predicate === 'showx' && g0.arity >= 1) {
       return this._solveShowx(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call' && g0.predicate === 'nth0' && g0.arity === 3) {
@@ -927,12 +927,18 @@ class LogicEngine {
     const args = goal.args || [];
     const styleTerm = args[0];
     const contentArgs = args.slice(1);
+    const parsed = logicParseShowxStyle(styleTerm, env, this.table);
+    if (!contentArgs.length) {
+      if (parsed && parsed.clear && typeof this.onShowLine === 'function') {
+        this.onShowLine(null, { style: { clear: true, clearOnly: true } });
+      }
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
+    }
     const parts = [];
     for (const arg of contentArgs) {
       parts.push(logicFormatShowTerm(arg, env, this.table));
     }
     const line = parts.join(' ');
-    const parsed = logicParseShowxStyle(styleTerm, env, this.table);
     if (typeof this.onShowLine === 'function') {
       if (parsed && (parsed.clear || parsed.color)) {
         const style = {};
@@ -4660,6 +4666,7 @@ function logicCreateOnShowLineHandler(target) {
       if (target.logicShowMeta) target.logicShowMeta.length = 0;
       target.outputClearCount = (target.outputClearCount || 0) + 1;
     }
+    if (style && style.clearOnly) return;
     const idx = target.out.length;
     target.out.push(line);
     const color = style && style.color ? style.color : null;
