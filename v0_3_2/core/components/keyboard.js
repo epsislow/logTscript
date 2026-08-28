@@ -293,6 +293,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         { name: 'codesAccepted', value: '.component (lut)' },
         { name: 'showCode', value: 'integer' },
         { name: 'pulseColor', value: 'color' },
+        { name: 'focuskey', value: 'string' },
         { name: 'nl', value: null },
       ],
       initValue: '8bit',
@@ -362,6 +363,35 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     };
 
     return { onKey };
+  }
+
+  static buildFocusHandler(keyboardId) {
+    const getPanelKb = () => {
+      const maps = typeof getDeviceMaps === 'function' ? getDeviceMaps() : null;
+      if (maps && maps.panelKeyboards) return maps.panelKeyboards.get(keyboardId);
+      if (typeof window !== 'undefined' && window.panelKeyboards) {
+        return window.panelKeyboards.get(keyboardId);
+      }
+      return null;
+    };
+    const isFocused = () => typeof window !== 'undefined' && window.focusedKeyboardId === keyboardId;
+    const focus = () => {
+      if (typeof window !== 'undefined') window.focusedKeyboardId = keyboardId;
+      const kb = getPanelKb();
+      if (kb && typeof kb.focus === 'function') kb.focus();
+    };
+    const unfocus = () => {
+      if (typeof window !== 'undefined' && window.focusedKeyboardId === keyboardId) {
+        window.focusedKeyboardId = null;
+      }
+      const kb = getPanelKb();
+      if (kb && typeof kb.unfocus === 'function') kb.unfocus();
+    };
+    const toggleFocus = () => {
+      if (isFocused()) unfocus();
+      else focus();
+    };
+    return { focus, unfocus, isFocused, toggleFocus, keyboardId };
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
@@ -434,11 +464,19 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
       });
     }
 
+    const focusHandler = KeyboardComponent.buildFocusHandler(keyboardId);
+
+    const reg = typeof LogTScriptHotkeyRegister !== 'undefined' ? LogTScriptHotkeyRegister : null;
+    if (reg && attributes.focuskey !== undefined) {
+      reg.registerKeyboardFocusKey(ctx, name, keyboardId, attributes.focuskey, focusHandler);
+    }
+
     return {
       deviceIds: [keyboardId],
       ref: getRef,
       validRef,
       keyboardHandler: { onKey },
+      focusHandler,
       codesAcceptedFilter: filterState,
       keyboardUi: ui,
     };

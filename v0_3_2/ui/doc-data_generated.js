@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -16493,6 +16493,7 @@ comp [dip] .name::
 | \`text\`     | string  | \`''\`      | Group label |
 | \`color\`    | hex \\| wire | \`#2ecc71\` | Color when a position is on |
 | \`colorFor\` | hex \\| wire (array) | —         | Per-position colors (\`colorFor.3: swatch\` or \`colorFor.3: ^ff0\`) |
+| \`hotkeyFor\` | string (array) | — | Per-position hotkeys (\`hotkeyFor.0: "1"\`) — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | \`visual\`   | \`0\`/\`1\` | \`0\`       | Show \`0\`/\`1\` on each position |
 | \`noLabels\` | flag    | (no)      | Hide position labels |
 | \`noTrans\`  | flag    | —         | Disable transition animation |
@@ -22834,6 +22835,8 @@ doc(.character)
 
 Per-component pages: [switch.md](switch.md), [key.md](key.md), [keyboard.md](keyboard.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [sensor.md](sensor.md), [scanner.md](scanner.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
 
+**Keyboard hotkeys and Devices focus:** [ui-focus-hotkeys.md](ui-focus-hotkeys.md) — \`hotkey\` / \`hotkeyFor\` on panel inputs and \`focuskey\` on keyboard/scanner.
+
 **Switch**, **key**, **keyboard**, **dip**, **rotary**, **slider**, **sensor**, and **scanner** are input components you control from the devices panel while the program is running.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
@@ -24017,6 +24020,7 @@ comp [key] .name::
 | \`label\`   | string  | \`''\`    | Text on the button |
 | \`size\`    | integer | \`36\`    | Button size (pixels) |
 | \`type\`    | \`0\`/\`1\`/\`2\` | \`0\` | Interaction mode (see below) |
+| \`hotkey\`  | string  | —       | Keyboard shortcut while Devices panel is focused ([ui-focus-hotkeys.md](ui-focus-hotkeys.md)) |
 | \`nl\`      | flag    | (no)    | Newline after the button |
 
 ### \`type\` interaction modes
@@ -24183,6 +24187,7 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | \`codesAccepted\` | LUT ref | (no) | Whitelist of allowed keys via \`comp [lut]\` (\`codesAccepted = .lut\`) |
 | \`showCode\` | integer | \`0\` | Display last \`:get\` code next to label (\`0\` off, \`1\` hex, \`2\` decimal) |
 | \`pulseColor\` | hex \\| wire | (no) | Brief color flash on border/label after each accepted key |
+| \`focuskey\` | string | — | Hotkey to enter/leave keyboard focus — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | \`nl\` | flag | (no) | New line after component |
 
 Color attributes: hex \`^RRGGBB\` or wire name (snapshot). See [component-color-attributes.md](component-color-attributes.md).
@@ -45945,6 +45950,7 @@ When set, non-digit characters are stripped from the field (and on commit). Digi
 | \`focusColor\` | hex \\| wire | \`^2ecc71\` | Border when the field is focused |
 | \`focusBgColor\` | hex \\| wire | \`^181818\` | Background when focused |
 | \`onlyDigits\` | flag | off | Accept digits only |
+| \`focuskey\` | string | — | Hotkey to enter/leave scanner field focus — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | \`nl\` | flag | off | Newline after the control |
 
 Color attributes: hex or wire name — [component-color-attributes.md](component-color-attributes.md).
@@ -51013,6 +51019,7 @@ comp [switch] .name::
 | Attribute | Type   | Default | Description |
 |-----------|--------|---------|-------------|
 | \`text\`    | string | \`''\`    | Label next to the switch |
+| \`hotkey\`  | string | —       | Keyboard shortcut while Devices panel is focused — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | \`nl\`      | flag   | (no)    | Newline after the control |
 
 ---
@@ -51686,6 +51693,233 @@ See [builtin-TRIMT.md](builtin-TRIMT.md).
 | Wire string literals | [wire-literals.md](wire-literals.md) |
 | Logic \`text\` pins | [comp-logic.md](comp-logic.md) |
 | \`show(…; ascii)\` | [debug.md](debug.md) |
+`,
+    'ui-focus-hotkeys.md': `# UI focus and hotkeys
+
+Panel inputs can be driven from the keyboard while a simulation is **running**. Two mechanisms work together:
+
+| Mechanism | Attribute | Components | Purpose |
+|-----------|-----------|------------|---------|
+| **Action hotkey** | \`hotkey:\` or \`hotkeyFor.N:\` | \`key\`, \`switch\`, \`dip\` | Toggle or press the control (same effect as clicking it in the Devices panel) |
+| **Focus hotkey** | \`focuskey:\` | \`keyboard\`, \`scanner\` | Enter or leave text input focus on that widget |
+
+See also: [key.md](key.md), [switch.md](switch.md), [dip.md](dip.md), [keyboard.md](keyboard.md), [scanner.md](scanner.md), [interactive-components.md](interactive-components.md).
+
+---
+
+## Devices panel focus
+
+Action hotkeys run only when the **Devices panel has UI focus**:
+
+1. Click inside the **Devices** panel (or press **Load & Run** and then click Devices) — the panel shows a green outline while focused.
+2. Press a configured hotkey — matching controls fire in **script declaration order**.
+3. Click the **editor** or outside Devices — hotkeys stop until you focus Devices again.
+
+While a **keyboard** or **scanner** widget has text focus, action hotkeys are **blocked** (typed characters go to that widget instead).
+
+**Escape** (built-in, not configurable):
+
+| Level | When | Effect |
+|-------|------|--------|
+| 1 | Keyboard or scanner focused | Leave widget focus; Devices stays focused |
+| 2 | Devices focused, no widget | Clear Devices focus (outline off) |
+| 3 | Editor focused | Normal editor behaviour |
+
+---
+
+## \`hotkey:\` (key and switch)
+
+Quoted string required:
+
+\`\`\`
+comp [switch] .enable:
+  hotkey: "e"
+  on: 1
+  :
+
+comp [key] .fire:
+  label: 'Fire'
+  hotkey: "f"
+  type: 2
+  on: 1
+  :
+\`\`\`
+
+Hotkey dispatch uses the same callbacks as mouse/touch (\`onChange\` for switch, \`onPress\`/\`onRelease\` for key). Key \`type\` modes apply:
+
+| \`type\` | Hotkey \`keydown\` | Hotkey \`keyup\` |
+|--------|------------------|----------------|
+| \`0\` | Short pulse (press + release) | — |
+| \`1\` | Hold (\`press\`) | Release |
+| \`2\` | Toggle | — |
+
+**Load & Run**, focus the Devices panel, then press **e** / **f** — wires linked with \`on: 1\` update live.
+
+\`\`\`logts-play
+comp [switch] .arm:
+  text: 'Arm'
+  hotkey: "a"
+  on: 1
+  :
+
+comp [key] .go:
+  label: 'Go'
+  hotkey: "g"
+  type: 2
+  on: 1
+  :
+
+comp [led] .ready:
+  color: ^e74
+  on: 1
+  :
+
+comp [led] .goLed:
+  color: ^2ecc71
+  on: 1
+  :
+
+1wire armed = .arm
+1wire go = .go
+
+.ready = armed
+.goLed = go
+\`\`\`
+
+---
+
+## \`hotkeyFor.N:\` (dip)
+
+Per-position hotkeys — index **0-based** (same as \`colorFor.N\`), leftmost position = \`hotkeyFor.0\`:
+
+\`\`\`
+comp [dip] .mode:
+  length: 4
+  hotkeyFor.0: "1"
+  hotkeyFor.1: "2"
+  hotkeyFor.2: "3"
+  hotkeyFor.3: "4"
+  on: 1
+  :
+\`\`\`
+
+Each hotkey **toggles** that bit (same as flipping the DIP in the panel).
+
+**Load & Run**, focus Devices, press **2** — bit 1 toggles; \`probe(.mode)\` shows the new pattern.
+
+\`\`\`logts-play
+comp [dip] .hex:
+  length: 4
+  text: 'Hex'
+  hotkeyFor.0: "1"
+  hotkeyFor.1: "2"
+  hotkeyFor.2: "3"
+  hotkeyFor.3: "4"
+  on: 1
+  :
+
+comp [led] .d0:
+  color: ^f39
+  on: 1
+  :
+
+comp [led] .d1:
+  color: ^349
+  on: 1
+  :
+
+4wire pat = .hex
+1wire b0 = .hex.0
+1wire b1 = .hex.1
+
+.d0 = b0
+.d1 = b1
+
+show(pat)
+\`\`\`
+
+---
+
+## Duplicate hotkeys
+
+The same hotkey string may appear on **different** components — **all** matching actions run on each key press (non-hold first, in script order; then at most one \`type: 1\` hold).
+
+Only **one** \`key\` with \`type: 1\` may use a given hotkey (parse error on the second).
+
+\`hotkey\` and \`focuskey\` share one global key registry — the same key cannot be both (parse error).
+
+Each \`focuskey\` must be unique (parse error on duplicate).
+
+\`Escape\` cannot be used as \`hotkey\` or \`focuskey\` (reserved).
+
+---
+
+## Key matching
+
+| Script | Matches | Does not match |
+|--------|---------|----------------|
+| \`"1"\` | Main keyboard \`1\` (\`Digit1\`) | Numpad \`1\` |
+| \`"a"\` | \`a\` or \`A\` | — |
+| \`"F2"\` | Function key F2 | — |
+
+---
+
+## \`focuskey:\` (keyboard and scanner)
+
+Toggle focus on the widget (same as clicking it):
+
+\`\`\`
+comp [keyboard] .term:
+  label: 'Term'
+  focuskey: "F2"
+  allowEnter
+  :
+
+comp [scanner] .scan:
+  focuskey: "F3"
+  length: 8
+  :
+\`\`\`
+
+**Load & Run**, focus Devices, press **F2** — keyboard accepts typing; press **F2** again to leave. **Escape** also leaves widget focus.
+
+\`\`\`logts-play
+comp [keyboard] .kbd:
+  label: 'Code'
+  focuskey: "F2"
+  onlyDigits
+  on: 1
+  :
+
+comp [led] .valid:
+  color: ^2ecc71
+  on: 1
+  :
+
+8wire code = .kbd
+1wire ok = .kbd:valid
+
+.valid = ok
+
+show(code)
+\`\`\`
+
+After **Load & Run**: focus Devices → **F2** → type digits → watch \`:get\` / \`:valid\` in the Output panel.
+
+---
+
+## Quick reference
+
+| Goal | Setup |
+|------|--------|
+| Toggle switch from keyboard | \`hotkey: "…"\` on \`switch\` + Devices focus |
+| Fire / hold / latch a key | \`hotkey: "…"\` on \`key\` (respect \`type\`) |
+| Flip one DIP bit | \`hotkeyFor.N: "…"\` on \`dip\` |
+| Jump to keyboard input | \`focuskey: "…"\` on \`keyboard\` |
+| Jump to scanner field | \`focuskey: "…"\` on \`scanner\` |
+| Leave widget / Devices | **Escape** (built-in) |
+
+Tests: **4609–4638** (legacy + wave pairs for runtime behaviour).
 `,
     'user-functions.md': `# User-defined functions (\`def\`)
 

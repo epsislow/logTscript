@@ -78,6 +78,7 @@ When set, non-digit characters are stripped from the field (and on commit). Digi
 | `focusColor` | hex \| wire | `^2ecc71` | Border when the field is focused |
 | `focusBgColor` | hex \| wire | `^181818` | Background when focused |
 | `onlyDigits` | flag | off | Accept digits only |
+| `focuskey` | string | — | Hotkey to enter/leave scanner field focus — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | `nl` | flag | off | Newline after the control |
 
 Color attributes: hex or wire name — [component-color-attributes.md](component-color-attributes.md).

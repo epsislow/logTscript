@@ -156,6 +156,7 @@ var ScannerComponent = class ScannerComponent extends BuiltinComponent {
         { name: 'focusColor', value: 'color' },
         { name: 'focusBgColor', value: 'color' },
         { name: 'onlyDigits', value: null },
+        { name: 'focuskey', value: 'string' },
         { name: 'nl', value: null },
       ],
       initValue: null,
@@ -198,6 +199,39 @@ var ScannerComponent = class ScannerComponent extends BuiltinComponent {
     return { onCommit };
   }
 
+  static buildFocusHandler(scannerId) {
+    const getPanelScanner = () => {
+      const maps = typeof getDeviceMaps === 'function' ? getDeviceMaps() : null;
+      if (maps && maps.scanners) return maps.scanners.get(scannerId);
+      if (typeof window !== 'undefined' && window.scanners) {
+        return window.scanners.get(scannerId);
+      }
+      return null;
+    };
+    const isFocused = () => typeof window !== 'undefined' && window.focusedScannerId === scannerId;
+    const focus = () => {
+      if (typeof window !== 'undefined') window.focusedScannerId = scannerId;
+      const sc = getPanelScanner();
+      if (sc && sc.input && typeof sc.input.focus === 'function') {
+        try { sc.input.focus({ preventScroll: true }); } catch (_e) { sc.input.focus(); }
+      }
+    };
+    const unfocus = () => {
+      if (typeof window !== 'undefined' && window.focusedScannerId === scannerId) {
+        window.focusedScannerId = null;
+      }
+      const sc = getPanelScanner();
+      if (sc && sc.input && typeof sc.input.blur === 'function') {
+        sc.input.blur();
+      }
+    };
+    const toggleFocus = () => {
+      if (isFocused()) unfocus();
+      else focus();
+    };
+    return { focus, unfocus, isFocused, toggleFocus, scannerId };
+  }
+
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const cfg = ScannerComponent.resolveConfig(attributes || {}, name);
     const packed = ScannerComponent.packPayload('', cfg.length);
@@ -229,12 +263,20 @@ var ScannerComponent = class ScannerComponent extends BuiltinComponent {
       });
     }
 
+    const focusHandler = ScannerComponent.buildFocusHandler(baseId);
+
+    const reg = typeof LogTScriptHotkeyRegister !== 'undefined' ? LogTScriptHotkeyRegister : null;
+    if (reg && attributes.focuskey !== undefined) {
+      reg.registerScannerFocusKey(ctx, name, baseId, attributes.focuskey, focusHandler);
+    }
+
     return {
       deviceIds: [baseId],
       ref: getRef,
       sizeRef,
       validRef,
       scannerHandler: { onCommit },
+      focusHandler,
       scannerCfg: cfg,
     };
   }

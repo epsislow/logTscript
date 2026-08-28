@@ -28,6 +28,7 @@ comp [switch] .name::
 | Attribute | Type   | Default | Description |
 |-----------|--------|---------|-------------|
 | `text`    | string | `''`    | Label next to the switch |
+| `hotkey`  | string | —       | Keyboard shortcut while Devices panel is focused — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | `nl`      | flag   | (no)    | Newline after the control |
 
 ---

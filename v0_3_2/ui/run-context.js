@@ -400,6 +400,9 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
   }
 
   stopRunContextTimers(ctx);
+  if (ctx.interp && ctx.interp.hotkeyManager) {
+    ctx.interp.hotkeyManager.clear();
+  }
   if (ctx.interp && typeof plcRetainSaveFromContext === 'function') {
     plcRetainSaveFromContext(ctx.interp);
   }
@@ -505,6 +508,9 @@ function bindInterpToRunContext(interp, ctx) {
   interp._instanceId = ctx.id;
   interp._ownerTabId = ctx.ownerTabId;
   ctx.interp = interp;
+  if (typeof interp.getHotkeyManager === 'function') {
+    ctx.hotkeyManager = interp.getHotkeyManager();
+  }
   if (typeof applyWaveListenToInterp === 'function') {
     applyWaveListenToInterp(interp, ctx);
   }

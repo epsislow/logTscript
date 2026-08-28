@@ -89,6 +89,7 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | `codesAccepted` | LUT ref | (no) | Whitelist of allowed keys via `comp [lut]` (`codesAccepted = .lut`) |
 | `showCode` | integer | `0` | Display last `:get` code next to label (`0` off, `1` hex, `2` decimal) |
 | `pulseColor` | hex \| wire | (no) | Brief color flash on border/label after each accepted key |
+| `focuskey` | string | — | Hotkey to enter/leave keyboard focus — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | `nl` | flag | (no) | New line after component |
 
 Color attributes: hex `^RRGGBB` or wire name (snapshot). See [component-color-attributes.md](component-color-attributes.md).

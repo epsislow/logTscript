@@ -56,6 +56,7 @@
       "title": "Interactive inputs",
       "items": [
         { "file": "interactive-components.md", "label": "Overview" },
+        { "file": "ui-focus-hotkeys.md", "label": "UI focus & hotkeys", "searchExtra": "hotkey focuskey Devices panel focus Escape keyboard scanner switch dip key Load Load and Run" },
         { "file": "switch.md", "label": "switch" },
         { "file": "key.md", "label": "key" },
         { "file": "keyboard.md", "label": "keyboard", "searchExtra": "input ASCII onlyDigits allowEnter allowBackspace valid focus UART RX" },

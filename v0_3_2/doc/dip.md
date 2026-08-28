@@ -35,6 +35,7 @@ comp [dip] .name::
 | `text`     | string  | `''`      | Group label |
 | `color`    | hex \| wire | `#2ecc71` | Color when a position is on |
 | `colorFor` | hex \| wire (array) | —         | Per-position colors (`colorFor.3: swatch` or `colorFor.3: ^ff0`) |
+| `hotkeyFor` | string (array) | — | Per-position hotkeys (`hotkeyFor.0: "1"`) — [ui-focus-hotkeys.md](ui-focus-hotkeys.md) |
 | `visual`   | `0`/`1` | `0`       | Show `0`/`1` on each position |
 | `noLabels` | flag    | (no)      | Hide position labels |
 | `noTrans`  | flag    | —         | Disable transition animation |

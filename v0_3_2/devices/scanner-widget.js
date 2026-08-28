@@ -111,8 +111,16 @@ function addScanner({
     input.focus();
   };
 
-  input.addEventListener('focus', () => applyFocus(true));
-  input.addEventListener('blur', () => applyFocus(false));
+  input.addEventListener('focus', () => {
+    if (typeof window !== 'undefined') window.focusedScannerId = id;
+    applyFocus(true);
+  });
+  input.addEventListener('blur', () => {
+    if (typeof window !== 'undefined' && window.focusedScannerId === id) {
+      window.focusedScannerId = null;
+    }
+    applyFocus(false);
+  });
   input.addEventListener('input', sanitize);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {

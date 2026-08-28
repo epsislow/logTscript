@@ -1,5 +1,11 @@
 var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-component') : BuiltinComponent;
 
+function syncSwitchPanel(switchId, on) {
+  if (typeof setSwitch === 'function') {
+    setSwitch(switchId, on);
+  }
+}
+
 var SwitchComponent = class SwitchComponent extends BuiltinComponent {
   static get type() { return 'switch'; }
   static get shortnames() { return {}; }
@@ -22,7 +28,11 @@ var SwitchComponent = class SwitchComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'text', value: 'string' }, { name: 'nl', value: null }],
+      attrs: [
+        { name: 'text', value: 'string' },
+        { name: 'hotkey', value: 'string' },
+        { name: 'nl', value: null },
+      ],
       initValue: '1bit',
       pins: [],
       pouts: [{ bits: '1', name: 'get' }],
@@ -44,10 +54,27 @@ var SwitchComponent = class SwitchComponent extends BuiltinComponent {
       ctx.scheduleComponentOutputChange(name, checked ? '1' : '0');
     };
 
+    const switchHandler = {
+      toggle: () => {
+        const cur = ctx.getComponentStableValue(name);
+        const on = cur === '1';
+        const next = on ? '0' : '1';
+        ctx.scheduleComponentOutputChange(name, next);
+        syncSwitchPanel(switchId, next === '1');
+        ctx.showlog(1);
+      },
+    };
+
     if (typeof addSwitch === 'function') {
-      addSwitch({ text, value, nl, onChange });
+      addSwitch({ id: switchId, text, value, nl, onChange });
     }
-    return { deviceIds, ref: switchRef };
+
+    const reg = typeof LogTScriptHotkeyRegister !== 'undefined' ? LogTScriptHotkeyRegister : null;
+    if (reg && attributes.hotkey !== undefined) {
+      reg.registerSwitchHotkey(ctx, name, switchId, attributes.hotkey, switchHandler);
+    }
+
+    return { deviceIds, ref: switchRef, switchHandler };
   }
 };
 

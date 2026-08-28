@@ -3898,6 +3898,9 @@ assignment() {
               if (!attributes[attrName]) {
                 attributes[attrName] = {};
               }
+              if (attrName === 'hotkeyFor' && attributes[attrName][stateNum] !== undefined) {
+                throw Error(`Duplicate hotkeyFor.${stateNum} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+              }
               attributes[attrName][stateNum] = strValue;
             } else {
               attributes[attrName] = strValue;

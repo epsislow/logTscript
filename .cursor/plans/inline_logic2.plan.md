@@ -3,7 +3,7 @@ name: inline logic engine — plan 2
 overview: Continuare [inline_logic.plan.md](inline_logic.plan.md) — de la **Faza 100** / **D1000**; backlog amânat **3+a …**; primul subiect **predicate `$` / `$$`** (unique & keyed state).
 todos:
   - id: logic2-deferred-table
-    content: "Menține tabel backlog 3+a … (migrate din 2+a/2+b/2+f/2+j + sloturi viitoare)"
+    content: Menține tabel backlog 3+a … (migrate din 2+a/2+b/2+f/2+j + sloturi viitoare)
     status: pending
   - id: logic-unique-keyed-100
     content: "Faza 100 (3+a): predicate $/$$ — D1000–D1017✅ (ready-to-implement)"

@@ -9,6 +9,7 @@ function createDeviceMaps() {
     leds: new Map(),
     sevenSegDisplays: new Map(),
     dipSwitches: new Map(),
+    switchSwitches: new Map(),
     ioportContainers: new Map(),
     terminalDisplays: new Map(),
     lcdDisplays: new Map(),

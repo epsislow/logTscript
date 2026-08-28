@@ -116,3 +116,37 @@ nu imi pune intrebari iti dau in scris pt fiecare decizie neconfirmata,
 
 -----
 
+scrie un plan pentru asta ceva de genul hotkey on comps
+
+as vrea sa putem asocia hotkey pe componentele de input din logTscript si ma refer aici la componentele:
+comp key 
+hotkey: "1"
+
+comp switch
+hotkey: "2"
+si pentru 
+comp dip 
+care contine multi switchuri
+hotkeyFor.X ca sa poti desemna un hotkey pentru fiecare switch
+
+ma gandesc sa poti pune acelasi hotkey la mai multe componente nu e o problema, daca se apasa acel hotkey atunci sa apeleze acele evenimente care exista deja in aceste componente si se triggeruiesc acum la click de buton.
+ma astept ca in spate sa existe un manager de hotkeyuri definite 
+
+mai e o problema aici legat de cand avem un focus acele hotkeyuri, si raspunsul meu cred ca ar fi sa dam o posibilitate ca sa punem focus pe devices, poate prin click pe panelul de devices, 
+si inca ceva cum va functiona cand exista un keyboard sau mai multe keyboard-uri? raspunsul ar fi cand un keyboard este focusat atunci devices nu e focusat deci nu merg aceste hotkeys definite pe componente. 
+
+as vrea sa te uiti la inlie_logic2.plan.md sa vezi cum vreau sa functionam structura de acolo si cum arata fazele si deciziile si optiunile.
+
+daca e ceva de amanat in tabelul cu faze amanate ar trebuii sa aibe nume date de genul 1+a, 1+b, 1+c, ... 1+x
+
+nu imi pune intrebari iti dau in scris pt fiecare decizie neconfirmata,
+
+necesar, si de adaugat si in plan daca nu este deja ca legenda:
+daca ai recomandari notezi optinile cu (recommended) 
+daca gasesti ca daca facem altfel are mai mult sens, poti pune optiunile tale cu (change)
+cand e o faza gata de implementare poti sa scrii (ready-to-implement)
+daca o faza e implementata poti sa scrii (completed)
+
+ as vrea sa analizezi sa vezi directia, sa vezi cam ce se doreste, posibil sa fie si greseli la ce am zis eu, ce ti se pare neclar sau daca vezi modificari de la directie da-mi optiuni, in tabel as vrea tot asa D1, D2, D3, Dx si sa continuam de la numarul Dx la care suntem in plan, si pt fiecare decizie poti sa imi dai optiunile detaliate sub tabelul deciziilor, vezi cum am facut la ultimele faze din planul @.cursor/plans/inline_logic2.plan.md 
+
+-------

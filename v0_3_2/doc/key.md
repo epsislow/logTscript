@@ -32,6 +32,7 @@ comp [key] .name::
 | `label`   | string  | `''`    | Text on the button |
 | `size`    | integer | `36`    | Button size (pixels) |
 | `type`    | `0`/`1`/`2` | `0` | Interaction mode (see below) |
+| `hotkey`  | string  | —       | Keyboard shortcut while Devices panel is focused ([ui-focus-hotkeys.md](ui-focus-hotkeys.md)) |
 | `nl`      | flag    | (no)    | Newline after the button |
 
 ### `type` interaction modes

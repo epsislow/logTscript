@@ -114,6 +114,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/policy-type-modules.js",
   "core/usage-policy.js",
   "core/parser.js",
+  "core/hotkey-manager.js",
   "core/interpreter.js",
   "core/signal-propagation.js",
   "ui/timeline-analyzer.js",

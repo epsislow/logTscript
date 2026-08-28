@@ -9985,12 +9985,25 @@ if (this.isBuiltinDEMUX(name)) {
     this.startProc();
   }
   
+  getHotkeyManager() {
+    if (!this.hotkeyManager) {
+      const HM = typeof LogTScriptHotkeyManager !== 'undefined' ? LogTScriptHotkeyManager : null;
+      if (!HM) return null;
+      this.hotkeyManager = new HM(this);
+    }
+    return this.hotkeyManager;
+  }
+
   postExecSrc() {
     if (this.componentRegistry) {
       const keyboardHandler = this.componentRegistry.get('keyboard');
       if (keyboardHandler && typeof keyboardHandler.finalizeAllCodesAccepted === 'function') {
         keyboardHandler.finalizeAllCodesAccepted(this);
       }
+    }
+    const hm = this.hotkeyManager;
+    if (hm && typeof hm.attachBrowserListeners === 'function') {
+      hm.attachBrowserListeners();
     }
     if (this.pendingProbeExprs && this.pendingProbeExprs.length) {
       this.activateProbes(this.pendingProbeExprs);
@@ -13279,6 +13292,9 @@ if (s.assignment) {
         if (result.clcdSymbols) compInfo.clcdSymbols = result.clcdSymbols;
         if (result.touchHandler) compInfo.touchHandler = result.touchHandler;
         if (result.keyHandler) compInfo.keyHandler = result.keyHandler;
+        if (result.switchHandler) compInfo.switchHandler = result.switchHandler;
+        if (result.dipHandler) compInfo.dipHandler = result.dipHandler;
+        if (result.focusHandler) compInfo.focusHandler = result.focusHandler;
         if (result.validRef) compInfo.validRef = result.validRef;
         if (result.sizeRef) compInfo.sizeRef = result.sizeRef;
         if (result.movingRef) compInfo.movingRef = result.movingRef;

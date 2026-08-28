@@ -2,6 +2,8 @@
 
 Per-component pages: [switch.md](switch.md), [key.md](key.md), [keyboard.md](keyboard.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [sensor.md](sensor.md), [scanner.md](scanner.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
 
+**Keyboard hotkeys and Devices focus:** [ui-focus-hotkeys.md](ui-focus-hotkeys.md) — `hotkey` / `hotkeyFor` on panel inputs and `focuskey` on keyboard/scanner.
+
 **Switch**, **key**, **keyboard**, **dip**, **rotary**, **slider**, **sensor**, and **scanner** are input components you control from the devices panel while the program is running.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.

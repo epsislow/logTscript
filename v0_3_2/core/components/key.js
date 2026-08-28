@@ -53,6 +53,7 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
         { name: 'size', value: 'integer' },
         { name: 'nl', value: null },
         { name: 'type', value: '0/1/2' },
+        { name: 'hotkey', value: 'string' },
       ],
       initValue: '1bit',
       pins: [],
@@ -106,14 +107,21 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
       name, keyId, keyRef, attributes.type, ctx
     );
 
+    const keyHandler = { onPress, onRelease, type };
+
     if (typeof addKey === 'function') {
       addKey({ id: keyId, label, size, nl, onPress, onRelease, type });
+    }
+
+    const reg = typeof LogTScriptHotkeyRegister !== 'undefined' ? LogTScriptHotkeyRegister : null;
+    if (reg && attributes.hotkey !== undefined) {
+      reg.registerKeyHotkey(ctx, name, keyId, type, attributes.hotkey, keyHandler);
     }
 
     return {
       deviceIds,
       ref: keyRef,
-      keyHandler: { onPress, onRelease },
+      keyHandler,
     };
   }
 };

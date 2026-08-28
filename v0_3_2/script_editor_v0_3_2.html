@@ -741,6 +741,11 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   flex-wrap: wrap;
 }
 
+#devicesPanel.devices-hotkey-focus {
+  outline: 2px solid #2ecc71;
+  outline-offset: 2px;
+}
+
 #devices .break {
   flex-basis: 100%;
 }
@@ -3560,6 +3565,7 @@ show(a,b,c)
 <script src="core/policy-type-modules.js"></script>
 <script src="core/usage-policy.js"></script>
 <script src="core/parser.js"></script>
+<script src="core/hotkey-manager.js"></script>
 <script src="core/interpreter.js"></script>
 <script src="core/signal-propagation.js"></script>
 <!-- @generated editor-pipeline-tail end -->

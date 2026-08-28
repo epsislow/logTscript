@@ -25,7 +25,17 @@ var DipComponent = class DipComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'color', value: 'color' }, { name: 'colorFor', type: 'array', value: 'color' }, { name: 'nl', value: null }, { name: 'noLabels', value: null }, { name: 'noTrans', value: null }, { name: 'visual', value: '0/1' }],
+      attrs: [
+        { name: 'length', value: 'integer' },
+        { name: 'text', value: 'string' },
+        { name: 'color', value: 'color' },
+        { name: 'colorFor', type: 'array', value: 'color' },
+        { name: 'hotkeyFor', type: 'array', value: 'string' },
+        { name: 'nl', value: null },
+        { name: 'noLabels', value: null },
+        { name: 'noTrans', value: null },
+        { name: 'visual', value: '0/1' },
+      ],
       initValue: 'Xbit',
       pins: [],
       pouts: [{ bits: 'X', name: 'get' }],
@@ -71,10 +81,33 @@ var DipComponent = class DipComponent extends BuiltinComponent {
       ctx.showlog(1);
     };
 
+    const dipHandler = {
+      toggleBit: (index) => {
+        let currentValue = ctx.getComponentStableValue(name) || '0'.repeat(count);
+        if (currentValue.length < count) currentValue = currentValue.padEnd(count, '0');
+        else if (currentValue.length > count) currentValue = currentValue.substring(0, count);
+        const bitsArr = currentValue.split('');
+        const next = bitsArr[index] !== '1';
+        bitsArr[index] = next ? '1' : '0';
+        ctx.clog('onChange');
+        ctx.scheduleComponentOutputChange(name, bitsArr.join(''));
+        if (typeof setDip === 'function') {
+          setDip(dipId, index, next);
+        }
+        ctx.showlog(1);
+      },
+    };
+
     if (typeof addDipSwitch === 'function') {
       addDipSwitch({ id: dipId, text, count, initial, nl, noLabels, visual, color, colorFor, onChange, noTransition });
     }
-    return { deviceIds, ref: dipRef };
+
+    const reg = typeof LogTScriptHotkeyRegister !== 'undefined' ? LogTScriptHotkeyRegister : null;
+    if (reg) {
+      reg.registerDipHotkeys(ctx, name, dipId, count, attributes, dipHandler);
+    }
+
+    return { deviceIds, ref: dipRef, dipHandler };
   }
 
   updateDisplayValue(comp, value, bitRange) {

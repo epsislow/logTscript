@@ -1,6 +1,6 @@
 /* ================= DEVICE RENDERERS ================= */
 
-function addSwitch({ text, value = false, nl = false, onChange }) {
+function addSwitch({ id, text, value = false, nl = false, onChange }) {
   const container = getDevicesContainer();
   if (!container) return;
   showDevices();
@@ -36,6 +36,20 @@ function addSwitch({ text, value = false, nl = false, onChange }) {
     br.className = 'break';
     container.appendChild(br);
   }
+
+  if (id) {
+    const maps = typeof dm === 'function' ? dm() : null;
+    if (maps) {
+      if (!maps.switchSwitches) maps.switchSwitches = new Map();
+      maps.switchSwitches.set(id, input);
+    }
+  }
+}
+
+function setSwitch(id, on) {
+  const maps = typeof dm === 'function' ? dm() : null;
+  const input = maps && maps.switchSwitches ? maps.switchSwitches.get(id) : null;
+  if (input) input.checked = Boolean(on);
 }
 
 function addLed({ id, text = "", color = "#ff0000", value = false, round, nl = false}) {

@@ -195,6 +195,53 @@
         }
       },
 
+      _propagateIfNeeded(interp) {
+        const i = interp || this.interp;
+        if (i && i.deferWirePropagation && i.deferWirePropagation() && i.signalPropagationStrategy) {
+          i.signalPropagationStrategy.propagate();
+        }
+      },
+
+      getHotkeyManager(interp) {
+        const i = interp || this.interp;
+        if (!i || typeof i.getHotkeyManager !== 'function') return null;
+        return i.getHotkeyManager();
+      },
+
+      setDevicesFocus(interp, on) {
+        const mgr = this.getHotkeyManager(interp);
+        if (mgr) mgr.setDevicesPanelFocused(!!on);
+      },
+
+      getDevicesFocus(interp) {
+        const mgr = this.getHotkeyManager(interp);
+        return mgr ? !!mgr.devicesPanelFocused : false;
+      },
+
+      triggerHotkeyDown(interp, opts) {
+        const i = interp || this.interp;
+        if (!i || !i.hotkeyManager) return false;
+        const handled = i.hotkeyManager.dispatchFromTest(opts || {}, 'down');
+        if (handled) this._propagateIfNeeded(i);
+        return handled;
+      },
+
+      triggerHotkeyUp(interp, opts) {
+        const i = interp || this.interp;
+        if (!i || !i.hotkeyManager) return false;
+        const handled = i.hotkeyManager.dispatchFromTest(opts || {}, 'up');
+        if (handled) this._propagateIfNeeded(i);
+        return handled;
+      },
+
+      triggerFocusKeyDown(interp, opts) {
+        return this.triggerHotkeyDown(interp, opts);
+      },
+
+      triggerEscape(interp) {
+        return this.triggerHotkeyDown(interp, { key: 'Escape' });
+      },
+
       triggerKeyboardKey(interp, compName, opts) {
         const i = interp || this.interp;
         if (!i) return false;

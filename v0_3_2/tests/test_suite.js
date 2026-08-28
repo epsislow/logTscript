@@ -50878,5 +50878,286 @@ comp [logic] .gameLogic:
   reg(4607, 'logic', 'showx/1 x then showx/2 colored line (legacy)', runLogicShowx1ThenShowxMsg);
   reg(4608, 'logic', 'showx/1 x then showx/2 colored line (wave)', runLogicShowx1ThenShowxMsg, { propagation: 'wave' });
 
+  function runHotkeyKeyFlash(h, session) {
+    const src = [
+      'comp [key] .k:',
+      '  hotkey: "a"',
+      '  type: 2',
+      '  on: 1',
+      '  :',
+      '1wire v = .k',
+    ].join('\n');
+    const { interp } = session.run(src);
+    h.assert('manager', String(!!interp.hotkeyManager), 'true');
+    h.assert('no focus noop', String(session.triggerHotkeyDown(interp, { key: 'a' })), 'false');
+    session.setDevicesFocus(interp, true);
+    session.triggerHotkeyDown(interp, { key: 'a' });
+    h.assert('toggle on', session.getWire(interp, 'v'), '1');
+    session.triggerHotkeyDown(interp, { key: 'a' });
+    h.assert('toggle off', session.getWire(interp, 'v'), '0');
+  }
+
+  function runHotkeyDipBit(h, session) {
+    const src = [
+      'comp [dip] .d:',
+      '  length: 4',
+      '  hotkeyFor.1: "2"',
+      '  on: 1',
+      '  :',
+      '4wire bus = .d',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    h.assert('start', session.getWire(interp, 'bus'), '0000');
+    session.triggerHotkeyDown(interp, { key: '2', code: 'Digit2' });
+    h.assert('bit1 on', session.getWire(interp, 'bus'), '0100');
+    session.triggerHotkeyDown(interp, { key: '2', code: 'Digit2' });
+    h.assert('bit1 off', session.getWire(interp, 'bus'), '0000');
+  }
+
+  function runHotkeySwitchToggle(h, session) {
+    const src = [
+      'comp [switch] .s:',
+      '  hotkey: "s"',
+      '  on: 1',
+      '  :',
+      '1wire v = .s',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    h.assert('start', session.getWire(interp, 'v'), '0');
+    session.triggerHotkeyDown(interp, { key: 's' });
+    h.assert('on', session.getWire(interp, 'v'), '1');
+    session.triggerHotkeyDown(interp, { key: 's' });
+    h.assert('off', session.getWire(interp, 'v'), '0');
+  }
+
+  function runHotkeySameKeyTwoComps(h, session) {
+    const src = [
+      'comp [switch] .s1:',
+      '  hotkey: "x"',
+      '  on: 1',
+      '  :',
+      'comp [switch] .s2:',
+      '  hotkey: "x"',
+      '  on: 1',
+      '  :',
+      '1wire a = .s1',
+      '1wire b = .s2',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    session.triggerHotkeyDown(interp, { key: 'x' });
+    h.assert('s1', session.getWire(interp, 'a'), '1');
+    h.assert('s2', session.getWire(interp, 'b'), '1');
+  }
+
+  function runHotkeyMixOrderHold(h, session) {
+    const src = [
+      'comp [switch] .sw:',
+      '  hotkey: "1"',
+      '  on: 1',
+      '  :',
+      'comp [key] .k0:',
+      '  hotkey: "1"',
+      '  type: 0',
+      '  on: 1',
+      '  :',
+      'comp [key] .k1:',
+      '  hotkey: "1"',
+      '  type: 1',
+      '  on: 1',
+      '  :',
+      '1wire sw = .sw',
+      '1wire k0 = .k0',
+      '1wire k1 = .k1',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    session.triggerHotkeyDown(interp, { key: '1', code: 'Digit1' });
+    h.assert('sw', session.getWire(interp, 'sw'), '1');
+    h.assert('k0 flash', session.getWire(interp, 'k0'), '0');
+    h.assert('k1 hold', session.getWire(interp, 'k1'), '1');
+    session.triggerHotkeyUp(interp, { key: '1', code: 'Digit1' });
+    h.assert('k1 release', session.getWire(interp, 'k1'), '0');
+  }
+
+  function runHotkeyGateNoFocus(h, session) {
+    const src = 'comp [switch] .s:\n  hotkey: "g"\n  on: 1\n  :\n1wire v = .s\n';
+    const { interp } = session.run(src);
+    h.assert('noop', String(session.triggerHotkeyDown(interp, { key: 'g' })), 'false');
+    h.assert('unchanged', session.getWire(interp, 'v'), '0');
+  }
+
+  function runHotkeyGateKeyboardFocused(h, session) {
+    const src = [
+      'comp [keyboard] .kbd:',
+      '  :',
+      'comp [switch] .s:',
+      '  hotkey: "g"',
+      '  on: 1',
+      '  :',
+      '1wire v = .s',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    if (typeof window !== 'undefined') window.focusedKeyboardId = 'kbd';
+    h.assert('noop', String(session.triggerHotkeyDown(interp, { key: 'g' })), 'false');
+    h.assert('unchanged', session.getWire(interp, 'v'), '0');
+    if (typeof window !== 'undefined') window.focusedKeyboardId = null;
+  }
+
+  function runHotkeyNumpadNoMatch(h, session) {
+    const src = 'comp [switch] .s:\n  hotkey: "1"\n  on: 1\n  :\n1wire v = .s\n';
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    h.assert('numpad noop', String(session.triggerHotkeyDown(interp, { key: '1', code: 'Numpad1' })), 'false');
+    h.assert('unchanged', session.getWire(interp, 'v'), '0');
+    session.triggerHotkeyDown(interp, { key: '1', code: 'Digit1' });
+    h.assert('digit on', session.getWire(interp, 'v'), '1');
+  }
+
+  function runHotkeyEscapeDefocus(h, session) {
+    const src = 'comp [switch] .s:\n  hotkey: "e"\n  :\n';
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    h.assert('focused', String(session.getDevicesFocus(interp)), 'true');
+    session.triggerEscape(interp);
+    h.assert('defocused', String(session.getDevicesFocus(interp)), 'false');
+  }
+
+  function runHotkeyFocusKeyKeyboard(h, session) {
+    const src = [
+      'comp [keyboard] .kbd:',
+      '  focuskey: "F2"',
+      '  :',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    h.assert('off', String(typeof window !== 'undefined' && window.focusedKeyboardId == null), 'true');
+    session.triggerFocusKeyDown(interp, { key: 'F2' });
+    h.assert('on', String(typeof window !== 'undefined' && window.focusedKeyboardId === 'kbd'), 'true');
+    session.triggerFocusKeyDown(interp, { key: 'F2' });
+    h.assert('off again', String(typeof window !== 'undefined' && window.focusedKeyboardId == null), 'true');
+  }
+
+  function runHotkeyFocusKeyScanner(h, session) {
+    const src = [
+      'comp [scanner] .sc:',
+      '  focuskey: "F3"',
+      '  length: 4',
+      '  :',
+    ].join('\n');
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    session.triggerFocusKeyDown(interp, { key: 'F3' });
+    h.assert('scanner focused', String(typeof window !== 'undefined' && window.focusedScannerId === 'sc'), 'true');
+    session.triggerFocusKeyDown(interp, { key: 'F3' });
+    h.assert('scanner unfocused', String(typeof window !== 'undefined' && window.focusedScannerId == null), 'true');
+  }
+
+  function runHotkeyEscapeUnfocusKeyboard(h, session) {
+    const src = 'comp [keyboard] .kbd:\n  :\n';
+    const { interp } = session.run(src);
+    session.setDevicesFocus(interp, true);
+    if (typeof window !== 'undefined') window.focusedKeyboardId = 'kbd';
+    session.triggerEscape(interp);
+    h.assert('kb unfocused', String(typeof window !== 'undefined' && window.focusedKeyboardId == null), 'true');
+    h.assert('devices still focused', String(session.getDevicesFocus(interp)), 'true');
+  }
+
+  reg(4609, 'hotkey', 'key hotkey flash (legacy)', runHotkeyKeyFlash);
+  reg(4610, 'hotkey', 'key hotkey flash (wave)', runHotkeyKeyFlash, { propagation: 'wave' });
+  reg(4611, 'hotkey', 'dip hotkeyFor toggle (legacy)', runHotkeyDipBit);
+  reg(4612, 'hotkey', 'dip hotkeyFor toggle (wave)', runHotkeyDipBit, { propagation: 'wave' });
+
+  reg(4613, 'hotkey', 'parse error hotkeyFor out of range', function(h, session) {
+    const src = 'comp [dip] .d:\n  length: 4\n  hotkeyFor.4: "1"\n  :\n';
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('out of range')), 'true');
+  });
+
+  reg(4614, 'hotkey', 'parse error duplicate hotkeyFor', function(h, session) {
+    const src = 'comp [dip] .d:\n  length: 4\n  hotkeyFor.1: "a"\n  hotkeyFor.1: "b"\n  :\n';
+    let err = '';
+    try { session.parse(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('Duplicate hotkeyFor.1')), 'true');
+  });
+
+  reg(4615, 'hotkey', 'parse error duplicate focuskey', function(h, session) {
+    const src = [
+      'comp [keyboard] .k1:',
+      '  focuskey: "F2"',
+      '  :',
+      'comp [scanner] .s1:',
+      '  focuskey: "F2"',
+      '  length: 4',
+      '  :',
+    ].join('\n');
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('already used')), 'true');
+  });
+
+  reg(4616, 'hotkey', 'parse error hotkey vs focuskey same key', function(h, session) {
+    const src = [
+      'comp [switch] .s:',
+      '  hotkey: "F2"',
+      '  :',
+      'comp [keyboard] .k1:',
+      '  focuskey: "F2"',
+      '  :',
+    ].join('\n');
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('already used')), 'true');
+  });
+
+  reg(4617, 'hotkey', 'parse error second type 1 same hotkey', function(h, session) {
+    const src = [
+      'comp [key] .k1:',
+      '  hotkey: "h"',
+      '  type: 1',
+      '  :',
+      'comp [key] .k2:',
+      '  hotkey: "h"',
+      '  type: 1',
+      '  :',
+    ].join('\n');
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('hold type')), 'true');
+  });
+
+  reg(4618, 'hotkey', 'mix order with hold (legacy)', runHotkeyMixOrderHold);
+  reg(4619, 'hotkey', 'mix order with hold (wave)', runHotkeyMixOrderHold, { propagation: 'wave' });
+  reg(4620, 'hotkey', 'switch hotkey toggle (legacy)', runHotkeySwitchToggle);
+  reg(4621, 'hotkey', 'switch hotkey toggle (wave)', runHotkeySwitchToggle, { propagation: 'wave' });
+  reg(4622, 'hotkey', 'same hotkey two comps (legacy)', runHotkeySameKeyTwoComps);
+  reg(4623, 'hotkey', 'same hotkey two comps (wave)', runHotkeySameKeyTwoComps, { propagation: 'wave' });
+  reg(4624, 'hotkey', 'gate without devices focus (legacy)', runHotkeyGateNoFocus);
+  reg(4625, 'hotkey', 'gate without devices focus (wave)', runHotkeyGateNoFocus, { propagation: 'wave' });
+  reg(4626, 'hotkey', 'gate keyboard focused (legacy)', runHotkeyGateKeyboardFocused);
+  reg(4627, 'hotkey', 'gate keyboard focused (wave)', runHotkeyGateKeyboardFocused, { propagation: 'wave' });
+  reg(4628, 'hotkey', 'Escape defocus devices (legacy)', runHotkeyEscapeDefocus);
+  reg(4629, 'hotkey', 'Escape defocus devices (wave)', runHotkeyEscapeDefocus, { propagation: 'wave' });
+  reg(4630, 'hotkey', 'Digit1 not Numpad1 (legacy)', runHotkeyNumpadNoMatch);
+  reg(4631, 'hotkey', 'Digit1 not Numpad1 (wave)', runHotkeyNumpadNoMatch, { propagation: 'wave' });
+  reg(4632, 'hotkey', 'focuskey keyboard toggle (legacy)', runHotkeyFocusKeyKeyboard);
+  reg(4633, 'hotkey', 'focuskey keyboard toggle (wave)', runHotkeyFocusKeyKeyboard, { propagation: 'wave' });
+  reg(4634, 'hotkey', 'focuskey scanner toggle (legacy)', runHotkeyFocusKeyScanner);
+  reg(4635, 'hotkey', 'focuskey scanner toggle (wave)', runHotkeyFocusKeyScanner, { propagation: 'wave' });
+
+  reg(4636, 'hotkey', 'parse error hotkey Escape reserved', function(h, session) {
+    const src = 'comp [key] .k:\n  hotkey: "Escape"\n  :\n';
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('error', String(err.includes('reserved')), 'true');
+  });
+
+  reg(4637, 'hotkey', 'Escape unfocus keyboard (legacy)', runHotkeyEscapeUnfocusKeyboard);
+  reg(4638, 'hotkey', 'Escape unfocus keyboard (wave)', runHotkeyEscapeUnfocusKeyboard, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
