@@ -255,6 +255,75 @@ comp [logic] .gameLogic:
 
 **Load & Run:** two lines — **`turn: p1`** in **`#fff`**, **`turn: p2`** in **`#00f`** (one line per backtracking solution).
 
+**Dynamic `Style`:** bind **`Style`** in a **separate goal** before **`showx/…`**. There is no conditional **expression** inside arguments — **`if/3`** is control flow, not a term (see [logic-builtins — `if/3`](#if3--soft-if-then-else)). Use a **`color_style/2`** fact table or **multiple rule clauses** (below).
+
+### Example — `color_style/2` map (controlled Style per atom)
+
+```logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+    color_style(red, f00)
+    color_style(green, ff0)
+    color_style(blue, "00f")
+    walk([]) <- show("done")
+    walk([H | T]) <- color_style(H, C), showx(C, H), walk(T)
+
+    query demo:
+        colors(L),
+        walk(L)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = demo
+    set = trigger
+}
+```
+
+**Load & Run:** three colored lines — **`red`** in **`#f00`**, **`green`** in **`#ff0`**, **`blue`** in **`#00f`** — then plain **`done`**.
+
+### Example — multiple clauses (one `showx` Style per color)
+
+```logts-play
+inline [logic] .world:
+
+    colors([red, green, blue])
+
+    walk([]) <- show("done")
+
+    walk([H | T]) <- H = red, showx(f00, H), walk(T)
+    walk([H | T]) <- H = green, showx(ff0, H), walk(T)
+    walk([H | T]) <- H = blue, showx("00f", H), walk(T)
+
+    query demo:
+        colors(L),
+        walk(L)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+1wire trigger = 1
+
+.worldLogic:{
+    query = demo
+    set = trigger
+}
+```
+
+**Load & Run:** same Output as the **`color_style/2`** example — three colored atom names, then **`done`**.
+
 ### Example — non-hex Style (plain fallback)
 
 ```logts-play
