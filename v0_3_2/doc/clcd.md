@@ -110,6 +110,8 @@ Bus width = `max(bit index) + 1` over all symbols.
 
 Display bits (`bit` / `bits` → `:get`) and touch bits (`bitOut` → `:out`) are **separate namespaces**. A symbol may use display bits only, touch bits only, or both.
 
+**Canvas vs `:out`:** Click, touch, and hotkeys update **`:out` only**. The CLCD canvas draws each symbol's on/off look from **`:get`** (driven by `bit` / `bits`). Touch or hotkey alone does **not** change the canvas unless you wire **`:out`** into what feeds **`:get`** — for example `2wire touchOut = .panel:out` and `.panel = touchOut` when display `bit` indices align with `bitOut`. Without that (or separate display logic), use `peek` / `probe` / `show` on `:out` to see touch state; the screen stays unchanged.
+
 | Property | Description |
 |----------|-------------|
 | `:out` | Read-only bit vector; width = number of symbols with `bitOut`, indices `0 … N-1` in symbol order |
@@ -159,7 +161,7 @@ Property blocks can also assign `touchReset` when the component has `on: 1` (or 
 
 Per symbol with `bitOut`, add a quoted **`hotkey`** string. While the **Devices** panel has focus, the key triggers the same `:out` update as a click on that symbol (respecting `touchType`). Requires `touch: 1`. See [ui-focus-hotkeys.md](ui-focus-hotkeys.md).
 
-**Load & Run**, focus Devices, press **w** / **p** — `:out` updates like a panel click.
+**Load & Run**, focus Devices, press **w** / **p** — `:out` updates like a panel click. Watch **Output** (`show` below); the canvas icons do not change until `:out` is wired into `:get` (see next example).
 
 ```logts-play
 comp [clcd] .panel:
@@ -173,6 +175,21 @@ comp [clcd] .panel:
 2wire out = .panel:out
 
 show(out)
+```
+
+**On-screen feedback:** feed `:out` back to the display when `bit` and `bitOut` use the same indices:
+
+```logts-play
+comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "w" width: 22 height: 22 :
+    power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
+  }
+  :
+
+2wire touchOut = .panel:out
+.panel = touchOut
 ```
 
 Only one symbol with **`touchType: 1`** may use the same hotkey (parse error on duplicate). Multiple **`touchType: 2`/`3`** symbols may share a hotkey — all fire in symbol order.

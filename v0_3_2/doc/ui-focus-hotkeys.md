@@ -218,6 +218,8 @@ On `comp [clcd]` with **`touch: 1`**, each symbol with **`bitOut`** may define *
 
 **Load & Run**, focus Devices, press the configured keys — `:out` updates without clicking the canvas.
 
+**Display note:** Hotkeys (and touch clicks) change **`:out` only**, not the CLCD canvas. The screen reflects **`:get`** (`bit` / `bits`). Wire `:out` into what drives `:get` (e.g. `.panel = touchOut`) for on-screen icon/label feedback; otherwise use `probe` / `show` on `:out`.
+
 Full detail and examples: [clcd.md — Symbol hotkeys](clcd.md#symbol-hotkeys).
 
 ---
