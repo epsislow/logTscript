@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11412,6 +11412,7 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Outputs** | Query redirect (\`modifier:0 >= result\`) |
 | **Query selection** | **Omit** = all queries; **\`query = a, b\`** = subset; **\`query none\`** = no queries |
 | **Mutations** | \`logic { + fact / - fact }\` — see [logic-runtime.md](logic-runtime.md) |
+| **Observers** | \`observe\` / \`observe removal\` in program block — [logic-observers.md](logic-observers.md) |
 | **List pins** | \`Nodes is text list routePin\` — vector wires recommended; see [list pins](#list-pins--text-list-number-list-bool-list) |
 | **Compound redirect** | \`zoneId:0 >= zoneOut\`, \`zoneId:0:1 >= nameOut\` — nested args by column index |
 | **Constraints** | \`constraint P <= Body\` in inline; mutations validated — [logic-constraints.md](logic-constraints.md) |
@@ -29414,6 +29415,324 @@ After the first remove, further removes are **no-ops** — no index error, no \`
 - [logic-constraints.md](logic-constraints.md) — \`<=\` validation, proposed KB  
 - [logic-runtime.md](logic-runtime.md) — \`logic { + / - }\`, tombstones  
 - [comp-logic.md](comp-logic.md) — exec block, redirects, \`mutationFailed\`
+`,
+    'logic-observers.md': `# Logic observers — \`observe\` on \`comp [logic]\`
+
+**Observers** react to **dynamic mutations** on a \`comp [logic]\` instance. When a matching fact is added or removed in the component store, the runtime can update **observe pins** and redirect them to wires — without running a named query.
+
+Facts, rules, and queries live in \`inline [logic]\`. Component wiring → [comp-logic.md](comp-logic.md). Mutation syntax → [logic-runtime.md](logic-runtime.md).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (use \`on: 1\` on the component so the first run executes when \`set = 1\`).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Where** | **Program block only** — \`.module { observe … }\` inside \`comp [logic]\` |
+| **Not in inline** | \`observe\` inside \`inline [logic]\` is a **parse error** |
+| **Trigger** | Matching **\`+\`** / **\`-\`** / **\`~\`** mutation on the component dynamic store |
+| **No query pass** | Observers do **not** fire on query-only passes (no mutation) |
+| **Immediate** | Default — pin updates right after each matching mutation op |
+| **\`def\`** | Deferred — pin updates after queries finish (same pass) |
+| **\`removal\`** | Bool pin pulses **\`1\`** for one redirect cycle, then resets to **\`0\`** |
+| **Pattern** | Predicate ending in **\`$\`** or **\`$$\`**, optional **\`:key=Ground\`** / **\`:tail\`** |
+| **Pin types** | \`number\`, \`bool\`, \`text\`, \`float\`, optional **\`list\`** |
+| **Wiring** | Exec block: \`observePin >= targetWire\` (same as query redirects) |
+| **\`data: static\`** | Observe lines are rejected at elaboration |
+
+---
+
+## Syntax
+
+\`\`\`logts
+comp [logic] .gameLogic:
+    .game {
+        observe [removal] [def] Pattern is Type pinName
+    }
+\`\`\`
+
+| Part | Meaning |
+|------|---------|
+| **\`observe\`** | Declares one observer line (comp program block only) |
+| **\`removal\`** | Optional — bool pin only; pulse on matching **remove** / **\`~\`** expand |
+| **\`def\`** | Optional — deferred timing (after queries in the same pass) |
+| **\`Pattern\`** | Fact head pattern — see [Patterns](#patterns) |
+| **\`is Type\`** | Pin wire type: \`number\`, \`bool\`, \`text\`, \`float\`, optional \`/format\`, optional \`list\` |
+| **\`pinName\`** | Component pin — wired in the exec block with **\`pinName >= wire\`** |
+
+---
+
+## Patterns
+
+| Pattern | Matches | Projects |
+|---------|---------|----------|
+| **\`johnCar$\`** | Single-valued **\`+\`** / **\`-\`** on \`johnCar$(Atom)\` | The atom (text pin) |
+| **\`playerPos$$\`** | Keyed **\`+\`** / **\`-\`** on \`playerPos$$(Key, …)\` | Full args as list (with \`:key\` filter) or \`:tail\` |
+| **\`playerPos$$:key=p1\`** | Keyed facts whose first arg unifies with ground **\`p1\`** | Args from index 1 onward (list) |
+| **\`playerPos$$:key\`** | Any keyed \`playerPos$$\` mutation (deferred example) | Key atom as text |
+
+**\`:key=Ground\`** requires a **ground** term (atom, number, or quoted text). **\`:tail\`** on a list pin projects tail args; plain **\`:key\`** without \`=\` on a list pin is an elaboration error.
+
+---
+
+## Pipeline (one \`set\` pass)
+
+\`\`\`text
+trigger set active
+    → read input pins
+    → apply logic { + / - / ~ } mutations
+    → immediate observe pins (matching ops)
+    → run queries (if any)
+    → deferred observe pins (def lines)
+    → redirects (query + observe pins → wires)
+    → reset removal bool pins to 0
+\`\`\`
+
+Observers never run during a **query-only** pass (no mutation block).
+
+---
+
+## Example — text on add (\`johnCar$\`)
+
+When a **\`johnCar$(Model)\`** fact is asserted, the **\`carPin\`** text pin receives **\`Model\`**.
+
+\`\`\`logts-play
+inline [logic] .garage:
+
+:
+
+comp [logic] .carLogic:
+    on: 1
+    .garage {
+        observe johnCar$ is text carPin
+    }
+
+:
+
+1wire trigger = 1
+64wire carOut = \\0;64
+
+.carLogic:{
+    logic { + johnCar$(bmw) }
+    carPin >= carOut
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**, **\`carOut\`** holds the text **\`bmw\`** (8 bits per character).
+
+---
+
+## Example — keyed filter (\`$$\` + \`:key=\`)
+
+Only mutations whose key matches **\`p1\`** update **\`posPin\`**. The pin encodes coordinates **\`(7, 2)\`** as a number list.
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+    }
+
+:
+
+64wire posOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + playerPos$$(p1, 7, 2) }
+    posPin >= posOut
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**, **\`posOut\`** is non-zero (list payload for **\`p1\`**).
+
+Adding **\`playerPos$$(p2, …)\`** does **not** update **\`posPin\`** when the filter is **\`:key=p1\`**.
+
+---
+
+## Example — removal pulse (\`removal\` + \`-\`)
+
+**\`removedPin\`** is a bool pulse: **\`1\`** on the redirect wire for the pass where a matching fact is removed, then the pin returns to **\`0\`**.
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 3, 4)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe removal playerPos$$:key=p1 is bool removedPin
+    }
+
+:
+
+1wire remOut = 0
+1wire trigger = 1
+
+.gameLogic:{
+    logic { - playerPos$$(p1, 3, 4) }
+    removedPin >= remOut
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`remOut = 1\`**.
+
+---
+
+## Example — removal via retract-all (\`~\`)
+
+**\`~ Template\`** expands to individual removes. Each expanded remove that matches the observer pattern fires the same bool pulse.
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe removal playerPos$$:key=p1 is bool removedPin
+    }
+
+:
+
+1wire remOut = 0
+1wire trigger = 1
+
+.gameLogic:{
+    logic { ~ playerPos$$(p1, 0, 0) }
+    removedPin >= remOut
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**: **\`remOut = 1\`**.
+
+---
+
+## Example — deferred key pin (\`def\`)
+
+**\`def\`** observers run **after** queries in the same pass. Here **\`keyPin\`** receives the key atom (**\`p1\`**) from a keyed add.
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe def playerPos$$:key is text keyPin
+    }
+
+:
+
+64wire keyOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + playerPos$$(p1, 9, 1) }
+    keyPin >= keyOut
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**, **\`keyOut\`** holds the text **\`p1\`**.
+
+---
+
+## Example — query-only pass (no observe emit)
+
+Observers require a **mutation**. A pass that only runs queries leaves observe pins unchanged.
+
+\`\`\`logts-play
+inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+    query q:
+        playerPos$$(p1, X, Y)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+    }
+
+:
+
+64wire posOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    q >= posOut
+    set = trigger
+}
+\`\`\`
+
+After **Load & Run**, **\`posPin\`** (and **\`posOut\`**) stay zero — no mutation ran.
+
+---
+
+## Wiring observe pins
+
+Observe pins use the same redirect form as query outputs:
+
+\`\`\`logts
+.gameLogic:{
+    logic { + playerPos$$(p1, 7, 2) }
+    posPin >= posOut
+    removedPin >= remOut
+    set = trigger
+}
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| **Pin name** | Must be unique among input pins **and** other observe pins |
+| **List pins** | Prefer vector wires; width follows the target wire in the exec block |
+| **Text pins** | Width grows to fit encoded atoms |
+| **\`data: static\`** | Observe declarations are rejected — no dynamic store |
+
+---
+
+## Restrictions and errors
+
+| Condition | Result |
+|-----------|--------|
+| **\`observe\` in \`inline [logic]\`** | Parse error |
+| **\`observe removal … is text\`** | Parse error — removal requires **\`is bool\`** |
+| **Duplicate pin** (input + observe same name) | Elaboration error |
+| **\`data: static\`** + observe line | Elaboration error |
+| **Query-only pass** | Observe pins not updated |
+
+---
+
+## Related pages
+
+- [comp-logic.md](comp-logic.md) — program block, exec block, redirects, \`on:\` trigger
+- [logic-runtime.md](logic-runtime.md) — \`logic { + / - / ~ }\`, dynamic overlay
+- [inline-logic.md](inline-logic.md) — facts, \`$\` / \`$$\` predicates, queries
 `,
     'logic-query-exec.md': `# Inline logic query — \`.world:query({ })\`
 

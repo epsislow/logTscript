@@ -51310,5 +51310,300 @@ comp [logic] .gameLogic:
     h.assert('release', session.getCompProperty(interp, '.panel', 'out'), '0');
   });
 
+  function logicObserveTextFromPin(bits) {
+    if (typeof logicPinToInputValue !== 'function') return '';
+    const term = logicPinToInputValue(bits, 'text');
+    return term && term.kind === 'atom' ? term.name : '';
+  }
+
+  function runF108ObserveInlineParseError(h, session) {
+    h.assertThrows('observe in inline', function() {
+      session.run(`inline [logic] .bad:
+    observe johnCar$ is text carPin
+    johnCar$(bmw)
+:`); 
+    });
+  }
+
+  reg(4670, 'logic', 'F108 observe in inline parse error (legacy)', runF108ObserveInlineParseError);
+  reg(4671, 'logic', 'F108 observe in inline parse error (wave)', runF108ObserveInlineParseError, { propagation: 'wave' });
+
+  function runF108ObserveJohnCar(h, session) {
+    const src = `inline [logic] .garage:
+
+    query read:
+        johnCar$(X)
+
+:
+
+comp [logic] .carLogic:
+    on: 1
+    .garage {
+        observe johnCar$ is text carPin
+    }
+
+:
+
+1wire trigger = 1
+64wire carOut = \\0;64
+
+.carLogic:{
+    logic { + johnCar$(bmw) }
+    carPin >= carOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const pinBits = session.getCompProperty(interp, '.carLogic', 'carPin');
+    h.assert('car text', logicObserveTextFromPin(pinBits), 'bmw');
+  }
+
+  reg(4672, 'logic', 'F108 observe johnCar$ text pin (legacy)', runF108ObserveJohnCar);
+  reg(4673, 'logic', 'F108 observe johnCar$ text pin (wave)', runF108ObserveJohnCar, { propagation: 'wave' });
+
+  function runF108ObserveKeyedFilter(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+    query pos:
+        playerPos$$(p1, X, Y)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+    }
+
+:
+
+64wire posOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + playerPos$$(p1, 7, 2) }
+    posPin >= posOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const pinBits = session.getCompProperty(interp, '.gameLogic', 'posPin');
+    h.assert('pos non-zero', pinBits !== '0'.repeat(pinBits.length), true);
+  }
+
+  reg(4674, 'logic', 'F108 observe $$ :key=p1 filter (legacy)', runF108ObserveKeyedFilter);
+  reg(4675, 'logic', 'F108 observe $$ :key=p1 filter (wave)', runF108ObserveKeyedFilter, { propagation: 'wave' });
+
+  function runF108ObserveRemovalTilde(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe removal playerPos$$:key=p1 is bool removedPin
+    }
+
+:
+
+1wire remOut = 0
+1wire trigger = 1
+
+.gameLogic:{
+    logic { ~ playerPos$$(p1, 0, 0) }
+    removedPin >= remOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('removal pulse on wire', interp.getWireEffectiveValue('remOut'), '1');
+    h.assert('removal pin reset', session.getCompProperty(interp, '.gameLogic', 'removedPin'), '0');
+  }
+
+  reg(4676, 'logic', 'F108 observe removal ~ bool pulse (legacy)', runF108ObserveRemovalTilde);
+  reg(4677, 'logic', 'F108 observe removal ~ bool pulse (wave)', runF108ObserveRemovalTilde, { propagation: 'wave' });
+
+  function runF108ObserveRemovalMinus(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 3, 4)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe removal playerPos$$:key=p1 is bool removedPin
+    }
+
+:
+
+1wire remOut = 0
+1wire trigger = 1
+
+.gameLogic:{
+    logic { - playerPos$$(p1, 3, 4) }
+    removedPin >= remOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('removal minus pulse', interp.getWireEffectiveValue('remOut'), '1');
+  }
+
+  reg(4678, 'logic', 'F108 observe removal - bool pulse (legacy)', runF108ObserveRemovalMinus);
+  reg(4679, 'logic', 'F108 observe removal - bool pulse (wave)', runF108ObserveRemovalMinus, { propagation: 'wave' });
+
+  reg(4680, 'logic', 'F108 observe removal is text parse error (legacy)', function(h, session) {
+    h.assertThrows('removal text', function() {
+      session.run(`inline [logic] .g:
+    playerPos$$(p1, 0, 0)
+:
+comp [logic] .gameLogic:
+    on: 1
+    .g {
+        observe removal playerPos$$:key=p1 is text badPin
+    }
+:`); 
+    });
+  });
+  reg(4681, 'logic', 'F108 observe removal is text parse error (wave)', function(h, session) {
+    h.assertThrows('removal text', function() {
+      session.run(`inline [logic] .g:
+    playerPos$$(p1, 0, 0)
+:
+comp [logic] .gameLogic:
+    on: 1
+    .g {
+        observe removal playerPos$$:key=p1 is text badPin
+    }
+:`); 
+    });
+  }, { propagation: 'wave' });
+
+  function runF108NoEmitOnQueryOnly(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+    query q:
+        playerPos$$(p1, X, Y)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+    }
+
+:
+
+64wire posOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    q >= posOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const bits = session.getCompProperty(interp, '.gameLogic', 'posPin');
+    h.assert('pos unchanged', /^0+$/.test(bits || ''), true);
+  }
+
+  reg(4682, 'logic', 'F108 no observe emit query-only pass (legacy)', runF108NoEmitOnQueryOnly);
+  reg(4683, 'logic', 'F108 no observe emit query-only pass (wave)', runF108NoEmitOnQueryOnly, { propagation: 'wave' });
+
+  reg(4684, 'logic', 'F108 duplicate input+observe pin elab error (legacy)', function(h, session) {
+    h.assertThrows('dup pin', function() {
+      session.run(`inline [logic] .g:
+    playerPos$$(p1, 0, 0)
+:
+comp [logic] .gameLogic:
+    on: 1
+    .g {
+        X is number posPin
+        observe playerPos$$:key=p1 is number list posPin
+    }
+:`); 
+    });
+  });
+  reg(4685, 'logic', 'F108 duplicate input+observe pin elab error (wave)', function(h, session) {
+    h.assertThrows('dup pin', function() {
+      session.run(`inline [logic] .g:
+    playerPos$$(p1, 0, 0)
+:
+comp [logic] .gameLogic:
+    on: 1
+    .g {
+        X is number posPin
+        observe playerPos$$:key=p1 is number list posPin
+    }
+:`); 
+    });
+  }, { propagation: 'wave' });
+
+  function runF108ObserveDefKeyword(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe def playerPos$$:key is text keyPin
+    }
+
+:
+
+64wire keyOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + playerPos$$(p1, 9, 1) }
+    keyPin >= keyOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('def deferred key', logicObserveTextFromPin(session.getCompProperty(interp, '.gameLogic', 'keyPin')), 'p1');
+  }
+
+  reg(4686, 'logic', 'F108 observe def deferred key pin (legacy)', runF108ObserveDefKeyword);
+  reg(4687, 'logic', 'F108 observe def deferred key pin (wave)', runF108ObserveDefKeyword, { propagation: 'wave' });
+
+  function runF108NonMatchFilter(h, session) {
+    const src = `inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+    }
+
+:
+
+64wire posOut = \\0;64
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + playerPos$$(p2, 7, 2) }
+    posPin >= posOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const bits = session.getCompProperty(interp, '.gameLogic', 'posPin');
+    h.assert('p2 does not trigger p1 filter', /^0+$/.test(bits || ''), true);
+  }
+
+  reg(4688, 'logic', 'F108 observe filter p2 no trigger (legacy)', runF108NonMatchFilter);
+  reg(4689, 'logic', 'F108 observe filter p2 no trigger (wave)', runF108NonMatchFilter, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

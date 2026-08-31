@@ -19,6 +19,7 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Outputs** | Query redirect (`modifier:0 >= result`) |
 | **Query selection** | **Omit** = all queries; **`query = a, b`** = subset; **`query none`** = no queries |
 | **Mutations** | `logic { + fact / - fact }` — see [logic-runtime.md](logic-runtime.md) |
+| **Observers** | `observe` / `observe removal` in program block — [logic-observers.md](logic-observers.md) |
 | **List pins** | `Nodes is text list routePin` — vector wires recommended; see [list pins](#list-pins--text-list-number-list-bool-list) |
 | **Compound redirect** | `zoneId:0 >= zoneOut`, `zoneId:0:1 >= nameOut` — nested args by column index |
 | **Constraints** | `constraint P <= Body` in inline; mutations validated — [logic-constraints.md](logic-constraints.md) |

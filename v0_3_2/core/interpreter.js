@@ -10030,6 +10030,11 @@ if (this.isBuiltinDEMUX(name)) {
         const redirects = comp._logicRedirectProps;
         if (!redirects || !redirects.length) continue;
         handler._applyRedirects(comp, compName, redirects, this);
+        if (comp._observeRemovalPulsePendingReset
+            && typeof handler._resetObserveRemovalPulses === 'function') {
+          handler._resetObserveRemovalPulses(comp, this);
+          comp._observeRemovalPulsePendingReset = false;
+        }
       }
     } finally {
       this._logicRedirectSyncWrite = false;

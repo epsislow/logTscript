@@ -158,6 +158,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       if (p.property !== 'pout>' && p.property !== 'logicQuery>') continue;
       const qName = p.queryName || p.poutName;
       if (LogicComponent.LOGIC_META_POUTS.has(qName)) continue;
+      if (comp.observePinStorage && comp.observePinStorage[qName]) continue;
       const qMeta = meta[qName] || {};
       const freeVars = qMeta.freeVars || [];
       const argVarSlots = qMeta.argVarSlots || null;
@@ -256,6 +257,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
   getSupportedProperties() {
     return ['execCount', 'truncated', 'depthExceeded', 'mutationFailed'];
+  }
+
+  supportsPropertyName(property, attributes) {
+    if (LogicComponent.LOGIC_META_POUTS.has(property)) return true;
+    const names = attributes && attributes.observePinNames;
+    return Array.isArray(names) && names.indexOf(property) >= 0;
   }
 
   getRedirectProperties() {
@@ -439,10 +446,15 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       if (!inst || inst.kind !== 'logic') {
         throw Error(`logic program ${block.ref} must be inline [logic]`);
       }
-      const bindings = typeof parseLogicProgramBlock === 'function'
-        ? parseLogicProgramBlock(block.bodyRaw)
-        : [];
-      programs.push({ ref: block.ref, inst, bindings });
+      const parsedBlock = typeof parseLogicProgramBlock === 'function'
+        ? parseLogicProgramBlock(block.bodyRaw, `logic ${compName}`)
+        : { bindings: [], observeDefs: [] };
+      programs.push({
+        ref: block.ref,
+        inst,
+        bindings: parsedBlock.bindings || [],
+        observeDefs: parsedBlock.observeDefs || [],
+      });
     }
     return programs;
   }
@@ -451,9 +463,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const programs = this._parsePrograms(attributes, ctx, name);
     const prog = programs[0];
     const pinDefs = {};
+    const observePinDefs = {};
     const inputVars = new Set();
     for (const b of prog.bindings) {
-      if (pinDefs[b.pinName]) {
+      if (pinDefs[b.pinName] || observePinDefs[b.pinName]) {
         throw Error(`logic ${name}: duplicate pin '${b.pinName}'`);
       }
       inputVars.add(b.logicVar);
@@ -472,6 +485,29 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       };
     }
 
+    const observeDefs = prog.observeDefs || [];
+    const seenObservePins = new Set();
+    for (const def of observeDefs) {
+      if (pinDefs[def.pinName] || seenObservePins.has(def.pinName)) {
+        throw Error(`logic ${name}: duplicate pin '${def.pinName}'`);
+      }
+      seenObservePins.add(def.pinName);
+      observePinDefs[def.pinName] = {
+        bindType: def.bindType,
+        numberFormat: def.numberFormat || null,
+        listFlag: !!def.listFlag,
+        bits: def.bindType === 'bool'
+          ? 1
+          : def.bindType === 'text'
+            ? LogicComponent.TEXT_PIN_MIN_BITS
+            : (def.bindType === 'number' || def.bindType === 'float')
+              ? LogicComponent.NUMBER_PIN_DEFAULT_BITS
+              : 8,
+        removal: !!def.removal,
+        deferred: !!def.deferred,
+      };
+    }
+
     const merged = typeof logicResolveMerged === 'function'
       ? logicResolveMerged(prog.inst, ctx.inlineInstances)
       : prog.inst;
@@ -481,6 +517,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const indexFacts = this._parseIndexFacts(attributes, name);
     const indexRebuild = this._parseIndexRebuild(attributes, name, indexFacts);
     const dataMode = this._parseDataMode(attributes, name);
+    if (observeDefs.length && dataMode === 'static') {
+      throw Error(`logic ${name}: data: static forbids observe pins`);
+    }
     const randomSeed = this._parseRandomSeed(attributes, name, ctx);
 
     const validateStaticFn = typeof logicValidateStaticKnowledge === 'function'
@@ -555,8 +594,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       ref: null,
       programRef: prog.ref,
       programBindings: prog.bindings,
+      observeDefs,
+      observePinDefs,
+      observePinNames: observeDefs.map((d) => d.pinName),
       pinDefs,
       pinStorage: {},
+      observePinStorage: {},
       queryResults: {},
       queryMeta,
       execCount: 0,
@@ -594,12 +637,33 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       };
     }
 
+    for (const [pinName, meta] of Object.entries(observePinDefs)) {
+      const initial = '0'.repeat(meta.bits);
+      const storageIdx = ctx.storeValue(initial);
+      compInfo.observePinStorage[pinName] = {
+        bits: meta.bits,
+        ref: `&${storageIdx}`,
+        bindType: meta.bindType,
+        numberFormat: meta.numberFormat || null,
+        listFlag: !!meta.listFlag,
+        removal: !!meta.removal,
+        deferred: !!meta.deferred,
+      };
+    }
+
+    if (compInfo.observePinNames.length) {
+      attributes.observePinNames = [...compInfo.observePinNames];
+    }
+
     return { earlyReturn: true, compInfo };
   }
 
   finalizeCompInfo(compInfo, attributes) {
     if (attributes.logicPrograms && attributes.logicPrograms.length) {
       compInfo.programRef = attributes.logicPrograms[0].ref;
+    }
+    if (compInfo.observePinNames && compInfo.observePinNames.length) {
+      attributes.observePinNames = [...compInfo.observePinNames];
     }
   }
 
@@ -837,6 +901,116 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     strat.emitListenLogicMut(compName, detail, expandLines, 2);
   }
 
+  _writeObservePinBits(comp, pinName, bits, ctx) {
+    const pin = comp.observePinStorage && comp.observePinStorage[pinName];
+    if (!pin) return;
+    if (pin.bindType === 'text') {
+      this._writeTextPinStorage(pin, bits, ctx);
+      return;
+    }
+    if (pin.bindType === 'number') {
+      this._writeNumberPinStorage(pin, bits, ctx);
+      return;
+    }
+    let v = bits != null ? String(bits) : '0'.repeat(pin.bits);
+    if (v.length < pin.bits) v = v.padStart(pin.bits, '0');
+    else if (v.length > pin.bits) v = v.slice(-pin.bits);
+    ctx.setValueAtRef(pin.ref, v);
+  }
+
+  _observeEncodeAndStore(comp, def, term, ctx) {
+    const pin = comp.observePinStorage && comp.observePinStorage[def.pinName];
+    if (!pin || !term) return;
+    const encFn = typeof logicTermToWireValue === 'function' ? logicTermToWireValue : null;
+    const listEncFn = typeof logicEncodeListToVectorBits === 'function'
+      ? logicEncodeListToVectorBits : null;
+    let bits;
+    if (def.listFlag && term.kind === 'list' && listEncFn) {
+      const ew = 16;
+      const maxEl = Math.max(1, Math.floor(pin.bits / ew));
+      bits = listEncFn(term, def.bindType, maxEl, ew, '0'.repeat(ew), def.numberFormat);
+      if (bits.length > pin.bits) {
+        const storageIdx = ctx.storeValue(bits);
+        pin.ref = `&${storageIdx}`;
+        pin.bits = bits.length;
+      } else {
+        ctx.setValueAtRef(pin.ref, bits);
+      }
+      return;
+    }
+    if (def.bindType === 'text') {
+      let width = pin.bits;
+      if (term && term.kind === 'atom') {
+        width = Math.max(width, term.name.length * 8);
+      } else if (term && term.kind === 'number') {
+        width = Math.max(width, String(term.value).length * 8);
+      }
+      bits = encFn ? encFn(term, width, def.bindType, def.numberFormat) : '0'.repeat(width);
+      this._writeTextPinStorage(pin, bits, ctx);
+      return;
+    }
+    if (def.bindType === 'number') {
+      bits = encFn ? encFn(term, pin.bits, def.bindType, def.numberFormat) : '0'.repeat(pin.bits);
+      this._writeNumberPinStorage(pin, bits, ctx);
+      return;
+    }
+    bits = encFn ? encFn(term, pin.bits, def.bindType, def.numberFormat) : '0'.repeat(pin.bits);
+    ctx.setValueAtRef(pin.ref, bits);
+  }
+
+  _fireObserveForOp(comp, compName, op, ctx, timing) {
+    if (!comp.observeDefs || !comp.observeDefs.length || !comp._observeRuntimeReady) return;
+    const matchFn = typeof logicObserveMutationMatches === 'function'
+      ? logicObserveMutationMatches : null;
+    const projectFn = typeof logicProjectObserveTerm === 'function'
+      ? logicProjectObserveTerm : null;
+    if (!matchFn || !projectFn || !op || !op.head) return;
+    const opKind = op.op === 'add' ? 'add' : op.op === 'remove' ? 'remove' : null;
+    if (!opKind) return;
+    const deferredFlag = timing === 'deferred';
+    for (const def of comp.observeDefs) {
+      if (!!def.deferred !== deferredFlag) continue;
+      if (!matchFn(def, opKind, op.head)) continue;
+      if (def.removal) {
+        this._writeObservePinBits(comp, def.pinName, '1', ctx);
+        if (!comp._observeRemovalPulsePins) comp._observeRemovalPulsePins = new Set();
+        comp._observeRemovalPulsePins.add(def.pinName);
+      } else {
+        const term = projectFn(def, op.head);
+        if (term) this._observeEncodeAndStore(comp, def, term, ctx);
+      }
+    }
+  }
+
+  _queueDeferredObserveOp(comp, op) {
+    if (!comp._observeDeferredOps) comp._observeDeferredOps = [];
+    comp._observeDeferredOps.push(op);
+  }
+
+  _flushDeferredObservers(comp, compName, ctx) {
+    if (!comp._observeDeferredOps || !comp._observeDeferredOps.length) return;
+    for (const op of comp._observeDeferredOps) {
+      this._fireObserveForOp(comp, compName, op, ctx, 'deferred');
+    }
+    comp._observeDeferredOps = [];
+  }
+
+  _onMutationOpApplied(comp, compName, op, ctx) {
+    if (!comp.observeDefs || !comp.observeDefs.length) return;
+    const hasImmediate = comp.observeDefs.some((d) => !d.deferred);
+    const hasDeferred = comp.observeDefs.some((d) => d.deferred);
+    if (hasImmediate) this._fireObserveForOp(comp, compName, op, ctx, 'immediate');
+    if (hasDeferred) this._queueDeferredObserveOp(comp, op);
+  }
+
+  _resetObserveRemovalPulses(comp, ctx) {
+    if (!comp._observeRemovalPulsePins || !comp._observeRemovalPulsePins.size) return;
+    for (const pinName of comp._observeRemovalPulsePins) {
+      this._writeObservePinBits(comp, pinName, '0', ctx);
+    }
+    comp._observeRemovalPulsePins.clear();
+  }
+
   _applyMutations(comp, compName, mutationBlocks, ctx, merged) {
     const applyFn = typeof logicApplyMutationTransaction === 'function'
       ? logicApplyMutationTransaction : null;
@@ -964,8 +1138,18 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const stepFn = typeof logicApplyMutationOpStep === 'function'
       ? logicApplyMutationOpStep : null;
     const table = comp.factIndex && comp.factIndex.table;
+    const expandRetractFn = typeof logicExpandRetractAllOps === 'function'
+      ? logicExpandRetractAllOps : null;
+    const buildRuntimeFn = typeof logicBuildRuntimeClauses === 'function'
+      ? logicBuildRuntimeClauses : null;
+    const preExpandRetractRemoves = (op) => {
+      if (!op || op.op !== 'retract_all' || !expandRetractFn || !buildRuntimeFn) return [];
+      const runtimeClauses = buildRuntimeFn(merged.clauses, comp.dynamicStore, buildOpts);
+      return expandRetractFn(op.template, runtimeClauses, table) || [];
+    };
     if (stepFn) {
       for (const op of ops) {
+        const preRemoves = preExpandRetractRemoves(op);
         const result = stepFn(comp.dynamicStore, merged.clauses, op, {
           ...buildOpts,
           staticClauses: merged.clauses,
@@ -980,14 +1164,36 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           }
           return;
         }
+        if (preRemoves.length) {
+          for (const rem of preRemoves) {
+            if (rem && rem.head) this._onMutationOpApplied(comp, compName, rem, ctx);
+          }
+        } else if (op && op.head) {
+          this._onMutationOpApplied(comp, compName, op, ctx);
+        }
       }
       this._updateFactIndexAfterCommit(comp, merged, ops);
       comp.mutationFailed = 0;
       this._traceLogicMut(ctx, compName, `commit (${ops.length} ops, ${net} net)`, null);
       return;
     }
+    const retractPreRemoves = new Map();
+    for (const op of ops) {
+      if (op && op.op === 'retract_all') {
+        retractPreRemoves.set(op, preExpandRetractRemoves(op));
+      }
+    }
     const result = applyFn(comp.dynamicStore, ops, { ...buildOpts, staticClauses: merged.clauses });
     if (result && result.success) {
+      for (const op of ops) {
+        if (op && op.op === 'retract_all') {
+          for (const rem of retractPreRemoves.get(op) || []) {
+            if (rem && rem.head) this._onMutationOpApplied(comp, compName, rem, ctx);
+          }
+        } else if (op && op.head) {
+          this._onMutationOpApplied(comp, compName, op, ctx);
+        }
+      }
       this._updateFactIndexAfterCommit(comp, merged, ops);
       comp.mutationFailed = 0;
       this._traceLogicMut(ctx, compName, `commit (${ops.length} ops, ${net} net)`, null);
@@ -1076,6 +1282,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           return { ok: false };
         }
         comp.mutationFailed = 0;
+        for (const op of execOps || []) {
+          if (op && op.head) self._onMutationOpApplied(comp, compName, op, ctx);
+        }
         self._updateFactIndexAfterCommit(comp, merged, execOps);
         return {
           ok: true,
@@ -1098,6 +1307,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const merged = resolveFn(inst, ctx.inlineInstances);
     try {
       this._beginCompRng(comp, compName, ctx);
+      comp._observeRuntimeReady = true;
+      comp._observeDeferredOps = [];
+      this._resetObserveRemovalPulses(comp, ctx);
       this._applyMutations(comp, compName, mutationBlocks, ctx, merged);
       const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
       const buildOpts = this._buildDataOpts(comp);
@@ -1133,7 +1345,13 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       comp.depthExceeded = meta.depthExceeded ? 1 : 0;
       comp.execCount = (comp.execCount || 0) + 1;
 
+      this._flushDeferredObservers(comp, compName, ctx);
       this._applyRedirects(comp, compName, redirects, ctx);
+      if (!ctx.deferWirePropagation || !ctx.deferWirePropagation()) {
+        this._resetObserveRemovalPulses(comp, ctx);
+      } else {
+        comp._observeRemovalPulsePendingReset = true;
+      }
     } finally {
       this._endCompRng(comp);
     }
@@ -1176,6 +1394,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         } else if (rd.poutName === 'execCount') {
           const count = comp.execCount != null ? comp.execCount : 0;
           bits = count.toString(2).padStart(width, '0').slice(-width);
+        } else if (comp.observePinStorage && comp.observePinStorage[rd.poutName]) {
+          const obsPin = comp.observePinStorage[rd.poutName];
+          const rawBits = ctx.getValueFromRef(obsPin.ref) || '0'.repeat(obsPin.bits);
+          if (rawBits.length < width) bits = rawBits.padStart(width, '0');
+          else if (rawBits.length > width) bits = rawBits.slice(-width);
+          else bits = rawBits;
         } else {
           let solutions = logicSolutionsForRedirect(comp, qName, rd);
           if (!solutions) continue;
@@ -1478,6 +1702,11 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     if (property === 'mutationFailed') {
       const val = comp.mutationFailed ? '1' : '0';
       return { value: val, ref: null, varName: `${a.var}:mutationFailed`, bitWidth: 1 };
+    }
+    const obsPin = comp.observePinStorage && comp.observePinStorage[property];
+    if (obsPin) {
+      const val = ctx.getValueFromRef(obsPin.ref) || '0'.repeat(obsPin.bits);
+      return { value: val, ref: obsPin.ref, varName: `${a.var}:${property}`, bitWidth: obsPin.bits };
     }
     return null;
   }

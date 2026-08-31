@@ -1,6 +1,6 @@
 /* ================= LOGIC ASSEMBLER (inline [logic]) ================= */
 
-const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as']);
+const LOGIC_KEYWORDS = new Set(['query', 'use', 'constraint', 'as', 'observe']);
 const LOGIC_MUTATION_BIND_TYPES = new Set(['text', 'bool', 'number', 'float']);
 const LOGIC_BUILTIN_SHOW_PRED = 'show';
 const LOGIC_BUILTIN_SHOWX_PRED = 'showx';
@@ -367,6 +367,9 @@ class LogicParser {
         }
         uses.push({ ref: '.' + refName, mode, line: useLine, alias });
         continue;
+      }
+      if (this.at('KW', 'observe')) {
+        logicError("'observe' is only allowed in comp [logic] program block (.module { })", this.peek().line);
       }
       if (this.at('KW', 'query')) {
         this.advance();
@@ -1739,18 +1742,127 @@ function logicReuseUseError(targetRef, chain, useLine) {
   logicError(msg, useLine);
 }
 
-function parseLogicProgramBlock(bodyRaw) {
+function parseObserveGroundTerm(raw, line, ctxLabel) {
+  const src = String(raw == null ? '' : raw).trim();
+  if (!src) logicError(`${ctxLabel}: observe :key= requires a ground term`, line);
+  const groundFn = typeof logicTermIsGround === 'function' ? logicTermIsGround : null;
+  const tokens = logicTokenize(src);
+  const parser = new LogicParser(tokens);
+  let term;
+  try {
+    term = parser.parseTerm();
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    logicError(`${ctxLabel}: invalid ground term in observe filter (${msg})`, line);
+  }
+  if (groundFn && !groundFn(term)) {
+    logicError(`${ctxLabel}: observe :key= requires a ground term`, line);
+  }
+  return term;
+}
+
+function parseObserveFactPattern(raw, line, ctxLabel) {
+  const src = String(raw == null ? '' : raw).trim();
+  const m = src.match(/^([a-z][A-Za-z0-9_]*(\$\$|\$))(?::(key|tail)(?:=(.+))?)?$/);
+  if (!m) {
+    logicError(`${ctxLabel}: invalid observe fact pattern '${src}'`, line);
+  }
+  const predicate = m[1];
+  logicValidatePredicateName(predicate, line);
+  const kind = logicPredicateUniqueKind(predicate);
+  if (!kind) logicError(`${ctxLabel}: observe requires predicate ending with $ or $$`, line);
+  const selector = m[3] || null;
+  const filterRaw = m[4] != null ? m[4].trim() : null;
+  if (selector && kind !== 'keyed') {
+    logicError(`${ctxLabel}: observe selector :${selector} requires $$ predicate`, line);
+  }
+  if (filterRaw != null && filterRaw !== '' && selector !== 'key') {
+    logicError(`${ctxLabel}: observe filter requires :key=Ground`, line);
+  }
+  let keyFilter = null;
+  if (filterRaw != null && filterRaw !== '') {
+    keyFilter = parseObserveGroundTerm(filterRaw, line, ctxLabel);
+  }
+  return { predicate, kind, selector, keyFilter };
+}
+
+function parseObserveProgramLine(line, ctxLabel) {
+  let rest = line.trim();
+  if (!rest.startsWith('observe')) {
+    throw new Error(`${ctxLabel}: expected observe line`);
+  }
+  rest = rest.slice('observe'.length).trim();
+  let removal = false;
+  let deferred = false;
+  if (rest.startsWith('removal')) {
+    removal = true;
+    rest = rest.slice('removal'.length).trim();
+  }
+  if (rest.startsWith('def')) {
+    deferred = true;
+    rest = rest.slice('def'.length).trim();
+  }
+  const isMatch = rest.match(/^(.+?)\s+is\s+(number|bool|text|float)(?:\/([A-Za-z0-9]+))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/);
+  if (!isMatch) {
+    throw new Error(`${ctxLabel}: invalid observe line '${line}' (expected 'observe [removal] [def] Pattern is type pin')`);
+  }
+  const listFlag = /\blist\b/.test(line);
+  const bindType = isMatch[2];
+  const pinName = isMatch[4];
+  let numberFormat = null;
+  if (isMatch[3]) {
+    if (bindType === 'number') {
+      if (typeof parseLogicNumberFormatToken !== 'function') {
+        throw new Error('logic-number-formats is not loaded');
+      }
+      numberFormat = parseLogicNumberFormatToken(isMatch[3], `observe pin '${pinName}'`);
+    } else if (bindType === 'float') {
+      if (typeof parseLogicFloatFormatToken !== 'function') {
+        throw new Error('logic-float-formats is not loaded');
+      }
+      numberFormat = parseLogicFloatFormatToken(isMatch[3], `observe pin '${pinName}'`);
+    }
+  }
+  const pattern = parseObserveFactPattern(isMatch[1], 0, ctxLabel);
+  if (removal && bindType !== 'bool') {
+    throw new Error(`${ctxLabel}: observe removal '${pinName}' must be is bool`);
+  }
+  if (pattern.selector === 'tail' && !listFlag) {
+    throw new Error(`${ctxLabel}: observe '${pinName}' :tail requires list type`);
+  }
+  if (pattern.selector === 'key' && listFlag && pattern.keyFilter == null) {
+    throw new Error(`${ctxLabel}: observe '${pinName}' :key cannot use list type`);
+  }
+  return {
+    ...pattern,
+    bindType,
+    numberFormat,
+    listFlag,
+    pinName,
+    removal,
+    deferred,
+  };
+}
+
+function parseLogicProgramBlock(bodyRaw, ctxLabel) {
+  const label = ctxLabel || 'logic program block';
   const src = bodyRaw == null ? '' : String(bodyRaw).trim();
   const bindings = [];
+  const observeDefs = [];
   const lines = src.split('\n');
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line || line.startsWith(';')) continue;
+    if (line.startsWith('observe')) {
+      const def = parseObserveProgramLine(line, label);
+      observeDefs.push(def);
+      continue;
+    }
     const m = line.match(
       /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text|float)(?:\/([A-Za-z0-9]+))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/,
     );
     if (!m) {
-      throw new Error(`logic program block: invalid binding '${line}' (expected 'Var is type [/format] [list] pin')`);
+      throw new Error(`${label}: invalid binding '${line}' (expected 'Var is type [/format] [list] pin' or 'observe …')`);
     }
     const listFlag = /\blist\b/.test(line);
     let numberFormat = null;
@@ -1775,7 +1887,7 @@ function parseLogicProgramBlock(bodyRaw) {
       pinName: m[4],
     });
   }
-  return bindings;
+  return { bindings, observeDefs };
 }
 
 function mergeLogicDefinitions(base, usedInst) {

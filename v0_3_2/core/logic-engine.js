@@ -5880,6 +5880,52 @@ function logicPinToInputValue(bits, bindType, numberFormat) {
   return { kind: 'number', value: n };
 }
 
+function logicObserveArgsToListTerm(args) {
+  let tail = { kind: 'atom', name: '[]' };
+  for (let i = (args || []).length - 1; i >= 0; i--) {
+    tail = { kind: 'list', head: args[i], tail };
+  }
+  return tail;
+}
+
+function logicObserveMutationMatches(def, opKind, head) {
+  if (!def || !head || head.kind !== 'compound') return false;
+  if (head.predicate !== def.predicate) return false;
+  if (def.removal) {
+    if (opKind !== 'remove') return false;
+  } else if (opKind !== 'add') {
+    return false;
+  }
+  if (def.keyFilter != null) {
+    const k0 = head.args && head.args[0];
+    if (!k0 || !logicTermsEqualGround(k0, def.keyFilter)) return false;
+  }
+  return true;
+}
+
+function logicProjectObserveTerm(def, head) {
+  if (!def || !head || head.kind !== 'compound') return null;
+  const args = head.args || [];
+  if (def.kind === 'single') {
+    if (args.length === 0) return { kind: 'atom', name: def.predicate };
+    if (args.length === 1) return args[0];
+    return logicObserveArgsToListTerm(args);
+  }
+  if (def.kind === 'keyed') {
+    if (def.keyFilter != null && (def.listFlag || def.selector === 'tail')) {
+      return logicObserveArgsToListTerm(args.slice(1));
+    }
+    if (def.selector === 'key') {
+      return args.length > 0 ? args[0] : { kind: 'atom', name: '' };
+    }
+    if (def.selector === 'tail') {
+      return logicObserveArgsToListTerm(args.slice(1));
+    }
+    return logicObserveArgsToListTerm(args);
+  }
+  return null;
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.executeLogicQueries = executeLogicQueries;
   globalThis.executeLogicGoals = executeLogicGoals;
@@ -5947,7 +5993,9 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicMutationDeltaPlusFacts = logicMutationDeltaPlusFacts;
   globalThis.logicCollectStaticGroundFacts = logicCollectStaticGroundFacts;
   globalThis.logicFactClauseKey = logicFactClauseKey;
-  globalThis.logicPredicateUniqueKind = logicPredicateUniqueKind;
+  globalThis.logicObserveMutationMatches = logicObserveMutationMatches;
+  globalThis.logicProjectObserveTerm = logicProjectObserveTerm;
+  globalThis.logicObserveArgsToListTerm = logicObserveArgsToListTerm;
   globalThis.logicUniqueSlotKeyFromHead = logicUniqueSlotKeyFromHead;
   globalThis.logicNormalizeUniqueClauses = logicNormalizeUniqueClauses;
   globalThis.logicTermIsGround = logicTermIsGround;
