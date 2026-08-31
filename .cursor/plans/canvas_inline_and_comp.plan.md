@@ -1,0 +1,1008 @@
+---
+name: inline canvas + comp canvas
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–4 MVP; backlog amânat 1+a…; decizii de la D1 (draft)."
+todos:
+  - id: canvas-deferred-table
+    content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
+    status: pending
+  - id: canvas-f1
+    content: "Faza 1: parse inline/comp [canvas] + attrs width/height/bgColor + device gol — D1–D12 draft"
+    status: pending
+  - id: canvas-f2
+    content: "Faza 2: limbaj draw (expr + assign) + builtins drawRect/Text/Line/Circle/style — D13–D28 draft"
+    status: pending
+  - id: canvas-f3
+    content: "Faza 3: renderer block + wire args + set/draw/busy/dirty coalesce — D29–D42 draft"
+    status: pending
+  - id: canvas-f4
+    content: "Faza 4: doc EN + teste + integrare logic/observe/osc — D43–D48 draft"
+    status: pending
+isProject: false
+---
+
+# Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
+
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–4**; amânări **1+a, 1+b, …**.  
+> **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
+> **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
+> **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
+
+---
+
+## Pachet confirmare — prioritate
+
+User confirmă în scris `D#: literă` (ex. `D1 A`, `D5 A`, …). Ordine: **întâi Faza 1 (D1–D12)** → F1 poate deveni **(ready-to-implement)**; apoi F2/F3/F4.
+
+### Batch F1 — confirmat user 2026-08-31
+
+```text
+D1   (pending — vezi explicație mai jos; recommended A canvas)
+D2 A ✅
+D3 A ✅ — width/height fixe la elaborare; fără resize runtime
+D4 D ✅ — fără default; width și height obligatorii (parse error dacă lipsesc)
+D5 A ✅
+D6 B ✅
+D7 B ✅ — default bgColor ^000000 (tema dark, ca CLCD)
+D8 A ✅
+D9 A ✅
+D10 A ✅
+D11 A ✅
+D12 A ✅
+```
+
+> **D6 B:** braces `{ }` — confirmat cu D5.  
+> **D4:** opțiune nouă **D (change)** — nu exista în tabelul inițial; user respinge A/B/C (defaults).
+
+### Batch F2–F4 — după F1
+
+Vezi tabelele pe fază; rezumat recommended în [Tabel rezumat decizii](#tabel-rezumat-decizii-toate--draft).
+
+---
+
+## Legenda
+
+| Marcaj | Semnificație |
+| ------ | ------------ |
+| **(recommended)** | Opțiunea recomandată de analiză |
+| **(change)** | Alternativă validă; diferă de sketch sau de direcția implicită |
+| **(ready-to-implement)** | Faza poate începe după confirmarea deciziilor ei |
+| **(completed)** | Decizie luată / fază implementată |
+| **1+a … 1+z** | Faze **amânate** — vezi [Backlog faze amânate](#backlog-faze-amânate-1a--1z) |
+| ✅ | Backlog **promovat / livrat** |
+| ❌ | Backlog **respins** definitiv |
+| 🟠✗ | Backlog **închis** — alternativa nu se face |
+| ⏳ | Backlog **deschis** — încă amânat |
+| ⏸ | Backlog **pause** — idee, fără promovare fază |
+
+**Notă:** **D1+** sunt **locale acestui plan**. Nu importă numerotarea din logic2/hotkey. Breaking față de alte planuri = notă cross-link, nu reutilizare ID.
+
+---
+
+## Reguli planului
+
+1. **Plan izolat:** numerotare **Faza 1, 2, 3, 4** + subfaze **F1a, F1b, …**; decizii **D1, D2, …**.
+2. **Confirmare:** user confirmă **A/B/C** în scris; până atunci **draft**.
+3. **Backlog amânat:** ID **1+a, 1+b, …** — tabel master mai jos; promovare → **Faza N** cu secțiune completă.
+4. **Implementare:** pattern legacy + wave în `tests/test_suite.js`; doc EN în `v0_3_2/doc/`; `node _run_test_suite_node.js -q` + `_verify_doc_examples.js` la done.
+5. **Fără întrebări în chat pentru draft:** opțiunile stau în tabel + detaliu sub tabel.
+6. **Sketch ≠ spec:** sketch-ul poate conține lacune/erori — analiza notează **(change)** unde e cazul.
+7. **Principiu arhitectură (din sketch):** logic = **ce stare**; canvas = **cum se desenează**; `observe` = punte (depinde de F108 logic, nu de acest plan).
+
+---
+
+## Stare la handoff (azi)
+
+| Existent azi | Relevant canvas |
+| ------------ | --------------- |
+| `inline [logic]` / `comp [logic]` | Pattern inline+comp de urmat |
+| `inline` kinds: `asm`, `lut`, `protocol`, `plc`, `logic` | **`canvas` necunoscut** → parse error |
+| `comp [clcd]` / LCD / servo widgets | Canvas DOM + `getContext('2d')` + rAF — **pattern UI** |
+| Culori pe comps: `^aaffaa` / wire color | Sketch folosește `"aaffaa"`; **`#` = comentariu** în LogTScript |
+| `set` pe logic/clcd | Control pin existent ca model |
+| `busy` pe DMA/CPU | Model pout status |
+| **Nu există** `inline [canvas]` / `comp [canvas]` | Feature nou |
+| **Nu există** limbaj draw (rect/text/line/circle) | Feature nou |
+| Logic `observe` (F108) | Consumator downstream — **nu** blocant MVP canvas |
+
+**Teste:** alocare canvas draft **4700+**.
+
+---
+
+## Mapare decizii → faze
+
+| Fază | Decizii | Status |
+| ---- | ------- | ------ |
+| **Faza 1** Scaffold parse + device + attrs | **D1–D12** — D2–D12✅; **D1** pending | **(ready-to-implement)** după **D1** |
+| **Faza 2** Limbaj draw + builtins | **D13–D28** draft | — |
+| **Faza 3** Renderer + wires + set/draw/busy | **D29–D42** draft | — |
+| **Faza 4** Doc + teste + integrare | **D43–D48** draft | — |
+| *(amânate)* | — | **1+a …** |
+
+---
+
+## Backlog faze amânate (1+a … 1+z)
+
+Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/livrat · ⏸ pause.
+
+| Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
+| ----- | -- | ------- | ------- | ---------- | -------- |
+| ⏳ | **1+a** | `if` / conditional draw | Branch în body metodă canvas | — | user: „nu avem if acum” |
+| ⏳ | **1+b** | Loops `for` / `while` | Iterație desen (ex. N tiles) | — | user: fără loops |
+| ⏳ | **1+c** | Imagini / sprite sheet | `drawImage`, load asset | — | post-MVP |
+| ⏳ | **1+d** | Transform (rotate/scale/translate) | Stack `save`/`restore` JS | — | post-MVP |
+| ⏳ | **1+e** | Path / arc / bezier / polygon | Dincolo de rect/line/circle | — | post-MVP |
+| ⏳ | **1+f** | Input mouse/touch pe canvas | Hit-test → pout / logic | — | CLCD touch pattern |
+| ⏳ | **1+g** | Clip / partial dirty rect | Optimizare redraw regiuni | — | D36 |
+| ⏳ | **1+h** | Layer / offscreen buffer | Multi-layer compose | — | — |
+| ⏳ | **1+i** | `fill` vs `stroke` separate API | Extindere style | — | D18 |
+| ⏳ | **1+j** | Alpha / rgba / opacity | Dincolo de RGB hex | — | D16 |
+| ⏳ | **1+k** | Font family/size ca API | Extindere `drawText` | — | D22 |
+| ⏳ | **1+l** | Vector wire args (`shotsXVector/s16`) | Sketch menționează; MVP scalar | — | D33 |
+| ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
+| ⏸ | **1+n** | *(slot liber)* | — | — | — |
+| ⏸ | **1+o** | *(slot liber)* | — | — | — |
+
+**Ordine recomandată MVP:** **F1 → F2 → F3 → F4**; apoi **1+a** / **1+b** la cerere; input **1+f** după observe+games.
+
+---
+
+## Backlog post-MVP (2+a … 2+z)
+
+| Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
+| ----- | -- | ------- | ------- | ---------- | -------- |
+| ⏸ | **2+a** | WebGL / 3D | Out of scope 2D | — | — |
+| ⏸ | **2+b** | Export PNG / screenshot pin | — | — | — |
+| ⏸ | **2+c** | *(slot liber)* | — | — | — |
+
+---
+
+## Analiză direcție (sketch — global)
+
+**Ce se dorește:**
+
+```text
+inline [canvas]  →  metode de desen reutilizabile (implementare vizuală)
+comp [canvas]    →  instanță <canvas> + legături input + când se redesenează
+logic + observe  →  stare → wire → canvas input → set/dirty → renderer → pixeli
+```
+
+**Potrivire cu codebase:**
+
+| Building block | Stare | Canvas |
+| -------------- | ----- | ------ |
+| `parseInline` kinds | fără `canvas` | F1 — extindere |
+| Comp registry + Devices panel | CLCD/LCD pattern | F1 — `canvas.js` + widget |
+| Property block `.comp:{ … set = 1 }` | logic/clcd | F3 — `set`/`draw`/`busy` |
+| rAF coalesce | `clcd-widget`, `panel-anim-raf` | F3 — dirty single-slot |
+| Expr aritmetică | logic `is/2`, wire expr | F2 — **subset nou** în body canvas (fără Prolog) |
+
+**Lacune / posibile erori în sketch:**
+
+| # | Observație | Impact | Decizie |
+| - | ---------- | ------ | ------- |
+| 1 | Inline arată **doar semnături** `drawBg(...)` — **fără body** | Fără body nu există desen | **D5 (change)** — metode **cu body** |
+| 2 | **Cum se leagă** `inline` de `comp`? Sketch omite `use`/program block | Binding obligatoriu | **D8** |
+| 3 | Culori `"aaffaa"` vs ecosistem `^aaffaa` | Consistență + `#` comentariu | **D16** |
+| 4 | `renderer { }` e în **comp body** sau în **exec block** `.comp:{ }`? Sketch amestecă | Parse + semantică | **D29** |
+| 5 | Args `xWire/s16` — codec existent logic vs tip nou canvas | Reuse vs invent | **D33** |
+| 6 | `busy` synchronous pe rAF? JS e single-thread — busy scurt | Semantică reală | **D38** |
+| 7 | `draw` vs `set` — ambele schedule; diferența „immediate” e subtilă în browser | Clarificare | **D35–D37** |
+| 8 | Fără `if`/`for` — scene complexe greu de scris | Acceptat MVP; backlog **1+a/1+b** | — |
+| 9 | Clear canvas la fiecare frame? Sketch nu spune | Artefacte / flicker | **D36** |
+| 10 | Parametri metodă vs variabile locale vs pinuri | Scope limbaj | **D14–D15** |
+
+**Verdict:** direcția sketch e **coerentă** (separare logic/render + dirty coalesce). Spec-ul de implementare trebuie să **completeze** body-urile metodelor, binding inline↔comp, și subsetul de limbaj draw (builtins + aritmetică + assign). Nu e nevoie de motor logic în canvas.
+
+---
+
+## Faza 1 — Scaffold: `inline [canvas]` + `comp [canvas]` + device + atribute **(draft)**
+
+> **Status:** draft — așteaptă **D1–D12**.  
+> **Livrabil:** parse OK, componentă înregistrată, panou Devices cu `<canvas>` gol (bgColor), fără draw API încă.
+
+### Problemă (azi)
+
+| Situație | Comportament azi |
+| -------- | ---------------- |
+| `inline [canvas] .r:` | **Parse error** — unknown kind |
+| `comp [canvas] .c:` | **Unknown component** |
+| Device canvas user-draw | **Nu există** (doar CLCD/LCD interne) |
+
+### Sintaxă țintă (F1 — structură)
+
+```logts
+inline [canvas] .gameRenderer:
+
+    /* F1: poate accepta body gol sau doar declarații metode stub;
+       body real + builtins → Faza 2 */
+
+:
+
+comp [canvas] .myCanvas:
+
+    width: 512
+    height: 512
+    bgColor: ^000000
+
+    .gameRenderer { }
+:
+```
+
+### Atribute componentă (cerință user)
+
+| Atribut | Tip | Default | Rol |
+| ------- | --- | ------- | --- |
+| `width` | int | **obligatoriu** (**D4 D✅**) | lățime canvas (px); setat o dată la definirea comp |
+| `height` | int | **obligatoriu** (**D4 D✅**) | înălțime px; setat o dată |
+| `bgColor` | color | **`^000000`** (**D7 B✅**) | fundal clear/init — ca CLCD dark |
+
+### Decizii **D1–D12** (draft)
+
+| ID | Subiect | Opțiuni |
+| -- | ------- | ------- |
+| **D1** | Kind name | **A (recommended)** `canvas` · **B** `draw` · **C** `gfx` |
+| **D2** | Device UI | **A (recommended)** panou Devices ca CLCD (un `<canvas>` per comp) · **B** doar offscreen (fără widget) |
+| **D3** | `width`/`height` mutable runtime | **A (recommended)** parse-time only (ca CLCD) · **B** pins resize · **C** property block |
+| **D4** | Defaults `width`/`height` | **A** 320×240 · **B** 512×512 · **C** 200×100 · **D (change) ✅** **fără default** — ambele atribute **obligatorii** |
+| **D5** | Formă `inline [canvas]` | **A (change, recommended)** metode **cu body** `{…}` sau indent block · **B** doar semnături (sketch literal — insuficient) · **C** semnături în inline + body în fișier separat |
+| **D6** | Delimitare body metodă | **A** indent până la next method · **B (change, recommended)** braces `{ }` obligatoriu · **C** `name(args): … :` |
+| **D7** | Default `bgColor` | **A (recommended)** `"ffffff"` · **B** `"000000"` · **C** transparent (fără fill init) |
+| **D8** | Binding inline → comp | **A (recommended)** program block `.rendererName { }` ca logic · **B** `use .renderer` · **C** `renderer: .gameRenderer` attr · **D** implicit același nume |
+| **D9** | Comp fără inline | **A (recommended)** elaboration error · **B** permis (doar clear bg) · **C** builtins doar în `renderer` exec (fără inline) **(change)** |
+| **D10** | Allow policy | **A (recommended)** `inline.type{canvas}` + `comp.type{canvas}` ca logic · **B** mereu allowed |
+| **D11** | Fișiere | **A (recommended)** `core/components/canvas.js` + `devices/canvas-widget.js` + assembler dedicat · **B** tot în un fișier |
+| **D12** | Teste F1 | **A (recommended)** parse + registry + width/height/bgColor; ID **4700+** · **B** doar parse |
+
+### D1 — Kind name
+
+**Ce înseamnă „Kind name”:** cuvântul din parantezele pătrate după `inline` / `comp` — **identificatorul tipului** de modul inline sau componentă.
+
+```logts
+inline [canvas] .gameRenderer:    ← kind = canvas
+comp [canvas] .myCanvas:          ← kind = canvas
+```
+
+Analogii existente în LogTScript:
+
+| Kind | Rol |
+| ---- | --- |
+| `logic` | motor Prolog inline + comp logic |
+| `clcd` | display simboluri pe biți |
+| `asm`, `lut`, `protocol`, `plc` | alte inline-uri |
+
+Parserul (`parseInline`) acceptă azi doar lista fixă de kinds; pentru canvas trebuie adăugat **`canvas`** în acea listă + înregistrare `CanvasComponent`.
+
+| | |
+| - | - |
+| **A (recommended)** | `inline [canvas]` / `comp [canvas]` — aliniat sketch + element HTML `<canvas>` |
+| **B** | `draw` — scurt, dar **confuz** cu pinul de control `draw` (redraw) |
+| **C** | `gfx` — nefolosit în sketch |
+
+**Decizie:** **pending** — recommended **A**; confirmă cu `D1 A` dacă ești de acord.
+
+### D2 — Device UI
+
+| | |
+| - | - |
+| **A (recommended)** | Widget în panoul Devices — un `<canvas>` DOM per `comp [canvas]` (pattern CLCD/LCD) |
+| **B** | Offscreen only — fără panou |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+### D3 — `width` / `height` — ce înseamnă „mutable”
+
+În plan, **mutable** = poate fi **schimbat după ce comp-ul există** (runtime), de ex. prin pin `width`, property block `.canvas:{ width = 800 }`, sau resize dinamic.
+
+| Opțiune plan | Semnificație |
+| ------------ | ------------ |
+| **A** | Dimensiunea se citește **o singură dată** la parse/elaboration din atributele `width:` / `height:` — apoi **fixă** |
+| **B** | Pinuri wire care pot redimensiona canvas la fiecare wave |
+| **C** | Resize prin property block exec |
+
+**Confirmare user:** width și height sunt **atribute de componentă**, se inițializează **o dată** și **nu se mai schimbă** → **D3 A ✅**.
+
+Implementare: `comp [canvas]` **fără** `width`/`height` ca pin sau property mutabilă; lipsă atribut → eroare (**D4**).
+
+### D4 — Defaults dimensiuni
+
+| | |
+| - | - |
+| **A** | Default 320×240 dacă omit user |
+| **B** | Default 512×512 |
+| **C** | Default 200×100 |
+| **D (change) ✅** | **Fără default** — `width:` și `height:` **obligatorii**; `comp [canvas] .x:` fără ele → **parse/elaboration error** |
+
+Exemplu valid:
+
+```logts
+comp [canvas] .board:
+    width: 512
+    height: 512
+    bgColor: ^000000
+    .gameRenderer { }
+:
+```
+
+**Decizie:** **D ✅** — confirmed user 2026-08-31.
+
+### D5 — Semnături vs body **(change față de sketch)**
+
+Sketch:
+
+```text
+inline [canvas] .gameRenderer
+    drawBg(x, y, width, height, color)
+```
+
+**Problemă:** fără body, `drawBg` nu poate apela builtins. User cere builtins + aritmetică în canvas.
+
+| | |
+| - | - |
+| **A (change, recommended)** | Metodă = nume + params + **body** cu statements draw/assign |
+| **B** | Doar semnături (sketch) — **respins practic** pentru MVP util |
+| **C** | Semnături în inline; implementare JS host — out of LogTScript |
+
+Exemplu țintă **A** (cu **D6 B** braces):
+
+```logts
+inline [canvas] .gameRenderer:
+
+    drawBg(x, y, w, h, color) {
+        style(color)
+        drawRect(x, y, w, h)
+    }
+
+    drawPlayer(x, y, name, health) {
+        style("0000ff")
+        drawCircle(x, y, 12)
+        style("000000")
+        drawText(x, y - 20, name)
+    }
+:
+```
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+### D6 — Delimitare body metodă
+
+| | |
+| - | - |
+| **A** | Indent |
+| **B** | `{ }` obligatoriu după semnătură |
+| **C** | `drawBg(...): … :` |
+
+**Decizie:** **B ✅** — confirmed user 2026-08-31 (cu D5).
+
+### D7 — Default `bgColor`
+
+| | |
+| - | - |
+| **A** | `"ffffff"` |
+| **B ✅** | **`^000000`** — fundal negru, aliniat CLCD + tema dark Devices |
+| **C** | transparent |
+
+**Notă:** pe **atribut comp** folosim sintaxa existentă **`^000000`** (ca `clcd.md`), nu `#000000` — `#` rămâne comentariu în LogTScript. În **body metode** canvas, culorile rămân string `"rrggbb"` conform **D16**.
+
+**Decizie:** **B ✅** — confirmed user 2026-08-31.
+
+### D8 — Binding inline → comp
+
+Sketch **nu** arată legătura. Pattern logic (cod real):
+
+```logts
+comp [logic] .L:
+    .world { }
+```
+
+Parser: `compType === 'logic'` + `.ref { bodyRaw }` → `attributes.logicPrograms`.
+
+| | |
+| - | - |
+| **A (recommended)** | Același pattern: `comp [canvas] .C: .gameRenderer { }` → `canvasPrograms` / `canvasRenderers`; body block **gol în F1**; F3 poate pune mapări pin dacă **D30 B** |
+| **B** | `use .gameRenderer` — keyword nou |
+| **C** | `renderer: .gameRenderer` — attr scalar |
+| **D** | basename identic obligatoriu — fragil la rename |
+
+**MVP A:** un singur inline per comp; multiple → **1+m**.
+
+Exemplu F1:
+
+```logts
+comp [canvas] .myCanvas:
+
+    width: 512
+    height: 512
+    bgColor: ^000000
+
+    .gameRenderer { }
+:
+```
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+### D9 — Comp fără inline
+
+**Decizie:** **A ✅** — elaboration error.
+
+### D10 — Allow / NotAllow
+
+**Decizie:** **A ✅** — `inline.type{canvas}` + `comp.type{canvas}`.
+
+### D11 — Layout fișiere
+
+**Decizie:** **A ✅** — split `canvas.js` + `canvas-widget.js` + assembler/engine.
+
+### D12 — Teste F1
+
+| ID draft | Caz |
+| -------- | --- |
+| 4700 | parse `inline [canvas]` minimal |
+| 4701 | parse `comp [canvas]` + attrs obligatorii + `.renderer { }` |
+| 4702 | parse error — lipsește `width` sau `height` (**D4 D**) |
+| 4703 | default `bgColor` ^000000 când omit (**D7 B**) |
+| 4704 | explicit width/height/bgColor |
+| 4705 | missing inline ref → elaboration error (**D9 A**) |
+| 4706 | Allow policy reject (**D10 A**) |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31 (detaliu test IDs alocat în plan).
+
+### Arhitectură F1–F3
+
+```mermaid
+flowchart TB
+  subgraph dsl [DSL]
+    Inline["inline [canvas] methods+bodies"]
+    Comp["comp [canvas] attrs + .renderer ref"]
+    Exec[".canvas:{ renderer { calls } set/draw }"]
+  end
+
+  subgraph core [Core]
+    Asm["canvas-assembler"]
+    Eng["canvas-engine"]
+    CompJS["components/canvas.js"]
+  end
+
+  subgraph ui [Devices]
+    Widget["canvas-widget.js"]
+    DOM["HTMLCanvasElement 2d"]
+  end
+
+  Inline --> Asm
+  Comp --> CompJS
+  Exec --> CompJS
+  Asm --> Eng
+  CompJS --> Eng
+  Eng --> Widget
+  Widget --> DOM
+```
+
+### Scope F1 (subfaze)
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F1a** | Parser: kind `canvas`; stub inline body; attrs `width`/`height`/`bgColor` |
+| **F1b** | `CanvasComponent` + register + validate attrs |
+| **F1c** | `canvas-widget.js` — create/resize `<canvas>`, fill `bgColor` |
+| **F1d** | Teste **4700+** + doc stub `canvas.md` (minimal) |
+
+### Criterii done F1
+
+- [ ] `inline [canvas]` / `comp [canvas]` parse fără eroare (cu binding D8)
+- [ ] Device vizibil; dimensiuni + bgColor aplicate
+- [ ] Policy Allow/NotAllow (D10)
+- [ ] Teste F1 verzi; **nu** încă builtins
+
+### Status F1
+
+**(ready-to-implement)** după confirmare **D1 A** — **D2–D12✅** user 2026-08-31.
+
+---
+
+## Faza 2 — Limbaj draw: expresii, asignări, builtins **(draft)**
+
+> **Status:** draft — **D13–D28**.  
+> **Depinde:** F1.  
+> **Out of scope:** `if`, loops (**1+a**, **1+b**).
+
+### Cerințe user (confirmate ca intent)
+
+| Cerință | Interpretare |
+| ------- | ------------ |
+| builtins tip JS canvas | `drawRect`, `drawText`, `drawLine`, `drawCircle`, `style` |
+| `#` = comentariu | **niciodată** culoare `#rrggbb` |
+| text `"..."` | string literal |
+| int / float | `1`, `34`, `1.3`, `1.444` |
+| aritmetică | `x + 10`, `x - (y * 3)`, paranteze |
+| asignări | `a = 31 + (b / 3) * 2 - (b - 3)` |
+| fără `if` / `for` / `while` | backlog |
+
+### Gramatică draft (body metodă)
+
+```text
+method     := name '(' params? ')' '{' stmt* '}'     # D6 B
+params     := id (',' id)*
+stmt       := assign | call
+assign     := id '=' expr
+call       := name '(' args? ')'
+args       := expr (',' expr)*
+expr       := term (('+'|'-') term)*
+term       := factor (('*'|'/') factor)*
+factor      := number | float | string | id | '(' expr ')' | '-' factor
+```
+
+**Interzis MVP:** `if`, `while`, `for`, `==`, `<`, `&&`.
+
+### Sintaxă țintă (body metodă)
+
+```logts
+inline [canvas] .demo:
+
+    drawBox(x, y, w, h, color) {
+        pad = 2
+        innerW = w - pad * 2
+        innerH = h - pad * 2
+        style(color)
+        drawRect(x + pad, y + pad, innerW, innerH)
+        style("000000")
+        drawLine(x, y, x + w, y + h)
+        drawCircle(x + w / 2, y + h / 2, 4)
+        drawText(x, y - 12, "box")
+    }
+:
+```
+
+### Decizii **D13–D28** (draft)
+
+| ID | Subiect | Opțiuni |
+| -- | ------- | ------- |
+| **D13** | Unde rulează statements | **A (recommended)** doar în body metode inline · **B** și în `renderer` comp · **C** doar în renderer **(change)** |
+| **D13b** | Apel metodă→metodă | **A (recommended)** permis · **B** interzis MVP · **C** max depth N |
+| **D14** | Scope variabile | **A (recommended)** local per apel metodă · **B** state persistent pe comp · **C** `static` |
+| **D15** | Params metode | **A (recommended)** by-value la apel; shadow pe locals · **B** mutable ref |
+| **D16** | Literali culoare | **A (recommended)** string hex `"rrggbb"` / `"rgb"` (3 sau 6) · **B** doar `^rrggbb` (ecosistem comps) · **C (change)** ambele `"…"` și `^…` · **D** interzis `#…` (obligatoriu — aliniat user) |
+| **D17** | Normalizare culoare intern | **A (recommended)** → CSS `#rrggbb` doar în widget JS · **B** păstrează fără `#` în tot stack-ul |
+| **D18** | `style(...)` semantică | **A (recommended)** setează fillStyle **și** strokeStyle · **B** doar fill · **C** `style(fill, stroke)` 2 args · **D** `styleFill`/`styleStroke` separate (**1+i**) |
+| **D19** | `drawRect` | **A (recommended)** filled rect (x,y,w,h) · **B** stroke · **C** flag fill/stroke arg |
+| **D20** | `drawLine` | **A (recommended)** (x1,y1,x2,y2); folosește stroke din style · **B** + thickness arg |
+| **D21** | `drawCircle` | **A (recommended)** filled (cx,cy,r) · **B** stroke · **C** + start/end angle (**1+e**) |
+| **D22** | `drawText` | **A (recommended)** (x,y,text) font default monospace 14 · **B** + size · **C** + font args (**1+k**) |
+| **D23** | Operatori aritmetici MVP | **A (recommended)** `+ - * /` + paranteze · **B** + `%` · **C** + `//` floor div |
+| **D24** | Diviziune | **A (recommended)** float JS (`/`) · **B** int trunc · **C** eroare dacă mix int/float fără cast |
+| **D25** | Tipuri în expr | **A (recommended)** number unificat (IEEE) la runtime draw · **B** int/float distincte cu erori |
+| **D26** | Comparații / bool | **A (recommended)** **interzis** MVP (fără if) · **B** permis dar inutil |
+| **D27** | Erori runtime draw | **A (recommended)** elaboration unde e static; runtime → log + skip op · **B** stop renderer · **C** set pout `error` |
+| **D28** | Comentarii în body | **A (recommended)** `#` line comment (ca restul LogT) · **B** `/* */` only |
+
+### D13 — Unde rulează statements
+
+| | |
+| - | - |
+| **A (recommended)** | Body metode = assign + builtins; `renderer { }` doar **invocă** metode (sketch) |
+| **B** | + statements brute în `renderer` |
+| **C (change)** | Totul în `renderer` — slăbește reuzarea |
+
+**Decizie:** draft.
+
+### D13b — Compoziție metode
+
+```logts
+drawFrame(x, y) {
+    drawBg(0, 0, 320, 240, "ffffff")
+    drawPlayer(x, y, "p1", 100)
+}
+```
+
+| | |
+| - | - |
+| **A (recommended)** | Permis — altfel scenele se copiază în `renderer` |
+| **B** | Interzis — doar builtins în body |
+| **C** | Depth max (ex. 8) |
+
+Cicluri statice → elab error; overflow → **D27**.
+
+**Decizie:** draft.
+
+### D14 — Locals vs state între frame-uri
+
+Starea animației trăiește în **logic**, nu în canvas.
+
+| | |
+| - | - |
+| **A (recommended)** | Locals **per apel**; dispar după return |
+| **B** | State pe comp — **(change)** față de principiu |
+| **C** | `static` — post-MVP |
+
+**Decizie:** draft.
+
+### D16 — Culori **(important)**
+
+| | |
+| - | - |
+| **A (recommended)** | `"rrggbb"` / `"rgb"`; **`#` = comentariu** |
+| **B** | Doar `^rrggbb` |
+| **C (change)** | `"…"` **și** `^…` |
+
+Constraint: `#rrggbb` **nu** e literal culoare. Attr `bgColor` pe comp = aceeași regulă.
+
+**Decizie:** draft.
+
+### D18–D22 — Mapping JS
+
+| Builtin LogT | JS 2D (recommended A) |
+| ------------ | --------------------- |
+| `style(c)` | `fillStyle = strokeStyle = normalize(c)` |
+| `drawRect(x,y,w,h)` | `fillRect` |
+| `drawLine(…)` | `moveTo`/`lineTo`/`stroke` |
+| `drawCircle(cx,cy,r)` | `arc` + `fill` |
+| `drawText(x,y,s)` | `fillText` |
+
+#### D22n — Text baseline
+
+| | |
+| - | - |
+| **A (recommended)** | `textBaseline = 'top'` — (x,y) = stânga-sus |
+| **B** | `alphabetic` (JS default) |
+
+Precedență: `*` `/` înainte de `+` `-`; stânga-asociativ; paranteze OK.
+
+### Scope F2
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F2a** | Parser body (gramatică) |
+| **F2b** | Engine → ctx |
+| **F2c** | Builtins + mock ctx |
+| **F2d** | Doc builtins |
+
+### Criterii done F2
+
+- [ ] Assign + 5 builtins pe mock/real ctx
+- [ ] `#` ≠ culoare; `"ff00aa"` OK
+- [ ] `if`/`for` → parse error
+- [ ] Compoziție metode (D13b)
+- [ ] Teste **47xx**
+
+### Status F2
+
+**draft**.
+
+---
+
+## Faza 3 — `renderer` + wire args + `set` / `draw` / `busy` / dirty **(draft)**
+
+> **Status:** draft — **D29–D42**.  
+> **Depinde:** F2.  
+> **Sursă sketch:** set/draw/busy/dirty + coalescing + single-slot pending.
+
+### Sintaxă țintă (din sketch, clarificată)
+
+**Definiție comp (body):**
+
+```logts
+comp [canvas] .myCanvas:
+
+    width: 512
+    height: 512
+    bgColor: "ffffff"
+
+    .gameRenderer {
+        /* F3: eventual mapări pin; sau gol dacă pinii vin din exec — D30 */
+    }
+:
+```
+
+**Exec / property block (ca logic):**
+
+```logts
+.myCanvas:{
+    renderer {
+        drawBg(0, 0, 512, 512, "aaffaa")
+        drawPlayer(xWire/s16, yWire/s16, playerNameWire/ascii, healthWire/u16)
+        drawBox(boxX/s16, boxY/s16, 100, 150, "0000ff")
+    }
+
+    set = 1
+}
+```
+
+`renderer { }` **invocă** metode din inline selectat — **nu** le definește (sketch OK).
+
+### Model control (sketch)
+
+| Semnal | Vizibilitate | Rol |
+| ------ | ------------ | --- |
+| `set = 1` | public | state updated → `dirty=1` → schedule coalesced |
+| `draw = 1` | public | explicit redraw request (tot schedule, „urgent”) |
+| `busy` | public pout | 1 în timpul exec renderer |
+| `dirty` | **intern** | pending redraw; nu pin user |
+
+Coalesce: N× `set` înainte de frame → **un** redraw cu starea latest.
+
+### Decizii **D29–D42** (draft)
+
+| ID | Subiect | Opțiuni |
+| -- | ------- | ------- |
+| **D29** | Unde trăiește `renderer { }` | **A (recommended)** în exec block `.comp:{ }` (sketch) · **B** doar în body comp · **C** ambele (body = default list; exec poate override) |
+| **D30** | Pinii canvas — declarație | **A (recommended)** inferați din args `name/type` din `renderer` · **B** declarație explicită în program block ca logic · **C** mix |
+| **D31** | Ordine apeluri în `renderer` | **A (recommended)** secvențial top→bottom · **B** paralel (nonsens 2D) |
+| **D32** | Literal vs wire arg | **A (recommended)** număr/string literal **sau** `wire/rep` · **B** doar wire · **C** expr în arg listă (`x+1` — **change**, util) |
+| **D33** | Reprezentări `/s16` `/u16` `/ascii` | **A (recommended)** reuse codec logic number/text pe lățime wire · **B** tipuri canvas-only · **C** MVP doar `/number` pe wire lățime naturală; `/s16` în **1+l** delay |
+| **D34** | Vector args sketch | **A (recommended)** amânat **1+l** · **B** MVP vector |
+| **D35** | `set` semantică | **A (recommended)** latch/pulse ca logic: pe edge/valoare 1 → dirty+schedule · **B** level-triggered cât e 1 |
+| **D36** | Clear înainte de renderer | **A (recommended)** clear cu `bgColor` fiecare redraw · **B** nu clear (user desenează bg) · **C** attr `autoClear: 0/1` |
+| **D37** | `draw` vs `set` | **A (recommended)** ambele setează dirty; `draw` bypass debounce / schedule rAF ASAP; `set` poate coalesța în același frame · **B** `draw` = sync `renderer()` imediat (poate bloca) · **C (change)** un singur pin `redraw` (simplificare sketch) |
+| **D38** | `busy` | **A (recommended)** 1 pe durata rulării metodelor pe ctx; 0 după; pout 1-bit · **B** busy și cât e rAF pending · **C** fără busy MVP |
+| **D39** | Pending când busy | **A (recommended)** sketch: dirty rămâne 1; după busy re-schedule o dată · **B** drop · **C** eroare |
+| **D40** | Scheduler | **A (recommended)** `requestAnimationFrame` single-slot · **B** `queueMicrotask` · **C** sync always |
+| **D41** | `set` fără `renderer` block | **A (recommended)** clear-only / no-op draw · **B** elaboration error dacă lipsește renderer |
+| **D42** | Test helpers | **A (recommended)** `flushCanvas(comp)` + mock ctx spy calls · **B** doar pixel digest |
+
+### D29 — Loc `renderer { }`
+
+Sketch pune `renderer` în `.myCanvas:{ … }` lângă `set = 1` → **exec block**.
+
+| | |
+| - | - |
+| **A (recommended)** | Exec block — ca `query =` la logic |
+| **B** | Body comp — listă statică |
+| **C** | Body = default; exec override |
+
+**Notă:** cu **A**, fiecare update reia `renderer { }` + `set` — consistent wave.
+
+**Alternativă (change) C:** body declară lista „scenă default”; exec doar `set=1` fără a re-lista apelurile — mai puțin verbose la animație.
+
+### D30 — Pinii
+
+| | |
+| - | - |
+| **A (recommended)** | Infer din `renderer` args `boxX/s16` → pin/input `boxX` |
+| **B** | Declarație în `.gameRenderer { x is number xPin }` ca logic — verbose |
+| **C** | Mix |
+
+**Risc A:** `renderer` trebuie să apară o dată la elaboration (sau primul exec) ca pinii să existe — clarificat: **lista `renderer` din primul exec block din script** sau **obligatoriu și un default în body (D29 C)**.
+
+### D32 — Expr în args `renderer`
+
+Sketch: doar literal sau `wire/rep`.
+
+| | |
+| - | - |
+| **A (recommended)** | literal **sau** `wire/rep` |
+| **C (change)** | și `xWire/s16 + 10` — util, dar parser mai greu; poate aștepta F2 expr pe wire decode |
+
+### D33 — `wire/s16`
+
+| | |
+| - | - |
+| **A (recommended)** | Decode ca logic `/s16` `/u16` `/ascii` |
+| **C (change, MVP mic)** | Wire numeric/string fără slash formats — **1+l** pentru rest |
+
+### D35 / D37 — `set` vs `draw`
+
+| Op | Semantica recommended **A** |
+| -- | --------------------------- |
+| `set` | dirty=1; coalesce în rAF curent/următor |
+| `draw` | dirty=1; tot rAF, dar **nu** debounced dincolo de frame (același single-slot; diferența e documentară + eventual skip coalescing delay artificial) |
+
+**Realitate JS:** ambele ajung pe același rAF single-slot. Diferența utilă: **intent** + eventual `draw` forțează redraw chiar dacă valorile pin neschimbate (skip dirty-check pe inputs).
+
+| | |
+| - | - |
+| **A (recommended)** | Păstrează ambele pinuri (sketch) |
+| **B** | `draw` = sync blocking |
+| **C (change)** | Un singur `redraw` |
+
+### D36 — Clear **(lacună sketch)**
+
+| | |
+| - | - |
+| **A (recommended)** | Auto-clear `bgColor` înainte de `renderer` |
+| **B** | Fără clear — user `drawBg` obligatoriu |
+| **C** | Attr `autoClear: 0/1` (default 1) |
+
+### D38–D40 — busy + schedule
+
+JS single-thread: `busy=1` e scurt (durata interpretării). Tot util pentru `wait = OR(.canvas:busy)` patterns ca DMA.
+
+| | |
+| - | - |
+| **D38 A** | busy doar în timpul run metodelor |
+| **D39 A** | set în timpul busy → dirty rămâne; re-schedule o dată |
+| **D40 A** | `requestAnimationFrame` single-slot (ca CLCD widget) |
+
+### Flow (formalizat)
+
+```text
+set/draw → dirty=1 → (dacă !busy) schedule rAF
+rAF → busy=1 → [clear?] → run renderer calls → busy=0 → dirty=0
+         ↘ dacă dirty din nou în timpul busy → re-schedule după
+```
+
+### Scope F3
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F3a** | Parse `renderer { calls }` + wire/rep args |
+| **F3b** | Pins infer / validate; pout `busy` |
+| **F3c** | Dirty/rAF/coalesce + set/draw handlers |
+| **F3d** | Teste schedule + flush + spy draw order |
+
+### Criterii done F3
+
+- [ ] `set` multiplu → un redraw
+- [ ] `set` în timpul `busy` → redraw ulterior, fără eroare
+- [ ] Args literal + wire decode
+- [ ] `busy` pout observabil
+- [ ] `dirty` **nu** e pin public
+
+### Status F3
+
+**draft**.
+
+---
+
+## Faza 4 — Documentație, teste end-to-end, integrare logic/observe/osc **(draft)**
+
+> **Status:** draft — **D43–D48**.  
+> **Depinde:** F3; observe opțional (soft dep pe logic F108).
+
+### Scop
+
+| Item | Detaliu |
+| ---- | ------- |
+| Doc EN | `canvas.md`, `inline-canvas.md` (sau secțiuni), update `components.md`, `doc-index.json` |
+| Exemple | static draw; wire-driven; osc→logic→observe→canvas (dacă observe gata) |
+| Verify | `_verify_doc_examples.js` + logts-play |
+| Non-goals | implementare `if`/loops; sprite; touch |
+
+### Decizii **D43–D48** (draft)
+
+| ID | Subiect | Opțiuni |
+| -- | ------- | ------- |
+| **D43** | Structură doc | **A (recommended)** un `canvas.md` (inline+comp+builtins+control) · **B** split `inline-canvas.md` + `comp-canvas.md` (ca logic) |
+| **D44** | Exemplu anim osc | **A (recommended)** doc + test dacă observe+`$` disponibile · **B** doc conceptual only până F108 done |
+| **D45** | Integrare observe | **A (recommended)** soft: canvas MVP fără observe; exemplu integrare când F108✅ · **B** hard dep F108 |
+| **D46** | Pixel tests | **A (recommended)** mock ctx call log (nu PNG) MVP · **B** hash PNG |
+| **D47** | Wave + legacy | **A (recommended)** ambele ca restul suitei · **B** doar wave |
+| **D48** | Demo script | **A (recommended)** exemplu în doc + optional `examples/` · **B** doar unit tests |
+
+### Exemplu țintă integrare (din sketch, adaptat)
+
+```logts
+inline [logic] .game:
+    boxX$(10)
+    /* … */
+:
+
+inline [canvas] .gameRenderer:
+    drawScene(x, y) {
+        style("aaffaa")
+        drawRect(0, 0, 800, 600)
+        style("0000ff")
+        drawRect(x, y, 40, 40)
+    }
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe boxX$ is number boxXPin
+    }
+:
+
+comp [canvas] .gameCanvas:
+    width: 800
+    height: 600
+    bgColor: "aaffaa"
+    .gameRenderer { }
+:
+
+/* wiring + osc → query → commit → observe → set canvas — detalii după D8/D30/D45 */
+```
+
+### Scope F4
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F4a** | Doc + index + verify examples |
+| **F4b** | Suite e2e **47xx–48xx** |
+| **F4c** | Notă cross-link în logic2 / monopoly dacă e cazul |
+
+### Criterii done F4
+
+- [ ] Doc EN verificată
+- [ ] Suite verde quiet
+- [ ] Exemplu static + un exemplu dinamic (wire sau observe)
+
+### Status F4
+
+**draft**.
+
+---
+
+## Tabel rezumat decizii (toate — draft)
+
+| ID | Fază | Subiect | Recommended |
+| -- | ---- | ------- | ----------- |
+| **D1** | 1 | Kind `canvas` | **A** (pending) |
+| **D2** | 1 | Device UI Devices panel | **A ✅** |
+| **D3** | 1 | size fixe elaborare | **A ✅** |
+| **D4** | 1 | width/height obligatorii | **D ✅** |
+| **D5** | 1 | metode cu body | **A ✅** |
+| **D6** | 1 | delimitare body | **B ✅** |
+| **D7** | 1 | bgColor default | **B ✅** `^000000` |
+| **D8** | 1 | binding `.inline { }` | **A ✅** |
+| **D9** | 1 | inline obligatoriu | **A ✅** |
+| **D10** | 1 | Allow policy | **A ✅** |
+| **D11** | 1 | fișiere split | **A ✅** |
+| **D12** | 1 | teste 4700+ | **A ✅** |
+| **D13b** | 2 | apel metodă→metodă | **A** |
+| **D22n** | 2 | text baseline | **A** top |
+| **D13** | 2 | statements în metode | **A** |
+| **D14** | 2 | locals per call | **A** |
+| **D15** | 2 | params by value | **A** |
+| **D16** | 2 | color `"hex"` (+opt `^`) | **A** sau **C** |
+| **D17** | 2 | `#` doar în widget JS | **A** |
+| **D18** | 2 | `style` fill+stroke | **A** |
+| **D19** | 2 | `drawRect` fill | **A** |
+| **D20** | 2 | `drawLine` stroke | **A** |
+| **D21** | 2 | `drawCircle` fill | **A** |
+| **D22** | 2 | `drawText` basic | **A** |
+| **D23** | 2 | ops `+ - * /` | **A** |
+| **D24** | 2 | `/` float | **A** |
+| **D25** | 2 | number unificat | **A** |
+| **D26** | 2 | fără bool/cmp | **A** |
+| **D27** | 2 | erori skip/log | **A** |
+| **D28** | 2 | `#` comment | **A** |
+| **D29** | 3 | `renderer` în exec | **A** |
+| **D30** | 3 | pins inferate | **A** |
+| **D31** | 3 | ordine secvențială | **A** |
+| **D32** | 3 | literal sau wire | **A** (+ **C** expr?) |
+| **D33** | 3 | `/s16` codec | **A** |
+| **D34** | 3 | vector → **1+l** | **A** |
+| **D35** | 3 | `set` pulse/edge | **A** |
+| **D36** | 3 | auto-clear bg | **A** |
+| **D37** | 3 | `draw` vs `set` | **A** |
+| **D38** | 3 | `busy` pout | **A** |
+| **D39** | 3 | pending if busy | **A** |
+| **D40** | 3 | rAF single-slot | **A** |
+| **D41** | 3 | set fără renderer | **A** |
+| **D42** | 3 | mock ctx tests | **A** |
+| **D43** | 4 | un `canvas.md` | **A** |
+| **D44** | 4 | osc exemplu | **A** |
+| **D45** | 4 | soft dep observe | **A** |
+| **D46** | 4 | mock not PNG | **A** |
+| **D47** | 4 | wave+legacy | **A** |
+| **D48** | 4 | doc demo | **A** |
+
+---
+
+## Riscuri / neclarități
+
+| Topic | ID | Notă |
+| ----- | -- | ---- |
+| Sketch fără body metode | **D5** | **(change)** obligatoriu pentru MVP util |
+| Binding inline omis în sketch | **D8** | Pattern logic recommended |
+| `renderer` în exec vs body | **D29** | Sketch sugerează exec |
+| Culori `"hex"` vs `^hex` | **D16** | User: fără `#`; string OK |
+| `busy` aproape instant pe JS | **D38** | Tot util pentru sync cu alte comps |
+| Fără `if`/loops | **1+a/1+b** | Scene = multe apeluri explicite în `renderer` |
+| Depend observe | **D45** | Canvas MVP independent |
+| Confuzie CLCD vs canvas | doc | CLCD = bit symbols; canvas = draw API |
+
+---
+
+## Istoric plan
+
+| Data | Eveniment |
+| ---- | --------- |
+| 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
+| 2026-08-31 | **D2–D12✅** user — D3 fixe; **D4 D** obligatorii width/height; D7 `^000000`; D5/D6 body+braces; F1 așteaptă **D1** |
+
+---
+
+## Legături
+
+- [inline_logic2.plan.md](inline_logic2.plan.md) — `observe` (F108) ca sursă de inputuri
+- [comp_clcd.plan.md](comp_clcd.plan.md) — pattern device canvas (nu API draw)
+- [hotkey_on_comps.plan.md](hotkey_on_comps.plan.md) — structură plan + legendă (referință format)
