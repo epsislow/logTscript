@@ -38,6 +38,9 @@ todos:
   - id: f107-showx-style-only
     content: "F107: showx/1 — clear silent (x) sau noop (hex/invalid) — D1071–D1076✅ — teste 4597+"
     status: completed
+  - id: f108-observe
+    content: "F108: observe / observe removal — D1080–D1098✅ (ready-to-implement) — teste 4609+"
+    status: pending
 isProject: false
 ---
 
@@ -107,6 +110,7 @@ isProject: false
 | **Faza 105** `showx/N` — output logic cu **style** (culoare) | **F105 ✅** | **D1050–D1060✅** — teste 4563–4583 |
 | **Faza 106** `showx` — **Style** prefix **`x`** (clear Output panel) | **F106 ✅** | **D1061–D1068✅** — teste 4584–4596 |
 | **Faza 107** `showx/1` — style-only (clear silent / noop) | **F107 ✅** | **D1071–D1076✅** — teste 4597–4608 |
+| **Faza 108** `observe` / **`observe removal`** — reactive `$`/`$$` → pout | **F108 ready** | **D1080–D1098✅** |
 | *(rezervat)* | — | — |
 
 ---
@@ -125,7 +129,7 @@ Tabel master — itemi **amânați** în plan 2. **Stare:** ⏳ deschis · ✅ p
 | ⏸ | **3+f** | TCO / depth engine | Tail-call optimization sau trampoline JS; `maxDepth` semantic vs stack | — | F8, D25–D29 |
 | ⏸ | **3+g** | `is/2` trig + log/exp | Funcții transcendentale post-F42 | — | F42, D332 |
 | ⏸ | **3+h** | *(slot liber)* | — | — | — |
-| ⏸ | **3+i** | *(slot liber)* | — | — | — |
+| ⏳ | **3+i** | **`observe` / `observe removal`** | Reactive projection `$`/`$$` → comp pout — sketch [reactive_observers](../my_ideas/logic_reactive_observers.md) | **F108** | F100, F44, comp-logic |
 | ⏸ | **3+j** | *(slot liber)* | — | — | — |
 
 **Ordine recomandată (draft):** **3+a** (**F100**) → **3+b** / **3+c** (composiție) → **3+d** → **3+e** → rest **3+f …**
@@ -1570,6 +1574,629 @@ Pattern: legacy + wave.
 
 ---
 
+## Faza 108 — **`observe`** / **`observe removal`** — reactive `$`/`$$` → pout **(3+i — ready-to-implement)**
+
+> **Sursă:** sketch [logic_reactive_observers.md](../my_ideas/logic_reactive_observers.md).  
+> **Extinde:** [Faza 100](#faza-100--predicate--single-valued-și--keyed-3a--draft) (`$`/`$$`), [Faza 44](inline_logic.plan.md#faza-44--inline--retractall-via-2p--completed) (`commit`, `+`/`-`/`~`), [comp-logic.md](../../v0_3_2/doc/comp-logic.md) (program block, pout redirect).  
+> **Status:** **(ready-to-implement)** — **D1080–D1098✅** confirmed user 2026-08-31.  
+> **Nu înlocuiește:** `query` (exec logic), `trigger`/`on:` (exec pass), `process`/`onTick` (timp).
+
+### Analiză direcție (sketch)
+
+**Ce se dorește:** proiecție **reactivă** din KB dinamic (`$`/`$$`) către **outputs** de componentă — fără polling query, fără mutation din observer.
+
+```text
+runtime mutation (+ / - / ~)  →  KB change  →  observe / observe removal  →  pout  →  wire
+```
+
+**Nu** doar `commit` — orice cale de mutation runtime (vezi **D1084✅**). **Inițializarea KB nu declanșează** observe (vezi **D1086✅**).
+
+**Potrivire cu codebase:**
+
+| Building block | Stare azi | F108 |
+| -------------- | --------- | ---- |
+| `$`/`$$` replacement la mutation | F100 ✅ | sursă evenimente |
+| `comp [logic]` program block | input `Var is Type pin`; output **`observe … is Type pin`** | wiring simetric (**D1090 B**) |
+| Wire encode/decode list/text/number | comp-logic + query-exec | refolosire codec |
+| Reactive edge pe wire | wave / legacy | bool removal pulse |
+
+**Lacune / posibile erori în sketch:**
+
+| # | Observație | Impact |
+| - | ---------- | ------ |
+| 1 | **`observe` unde se declară?** | **D1097 B ✅** — **doar** program block **`comp [logic]`**; **parse error** în **`inline [logic]`** |
+| 2 | **`$` fără `:key`/`:tail`** — doar formă `observe pred$ is Type Out` | Proiecție „tot factul” — encoding arity>1 neclar |
+| 3 | **`:key`/`:tail` pe `$$` only** — sketch nu arată `:key` pe `$` | D1082 — restricție sau extensie |
+| 4 | **Bootstrap vs init** | Inițializare KB ≠ mutation — **nu** trigger observe | **D1086✅** |
+| 5 | **`observe removal … :tail is bool`** | bool = eveniment, nu valoare tail | D1088 — pulse 1-bit, nu latch |
+| 6 | **Removal `-` și `~`** | Ambele declanșează `observe removal` | **D1085✅** |
+| 7 | **Ordinea observerilor** la mutation multi-op | Monopoly + output comp (lcd, led, …) — ordine deterministă |
+| 8 | **`.world:query`** read-only | **`observe` doar pe comp** — inline nu poate declara (D1097) |
+| 9 | **`data: static`** — facts `$`/`$$` fără mutation | „Only dynamic” — static observe interzis? |
+| 10 | **Replacement `+` pe aceeași cheie `$$`** | State observe + filtered → fire; removal → nu |
+
+**Verdict analiză:** direcția e **coerentă** cu F100 + comp-logic — nu e motor Prolog nou; e **hook post-mutation** + **declarații compile-time** + **encode pout** (pattern apropiat redirect query, dar **push-driven** nu pull). Sketch e **implementabil** după confirmarea deciziilor de mai jos.
+
+### Problemă (stare azi post-F107)
+
+| Situație | Comportament azi |
+| -------- | ---------------- |
+| Output comp vrea stare din KB | `query` + redirect la fiecare exec — polling |
+| Monopoly `commit(+ playerPos$$(p1, …))` | KB se schimbă; **niciun** pout reactiv |
+| Ștergere `commit(~ playerPos$$(p2, …))` | Fact dispare; **niciun** trigger removal |
+| Sketch `observe … player1PositionPout` | **Parse error** — keyword inexistent |
+
+### Sintaxă țintă — gramatică **`observe`** (**D1096✅**, **D1097 B✅**)
+
+```text
+/* doar în comp [logic] program block .module { } */
+observe [removal] [def] FactPattern is Type PinName
+```
+
+| Token | Opțional | Semantica |
+| ----- | -------- | --------- |
+| **`removal`** | da | eveniment ștergere — **`is bool` obligatoriu** (D1089 B) |
+| **`def`** | da | **deferred** — fire la **end exec pass**; omit = **immediate** (default) |
+| **`FactPattern`** | nu | `pred$` / `pred$$` + optional `:key` / `:tail` / `:key=Ground` |
+| **`Type`** | nu | `text`, `number`, `bool`, `text list`, `number list`, … |
+| **`PinName`** | nu | **nume pin output** pe comp — creat de linia `observe` (**D1090 B✅**) |
+
+**Exemple (în `.game { }`, nu în inline):**
+
+```logts
+comp [logic] .gameLogic:
+    on: 1
+
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+        observe def playerPos$$:key is text keyPin
+        observe removal playerPos$$:key=p1 is bool removedPin
+        observe removal def playerPos$$:key=p1 is bool removedPulsePin
+    }
+```
+
+| Linie | Timing |
+| ----- | ------ |
+| fără **`def`** | **immediate** — după mutation, înainte de goals următoare |
+| cu **`def`** | **deferred** — la sfârșitul exec pass comp |
+
+**Inline** = facts / rules / queries — **fără** `observe` (**parse error** dacă apare).
+
+**Wire extern:**
+
+```logts
+.lcd:posIn = .gameLogic:posPin
+```
+
+| Formă pattern | Semantica sketch |
+| ------------- | ---------------- |
+| **`pred$`** | Observe slot **`pred$/N`** — proiectează factul activ |
+| **`pred$$`** | Observe keyed — toate cheile pot declanșa (fără filter) |
+| **`:key`** | Arg0 al factului `$$` |
+| **`:tail`** | Args 1..N ca listă Prolog |
+| **`:key=Ground`** | Filter — doar mutații pe acea cheie |
+| **`observe removal`** | Declanșare la **retract** (`-` sau `~`) fact matching |
+
+### Ce declanșează observeri **(D1084✅ / D1085✅)**
+
+| Cale mutation | State `observe` | `observe removal` |
+| ------------- | --------------- | ----------------- |
+| **`logic { + … }`** | **`+`** insert/replace matching | **`-`** / **`~`** remove matching |
+| **`commit(+ …, - …, ~ …)`** | **`+`** matching | **`-`** / **`~`** matching |
+| **`+` / `-` / `~` bare** în query / rule body | da | **`-`** / **`~`** |
+| **Concluzie regulă** cu side-effect `$`/`$$` (D1007) | **`+`** efectiv | **`-`** / **`~`** efectiv |
+
+### Ce **NU** declanșează **(D1086✅)**
+
+| Fază | Exemple | Motiv |
+| ---- | ------- | ----- |
+| **Inițializare KB** | static merge/collapse (D1005); **`data: seed`** copy la init; overlay assemble; facts `$`/`$$` din inline la elaboration | Nu e mutation runtime |
+| **Primul exec fără mutation** | doar query + redirect | KB neschimbat |
+
+După init, **prima mutation runtime** post-init poate declanșa observe / observe removal.
+
+### Decizii **D1080–D1098**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D1080** | Loc declarare | **B ✅** — **doar** program block **`comp [logic]`**; **parse error** în inline |
+| **D1081** | Facts eligibile | **A ✅** — doar **`$` / `$$`**; **`data: static`** → error |
+| **D1082** | Selectori `:key` / `:tail` / `:key=` | **A ✅** — doar pe **`$$`** |
+| **D1083** | Proiecție **`$`** whole-fact | **A ✅** — ghidat de **Type** + valoare; N=1 poate fi **`text`** sau **`text list`** (compound) |
+| **D1084** | Trigger state observe | **A ✅** — orice mutation runtime post-init cu **`+`** |
+| **D1085** | Trigger removal observe | **A ✅** — **`-`** și **`~`** post-init |
+| **D1086** | Init vs runtime | **A ✅** — init **nu** triggeruiește observe |
+| **D1087** | State pout | **A ✅** — **hold** level |
+| **D1088** | Removal bool pulse | **A ✅** — pulse **`1`** apoi **`0`** |
+| **D1089** | Removal payload | **B ✅** — **`observe removal` doar `is bool`** — eveniment „s-a șters”; **fără** valoare retrasă |
+| **D1090** | Comp binding | **B ✅** — pin direct în linia `observe`; **fără** mapare separată inline→comp |
+| **D1091** | Timing default | **A ✅** — **immediate** post-mutation; **`def`** = deferred |
+| **D1092** | Type check | **A ✅** — elaboration |
+| **D1093** | Ordine multi-observer | **A ✅** — ordinea declarării în program block comp |
+| **D1094** | Observe în inline | **B ✅ (revizie D1097)** — **`observe` în inline → parse error** |
+| **D1095** | Teste + doc | **A ✅** — **4609+**; **`logic-observers.md`** |
+| **D1096** | Modificator **`def`** | **A ✅** — prefix **`def`** după **`removal`**, înainte de pattern |
+| **D1097** | Loc observe | **B ✅** — **comp-only** |
+| **D1098** | Coliziune nume pin/pout | **A ✅** — **elaboration error** la duplicate / conflict |
+
+---
+
+### D1080 — Loc declarare `observe` **✅**
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A — inline top-level (change)** | `observe …` în **`inline [logic]`** | KB separat | Inert fără comp; două locuri — **respins** |
+| **B — doar comp program block ✓ ✅** | `observe …` în **`.module { }`** | Un loc wiring; simetric cu input pins | Inline nu declară observe |
+| **C — ambele (change)** | Duplicare | Flexibil | Coliziuni — **respins** |
+
+**Decizie:** **B ✅** — confirmed user 2026-08-31 (**D1097**). **`observe` în `inline [logic]`** → **parse error**.
+
+---
+
+### D1081 — Facts eligibile
+
+| Opțiune | Regulă |
+| ------- | ------ |
+| **A — doar `$`/`$$` ✓ (recommended)** | `observe foo(...)` pe predicate fără suffix → **parse error** |
+| **B — orice fact dinamic (change)** | Include facts obișnuite din overlay | Contrazice sketch „Only dynamic $ and $$” |
+| **C — `$`/`$$` + allowlist (change)** | Config per modul | Complex |
+
+**`data: static`:** facts `$`/`$$` în modul static — **A (recommended)** interzis observe (nu există mutation → observe meaningless).
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1082 — Selectori `:key` / `:tail` / `:key=Ground`
+
+| Opțiune | Regulă |
+| ------- | ------ |
+| **A — doar `$$` ✓ (recommended)** | `observe score$:key …` → **parse error** |
+| **B — permis și pe `$` (change)** | `:key` = arg0 chiar dacă nu e keyed semantic | Confuzie cu D1002 overwrite |
+| **C — `:tail` pe `$` whole args (change)** | `:tail` = toți args ca listă | Parțial util; neclar în sketch |
+
+**`:key=Ground`:** cheie ground la **parse** (atom/number/string/compound literal) — variabilă → **parse error**.
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1083 — Proiecție `observe pred$` (whole-fact) **✅**
+
+| Opțiune | Encoding output |
+| ------- | ---------------- |
+| **A — Type + valoare ✓ ✅** | **`Type`** declarate decide encoding; valoarea trebuie să fie compatibilă |
+| **B — mereu list (change)** | Uniform dar verbos | Respins ca singură regulă |
+| **C — compound ca struct wire (change)** | Fără list | Respins v1 |
+
+**Reguli A (confirmate + extensie user):**
+
+| Arity fact `$` | Valoare arg | Type permis (exemple) |
+| -------------- | ----------- | --------------------- |
+| **N = 1** | atom / number | **`text`**, **`number`**, **`bool`** |
+| **N = 1** | **compound** ground (ex. `player(id(1))`) | **`text list`**, **`number list`**, etc. — **listă cu un singur element** |
+| **N > 1** | args 1..N | **`text list`**, **`number list`**, … obligatoriu list |
+
+**Exemplu N=1 compound + `text list` (în comp program block):**
+
+```logts
+observe activePlayer$ is text list activePlayerPin
+/* commit(+ activePlayer$(player(p1))) → activePlayerPin = [player(p1)] encoded */
+```
+
+**Exemplu:** `.game { observe johnCar$ is text carPin }` + `+ johnCar$(bmw)` → `carPin` = `"bmw"`.
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31 (cu **`text list`** permis la N=1 când valoarea e compound).
+
+---
+
+### D1084 — Trigger state observe (add/replace) **✅**
+
+| Opțiune | Declanșare |
+| ------- | ---------- |
+| **A — orice mutation runtime `+` ✓ (recommended) ✅** | **`logic { + … }`**, **`commit(+ …)`**, **`+` bare**, concluzii regulă — insert **și** replace pe `$` / `$$` key matching |
+| **B — doar `commit` (change)** | Respins user — prea restrictiv |
+| **C — doar insert cheie nouă (change)** | Replace nu notifică filtered observers | Surpriză Monopoly |
+
+**Non-match:** `+ playerPos$$(p2,…)` **nu** trigger `observe … :key=p1`.
+
+**Post-init only:** mutația trebuie să fie **după** inițializarea KB (**D1086✅**).
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1085 — Trigger removal observe **✅**
+
+| Opțiune | Ops |
+| ------- | --- |
+| **A — `-` și `~` ✓ (recommended) ✅** | Orice retract efectiv post-init — **`logic { - / ~ }`**, **`commit(- / ~)`**, **bare** în body, side-effect regulă |
+| **B — doar `~` (change)** | **Respins** — user: removal = **`-` și `~`**, nu doar `~` |
+| **C — doar `-` (change)** | Respins |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1086 — Inițializare KB vs mutation runtime **✅**
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — init silent ✓ (recommended) ✅** | **Inițializarea KB** (static, seed copy, merge/collapse) **nu** triggeruiește observe / observe removal |
+| **B — emit snapshot la init (change)** | Seed/overlay → pout imediat | Contrazice user 2026-08-31 |
+| **C — emit la primul exec pass (change)** | Re-read KB fără mutation | Aproape polling |
+
+**Init include (non-exhaustiv):** assemble inline; normalizare static `$`/`$$`; **`data: seed`** populate dynamic store; elaboration comp — **fără** `logic { }` / query mutation.
+
+**Primul trigger:** prima **`+`** / **`-`** / **`~`** runtime **după** init.
+
+| | **A ✅** |
+|--|---------|
+| Seed `playerPos$$(p1,0)` la init | **fără** emit observe |
+| După `logic { + playerPos$$(p1,7) }` | observe fire |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1087 — State output — hold vs pulse
+
+| Opțiune | Comportament |
+| ------- | ------------ |
+| **A — hold level ✓ (recommended)** | Ultima valoare rămâne pe pout până la următorul match |
+| **B — pulse valoare (change)** | Revert la default după un tick | Nu e sketch |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1088 — Removal `is bool` — pulse **✅**
+
+| Opțiune | Semantica |
+| ------- | --------- |
+| **A — one-shot pulse ✓ (recommended)** | `1` pentru **o** propagare wave/legacy, apoi `0` |
+| **B — latched 1 (change)** | Rămâne 1 până la reset manual | Nu e diagrama sketch |
+| **C — hold 1 entire exec pass (change)** | 1 până la sfârșitul property block | Compromis |
+
+**`:tail is bool` la removal:** **eveniment** „fact matching removed” — **nu** expune tail values (sketch §6).
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31. Cu **D1089 B**, **`observe removal`** acceptă **doar** `is bool`.
+
+---
+
+### D1089 — `observe removal` — doar eveniment bool **✅**
+
+| Opțiune | Semantica |
+| ------- | --------- |
+| **A — proiectează valoarea retrasă (change)** | `:key`→text, `:tail`→list | **Respins** user — ștergerea s-a produs deja; nu re-transmitem payload |
+| **B — doar `is bool` ✓ ✅** | **`observe removal … is bool Out`** — singura formă validă; **`1`** pulse = „matching fact removed” |
+
+**Implicații B:**
+
+- **`observe removal playerPos$$:key is text Out`** → **parse/elab error**
+- Filter **`:key=p1`** + **`is bool`** → pulse când **`playerPos$$(p1, …)`** e retras — **fără** key/tail pe wire
+- Valoarea retrasă: citește din KB **înainte** de `-`/`~`, sau din **`observe` state** separat
+
+**Decizie:** **B ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1090 — Comp binding outputs **✅**
+
+**Decizie finală (D1097 B):** pin **direct** în linia `observe` din program block — **fără** mapare separată `Out is Type pin`.
+
+| Opțiune | Unde scrii ce | Exemplu | Stare |
+| ------- | ------------- | ------- | ----- |
+| **A — program block mirror (change)** | Inline output logic + comp map | `observe … Out` + `Out is Type pin` | **Respins** — inline nu are `observe` |
+| **B — pin în observe ✓ ✅** | **Comp:** `observe … is Type pinName` | `.game { observe status$ is text statusPin }` | **Confirmat** |
+| **C — auto pin (change)** | Pin generat implicit | magic | **Respins** F108 |
+
+#### Script canonic **B ✅**
+
+```logts
+inline [logic] .game:
+
+    query setMsg:
+        commit(+ status$(Msg))
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+
+    .game {
+        observe status$ is text statusPin
+    }
+
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + status$("hello from observe") }
+    set = trigger
+}
+
+comp [terminal] .term:
+    rows: 3
+    columns: 40
+    on: 1
+:
+
+.term:{
+    append = .gameLogic:statusPin
+    set = 1
+}
+```
+
+| Rol | Nume | Unde |
+| --- | ---- | ---- |
+| KB (facts/rules) | **`status$`** | inline |
+| Pin output observe | **`statusPin`** | `.game { observe … statusPin }` |
+| Wire extern | **`.gameLogic:statusPin`** | între comps |
+
+**Pout-uri comp logic — definiție clară (D1090 + D1098):**
+
+| Sursă | Cum apare pinul |
+| ----- | --------------- |
+| **Input** | `Var is Type pinName` în program block |
+| **Query redirect** | `queryName >= pinName` în exec body |
+| **Meta** | `truncated`, `mutationFailed`, … |
+| **Observe (F108)** | `observe … is Type pinName` — pin **output hold** (state) sau **pulse bool** (removal) |
+
+**Decizie:** **B ✅** — confirmed user 2026-08-31 (revizie D1097).
+
+#### Script respins **C** — pin generat automat (magic)
+
+```logts
+/* respins — vezi D1090 C */
+inline [logic] .game:
+    observe status$ is text statusPout   /* parse error — observe nu e în inline */
+```
+
+---
+
+### D1091 — Timing default **✅**
+
+| Opțiune | Semantica |
+| ------- | --------- |
+| **A — immediate default ✓ ✅** | Fără **`def`** → fire sincron după mutation reușită |
+| **B — deferred via `def` ✅** | Cu prefix **`def`** → fire la **end exec pass** |
+
+**Decizie:** **A ✅** + **`def`** pentru deferred — confirmed user 2026-08-31; detaliu sintaxă **D1096**.
+
+---
+
+### D1096 — Modificator **`def`** (deferred) **✅**
+
+| Opțiune | Sintaxă |
+| ------- | ------- |
+| **A — prefix `def` ✓ ✅** | `observe [removal] **def** FactPattern is Type Out` — **`def`** după **`removal`**, **înainte** de pattern |
+| **B — suffix `deferred` (change)** | Respins — user preferă **`def`** prefix |
+| **C — attribute comp (change)** | Respins |
+
+**Exemple:**
+
+```logts
+observe playerPos$$:key=p1 is number list posPin
+observe def playerPos$$:key is text keyPin
+observe removal playerPos$$:key=p1 is bool removedPin
+observe removal def playerPos$$:key=p1 is bool removedPulsePin
+```
+
+*(în `.game { }` — nu în inline)*
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1097 — Unde trăiește `observe`? **✅**
+
+| Opțiune | Unde declari | Stare |
+| ------- | ------------ | ----- |
+| **A — inline only (change)** | **`inline [logic]`** + mapare comp | **Respins** |
+| **B — comp program block only ✓ ✅** | **`.module { observe … is Type pin }`** | **Confirmat** |
+| **C — ambele (change)** | inline + comp | **Respins** |
+
+**Script canonic:**
+
+```logts
+inline [logic] .game:
+
+    playerPos$$(p1, 0, 0)
+
+    query move:
+        commit(+ playerPos$$(p1, X, Y))
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+
+    .game {
+        observe playerPos$$:key=p1 is number list posPin
+        observe def playerPos$$:key is text keyPin
+        observe removal playerPos$$:key=p1 is bool removedPin
+        observe removal def playerPos$$:key=p1 is bool removedPulsePin
+    }
+
+:
+
+1wire trigger = 1
+
+.gameLogic:{
+    logic { + playerPos$$(p1, 7, 2) }
+    set = trigger
+}
+
+.lcd:posIn = .gameLogic:posPin
+```
+
+**Decizie:** **B ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1098 — Coliziune nume pin / pout **✅**
+
+| Situație | Regulă |
+| -------- | ------ |
+| **`observe … is Type posPin`** + **`X is number posPin`** (input) | **Elaboration error** — pin duplicat |
+| Două **`observe … posPin`** pe același comp | **Elaboration error** |
+| **`observe … posPin`** + query redirect **`score >= posPin`** | **Elaboration error** — nume ambiguu |
+| **`observe … posPin`** + meta pout **`mutationFailed >= failPin`** | **OK** — nume diferite |
+| **`observe` în `inline [logic]`** | **Parse error** (D1080 B) |
+
+**Decizie:** **A ✅** — **elaboration error** la coliziune — confirmed user 2026-08-31.
+
+---
+
+### D1092 — Type check
+
+| Opțiune | Când |
+| ------- | ---- |
+| **A — elaboration ✓ (recommended)** | `:tail` + `number list` OK; `:key` + `number list` → error |
+| **B — runtime la primul emit (change)** | Amână erori |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1093 — Multi-observer / ordine **✅**
+
+| Opțiune | Regulă |
+| ------- | ------ |
+| **A — toți matching; ordine declarare ✓ ✅** | La aceeași mutation, toți observerii matching fire în **ordinea declarării** în program block comp |
+| **B — prioritate explicită (change)** | `priority:` attribute | Overkill v1 |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### D1094 — `observe` în inline **✅ (revizie D1097)**
+
+**Decizie revizuită:** **`observe` în `inline [logic]`** → **parse error**. Observe există **doar** în program block **`comp [logic]`**.
+
+| Cale | Mutation? | `observe` |
+| ---- | --------- | --------- |
+| **`.world:query({ … })`** | **❌** read-only | **N/A** — nu există comp |
+| **`inline [logic]`** cu `observe …` | — | **❌ parse error** |
+| **`comp [logic]`** + `logic { }` | **✅** | **✅** — pins din `.game { observe … }` |
+
+#### Test — parse error observe în inline
+
+```logts
+inline [logic] .scores:
+
+    observe highScore$ is number highScorePin   /* parse error D1094 B */
+
+    highScore$(0)
+
+    query read:
+        highScore$(S)
+
+:
+```
+
+#### Script activ — observe în comp
+
+```logts
+inline [logic] .scores:
+
+    highScore$(0)
+
+    query read:
+        highScore$(S)
+
+    query bump:
+        commit(+ highScore$(N))
+
+:
+
+comp [logic] .scoreLogic:
+    on: 1
+
+    .scores {
+        observe highScore$ is number highScorePin
+    }
+
+:
+
+1wire trigger = 1
+
+.scoreLogic:{
+    logic { + highScore$(100) }
+    set = trigger
+}
+
+8wire pinVal = .scoreLogic:highScorePin
+```
+
+| Ce se întâmplă | |
+| -------------- | --- |
+| Mutation **`logic { + … }`** | **✅** |
+| **`highScorePin`** | **100** după mutation |
+| **`.world:query` fără comp** | read-only — **fără** mutation, **fără** observe |
+
+**Decizie:** **B ✅** — revizie D1097 — confirmed user 2026-08-31.
+
+---
+
+### D1095 — Teste + doc
+
+| Livrabil | Detaliu |
+| -------- | ------- |
+| **Doc EN** | **`logic-observers.md`** — referință completă (sketch curățat) |
+| **Cross-ref** | `inline-logic.md`, `comp-logic.md`, `logic-runtime.md` |
+| **Teste 4609+** | comp-only observe; parse error inline; state `$`/`$$`; removal; **`def`**; coliziune pin; **no emit on KB init** |
+| **Verify** | `logts-play` blocks Load & Run |
+
+**Decizie:** **A ✅** — confirmed user 2026-08-31.
+
+---
+
+### Subfaze implementare
+
+| Subfază | Scope |
+| ------- | ----- |
+| **F108a** | Parse `observe` în program block comp; **parse error** în inline; validare `$`/`$$`; selectori |
+| **F108b** | Hook post-mutation runtime; proiecție state; matching filter |
+| **F108c** | Removal branch; bool pulse |
+| **F108d** | Comp elaboration pins observe + encode pout + wire propagation |
+| **F108e** | Teste **4609+** + doc EN |
+
+### Teste draft **4609+**
+
+| ID | Scenariu | Așteptat |
+| ---- | -------- | -------- |
+| 4609 | `observe` în **`inline [logic]`** | **parse error** (D1094 B) |
+| 4610–4611 | comp `.game { observe johnCar$ is text carPin }` + `commit(+ johnCar$(bmw))` | `carPin`=`bmw` |
+| 4612–4613 | `$$` `:key` + `:tail` în comp | key + list la commit |
+| 4614–4615 | `:key=p1` filter | p2 commit nu trigger |
+| 4616–4617 | removal `:key=p1 is bool` via **`~`** | pulse 1 then 0 |
+| 4618–4619 | removal via **`-`** | pulse bool same as `~` |
+| 4620–4621 | **`observe removal … is text`** | **parse/elab error** (D1089 B) |
+| 4622–4623 | **`logic { + … }`** triggers state observe | pin updated |
+| 4624–4625 | seed/init — **no** observe emit | D1086 |
+| 4626–4627 | **`def`** vs default immediate (D1096) | timing differ |
+| 4628–4629 | comp wire **`lcd`** / **`terminal`** | wire reflects observe pin |
+| 4630–4631 | coliziune pin: input + observe același nume | **elab error** (D1098) |
+| — | regresie F100/F101 commit | green |
+
+### Criterii done
+
+- [ ] **D1080–D1098✅**
+- [ ] **F108a…F108e** livrate
+- [ ] Teste **4609+** + regresie commit `$`/`$$`
+- [ ] Doc verify `logic-observers` + cross-ref
+
+### Legături
+
+- [logic_reactive_observers.md](../my_ideas/logic_reactive_observers.md) — sketch sursă
+- [logic_monopoly_interactiv.plan.md](logic_monopoly_interactiv.plan.md) — Monopoly + state reactive (output comps reale, nu `canvas`)
+- [Faza 100](#faza-100--predicate--single-valued-și--keyed-3a--draft)
+
+---
+
 ## Riscuri / neclarități plan 2
 
 | Topic | ID | Notă |
@@ -1585,6 +2212,7 @@ Pattern: legacy + wave.
 | `showx/N` style color | **F105** | **D1050–D1060✅**; fallback plain; teste 4563–4583 |
 | `showx/N` clear prefix `x` | **F106** | **D1061–D1068✅**; clear Output panel; teste 4584–4596 |
 | `showx/1` style-only | **F107** | **D1071–D1076✅**; clear silent / noop; teste 4597–4608 |
+| `observe` / `observe removal` | **F108 ready** | **D1080–D1098✅**; comp-only; pin în observe; **`def`** deferred |
 
 ---
 
@@ -1600,3 +2228,6 @@ Pattern: legacy + wave.
 | 2026-08-28 | **F106 draft** — **D1061–D1068✅** user confirm; Style prefix **`x`** clear Output; **4+h** promovat; teste **4584+** |
 | 2026-08-28 | **F106 done** — `logicParseShowxStyle`; clear în handler; teste 4584–4596; doc verify OK |
 | 2026-08-28 | **F107 done** — `showx/1` style-only; clear silent (`x`); hex noop; teste 4597–4608 |
+| 2026-08-31 | **F108 draft** — `observe` / `observe removal`; sketch [logic_reactive_observers.md](../my_ideas/logic_reactive_observers.md); **D1080–D1095** |
+| 2026-08-31 | **D1097 B + D1098 + D1090 B✅** — comp-only; pin direct; coliziune → elab error; F108 **ready-to-implement** |
+| 2026-08-31 | **D1091+D1096✅** — prefix **`def`** = deferred; **D1097** draft comp-only (recommended) |
