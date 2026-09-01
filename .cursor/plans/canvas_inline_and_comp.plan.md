@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–7 done; Faza 8 = loops for/while (1+b); backlog 1+c…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–8 done; Faza 9 = vector wire args (1+l); backlog 1+c…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -27,14 +27,17 @@ todos:
     content: "Faza 7: if/else în body canvas — D62–D68 ✅ done"
     status: completed
   - id: canvas-f8
-    content: "Faza 8: for/while loops în body — 1+b → D69–D75 done"
+    content: "Faza 8: for/while loops + break/continue — 1+b → D69–D75 done"
+    status: completed
+  - id: canvas-f9
+    content: "Faza 9: vector wire args în renderer — 1+l → D76–D83 draft"
     status: pending
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–8**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b** — promovate **F5–F8**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–9**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l** — promovate **F5–F9**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -155,8 +158,9 @@ D28 A ✅
 | **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** | **done** |
 | **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
 | **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
-| **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** ✅ | **done** |
-| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+n) | — |
+| **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** | **done** |
+| **Faza 9** Vector wire args renderer (**1+l**) | **D76–D83** draft | **(next)** |
+| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+l, 1+n) | — |
 
 ---
 
@@ -178,18 +182,18 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ⏳ | **1+j** | Alpha 8-hex | `"rrggbbaa"` — **D16b** ✅; fără keyword `transparent` |
 | ✅ | **1+k** | Font family + `fontStyle` | **`fontFamily("mono"\|"sans"\|"serif")`**; **`fontStyle(family, size)`**; + `textAlign` `start`/`end` | **Faza 5** | D22e, D49–D52 |
 | ⏳ | **1+p** | Text contur (`strokeText`) | `drawText` = fill only (**D22c**); contur → backlog | — | D22c |
-| ⏳ | **1+l** | Vector wire args (`shotsXVector/s16`) | Sketch menționează; MVP scalar | — | D33 |
+| ✅ | **1+l** | Vector wire args (`shotsXVector/s16`) | D34 amânat MVP scalar F3 | **Faza 9** | D76–D83, D33, D34 |
 | ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1–F8** ✅; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F8** ✅; **F9** (vector wire args) **next**; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
 
 ---
 
-## Backlog **1+b** → **Faza 8** (promovat)
+## Backlog **1+l** → **Faza 9** (promovat)
 
-Vezi [Faza 8](#faza-8--loops-for--while-1b-promovat) — `for` / `while` în metode canvas.
+Vezi [Faza 9](#faza-9--vector-wire-args-renderer-1l-promovat) — pin vector din `renderer`, decode per element, index în body metodă.
 
 ---
 
@@ -1704,7 +1708,197 @@ while:
 
 ### Status F8
 
-**done** — teste **4768**, **4770–4779**; postfix `i++`/`i--` (D71 parțial).
+**done** — teste **4768**, **4770–4779**; postfix `i++`/`i--` (D71 parțial); **break**/**continue** adăugate post-F8.
+
+---
+
+## Faza 9 — Vector wire args în `renderer` (**1+l** promovat)
+
+> **Status:** draft — **D76–D83**; așteaptă confirmare user.  
+> **Depinde:** F3 (wire args scalar + pin inference), F8 (loops pentru iterare pe vector).  
+> **Promovat din backlog:** **1+l** (user 2026-09-01); continuare **D34** amânat MVP.
+
+### Scop
+
+Astăzi F3 acceptă doar **scalar** în `renderer`: `mark(xPos/s16, yPos/s16)` cu `16wire` → un număr per pin.
+
+F9 adaugă **vector wire** conectat la același stil de arg `pinName/s16`, dar wire-ul sursă e `16wire[N]` (sau `Ewire[N]`). Metoda canvas primește un **array de valori decodate** și poate desena N sprite-uri / puncte / bare fără N pinuri separate.
+
+| În scope F9 | În afara scope |
+| ----------- | -------------- |
+| `renderer { drawShots(shotsX/s16) }` + `shotsX = trajectory` (wire `16wire[8] trajectory` declarat în script) | Vector în args **metodă→metodă** fără pin (defer) |
+| Decode per element `/s16` `/u16` (reuse `logicDecodeNumberBits`) | `/ascii` vector per element (defer **D81 B**) |
+| Index `xs[i]` în expr body metodă | `xs[i] = …` assign în vector (defer) |
+| `vectorLen(xs)` builtin | Slice `xs[i:j]` (defer) |
+| Validare scalar↔vector mismatch | Matrix `wire[r,c]` (defer **2+z**) |
+| Loops + `vectorLen` pentru desen serie | Vector ca arg în `renderer` fără metodă intermediară |
+
+### Sintaxă țintă
+
+**Script (exec):**
+
+```logts
+inline [canvas] .traj:
+
+    drawShots(xs) {
+        n = vectorLen(xs)
+        for (i = 0; i < n; i++) {
+            style(0, "aaffaa")
+            drawRect(xs[i] * 4, 40, 6, 6)
+        }
+    }
+
+    drawBars(vals) {
+        for (i = 0; i < vectorLen(vals); i++) {
+            h = vals[i]
+            if (h > 0) {
+                styleFill("00ff00")
+                drawRect(i * 12, 80 - h, 10, h)
+            }
+        }
+    }
+
+:
+
+comp [canvas] .plot:
+    width: 200
+    height: 100
+    .traj { }
+:
+
+16wire[8] trajectory = 0000000000000010 + 0000000000000100 + 0000000000000110 + 0000000000001000
+         + 0000000000001010 + 0000000000001100 + 0000000000001110 + 0000000000010000
+16wire[4] heights = 0000000000001010 + 0000000000001111 + 0000000000000101 + 0000000000001100
+1wire go = 1
+
+.plot:{
+    renderer {
+        drawShots(shotsX/s16)
+        drawBars(barHeights/u16)
+    }
+    shotsX = trajectory
+    barHeights = heights
+    set = go
+}
+```
+
+> **Pin vs wire:** `shotsX` / `barHeights` sunt **pinii** inferați din `renderer` (ca `xPos` la scalar). `trajectory` / `heights` sunt **wire-urile** scriptului — deja declarate `16wire[N]`; assign-ul e doar `pin = wire`, **fără** repetarea tipului (identic cu `xPos = valX` din F3).
+
+### Model pin vector (draft)
+
+```text
+renderer parse:  shotsX/s16  →  wireRef { pinName, bindType:number, numberFormat:s16, vector:null }
+prima assign:    shotsX = trajectory  →  pin.vector din metadata wire trajectory (16wire[8])
+pin.bits:        16 * 8 = 128  (storage flat, MSB element order ca wire-vectors)
+exec decode:     env.shotsX = [2, 4, 6, 8, 10, 12, 14, 16]   // s16 per element
+body index:      xs[i]  →  canvasEvalExpr index pe array
+```
+
+**Scalar rămâne neschimbat:** `xPos/s16` + `xPos = valX` (`16wire`) → pin scalar → `env.xPos = 25` (number).
+
+### Când știm scalar vs vector? (răspuns D82)
+
+Fără sintaxă explicită în `renderer`, shape-ul **nu** e cunoscut la parse `shotsX/s16` — doar **formatul** (`/s16`, `/ascii`, …).
+
+| Moment | Ce știm |
+| ------ | ------- |
+| **Parse `renderer`** | pin `shotsX`, format `/s16` — shape **nelegat** |
+| **Prima `shotsX = wire`** | din metadata wire: `16wire` → pin **scalar**; `16wire[8]` → pin **vector** (resize storage, `elementCount: 8`) |
+| **Assign ulterior** | wire scalar la pin vector (sau invers) → **eroare D82** |
+| **Exec metodă** | `xs[i]` / `vectorLen(xs)` → dacă valoarea e number/string scalar → **runtime error** `not a vector` |
+
+> **Nu** putem respinge `xs[i]` la parse inline fără a ști ce wire se conectează. Metoda e generică; verificarea e la **draw** (sau la assign dacă shape-ul pin ≠ ce așteaptă body-ul — enhancement opțional F9+).
+
+**`vectorLen` pe scalar:** eroare (nu `1`) — altfel ascunde bug-uri; scalar rămâne un singur număr, nu „vector de lungime 1” implicit.
+
+### Formate vector (D81)
+
+Aceleași ca scalar F3 — per element, aceeași decodare:
+
+| Format pin | Element în array |
+| ---------- | ---------------- |
+| `/s16`, `/u16`, `/s8`, … | `number` |
+| `/ascii`, `/text` | `string` (NUL-trim ca scalar) |
+| `/bool` | `0` / `1` |
+
+### Gramatică index (body metodă)
+
+```text
+primary   += var '[' expr ']'
+builtin   += vectorLen(id)
+```
+
+- `i` în `xs[i]` = orice expr numerică (ca F8).
+- Index out of range → runtime error (ca wire `vectorA:i`).
+
+### Execuție (engine / wire)
+
+```text
+canvasPinBitWidth(bindType, numberFormat, vectorMeta):
+  scalar  → ca azi
+  vector  → elementWidth * elementCount
+
+canvasPinBitsToValue(bits, pin):
+  scalar  → ca azi
+  vector  → [ decode(slice element i) for i in 0..count-1 ]
+
+canvasEvalExpr:
+  case 'index': array = env[name]; return array[Number(index)]
+```
+
+### Tokenizer / parser / component
+
+| Schimbare | Detaliu |
+| --------- | ------- |
+| **parseRendererArg** | `wireRef` neschimbat la suprafață (D76 A) sau flag `vectorHint` (D76 B) |
+| **canvas-wire.js** | `canvasPinBitWidth`, `canvasPinBitsToValue`, `canvasBuildPinEnv` — branch vector |
+| **canvas.js `_ensurePin`** | stochează `vector: { elementWidth, elementCount }` după prima assign validă |
+| **assign validation** | la `pinName = wire` verifică scalar vs vector (D82) |
+| **CANVAS_BUILTINS** | + `vectorLen` |
+| **canvas-assembler** | `parsePrimary` + `xs[i]`; parse call `vectorLen(x)` |
+
+### Decizii **D76–D83** (draft)
+
+| ID | Subiect | Recommended |
+| -- | ------- | ----------- |
+| **D76** | Cum marchezi arg vector în `renderer` | **A** aceeași sintaxă `pin/s16` — vector vs scalar din **wire-ul conectat** la assign · **B** sintaxă explicită `pin/s16[N]` sau `pin[]/s16` la parse |
+| **D77** | Când se fixează lățimea pin | **A** la **prima** `pinName = wire` (metadata `Nwire[N]` din wire) · **B** count literal în renderer (D76 B) |
+| **D78** | Valoare param metodă | **A** array JS: `number[]` pentru formate numerice, `string[]` pentru `/ascii` · **B** handle opaque |
+| **D79** | Acces element în body | **A** `xs[i]` — **runtime error** dacă valoarea nu e array (`not a vector`) |
+| **D80** | Lungime | **A** `vectorLen(xs)` — **runtime error** pe non-vector (nu return 1) |
+| **D81** | Formate vector | **A** toate formatele scalar existente per element (`/s16`, `/u16`, `/ascii`, `/bool`, `/s8`, …) — reuse `canvasParseFormatToken` + `logicDecodeNumberBits` |
+| **D82** | Scalar vs vector fără sintaxă explicită | **A** **pin shape** fixat la **prima** `pin = wire` din metadata wire; mismatch la assign ulterior → eroare · opțional: body folosește `xs[i]` dar prima assign scalar → eroare la **draw**, nu la assign |
+| **D83** | Teste | **A** **4790–4799** wave+legacy; parse + exec + mismatch error |
+
+### Scope F9
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F9a** | Pin vector metadata + resize bits la assign |
+| **F9b** | Decode vector în `canvasBuildPinEnv` |
+| **F9c** | `xs[i]` + `vectorLen` parser/engine |
+| **F9d** | Doc `comp-canvas.md` + `inline-canvas.md` secțiune Vector pins |
+| **F9e** | Teste **4790+** |
+
+### Criterii done F9
+
+- [ ] `trajectory` (`16wire[8]`) → `shotsX = trajectory` → `drawShots(shotsX/s16)` → 8 `drawRect`
+- [ ] `vectorLen(xs)` în `for` condiție
+- [ ] Scalar `xPos/s16` încă funcționează (regresie 4732)
+- [ ] `shotsX = scalarWire` după pin vector → eroare clară
+- [ ] Doc + suite verde
+
+### Non-goals F9
+
+- Vector args fără pin (literal array în renderer)
+- Matrix `16wire[r,c]`
+- Mutare elemente `xs[i] = …`
+- Vector în condiții `if (xs)` truthiness array (defer — sau D78 note)
+- Auto-expand `renderer { drawPt(shotsX[i]/s16) }` per index
+
+### Status F9
+
+**(next)** — promovat **1+l**; confirmă **D76–D83**.
 
 ---
 
@@ -1762,13 +1956,21 @@ while:
 | **D66** | 7 | `&&` `||` `!` | **A ✅** |
 | **D67** | 7 | `if` doar în metode | **A ✅** |
 | **D68** | 7 | teste 4760+ | **A ✅** |
-| **D69** | 8 | `for` C-style | **A** |
-| **D70** | 8 | `while` | **A** |
-| **D71** | 8 | `++`/`--` | **A** amânat |
-| **D72** | 8 | `break`/`continue` | **A** interzise |
-| **D73** | 8 | max iterations | **A** 10000 |
-| **D74** | 8 | doar în metode | **A** |
-| **D75** | 8 | teste 4770+ | **A** |
+| **D69** | 8 | `for` C-style | **A ✅** |
+| **D70** | 8 | `while` | **A ✅** |
+| **D71** | 8 | `++`/`--` | **B parțial** postfix `i++`/`i--` |
+| **D72** | 8 | `break`/`continue` | **A ✅** permise |
+| **D73** | 8 | max iterations | **A ✅** 10000 |
+| **D74** | 8 | doar în metode | **A ✅** |
+| **D75** | 8 | teste 4770+ | **A ✅** |
+| **D76** | 9 | marcare arg vector | **A ✅** din wire assign |
+| **D77** | 9 | lățime pin vector | **A ✅** la prima assign |
+| **D78** | 9 | valoare param | **A ✅** array number sau string |
+| **D79** | 9 | `xs[i]` | **A ✅** + runtime `not a vector` |
+| **D80** | 9 | lungime | **A ✅** `vectorLen` + eroare pe scalar |
+| **D81** | 9 | formate vector | **A ✅** toate formatele scalar |
+| **D82** | 9 | scalar vs vector | **A ✅** prima assign fixează shape |
+| **D83** | 9 | teste 4790+ | **A** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -1807,7 +2009,8 @@ while:
 | `renderer` în exec vs body | **D29** | Sketch sugerează exec |
 | Culori `"hex"` vs `^hex` | **D16** | User: fără `#`; string OK |
 | `busy` aproape instant pe JS | **D38** | Tot util pentru sync cu alte comps |
-| Fără loops | **1+b → F8** | `for`/`while` în body metodă |
+| Fără loops | **1+b → F8** ✅ | `for`/`while` + break/continue |
+| Fără vector renderer | **1+l → F9** | `16wire[N]` → pin array + `xs[i]` |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
 
@@ -1819,7 +2022,8 @@ while:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
-| 2026-09-01 | **1+b → Faza 8** — `for`/`while` în body; D69–D75 draft; teste **4770+** |
+| 2026-09-01 | **1+l → Faza 9** — vector wire args renderer; D76–D83 draft; teste **4790+** |
+| 2026-09-01 | **F8 done** — break/continue; teste **4780–4788** |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
 | 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |
