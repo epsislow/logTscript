@@ -21495,7 +21495,7 @@ inline [canvas] .gameRenderer:
 | **Variables** | Locals via \`name = expr\` |
 | **Arithmetic** | \`+ - * /\` and parentheses |
 | **Calls** | Draw builtins and other methods in the same inline |
-| **Control flow** | \`if\` / \`else\` / \`else if\` (JS-style); \`&&\` \`||\` \`!\` in conditions |
+| **Control flow** | \`if\` / \`else\` / \`else if\` (JS-style); \`&&\` \`||\` \`!\` in conditions; \`for\` / \`while\` loops |
 | **Conditions** | Comparisons \`==\` \`!=\` \`<\` \`>\` \`<=\` \`>=\` on numbers; \`==\` / \`!=\` on strings (e.g. \`/ascii\` params); truthiness \`if (name)\` / \`if (!name)\` |
 | **Comments** | \`#\` to end of line |
 
@@ -21572,6 +21572,49 @@ drawHud(score, hi, playerName) {
 | **Numbers** | \`==\` \`!=\` \`<\` \`>\` \`<=\` \`>=\`; truthy when \`!= 0\` |
 | **Strings** (e.g. \`/ascii\` wire args) | \`==\` / \`!=\`; truthy when non-empty; \`!name\` when empty |
 | **Logic** | \`&&\` \`||\` \`!\` and parentheses — same precedence as JS |
+
+---
+
+## Loops (\`for\` / \`while\`)
+
+Only inside **method bodies** (not directly in \`renderer { }\`). Nested loops are allowed. Use **\`break\`** / **\`continue\`** inside loops (JS semantics).
+
+\`\`\`logts
+drawStrip(n, color) {
+    for (i = 0; i < n; i++) {
+        style(0, color)
+        drawRect(i * 18, 10, 16, 16)
+    }
+}
+
+drawGrid(cols, rows, tileW, tileH) {
+    for (row = 0; row < rows; row = row + 1) {
+        for (col = 0; col < cols; col++) {
+            style(0, "aaffaa")
+            drawRect(col * tileW, row * tileH, tileW - 2, tileH - 2)
+        }
+    }
+}
+
+scanRows(rows) {
+    y = 0
+    row = 0
+    while (row < rows) {
+        drawRect(0, y, 40, 8)
+        y = y + 12
+        row++
+    }
+}
+\`\`\`
+
+| Feature | Rules |
+|---------|--------|
+| **\`for\`** | C-style \`for (init; cond; step)\` — each clause optional (\`for (;;)\` runs until cap) |
+| **\`while\`** | \`while (cond) { … }\` — same conditions as \`if\` |
+| **Init / step** | Assign (\`i = 0\`, \`i = i + 1\`) or postfix \`i++\` / \`i--\` |
+| **Postfix only** | \`i++\` and \`i--\` as statement or in \`for\` step — prefix \`++i\` / \`--i\` not allowed |
+| **\`break\` / \`continue\`** | Only inside \`for\` / \`while\`; \`break\` exits innermost loop, \`continue\` next iteration (\`for\` runs step) |
+| **Safety cap** | Max **10 000** iterations per loop — runtime error if exceeded |
 
 ---
 
