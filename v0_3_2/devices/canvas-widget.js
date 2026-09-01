@@ -62,6 +62,9 @@ class CanvasDisplay {
       this.canvas.height = height;
       this.canvas.className = 'canvas-device';
       this.ctx = this.canvas.getContext('2d');
+      if (typeof ensureClcdFaFontsLoaded === 'function') {
+        ensureClcdFaFontsLoaded();
+      }
     } else {
       this.ctx = null;
     }

@@ -43,6 +43,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/components/servo.js",
   "core/components/scanner.js",
   "devices/clcd-symbols_generated.js",
+  "devices/clcd-symbol-draw.js",
   "core/components/clcd.js",
   "core/components/alu.js",
   "core/components/cpu.js",

@@ -52143,5 +52143,95 @@ comp [canvas] .screen:
 
   regCanvasDual(4748, 4749, 'fontFamily invalid error', runCanvasFontFamilyInvalid);
 
+  function runCanvasDrawSymbolBattery(h) {
+    const prog = parseCanvasBody(`draw() {
+        styleFill("00ff00")
+        symbolSize(24)
+        drawSymbol(10, 10, "battery")
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const text = mock.calls.find((c) => c.op === 'fillText');
+    h.assert('fillText', !!text, true);
+    h.assert('battery glyph', text && text.text === '\uf240', true);
+    h.assert('fa font size', text && String(text.font).indexOf('24px') >= 0, true);
+  }
+
+  regCanvasDual(4750, 4751, 'drawSymbol FA battery', runCanvasDrawSymbolBattery);
+
+  function runCanvasSymbolStyleWeight(h) {
+    const progSolid = parseCanvasBody(`draw() {
+        styleFill("ffffff")
+        symbolStyle(1)
+        drawSymbol(0, 0, "bell")
+    }`);
+    const progRegular = parseCanvasBody(`draw() {
+        styleFill("ffffff")
+        symbolStyle(2)
+        drawSymbol(0, 0, "bell")
+    }`);
+    const mockSolid = createCanvasMockCtx();
+    executeCanvasRenderer(progSolid, parseCanvasRendererBlock('draw()'), mockSolid.ctx, { skipOnError: false });
+    const mockReg = createCanvasMockCtx();
+    executeCanvasRenderer(progRegular, parseCanvasRendererBlock('draw()'), mockReg.ctx, { skipOnError: false });
+    const solidFont = mockSolid.calls.find((c) => c.op === 'fillText').font;
+    const regFont = mockReg.calls.find((c) => c.op === 'fillText').font;
+    h.assert('solid 900', String(solidFont).indexOf('900') >= 0, true);
+    h.assert('regular 400', String(regFont).indexOf('400') >= 0, true);
+  }
+
+  regCanvasDual(4752, 4753, 'symbolStyle solid vs regular', runCanvasSymbolStyleWeight);
+
+  function runCanvasDrawSymbolDigit7(h) {
+    const prog = parseCanvasBody(`draw() {
+        style("222222", "00ff00")
+        symbolSize(44)
+        drawSymbol(5, 5, "digit7", "1111111")
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('segment rects', rects.length >= 7, true);
+  }
+
+  regCanvasDual(4754, 4755, 'drawSymbol digit7 bits', runCanvasDrawSymbolDigit7);
+
+  function runCanvasDrawSymbolDpColon(h) {
+    const prog = parseCanvasBody(`draw() {
+        style("000000", "ffffff")
+        drawSymbol(10, 10, "dp", "1")
+        drawSymbol(30, 10, "dp", "0")
+        drawSymbol(50, 10, "colon", "10")
+        drawSymbol(70, 10, "colon", "00")
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const arcs = mock.calls.filter((c) => c.op === 'arc');
+    h.assert('six dot arcs', arcs.length, 6);
+  }
+
+  regCanvasDual(4756, 4757, 'drawSymbol dp colon bits', runCanvasDrawSymbolDpColon);
+
+  function runCanvasDrawSymbolErrors(h) {
+    const mock = createCanvasMockCtx();
+    h.assertThrows('unknown symbol', function() {
+      const prog = parseCanvasBody(`draw() { drawSymbol(0, 0, "not_a_symbol") }`);
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+    h.assertThrows('digit7 missing bits', function() {
+      const prog = parseCanvasBody(`draw() { drawSymbol(0, 0, "digit7") }`);
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+    h.assertThrows('fa extra bits', function() {
+      const prog = parseCanvasBody(`draw() {
+          styleFill("ffffff")
+          drawSymbol(0, 0, "battery", "1")
+      }`);
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  }
+
+  regCanvasDual(4758, 4759, 'drawSymbol validation errors', runCanvasDrawSymbolErrors);
+
   window.LogTScriptTestSuite.finalize();
 })();

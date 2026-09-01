@@ -10213,8 +10213,14 @@ In the **documentation viewer**, use **Load** and **Load & Run** on \`logts-play
 | \`fontStyle(family, size)\` | Set family and size in one call |
 | \`textAlign("left"\\|"center"\\|"right"\\|"start"\\|"end")\` | Default \`left\` |
 | \`textBaseline("top"\\|"middle"\\|"alphabetic"\\|"bottom")\` | Default \`alphabetic\` |
+| \`symbolSize(n)\` | Display size for next \`drawSymbol\` (CLCD semantics per symbol kind) |
+| \`symbolStyle(1\\|2\\|3)\` | FA icon style: solid / regular / brands (default from catalog) |
+| \`drawSymbol(x, y, name)\` | CLCD catalog icon (Font Awesome), 3 args |
+| \`drawSymbol(x, y, name, bits)\` | CLCD canvas symbol (\`digit7\`, \`colon\`, \`dp\`, …), 4 args |
 
 Default font is **\`mono\`** (\`Consolas\`, \`Courier New\`, monospace stack).
+
+Symbol names match [clcd-symbols.md](clcd-symbols.md). **\`label\`** uses \`drawText\`, not \`drawSymbol\`.
 
 ---
 
@@ -10331,6 +10337,79 @@ drawText(10, 200, "caption")
 | \`fontSize\` | Positive number — pixels |
 
 Unknown \`fontFamily\` token → runtime error (\`allowed: mono, sans, serif\`).
+
+---
+
+## CLCD symbols — \`drawSymbol\`, \`symbolSize\`, \`symbolStyle\`
+
+Reuse the same symbol names as \`comp [clcd]\`. See the searchable [symbol catalog](clcd-symbols.md).
+
+### Font Awesome icons (3 arguments)
+
+\`\`\`logts
+styleFill("00ff00")
+symbolSize(28)
+symbolStyle(1)
+drawSymbol(20, 10, "battery")
+\`\`\`
+
+- Color: \`styleFill\` (like \`drawText\`).
+- \`symbolStyle\` optional — default is the catalog \`defaultStyle\` for that icon.
+- FA \`symbolSize\`: target height in px (default **22**, range **8–64**).
+
+### Canvas symbols (4 arguments — \`bits\` required)
+
+\`\`\`logts
+style("334455", "00ff00")
+symbolSize(44)
+drawSymbol(60, 10, "digit7", "1101010")
+drawSymbol(80, 10, "dp", "1")
+drawSymbol(90, 10, "colon", "10")
+\`\`\`
+
+| Symbol | \`bits\` string |
+|--------|----------------|
+| \`digit7\` | 7 characters \`0\` or \`1\` (segments) |
+| \`digit14\` | 7 or 14 characters |
+| \`dp\` | 1 character |
+| \`colon\` | 2 characters (top dot, bottom dot) |
+
+Colors: segment/dot **on** → \`styleFill\`; **off** → \`styleStroke\` (same as CLCD \`color\` / \`bgColor\`).
+
+Canvas \`symbolSize\`: scales to target height (default native heights: \`digit7\` **44**, \`colon\` **32**, \`dp\` **8**; range **8–120**).
+
+### Runnable symbol demo
+
+\`\`\`logts-play
+inline [canvas] .icons:
+
+    panel() {
+        styleFill("00ff00")
+        symbolSize(26)
+        drawSymbol(12, 12, "wifi")
+        style("222222", "ff6600")
+        symbolSize(44)
+        drawSymbol(50, 8, "digit7", "1000001")
+        style("000000", "aaaaaa")
+        drawSymbol(100, 20, "colon", "10")
+    }
+
+:
+
+comp [canvas] .symDemo:
+    on: 1
+    width: 130
+    height: 60
+    bgColor: ^000000
+    .icons { }
+:
+
+1wire go = 1
+.symDemo:{
+    renderer { panel() }
+    set = go
+}
+\`\`\`
 
 ---
 

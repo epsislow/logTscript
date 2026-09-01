@@ -9,6 +9,7 @@ const CANVAS_BUILTINS = new Set([
   'styleFill', 'styleStroke', 'style',
   'drawRect', 'drawCircle', 'drawLine', 'drawText',
   'textAlign', 'textBaseline', 'fontSize', 'fontFamily', 'fontStyle',
+  'symbolSize', 'symbolStyle', 'drawSymbol',
 ]);
 
 function canvasError(msg, line) {

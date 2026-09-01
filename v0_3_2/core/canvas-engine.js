@@ -23,6 +23,7 @@ const CANVAS_BUILTIN_SET = (typeof CANVAS_BUILTINS !== 'undefined')
     'styleFill', 'styleStroke', 'style',
     'drawRect', 'drawCircle', 'drawLine', 'drawText',
     'textAlign', 'textBaseline', 'fontSize', 'fontFamily', 'fontStyle',
+    'symbolSize', 'symbolStyle', 'drawSymbol',
   ]);
 
 function canvasIsTransparentColor(c) {
@@ -87,6 +88,13 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
   }
 }
 
+function canvasSymbolColors(state) {
+  return {
+    fg: canvasToCssColor(state.fillColor) || '#ffffff',
+    bg: canvasToCssColor(state.strokeColor) || '#000000',
+  };
+}
+
 function createCanvasDrawState() {
   return {
     fillColor: 'ffffff',
@@ -96,6 +104,8 @@ function createCanvasDrawState() {
     fontFamily: CANVAS_FONT_FAMILIES.mono,
     textAlign: 'left',
     textBaseline: 'alphabetic',
+    symbolSize: null,
+    symbolStyle: null,
   };
 }
 
@@ -162,6 +172,80 @@ function canvasRunBuiltin(name, args, state, ctx, evalArg, line) {
         throw new Error(`canvas: textBaseline must be top|middle|alphabetic|bottom (line ${line})`);
       }
       state.textBaseline = v;
+      return;
+    }
+    case 'symbolSize': {
+      if (nargs.length !== 1) throw new Error(`canvas: symbolSize expects 1 arg (line ${line})`);
+      state.symbolSize = Number(nargs[0]);
+      return;
+    }
+    case 'symbolStyle': {
+      if (nargs.length !== 1) throw new Error(`canvas: symbolStyle expects 1 arg (line ${line})`);
+      const s = Number(nargs[0]);
+      if (s !== 1 && s !== 2 && s !== 3) {
+        throw new Error(`canvas: symbolStyle must be 1, 2, or 3 (line ${line})`);
+      }
+      state.symbolStyle = s;
+      return;
+    }
+    case 'drawSymbol': {
+      if (nargs.length < 3 || nargs.length > 4) {
+        throw new Error(`canvas: drawSymbol expects 3 or 4 args (line ${line})`);
+      }
+      const x = Number(nargs[0]);
+      const y = Number(nargs[1]);
+      const symName = String(nargs[2]);
+      const lookup = (typeof getClcdSymbolDef === 'function') ? getClcdSymbolDef : null;
+      const symDef = lookup ? lookup(symName) : null;
+      if (!symDef) {
+        throw new Error(`canvas: unknown symbol '${symName}' (line ${line})`);
+      }
+      if (symDef.kind === 'text') {
+        throw new Error(`canvas: symbol 'label' use drawText, not drawSymbol (line ${line})`);
+      }
+      const sym = { size: state.symbolSize };
+      if (typeof canvasValidateSymbolSize === 'function') {
+        canvasValidateSymbolSize(symDef.kind, state.symbolSize, line);
+      }
+      const colors = canvasSymbolColors(state);
+      if (symDef.kind === 'fa') {
+        if (nargs.length === 4) {
+          throw new Error(`canvas: drawSymbol '${symName}' does not take bits (line ${line})`);
+        }
+        if (canvasIsTransparentColor(state.fillColor)) return;
+        const style = state.symbolStyle != null ? state.symbolStyle : undefined;
+        if (typeof drawClcdFaIcon !== 'function') {
+          throw new Error(`canvas: drawSymbol unavailable (missing clcd-symbol-draw) (line ${line})`);
+        }
+        drawClcdFaIcon(ctx, {
+          x,
+          y,
+          symDef,
+          style,
+          sym,
+          color: colors.fg,
+        });
+        return;
+      }
+      if (nargs.length !== 4) {
+        throw new Error(`canvas: drawSymbol '${symName}' requires bits argument (line ${line})`);
+      }
+      const bits = String(nargs[3]);
+      if (typeof validateClcdCanvasBits === 'function') {
+        validateClcdCanvasBits(symName, bits, line);
+      }
+      if (typeof drawClcdCanvasSymbol !== 'function') {
+        throw new Error(`canvas: drawSymbol unavailable (missing clcd-symbol-draw) (line ${line})`);
+      }
+      drawClcdCanvasSymbol(ctx, {
+        x,
+        y,
+        name: symName,
+        sym,
+        bits,
+        fg: colors.fg,
+        bg: colors.bg,
+      });
       return;
     }
     case 'drawRect': {
@@ -335,6 +419,10 @@ function createCanvasMockCtx() {
     font: '14px Consolas, "Courier New", monospace',
     textAlign: 'left',
     textBaseline: 'alphabetic',
+    save() { calls.push({ op: 'save' }); },
+    restore() { calls.push({ op: 'restore' }); },
+    translate(x, y) { calls.push({ op: 'translate', x, y }); },
+    scale(sx, sy) { calls.push({ op: 'scale', sx, sy: sy !== undefined ? sy : sx }); },
     fillRect(x, y, w, h) { calls.push({ op: 'fillRect', x, y, w, h, fillStyle: this.fillStyle }); },
     strokeRect(x, y, w, h) { calls.push({ op: 'strokeRect', x, y, w, h, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth }); },
     beginPath() { calls.push({ op: 'beginPath' }); },

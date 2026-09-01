@@ -136,15 +136,10 @@ class ClcdDisplay {
   }
 
   _loadFonts() {
-    if (!document.fonts) {
-      this._fontsReady = true;
-      return;
-    }
-    Promise.all([
-      document.fonts.load('900 24px "Font Awesome 5 Free"'),
-      document.fonts.load('400 24px "Font Awesome 5 Free"'),
-      document.fonts.load('400 24px "Font Awesome 5 Brands"'),
-    ]).then(() => {
+    const load = (typeof ensureClcdFaFontsLoaded === 'function')
+      ? ensureClcdFaFontsLoaded()
+      : Promise.resolve();
+    load.then(() => {
       this._fontsReady = true;
       this.requestDraw();
     }).catch(() => {
@@ -229,8 +224,17 @@ class ClcdDisplay {
         this._drawCanvasSymbol(ctx, sym, on, fg, bg);
       } else if (symDef && symDef.kind === 'text') {
         this._drawLabel(ctx, sym, color);
+      } else if (typeof drawClcdFaIcon === 'function') {
+        drawClcdFaIcon(ctx, {
+          x: sym.x,
+          y: sym.y,
+          symDef,
+          style: sym.style,
+          sym,
+          color,
+        });
       } else {
-        this._drawFaIcon(ctx, sym, color);
+        this._drawFaIconLegacy(ctx, sym, color);
       }
     }
 
@@ -238,6 +242,22 @@ class ClcdDisplay {
   }
 
   _drawCanvasSymbol(ctx, sym, on, fg, bg) {
+    const readBit = (i) => this._readBit(i);
+    const bits = (typeof clcdWidgetCanvasBits === 'function')
+      ? clcdWidgetCanvasBits(sym, readBit, on)
+      : '';
+    if (typeof drawClcdCanvasSymbol === 'function') {
+      drawClcdCanvasSymbol(ctx, {
+        x: sym.x,
+        y: sym.y,
+        name: sym.name,
+        sym,
+        bits,
+        fg,
+        bg,
+      });
+      return;
+    }
     const scale = (typeof resolveClcdCanvasScale === 'function')
       ? resolveClcdCanvasScale(sym, sym.name)
       : 1;
@@ -275,7 +295,7 @@ class ClcdDisplay {
     ctx.restore();
   }
 
-  _drawFaIcon(ctx, sym, color) {
+  _drawFaIconLegacy(ctx, sym, color) {
     const symDef = (typeof getClcdSymbolDef === 'function')
       ? getClcdSymbolDef(sym.name)
       : null;
@@ -295,6 +315,10 @@ class ClcdDisplay {
   }
 
   _drawDot(ctx, x, y, color, r) {
+    if (typeof clcdDrawDot === 'function') {
+      clcdDrawDot(ctx, x, y, color, r);
+      return;
+    }
     ctx.save();
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -304,6 +328,10 @@ class ClcdDisplay {
   }
 
   _drawDigit7(ctx, x, y, segBits, onColor, offColor, segCount) {
+    if (typeof clcdDrawDigit7 === 'function') {
+      clcdDrawDigit7(ctx, x, y, segBits, onColor, offColor, segCount);
+      return;
+    }
     const w = 28;
     const h = 44;
     const t = 3;

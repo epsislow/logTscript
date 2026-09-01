@@ -21,8 +21,8 @@ todos:
     content: "Faza 5: fontFamily + fontStyle + textAlign start/end — D49–D52 ✅ done"
     status: completed
   - id: canvas-f6
-    content: "Faza 6: drawSymbol + symbolSize/symbolStyle — 1+n → D53–D61 draft"
-    status: pending
+    content: "Faza 6: drawSymbol + symbolSize/symbolStyle — D53–D61 ✅ done"
+    status: completed
 isProject: false
 ---
 
@@ -147,7 +147,7 @@ D28 A ✅
 | **Faza 3** Renderer + wires + set/draw/busy/clear | **D29–D40** | **done** |
 | **Faza 4** Doc + teste + integrare observe | **D43–D48** | **done** |
 | **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** | **done** |
-| **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** draft | **(next)** |
+| **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
 | *(amânate)* | **1+a …** (fără 1+k, 1+n) | — |
 
 ---
@@ -1278,7 +1278,7 @@ drawText(10, 200, "caption")
 
 ## Faza 6 — CLCD symbols (`drawSymbol`, **1+n** promovat)
 
-> **Status:** draft — **D56 B**, **D58 A**, **D61 A** ✅; **D60** închis; **D53–D55**, **D57**, **D59** implicit A.
+> **Status:** done — **D53–D61** ✅ (user 2026-09-01).
 > **Depinde:** F2 (style/color), F5 (text separat de simboluri).  
 > **Promovat din backlog:** **1+n** (user 2026-09-01).
 
@@ -1428,22 +1428,15 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 
 ### Criterii done F6
 
-- [ ] `drawSymbol` 3-arg (FA) + 4-arg (canvas + bits)
-- [ ] `symbolSize` / `symbolStyle` conform CLCD
-- [ ] CLCD widget neschimbat vizual după refactor shared
-- [ ] Doc + exemplu runnable (battery + digit7)
-- [ ] Suite verde **4750–4759**
-
-### Non-goals F6
-
-- Touch / hit-test pe simboluri canvas (**1+f**)
-- `label` pe `drawSymbol`
-- Wire args pentru `bits` la `drawSymbol` (post-F6 / **1+l**)
-- Duplicare catalog — un singur `CLCD_SYMBOL_REGISTRY`
+- [x] `drawSymbol` 3-arg (FA) + 4-arg (canvas + bits)
+- [x] `symbolSize` / `symbolStyle` conform CLCD
+- [x] CLCD widget delegă la `clcd-symbol-draw.js`
+- [x] Doc `canvas-builtins.md` + exemplu `logts-play`
+- [x] Suite verde **4750–4759**
 
 ### Status F6
 
-**(next)** — **D56 B**, **D58 A**, **D61 A** confirmate; **D60** închis. Rămân implicite **D53–D55**, **D57**, **D59** (recommended A). Gata de implementare la „go”.
+**done** — teste **4750–4759** (wave + legacy).
 
 ---
 
@@ -1485,14 +1478,14 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 | **D50** | 5 | builtin `fontStyle(family, size)` | **A ✅** |
 | **D51** | 5 | `textAlign` start/end | **A ✅** |
 | **D52** | 5 | familie invalidă → error | **A ✅** |
-| **D53** | 6 | `drawSymbol` API | **A** |
-| **D54** | 6 | `symbolSize` / `symbolStyle` | **A** |
-| **D55** | 6 | size semantics CLCD | **A** |
+| **D53** | 6 | `drawSymbol` API | **A ✅** |
+| **D54** | 6 | `symbolSize` / `symbolStyle` | **A ✅** |
+| **D55** | 6 | size semantics CLCD | **A ✅** |
 | **D56** | 6 | biți în `drawSymbol` | **B ✅** arg 4 |
-| **D57** | 6 | `label` exclus | **A** |
+| **D57** | 6 | `label` exclus | **A ✅** |
 | **D58** | 6 | culori simboluri | **A ✅** |
-| **D59** | 6 | validare size 8–64/120 | **A** |
-| **D60** | 6 | `symbolOn` | **respins** (bits arg) |
+| **D59** | 6 | validare size 8–64/120 | **A ✅** |
+| **D60** | 6 | `symbolOn` | **respins** |
 | **D61** | 6 | default symbolStyle | **A ✅** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
@@ -1544,7 +1537,7 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
-| 2026-09-01 | **F6 D56–D61** — bits ca arg 4 la `drawSymbol`; D58/D61 A; D60 respins (`colon`/`dp` din bits) |
+| 2026-09-01 | **F6 done** — `drawSymbol`/`symbolSize`/`symbolStyle`; `clcd-symbol-draw.js`; teste **4750–4759** |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
 | 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |
