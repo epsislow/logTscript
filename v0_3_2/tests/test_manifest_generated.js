@@ -3829,7 +3829,15 @@
       {"id":4738,"group":"canvas","title":"busy >= mustWait redirect (legacy)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["mustWait idle after draw","mustWait from redirect"]}},
       {"id":4739,"group":"canvas","title":"busy >= mustWait redirect (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["mustWait idle after draw","mustWait from redirect"]}},
       {"id":4740,"group":"canvas","title":"observe spotX e2e canvas renderer (legacy)","detail":{"scripts":[],"steps":["run(CANVAS_OBSERVE_E2E) [nerezolvat]","session._ensureRegistry()"],"assertions":["spotX from observe","screen exists","circle at x=80"]}},
-      {"id":4741,"group":"canvas","title":"observe spotX e2e canvas renderer (wave)","detail":{"scripts":[],"steps":["run(CANVAS_OBSERVE_E2E) [nerezolvat]","session._ensureRegistry()"],"assertions":["spotX from observe","screen exists","circle at x=80"]}}
+      {"id":4741,"group":"canvas","title":"observe spotX e2e canvas renderer (wave)","detail":{"scripts":[],"steps":["run(CANVAS_OBSERVE_E2E) [nerezolvat]","session._ensureRegistry()"],"assertions":["spotX from observe","screen exists","circle at x=80"]}},
+      {"id":4742,"group":"canvas","title":"fontFamily sans + fontSize mock ctx (legacy)","detail":{"scripts":[],"steps":[],"assertions":["sans stack","font size 18","ctx font"]}},
+      {"id":4743,"group":"canvas","title":"fontFamily sans + fontSize mock ctx (wave)","detail":{"scripts":[],"steps":[],"assertions":["sans stack","font size 18","ctx font"]}},
+      {"id":4744,"group":"canvas","title":"fontStyle serif 20 sugar (legacy)","detail":{"scripts":[],"steps":[],"assertions":["serif stack","size 20","fillText font"]}},
+      {"id":4745,"group":"canvas","title":"fontStyle serif 20 sugar (wave)","detail":{"scripts":[],"steps":[],"assertions":["serif stack","size 20","fillText font"]}},
+      {"id":4746,"group":"canvas","title":"textAlign start end (legacy)","detail":{"scripts":[],"steps":[],"assertions":["textAlign end","ctx textAlign"]}},
+      {"id":4747,"group":"canvas","title":"textAlign start end (wave)","detail":{"scripts":[],"steps":[],"assertions":["textAlign end","ctx textAlign"]}},
+      {"id":4748,"group":"canvas","title":"fontFamily invalid error (legacy)","detail":{"scripts":[],"steps":[],"assertions":["invalid family"]}},
+      {"id":4749,"group":"canvas","title":"fontFamily invalid error (wave)","detail":{"scripts":[],"steps":[],"assertions":["invalid family"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -3864,7 +3872,7 @@
       { id: 'builtin-status-4bit', label: 'builtin-status-4bit', rangeLabel: '2030–2032', testIds: [2030, 2031, 2032] },
       { id: 'builtin-vector', label: 'builtin-vector', rangeLabel: '1802–1863, 1880–1881, 1970, 1981', testIds: [1802, 1803, 1804, 1805, 1806, 1807, 1808, 1809, 1810, 1811, 1812, 1813, 1814, 1815, 1816, 1817, 1818, 1819, 1820, 1821, 1822, 1823, 1824, 1825, 1826, 1827, 1828, 1829, 1830, 1831, 1832, 1833, 1834, 1835, 1836, 1837, 1838, 1839, 1840, 1841, 1842, 1843, 1844, 1845, 1846, 1847, 1848, 1849, 1850, 1851, 1852, 1853, 1854, 1855, 1856, 1857, 1858, 1859, 1860, 1861, 1862, 1863, 1880, 1881, 1970, 1981] },
       { id: 'builtins', label: 'builtins', rangeLabel: '1953–1956', testIds: [1953, 1954, 1955, 1956] },
-      { id: 'canvas', label: 'canvas', rangeLabel: '4700–4707, 4710–4715, 4720–4724, 4730–4741', testIds: [4700, 4701, 4702, 4703, 4704, 4705, 4706, 4707, 4710, 4711, 4712, 4713, 4714, 4715, 4720, 4721, 4722, 4723, 4724, 4730, 4731, 4732, 4733, 4734, 4735, 4736, 4737, 4738, 4739, 4740, 4741] },
+      { id: 'canvas', label: 'canvas', rangeLabel: '4700–4707, 4710–4715, 4720–4724, 4730–4749', testIds: [4700, 4701, 4702, 4703, 4704, 4705, 4706, 4707, 4710, 4711, 4712, 4713, 4714, 4715, 4720, 4721, 4722, 4723, 4724, 4730, 4731, 4732, 4733, 4734, 4735, 4736, 4737, 4738, 4739, 4740, 4741, 4742, 4743, 4744, 4745, 4746, 4747, 4748, 4749] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–543, 556–557, 857–860', testIds: [540, 541, 542, 543, 556, 557, 857, 858, 859, 860] },
       { id: 'clcd', label: 'CLCD component', rangeLabel: '1337–1352, 1383–1387, 1399–1428, 1549–1558, 2992–2994, 4650–4663', testIds: [1337, 1338, 1339, 1340, 1341, 1342, 1343, 1344, 1345, 1346, 1347, 1348, 1349, 1350, 1351, 1352, 1383, 1384, 1385, 1386, 1387, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1549, 1550, 1551, 1552, 1553, 1554, 1555, 1556, 1557, 1558, 2992, 2993, 2994, 4650, 4651, 4652, 4653, 4654, 4655, 4656, 4657, 4658, 4659, 4660, 4661, 4662, 4663] },
       { id: 'color-wire', label: 'color-wire', rangeLabel: '2988–2989, 2991, 2995', testIds: [2988, 2989, 2991, 2995] },

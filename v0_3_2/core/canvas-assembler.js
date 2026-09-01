@@ -8,7 +8,7 @@ const CANVAS_FORBIDDEN_IDS = new Set([
 const CANVAS_BUILTINS = new Set([
   'styleFill', 'styleStroke', 'style',
   'drawRect', 'drawCircle', 'drawLine', 'drawText',
-  'textAlign', 'textBaseline', 'fontSize',
+  'textAlign', 'textBaseline', 'fontSize', 'fontFamily', 'fontStyle',
 ]);
 
 function canvasError(msg, line) {

@@ -10209,10 +10209,12 @@ In the **documentation viewer**, use **Load** and **Load & Run** on \`logts-play
 | \`drawLine(x1, y1, x2, y2)\` | Line using current stroke |
 | \`drawText(x, y, text)\` | Filled text (current fill + font) |
 | \`fontSize(n)\` | Font size in pixels (default **14**) |
-| \`textAlign("left"\\|"center"\\|"right")\` | Default \`left\` |
+| \`fontFamily("mono"\\|"sans"\\|"serif")\` | Text family (default **\`mono\`**, same tokens as CLCD \`label\`) |
+| \`fontStyle(family, size)\` | Set family and size in one call |
+| \`textAlign("left"\\|"center"\\|"right"\\|"start"\\|"end")\` | Default \`left\` |
 | \`textBaseline("top"\\|"middle"\\|"alphabetic"\\|"bottom")\` | Default \`alphabetic\` |
 
-Font family is fixed **monospace** in the current release.
+Default font is **\`mono\`** (\`Consolas\`, \`Courier New\`, monospace stack).
 
 ---
 
@@ -10304,23 +10306,31 @@ drawLine(0, 0, 100, 100)
 
 ---
 
-## Text — \`drawText\`, \`fontSize\`, \`textAlign\`, \`textBaseline\`
+## Text — \`drawText\`, \`fontSize\`, \`fontFamily\`, \`fontStyle\`, \`textAlign\`, \`textBaseline\`
 
 \`drawText\` uses **fill only** (not outlined text).
 
 \`\`\`logts
 styleFill("ffffff")
-fontSize(24)
-textAlign("center")
+fontStyle("sans", 18)
+textAlign("start")
 textBaseline("middle")
 drawText(100, 50, "SCORE")
+
+fontFamily("serif")
+fontSize(12)
+drawText(10, 200, "caption")
 \`\`\`
 
 | Builtin | Values |
 |---------|--------|
-| \`textAlign\` | \`"left"\`, \`"center"\`, \`"right"\` |
+| \`fontFamily\` | \`"mono"\` (default), \`"sans"\`, \`"serif"\` — aligned with CLCD \`label\` \`family:\` |
+| \`fontStyle\` | \`(family, size)\` — same as \`fontFamily\` + \`fontSize\` |
+| \`textAlign\` | \`"left"\`, \`"center"\`, \`"right"\`, \`"start"\`, \`"end"\` |
 | \`textBaseline\` | \`"top"\`, \`"middle"\`, \`"alphabetic"\`, \`"bottom"\` |
 | \`fontSize\` | Positive number — pixels |
+
+Unknown \`fontFamily\` token → runtime error (\`allowed: mono, sans, serif\`).
 
 ---
 
@@ -10340,7 +10350,7 @@ inline [canvas] .showcase:
         drawLine(90, 20, 180, 100)
 
         styleFill("ffffff")
-        fontSize(16)
+        fontStyle("sans", 16)
         textAlign("center")
         textBaseline("bottom")
         drawText(100, 115, "builtins")

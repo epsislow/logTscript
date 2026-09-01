@@ -52083,5 +52083,65 @@ comp [canvas] .screen:
 
   regCanvasDual(4740, 4741, 'observe spotX e2e canvas renderer', runCanvasObserveE2E);
 
+  function runCanvasFontFamilySans(h) {
+    const prog = parseCanvasBody(`draw() {
+        fontFamily("sans")
+        fontSize(18)
+        styleFill("ffffff")
+        drawText(10, 10, "Hi")
+    }`);
+    const mock = createCanvasMockCtx();
+    const state = executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const text = mock.calls.find((c) => c.op === 'fillText');
+    h.assert('sans stack', String(state.fontFamily.indexOf('sans-serif') >= 0), 'true');
+    h.assert('font size 18', String(state.fontSize), '18');
+    h.assert('ctx font', text && String(text.font).indexOf('18px') >= 0 && String(text.font).indexOf('sans-serif') >= 0, 'true');
+  }
+
+  regCanvasDual(4742, 4743, 'fontFamily sans + fontSize mock ctx', runCanvasFontFamilySans);
+
+  function runCanvasFontStyleSerif(h) {
+    const prog = parseCanvasBody(`draw() {
+        fontStyle("serif", 20)
+        styleFill("000000")
+        drawText(0, 0, "T")
+    }`);
+    const mock = createCanvasMockCtx();
+    const state = executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const text = mock.calls.find((c) => c.op === 'fillText');
+    h.assert('serif stack', String(state.fontFamily.indexOf('Georgia') >= 0), 'true');
+    h.assert('size 20', String(state.fontSize), '20');
+    h.assert('fillText font', text && String(text.font).indexOf('20px') >= 0 && String(text.font).indexOf('serif') >= 0, 'true');
+  }
+
+  regCanvasDual(4744, 4745, 'fontStyle serif 20 sugar', runCanvasFontStyleSerif);
+
+  function runCanvasTextAlignStartEnd(h) {
+    const prog = parseCanvasBody(`draw() {
+        textAlign("start")
+        textAlign("end")
+        styleFill("ffffff")
+        drawText(5, 5, "x")
+    }`);
+    const mock = createCanvasMockCtx();
+    const state = executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    h.assert('textAlign end', state.textAlign, 'end');
+    h.assert('ctx textAlign', mock.ctx.textAlign, 'end');
+  }
+
+  regCanvasDual(4746, 4747, 'textAlign start end', runCanvasTextAlignStartEnd);
+
+  function runCanvasFontFamilyInvalid(h) {
+    const prog = parseCanvasBody(`draw() {
+        fontFamily("comic")
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('invalid family', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  }
+
+  regCanvasDual(4748, 4749, 'fontFamily invalid error', runCanvasFontFamilyInvalid);
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -1,11 +1,28 @@
 /* ================= CANVAS ENGINE (draw builtins + execution) ================= */
 
+const CANVAS_FONT_FAMILIES = {
+  mono: 'Consolas, "Courier New", monospace',
+  sans: 'system-ui, -apple-system, Segoe UI, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+};
+
+const CANVAS_TEXT_ALIGNS = new Set(['left', 'center', 'right', 'start', 'end']);
+
+function canvasResolveFontFamily(name, line) {
+  const token = String(name);
+  const stack = CANVAS_FONT_FAMILIES[token];
+  if (!stack) {
+    throw new Error(`canvas: fontFamily must be mono|sans|serif (allowed: mono, sans, serif)${line != null ? ` (line ${line})` : ''}`);
+  }
+  return stack;
+}
+
 const CANVAS_BUILTIN_SET = (typeof CANVAS_BUILTINS !== 'undefined')
   ? CANVAS_BUILTINS
   : new Set([
     'styleFill', 'styleStroke', 'style',
     'drawRect', 'drawCircle', 'drawLine', 'drawText',
-    'textAlign', 'textBaseline', 'fontSize',
+    'textAlign', 'textBaseline', 'fontSize', 'fontFamily', 'fontStyle',
   ]);
 
 function canvasIsTransparentColor(c) {
@@ -76,7 +93,7 @@ function createCanvasDrawState() {
     strokeColor: '000000',
     strokeWidth: 1,
     fontSize: 14,
-    fontFamily: 'monospace',
+    fontFamily: CANVAS_FONT_FAMILIES.mono,
     textAlign: 'left',
     textBaseline: 'alphabetic',
   };
@@ -118,11 +135,22 @@ function canvasRunBuiltin(name, args, state, ctx, evalArg, line) {
       state.fontSize = Number(nargs[0]);
       return;
     }
+    case 'fontFamily': {
+      if (nargs.length !== 1) throw new Error(`canvas: fontFamily expects 1 arg (line ${line})`);
+      state.fontFamily = canvasResolveFontFamily(nargs[0], line);
+      return;
+    }
+    case 'fontStyle': {
+      if (nargs.length !== 2) throw new Error(`canvas: fontStyle expects 2 args (line ${line})`);
+      state.fontFamily = canvasResolveFontFamily(nargs[0], line);
+      state.fontSize = Number(nargs[1]);
+      return;
+    }
     case 'textAlign': {
       if (nargs.length !== 1) throw new Error(`canvas: textAlign expects 1 arg (line ${line})`);
       const v = String(nargs[0]);
-      if (v !== 'left' && v !== 'center' && v !== 'right') {
-        throw new Error(`canvas: textAlign must be left|center|right (line ${line})`);
+      if (!CANVAS_TEXT_ALIGNS.has(v)) {
+        throw new Error(`canvas: textAlign must be left|center|right|start|end (line ${line})`);
       }
       state.textAlign = v;
       return;
@@ -304,7 +332,7 @@ function createCanvasMockCtx() {
     fillStyle: '#000000',
     strokeStyle: '#000000',
     lineWidth: 1,
-    font: '14px monospace',
+    font: '14px Consolas, "Courier New", monospace',
     textAlign: 'left',
     textBaseline: 'alphabetic',
     fillRect(x, y, w, h) { calls.push({ op: 'fillRect', x, y, w, h, fillStyle: this.fillStyle }); },
@@ -330,5 +358,7 @@ if (typeof module !== 'undefined' && module.exports) {
     executeCanvasRenderer,
     createCanvasMockCtx,
     canvasRunBuiltin,
+    canvasResolveFontFamily,
+    CANVAS_FONT_FAMILIES,
   };
 }
