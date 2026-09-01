@@ -15,7 +15,7 @@ todos:
     content: "Faza 3: renderer block + wire args + set/draw/busy/clear — D29–D40 done"
     status: pending
   - id: canvas-f4
-    content: "Faza 4: doc EN + teste + integrare logic/observe/osc — D43–D48 draft"
+    content: "Faza 4: doc EN + teste + integrare logic/observe — D43–D48 done"
     status: pending
 isProject: false
 ---
@@ -139,7 +139,7 @@ D28 A ✅
 | **Faza 1** Scaffold parse + device + attrs | **D1–D12** ✅ | **(ready-to-implement)** |
 | **Faza 2** Limbaj draw + builtins | **D13–D28** ✅ | **(ready-to-implement)** |
 | **Faza 3** Renderer + wires + set/draw/busy | **D29–D42** draft | — |
-| **Faza 4** Doc + teste + integrare | **D43–D48** draft | — |
+| **Faza 4** Doc + teste + integrare | **D43–D48** done | — |
 | *(amânate)* | — | **1+a …** |
 
 ---
@@ -1129,10 +1129,9 @@ rAF → busy=1 → [clear?] → run renderer calls → busy=0 → dirty=0
 
 ---
 
-## Faza 4 — Documentație, teste end-to-end, integrare logic/observe/osc **(draft)**
+## Faza 4 — Documentație, teste end-to-end, integrare logic/observe **(done)**
 
-> **Status:** draft — **D43–D48**.  
-> **Depinde:** F3; observe opțional (soft dep pe logic F108).
+> **Status:** done — **D43–D48**.
 
 ### Scop
 
@@ -1198,13 +1197,14 @@ comp [canvas] .gameCanvas:
 
 ### Criterii done F4
 
-- [ ] Doc EN verificată
-- [ ] Suite verde quiet
-- [ ] Exemplu static + un exemplu dinamic (wire sau observe)
+- [x] Doc EN verificată (`inline-canvas`, `comp-canvas`, `canvas-builtins`, `components.md`, `doc-index.json`)
+- [x] Suite verde quiet (4700–4741)
+- [x] Exemplu static + dinamic (`logts-play`: wire `/s16`, `observe` → canvas)
+- [x] `doc_verify` comp-canvas + inline-canvas
 
 ### Status F4
 
-**draft**.
+**done** — D43 B (split docs), D44 B (observe e2e doc, fără osc anim), D45 A (soft dep observe), D46 A (mock ctx), D47 A (wave+legacy), D48 A (doc `logts-play`).
 
 ---
 

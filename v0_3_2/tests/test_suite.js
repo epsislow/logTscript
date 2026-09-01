@@ -52022,5 +52022,66 @@ comp [canvas] .myCanvas:
 
   regCanvasDual(4738, 4739, 'busy >= mustWait redirect', runCanvasBusyPoutRedirect);
 
+  const CANVAS_OBSERVE_E2E = `inline [logic] .game:
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe spotX$ is number xPin
+    }
+
+:
+
+inline [canvas] .dots:
+
+    mark(x, y) {
+        styleFill("00ffaa")
+        drawCircle(x, y, 10)
+    }
+
+:
+
+comp [canvas] .screen:
+    on: 1
+    width: 200
+    height: 120
+    bgColor: ^001122
+    .dots { }
+
+:
+
+1wire go = 1
+16wire spotX = 0000000000000000
+
+.gameLogic:{
+    logic { + spotX$(80) }
+    xPin >= spotX
+    set = go
+}
+
+.screen:{
+    renderer { mark(xPos/s16, 60) }
+    xPos = spotX
+    set = go
+}`;
+
+  function runCanvasObserveE2E(h, session) {
+    const { interp } = session.run(CANVAS_OBSERVE_E2E);
+    h.assert('spotX from observe', session.getWire(interp, 'spotX'), '0000000001010000');
+    const screen = interp.components.get('.screen');
+    h.assert('screen exists', !!screen, true);
+    const canvasHandler = session._ensureRegistry().get('canvas');
+    canvasHandler.constructor.flushCanvas(screen, interp);
+    const mock = createCanvasMockCtx();
+    screen._canvasRendererCalls = parseCanvasRendererBlock('mark(xPos/s16, 60)');
+    canvasHandler._runDraw(screen, mock.ctx, interp, { clear: true });
+    const arc = mock.calls.find((c) => c.op === 'arc');
+    h.assert('circle at x=80', arc && arc.cx, 80);
+  }
+
+  regCanvasDual(4740, 4741, 'observe spotX e2e canvas renderer', runCanvasObserveE2E);
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -58,5 +58,54 @@ comp [canvas] .cv:
         return busy === '0';
       },
     },
+    {
+      name: 'observe spotX drives canvas xPos',
+      src: `inline [logic] .game:
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe spotX$ is number xPin
+    }
+
+:
+
+inline [canvas] .dots:
+
+    mark(x, y) {
+        styleFill("00ffaa")
+        drawCircle(x, y, 10)
+    }
+
+:
+
+comp [canvas] .screen:
+    on: 1
+    width: 200
+    height: 120
+    bgColor: ^001122
+    .dots { }
+
+:
+
+1wire go = 1
+16wire spotX = 0000000000000000
+
+.gameLogic:{
+    logic { + spotX$(80) }
+    xPin >= spotX
+    set = go
+}
+
+.screen:{
+    renderer { mark(xPos/s16, 60) }
+    xPos = spotX
+    set = go
+}`,
+      wires: { spotX: '0000000001010000' },
+      check: (interp) => !!interp.components.get('.screen'),
+    },
   ],
 };

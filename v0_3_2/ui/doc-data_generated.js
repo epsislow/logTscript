@@ -11876,6 +11876,67 @@ Redraws are coalesced per animation frame (\`requestAnimationFrame\`). If a draw
 
 ---
 
+## Logic \`observe\` → canvas (e2e)
+
+Wire a **logic observe pin** into canvas renderer args. When a fact is asserted, the observe pin updates a shared wire; the canvas redraws at the new position.
+
+Requires [\`comp [logic]\`](comp-logic.md) with an **\`observe\`** line in the program block — see [logic-observers.md](logic-observers.md).
+
+\`\`\`logts-play
+inline [logic] .game:
+
+:
+
+comp [logic] .gameLogic:
+    on: 1
+    .game {
+        observe spotX$ is number xPin
+    }
+
+:
+
+inline [canvas] .dots:
+
+    mark(x, y) {
+        styleFill("00ffaa")
+        drawCircle(x, y, 10)
+    }
+
+:
+
+comp [canvas] .screen:
+    on: 1
+    width: 200
+    height: 120
+    bgColor: ^001122
+    .dots { }
+
+:
+
+1wire go = 1
+16wire spotX = 0000000000000000
+
+.gameLogic:{
+    logic { + spotX$(80) }
+    xPin >= spotX
+    set = go
+}
+
+.screen:{
+    renderer { mark(xPos/s16, 60) }
+    xPos = spotX
+    set = go
+}
+\`\`\`
+
+Click **Load & Run** — a green circle appears at **x = 80** on the canvas in Devices.
+
+Pipeline: **\`logic { + spotX$(80) }\`** mutation → **\`xPin\`** observe pin → **\`spotX\`** wire → **\`xPos/s16\`** in **\`renderer { }\`** → canvas draw.
+
+Use **\`16wire spotX = 0000000000000000\`** (full width), not **\`= 0\`**, so strict wire rules accept the initializer.
+
+---
+
 ## \`draw\` pin — second redraw
 
 \`\`\`logts-play
@@ -11922,6 +11983,7 @@ comp [canvas] .dotPanel:
 |------|---------|
 | [inline-canvas.md](inline-canvas.md) | Method definitions |
 | [canvas-builtins.md](canvas-builtins.md) | Draw API reference |
+| [logic-observers.md](logic-observers.md) | \`observe\` pins → wires (e2e with canvas) |
 | [clcd.md](clcd.md) | Symbol-based display (different from free drawing) |
 `,
     'comp-logic.md': `# Component logic — \`comp [logic]\`
@@ -13738,6 +13800,7 @@ Overview (panel callbacks, common patterns): [interactive-components.md](interac
 | \`14seg\` | \`14\` | [14seg.md](14seg.md) |
 | \`lcd\` | — | [lcd.md](lcd.md) |
 | \`clcd\` | — | [clcd.md](clcd.md) |
+| \`canvas\` | — | [comp-canvas.md](comp-canvas.md) — free 2D draw; see [inline-canvas.md](inline-canvas.md) |
 | \`alu\` | — | [alu.md](alu.md) |
 | \`terminal\` | — | [terminal.md](terminal.md) |
 | \`dots\` (clock colon) | \`:\` | [dots.md](dots.md) |

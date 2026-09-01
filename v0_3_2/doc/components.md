@@ -51,6 +51,7 @@ Overview (panel callbacks, common patterns): [interactive-components.md](interac
 | `14seg` | `14` | [14seg.md](14seg.md) |
 | `lcd` | — | [lcd.md](lcd.md) |
 | `clcd` | — | [clcd.md](clcd.md) |
+| `canvas` | — | [comp-canvas.md](comp-canvas.md) — free 2D draw; see [inline-canvas.md](inline-canvas.md) |
 | `alu` | — | [alu.md](alu.md) |
 | `terminal` | — | [terminal.md](terminal.md) |
 | `dots` (clock colon) | `:` | [dots.md](dots.md) |
