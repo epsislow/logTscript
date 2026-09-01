@@ -44,6 +44,97 @@ function canvasToCssColor(c) {
   return `#${s}`;
 }
 
+function canvasIsCmpOp(op) {
+  return op === '==' || op === '!=' || op === '<' || op === '>' || op === '<=' || op === '>=';
+}
+
+function canvasTruthy(v) {
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'number') return v !== 0 && !Number.isNaN(v);
+  if (typeof v === 'string') return v.length > 0;
+  return !!v;
+}
+
+function canvasCompare(op, left, right) {
+  if (op === '==' || op === '!=') {
+    const eq = String(left) === String(right);
+    return op === '==' ? eq : !eq;
+  }
+  const ln = Number(left);
+  const rn = Number(right);
+  switch (op) {
+    case '<': return ln < rn;
+    case '>': return ln > rn;
+    case '<=': return ln <= rn;
+    case '>=': return ln >= rn;
+    default: throw new Error(`canvas: unknown compare operator '${op}'`);
+  }
+}
+
+function canvasEvalCond(expr, env, callMethodFn, line, pinEnv) {
+  if (!expr) return false;
+  switch (expr.kind) {
+    case 'truthy':
+      return canvasTruthy(canvasEvalExpr(expr.expr, env, callMethodFn, line, pinEnv));
+    case 'unary':
+      if (expr.op === '!') {
+        return !canvasEvalCond(expr.expr, env, callMethodFn, line, pinEnv);
+      }
+      throw new Error(`canvas: invalid unary '${expr.op}' in condition${line != null ? ` (line ${line})` : ''}`);
+    case 'binop': {
+      if (expr.op === '||') {
+        if (canvasEvalCond(expr.left, env, callMethodFn, line, pinEnv)) return true;
+        return canvasEvalCond(expr.right, env, callMethodFn, line, pinEnv);
+      }
+      if (expr.op === '&&') {
+        if (!canvasEvalCond(expr.left, env, callMethodFn, line, pinEnv)) return false;
+        return canvasEvalCond(expr.right, env, callMethodFn, line, pinEnv);
+      }
+      if (canvasIsCmpOp(expr.op)) {
+        const l = canvasEvalExpr(expr.left, env, callMethodFn, line, pinEnv);
+        const r = canvasEvalExpr(expr.right, env, callMethodFn, line, pinEnv);
+        return canvasCompare(expr.op, l, r);
+      }
+      throw new Error(`canvas: invalid operator '${expr.op}' in condition${line != null ? ` (line ${line})` : ''}`);
+    }
+    default:
+      return canvasTruthy(canvasEvalExpr(expr, env, callMethodFn, line, pinEnv));
+  }
+}
+
+function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, callMethodFn, evalArg) {
+  for (const stmt of stmts || []) {
+    try {
+      if (stmt.kind === 'assign') {
+        env[stmt.name] = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
+        locals.add(stmt.name);
+      } else if (stmt.kind === 'call') {
+        if (CANVAS_BUILTIN_SET.has(stmt.name)) {
+          canvasRunBuiltin(stmt.name, stmt.args, state, ctx, evalArg, stmt.line);
+        } else {
+          const vals = (stmt.args || []).map((a) => evalArg(a));
+          const m = program.methods[stmt.name];
+          if (!m) throw new Error(`canvas: unknown method '${stmt.name}' (line ${stmt.line})`);
+          canvasExecuteMethod(m, vals, program, state, ctx, options);
+        }
+      } else if (stmt.kind === 'if') {
+        const pinEnv = (options && options.pinEnv) || {};
+        if (canvasEvalCond(stmt.cond, env, callMethodFn, stmt.line, pinEnv)) {
+          canvasExecuteStmts(stmt.then, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+        } else if (stmt.else) {
+          canvasExecuteStmts(stmt.else, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+        }
+      }
+    } catch (err) {
+      if (options && options.logErrors) {
+        const msg = err && err.message ? err.message : String(err);
+        if (typeof console !== 'undefined' && console.warn) console.warn(msg);
+      }
+      if (!(options && options.skipOnError)) throw err;
+    }
+  }
+}
+
 function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
   if (!expr) return 0;
   switch (expr.kind) {
@@ -351,29 +442,7 @@ function canvasExecuteMethod(method, argValues, program, state, ctx, options) {
 
   const evalArg = (a) => canvasEvalExpr(a, env, callMethodFn, null);
 
-  for (const stmt of method.body) {
-    try {
-      if (stmt.kind === 'assign') {
-        env[stmt.name] = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
-        locals.add(stmt.name);
-      } else if (stmt.kind === 'call') {
-        if (CANVAS_BUILTIN_SET.has(stmt.name)) {
-          canvasRunBuiltin(stmt.name, stmt.args, state, ctx, evalArg, stmt.line);
-        } else {
-          const vals = (stmt.args || []).map((a) => evalArg(a));
-          const m = program.methods[stmt.name];
-          if (!m) throw new Error(`canvas: unknown method '${stmt.name}' (line ${stmt.line})`);
-          canvasExecuteMethod(m, vals, program, state, ctx, options);
-        }
-      }
-    } catch (err) {
-      if (options && options.logErrors) {
-        const msg = err && err.message ? err.message : String(err);
-        if (typeof console !== 'undefined' && console.warn) console.warn(msg);
-      }
-      if (!(options && options.skipOnError)) throw err;
-    }
-  }
+  canvasExecuteStmts(method.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
   return 0;
 }
 

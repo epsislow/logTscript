@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–5 done; Faza 6 = CLCD symbols drawSymbol (1+n); backlog 1+a…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–7 done; backlog 1+b…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -23,12 +23,15 @@ todos:
   - id: canvas-f6
     content: "Faza 6: drawSymbol + symbolSize/symbolStyle — D53–D61 ✅ done"
     status: completed
+  - id: canvas-f7
+    content: "Faza 7: if/else în body canvas — D62–D68 ✅ done"
+    status: completed
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–6**; amânări **1+a, 1+b, …** (fără **1+k**, **1+n** — promovate **F5**, **F6**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–7**; amânări **1+b, …** (fără **1+k**, **1+n**, **1+a** — promovate **F5**, **F6**, **F7**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -148,7 +151,8 @@ D28 A ✅
 | **Faza 4** Doc + teste + integrare observe | **D43–D48** | **done** |
 | **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** | **done** |
 | **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
-| *(amânate)* | **1+a …** (fără 1+k, 1+n) | — |
+| **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
+| *(amânate)* | **1+b …** (fără 1+a, 1+k, 1+n) | — |
 
 ---
 
@@ -158,7 +162,7 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 
 | Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
 | ----- | -- | ------- | ------- | ---------- | -------- |
-| ⏳ | **1+a** | `if` / conditional draw | Branch în body metodă canvas | — | user: „nu avem if acum” |
+| ✅ | **1+a** | `if` / conditional draw | `if` / `else` în body metodă; comparații în condiție | **Faza 7** | D62–D68, D26 |
 | ⏳ | **1+b** | Loops `for` / `while` | Iterație desen (ex. N tiles) | — | user: fără loops |
 | ⏳ | **1+c** | Imagini / sprite sheet | `drawImage`, load asset | — | post-MVP |
 | ⏳ | **1+d** | Transform (rotate/scale/translate) | Stack `save`/`restore` JS | — | post-MVP |
@@ -175,13 +179,13 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1–F5** ✅; **F6** (`drawSymbol`) **next**; apoi **1+a** / **1+b** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F6** ✅; **F7** (`if`) **next**; apoi **1+b** la cerere; input **1+f** după observe+games.
 
 ---
 
-## Backlog **1+n** → **Faza 6** (promovat)
+## Backlog **1+a** → **Faza 7** (promovat)
 
-Vezi [Faza 6](#faza-6--clcd-symbols-drawsymbol-1n-promovat) — `drawSymbol(x,y,name[,bits])`, `symbolSize`, `symbolStyle`, shared draw CLCD.
+Vezi [Faza 7](#faza-7--if--else-în-body-1a-promovat) — `if (cond) { … }` / `else { … }` în metode canvas.
 
 ---
 
@@ -1440,6 +1444,116 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 
 ---
 
+## Faza 7 — `if` / `else` în body (**1+a** promovat)
+
+> **Status:** done — **D62–D68** ✅ (user 2026-09-01).
+
+### Scop
+
+Branch condițional în **body metodă** `inline [canvas]` (și apeluri din `renderer { }` via metode) — fără loops (**1+b** rămâne amânat).
+
+| În scope F7 | În afara scope |
+| ----------- | -------------- |
+| `if (cond) { stmts }` | `for` / `while` (**1+b**) |
+| `else { stmts }` opțional | `for` / `while` (**1+b**) |
+| `else if` / `else if` / `else` (JS) | keywords `and` / `or` / `not` (folosește `&&` `||` `!`) |
+| Comparații number + string `==` `!=` | `true` / `false` literali |
+| Truthiness `if (name)` / `if (!name)` | `if` în `renderer { }` direct (**D67**) |
+| `&&` `||` `!` + `()` | |
+
+### Sintaxă țintă
+
+```logts
+inline [canvas] .hud:
+
+    drawScore(score, hi) {
+        styleFill("ffffff")
+        fontSize(16)
+        drawText(10, 10, "Score")
+
+        if (score > hi) {
+            styleFill("ffff00")
+            drawText(10, 30, "NEW HI!")
+        } else {
+            styleFill("888888")
+            drawText(10, 30, "keep going")
+        }
+
+        if (score == 0) {
+            drawSymbol(50, 20, "ban", "1")
+        }
+    }
+
+:
+
+comp [canvas] .screen:
+    width: 200
+    height: 60
+    .hud { }
+:
+
+# renderer: drawScore(xPos/s16, hiWire/s16)
+```
+
+### Parser / AST (draft)
+
+| Construct | AST |
+| --------- | --- |
+| `if (expr) { body }` | `{ kind: 'if', cond, then, else: null }` |
+| `else if (expr) { … }` | lanț `else: { kind: 'if', … }` sau listă `elif` — implementare la alegere |
+| `else { body }` | `else: [stmts]` |
+| Block `{ }` | aceeași delimitare ca body metodă (**D6 B**) |
+
+**Tokenizer:** extindere pentru `==`, `!=`, `<=`, `>=`, `<`, `>` (azi doar `=` există).  
+**CANVAS_FORBIDDEN_IDS:** scoate `if`, `else`; păstrează `for`, `while`, `and`, `or`, `not`, `true`, `false`.
+
+### Expresii condiție — **D64–D66**
+
+| Nivel | Draft recommended |
+| ----- | ----------------- |
+| **Comparație** | `expr cmp expr` — `cmp` ∈ `==` `!=` `<` `>` `<=` `>=` |
+| **Operanzi** | number (literal, var, param, wire în expr dacă e în scope renderer — doar în metode apelate cu args); **nu** string compare în F7 |
+| **Truthiness** (**D65**) | **A** condiția trebuie comparație (nu `if (x)` bare) · **B** + numeric truthy `!= 0` |
+| **Bool ops** (**D66**) | **A** fără `and`/`or`/`not` în F7 — condiții simple · **B** `and`/`or`/`not` ca logic |
+
+### Execuție (engine)
+
+```text
+evalCond(expr) → boolean
+executeBlock(stmts) → void (existing assign/call/if)
+if (evalCond(cond)) executeBlock(then); else if (else) executeBlock(else);
+```
+
+- Locals / params: același env ca azi (**D14**).
+- Erori: condiție non-boolean la runtime → eroare clară (**D27** pattern: throw sau skip — recomandat **throw** la eval cond invalid).
+
+### Decizii **D62–D68** ✅
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D62** | `if` / `else` JS-style | **A ✅** |
+| **D63** | `else if` chain | **A ✅** |
+| **D64** | Comparații | **A ✅** number + string `==`/`!=` |
+| **D65** | Truthiness | **A ✅** + ascii `if (name)` / `if (!name)` |
+| **D66** | `&&` `||` `!` | **A ✅** în F7 |
+| **D67** | `if` doar în metode | **A ✅** |
+| **D68** | Teste **4760+** | **A ✅** |
+
+### Criterii done F7
+
+- [x] `if`/`else`/`else if` în mock ctx
+- [x] Comparații number + string equality
+- [x] Truthiness ascii + `!`
+- [x] `&&` `||`
+- [x] `for` încă forbidden (**4768**)
+- [x] Doc `inline-canvas.md` + suite **3851** verde
+
+### Status F7
+
+**done** — teste **4710** (parse), **4760–4768** (exec + for forbidden).
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -1487,6 +1601,13 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 | **D59** | 6 | validare size 8–64/120 | **A ✅** |
 | **D60** | 6 | `symbolOn` | **respins** |
 | **D61** | 6 | default symbolStyle | **A ✅** |
+| **D62** | 7 | `if`/`else` JS-style | **A ✅** |
+| **D63** | 7 | `else if` chain | **A ✅** |
+| **D64** | 7 | comparații | **A ✅** |
+| **D65** | 7 | truthiness ascii | **A ✅** |
+| **D66** | 7 | `&&` `||` `!` | **A ✅** |
+| **D67** | 7 | `if` doar în metode | **A ✅** |
+| **D68** | 7 | teste 4760+ | **A ✅** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -1525,7 +1646,7 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 | `renderer` în exec vs body | **D29** | Sketch sugerează exec |
 | Culori `"hex"` vs `^hex` | **D16** | User: fără `#`; string OK |
 | `busy` aproape instant pe JS | **D38** | Tot util pentru sync cu alte comps |
-| Fără `if`/loops | **1+a/1+b** | Scene = multe apeluri explicite în `renderer` |
+| Fără `if`/loops | **1+a → F7** / **1+b** | F7 = `if`; loops amânate |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
 
@@ -1537,7 +1658,7 @@ Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
-| 2026-09-01 | **F6 done** — `drawSymbol`/`symbolSize`/`symbolStyle`; `clcd-symbol-draw.js`; teste **4750–4759** |
+| 2026-09-01 | **F7 done** — `if`/`else if`/`else`; `&&` `||` `!`; truthiness ascii; teste **4760–4768** |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
 | 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |

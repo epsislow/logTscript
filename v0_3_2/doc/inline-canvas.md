@@ -75,9 +75,11 @@ inline [canvas] .gameRenderer:
 | **Variables** | Locals via `name = expr` |
 | **Arithmetic** | `+ - * /` and parentheses |
 | **Calls** | Draw builtins and other methods in the same inline |
+| **Control flow** | `if` / `else` / `else if` (JS-style); `&&` `||` `!` in conditions |
+| **Conditions** | Comparisons `==` `!=` `<` `>` `<=` `>=` on numbers; `==` / `!=` on strings (e.g. `/ascii` params); truthiness `if (name)` / `if (!name)` |
 | **Comments** | `#` to end of line |
 
-**Not supported:** `if`, `for`, `while`, comparisons (`==`, `<`), booleans.
+**Not supported:** `for`, `while`, `and`/`or`/`not` keywords (use `&&` `||` `!`).
 
 ### Example — arithmetic and locals
 
@@ -106,6 +108,50 @@ inline [canvas] .demo:
 | `0` or `"0"` | Transparent — skip fill or stroke for that draw call |
 
 Component attribute `bgColor` on `comp [canvas]` uses the usual `^rrggbb` form (see [comp-canvas.md](comp-canvas.md)).
+
+---
+
+## Conditional draw (`if` / `else`)
+
+Only inside **method bodies** (not directly in `renderer { }`).
+
+```logts
+drawHud(score, hi, playerName) {
+    styleFill("ffffff")
+    fontSize(14)
+    drawText(10, 10, "Score")
+
+    if (score > hi) {
+        styleFill("ffff00")
+        drawText(10, 28, "NEW HI!")
+    } else if (score == 0) {
+        styleFill("888888")
+        drawText(10, 28, "—")
+    } else {
+        styleFill("aaaaaa")
+        drawText(10, 28, "keep going")
+    }
+
+    if (playerName) {
+        drawText(10, 46, playerName)
+    }
+    if (!playerName) {
+        styleFill("ff0000")
+        drawRect(0, 0, 8, 8)
+    }
+
+    if (score > 0 && playerName == "Ada") {
+        symbolSize(22)
+        drawSymbol(120, 10, "check")
+    }
+}
+```
+
+| Condition | Rules |
+|-----------|--------|
+| **Numbers** | `==` `!=` `<` `>` `<=` `>=`; truthy when `!= 0` |
+| **Strings** (e.g. `/ascii` wire args) | `==` / `!=`; truthy when non-empty; `!name` when empty |
+| **Logic** | `&&` `||` `!` and parentheses — same precedence as JS |
 
 ---
 

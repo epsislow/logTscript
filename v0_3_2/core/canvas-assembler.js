@@ -1,9 +1,14 @@
 /* ================= CANVAS ASSEMBLER (inline [canvas]) ================= */
 
 const CANVAS_FORBIDDEN_IDS = new Set([
-  'if', 'else', 'for', 'while', 'do', 'return', 'true', 'false',
+  'for', 'while', 'do', 'return', 'true', 'false',
   'and', 'or', 'not', 'break', 'continue',
 ]);
+
+const CANVAS_KEYWORDS = new Set(['if', 'else']);
+
+const CANVAS_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
+const CANVAS_LOGIC_OPS = new Set(['&&', '||']);
 
 const CANVAS_BUILTINS = new Set([
   'styleFill', 'styleStroke', 'style',
@@ -99,6 +104,19 @@ function canvasTokenize(src) {
       });
       continue;
     }
+    if (i + 1 < src.length) {
+      const pair = ch + src[i + 1];
+      if (pair === '==' || pair === '!=' || pair === '<=' || pair === '>=' || pair === '&&' || pair === '||') {
+        tokens.push({ type: 'SYM', value: pair, line });
+        i += 2;
+        continue;
+      }
+    }
+    if (ch === '<' || ch === '>' || ch === '!') {
+      tokens.push({ type: 'SYM', value: ch, line });
+      i++;
+      continue;
+    }
     if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
@@ -117,6 +135,10 @@ function canvasTokenize(src) {
         i++;
       }
       const lower = id.toLowerCase();
+      if (CANVAS_KEYWORDS.has(lower)) {
+        tokens.push({ type: 'KW', value: lower, line: startLine });
+        continue;
+      }
       if (CANVAS_FORBIDDEN_IDS.has(lower)) {
         canvasError(`'${id}' is not allowed in canvas body`, startLine);
       }
@@ -196,6 +218,9 @@ class CanvasParser {
 
   parseStmt() {
     const t = this.peek();
+    if (t.type === 'KW' && t.value === 'if') {
+      return this.parseIfStmt();
+    }
     if (t.type === 'ID') {
       const next = this.tokens[this.pos + 1];
       if (next && next.type === 'SYM' && next.value === '(') {
@@ -206,6 +231,74 @@ class CanvasParser {
       }
     }
     canvasError(`expected statement, got ${t.type} '${t.value}'`, t.line);
+  }
+
+  parseBlock() {
+    this.eat('SYM', '{');
+    const body = [];
+    while (!this.match('SYM', '}')) {
+      if (this.match('EOF')) {
+        canvasError('unclosed block', this.peek().line);
+      }
+      body.push(this.parseStmt());
+    }
+    return body;
+  }
+
+  parseIfStmt() {
+    const lineTok = this.eat('KW', 'if');
+    this.eat('SYM', '(');
+    const cond = this.parseCond();
+    this.eat('SYM', ')');
+    const thenBody = this.parseBlock();
+    let elseBody = null;
+    if (this.match('KW', 'else')) {
+      if (this.peek().type === 'KW' && this.peek().value === 'if') {
+        elseBody = [this.parseIfStmt()];
+      } else {
+        elseBody = this.parseBlock();
+      }
+    }
+    return { kind: 'if', cond, then: thenBody, else: elseBody, line: lineTok.line };
+  }
+
+  parseCond() {
+    return this.parseOr();
+  }
+
+  parseOr() {
+    let left = this.parseAnd();
+    while (this.match('SYM', '||')) {
+      left = { kind: 'binop', op: '||', left, right: this.parseAnd() };
+    }
+    return left;
+  }
+
+  parseAnd() {
+    let left = this.parseNot();
+    while (this.match('SYM', '&&')) {
+      left = { kind: 'binop', op: '&&', left, right: this.parseNot() };
+    }
+    return left;
+  }
+
+  parseNot() {
+    if (this.match('SYM', '!')) {
+      return { kind: 'unary', op: '!', expr: this.parseNot() };
+    }
+    return this.parseCompare();
+  }
+
+  parseCompare() {
+    const left = this.parseAdd();
+    const t = this.peek();
+    if (t.type === 'SYM' && CANVAS_CMP_OPS.has(t.value)) {
+      this.pos++;
+      const op = t.value;
+      const right = this.parseAdd();
+      return { kind: 'binop', op, left, right };
+    }
+    return { kind: 'truthy', expr: left };
   }
 
   parseAssign() {

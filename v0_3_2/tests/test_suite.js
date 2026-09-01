@@ -51734,17 +51734,18 @@ comp [canvas] .myCanvas:
     h.assert('label parsed', s2[1].comp.attributes.label, 'myLabel');
   });
 
-  reg(4710, 'canvas', 'parse error if forbidden', function(h, session) {
-    const src = `inline [canvas] .bad:
-    draw() {
-        if (1) {
+  reg(4710, 'canvas', 'parse if/else in method body', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        if (1 > 0) {
             drawRect(0, 0, 10, 10)
+        } else {
+            drawRect(20, 20, 5, 5)
         }
-    }
-:`;
-    h.assertThrows('if forbidden', function() {
-      session.run(src);
-    });
+    }`);
+    const draw = prog.methods.draw;
+    h.assert('if stmt', draw.body[0].kind, 'if');
+    h.assert('then block', draw.body[0].then.length, 1);
+    h.assert('else block', draw.body[0].else.length, 1);
   });
 
   reg(4711, 'canvas', 'engine drawRect mock ctx', function(h, session) {
@@ -52232,6 +52233,100 @@ comp [canvas] .screen:
   }
 
   regCanvasDual(4758, 4759, 'drawSymbol validation errors', runCanvasDrawSymbolErrors);
+
+  function runCanvasIfElseCompare(h) {
+    const prog = parseCanvasBody(`draw(score, hi) {
+        styleFill("888888")
+        drawText(10, 10, "base")
+        if (score > hi) {
+            styleFill("ffff00")
+            drawText(10, 30, "HI")
+        } else {
+            styleFill("444444")
+            drawText(10, 30, "lo")
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(100, 50)'), mock.ctx, { skipOnError: false });
+    const texts = mock.calls.filter((c) => c.op === 'fillText');
+    h.assert('two texts', texts.length, 2);
+    h.assert('hi color', texts[1].fillStyle, '#ffff00');
+  }
+
+  regCanvasDual(4760, 4761, 'if else numeric compare', runCanvasIfElseCompare);
+
+  function runCanvasIfElseIf(h) {
+    const prog = parseCanvasBody(`draw(n) {
+        if (n == 0) {
+            styleFill("ff0000")
+        } else if (n == 1) {
+            styleFill("00ff00")
+        } else {
+            styleFill("0000ff")
+        }
+        drawRect(0, 0, 10, 10)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(1)'), mock.ctx, { skipOnError: false });
+    const rect = mock.calls.find((c) => c.op === 'fillRect');
+    h.assert('green', rect && rect.fillStyle, '#00ff00');
+  }
+
+  regCanvasDual(4762, 4763, 'if else if chain', runCanvasIfElseIf);
+
+  function runCanvasIfTruthyAscii(h) {
+    const prog = parseCanvasBody(`draw(name) {
+        if (name) {
+            styleFill("ffffff")
+            drawText(5, 5, name)
+        }
+        if (!name) {
+            styleFill("ff0000")
+            drawRect(0, 0, 20, 20)
+        }
+    }`);
+    const mockOn = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw("Ada")'), mockOn.ctx, { skipOnError: false });
+    h.assert('name text', mockOn.calls.some((c) => c.op === 'fillText' && c.text === 'Ada'), true);
+    h.assert('no red rect', mockOn.calls.some((c) => c.op === 'fillRect'), false);
+    const mockOff = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw("")'), mockOff.ctx, { skipOnError: false });
+    h.assert('empty red rect', mockOff.calls.some((c) => c.op === 'fillRect'), true);
+  }
+
+  regCanvasDual(4764, 4765, 'if truthiness ascii and not', runCanvasIfTruthyAscii);
+
+  function runCanvasIfLogicOps(h) {
+    const prog = parseCanvasBody(`draw(a, b) {
+        if (a > 0 && b == "ok") {
+            styleFill("00ff00")
+            drawRect(0, 0, 30, 30)
+        }
+        if (a == 0 || b == "x") {
+            styleFill("ff0000")
+            drawRect(40, 0, 10, 10)
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(5, "ok")'), mock.ctx, { skipOnError: false });
+    h.assert('and branch', mock.calls.some((c) => c.op === 'fillRect' && c.w === 30), true);
+    h.assert('no or branch', mock.calls.some((c) => c.op === 'fillRect' && c.w === 10), false);
+  }
+
+  regCanvasDual(4766, 4767, 'if && || with parens expr', runCanvasIfLogicOps);
+
+  reg(4768, 'canvas', 'parse error for still forbidden', function(h, session) {
+    const src = `inline [canvas] .bad:
+    draw() {
+        for (i = 0; i < 3; i = i + 1) {
+            drawRect(0, 0, 1, 1)
+        }
+    }
+:`;
+    h.assertThrows('for forbidden', function() {
+      session.run(src);
+    });
+  });
 
   window.LogTScriptTestSuite.finalize();
 })();
