@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -10184,6 +10184,234 @@ doc(.l1)
 
 See [future-component-ideas.md](future-component-ideas.md) for roadmap items.
 `,
+    'canvas-builtins.md': `# Canvas draw built-ins
+
+Built-in calls available inside \`inline [canvas]\` method bodies and in \`comp [canvas]\` \`renderer { }\` blocks.
+
+Definitions → [inline-canvas.md](inline-canvas.md). Runtime wiring → [comp-canvas.md](comp-canvas.md).
+
+In the **documentation viewer**, use **Load** and **Load & Run** on \`logts-play\` examples.
+
+---
+
+## Quick reference
+
+| Builtin | Purpose |
+|---------|---------|
+| \`styleFill(c)\` | Set fill color only |
+| \`styleStroke(c)\` / \`styleStroke(c, w)\` | Set stroke color and optional width (px) |
+| \`style(stroke, fill)\` / \`style(stroke, fill, w)\` | Set stroke then fill (+ optional width) |
+| \`drawRect(x, y, w, h)\` | Filled + stroked rectangle (current style) |
+| \`drawRect(x, y, w, h, fill)\` | Rectangle with fill override |
+| \`drawRect(x, y, w, h, fill, stroke)\` | Rectangle with fill and stroke overrides |
+| \`drawCircle(cx, cy, r)\` | Filled + stroked circle |
+| \`drawCircle(cx, cy, r, fill)\` / \`(…, fill, stroke)\` | Circle with overrides |
+| \`drawLine(x1, y1, x2, y2)\` | Line using current stroke |
+| \`drawText(x, y, text)\` | Filled text (current fill + font) |
+| \`fontSize(n)\` | Font size in pixels (default **14**) |
+| \`textAlign("left"\\|"center"\\|"right")\` | Default \`left\` |
+| \`textBaseline("top"\\|"middle"\\|"alphabetic"\\|"bottom")\` | Default \`alphabetic\` |
+
+Font family is fixed **monospace** in the current release.
+
+---
+
+## Colors
+
+| Form | Meaning |
+|------|---------|
+| \`"rrggbb"\` | Opaque (6 hex digits, **no** \`#\`) |
+| \`"rrggbbaa"\` | With alpha (8 hex digits) |
+| \`0\` or \`"0"\` | Skip that fill or stroke pass |
+
+\`#\` starts a **comment**, not a color literal.
+
+---
+
+## Style builtins
+
+### \`styleFill(fillColor)\`
+
+Sets fill only; stroke and stroke width unchanged.
+
+\`\`\`logts
+styleFill("aaffaa")
+drawRect(10, 10, 40, 30)
+\`\`\`
+
+### \`styleStroke(strokeColor)\` / \`styleStroke(strokeColor, strokeWidth)\`
+
+\`\`\`logts
+styleStroke("ff0000")
+drawLine(0, 0, 100, 100)
+
+styleStroke("000000", 3)
+drawRect(5, 5, 50, 40)
+\`\`\`
+
+### \`style(strokeColor, fillColor)\` / \`style(strokeColor, fillColor, strokeWidth)\`
+
+Order: **stroke first**, then fill.
+
+\`\`\`logts
+style("000000", "aaffaa", 2)
+drawRect(20, 20, 60, 40)
+\`\`\`
+
+### Transparent stroke or fill
+
+\`\`\`logts
+styleFill(0)
+styleStroke("ff0000", 2)
+drawRect(10, 10, 50, 50)    # outline only
+
+style("000000", "00ff00")
+drawRect(70, 10, 50, 50, 0, "ff0000")   # fill skip via override
+\`\`\`
+
+---
+
+## \`drawRect\`
+
+\`\`\`logts
+drawRect(x, y, width, height)
+drawRect(x, y, width, height, fillColor)
+drawRect(x, y, width, height, fillColor, strokeColor)
+\`\`\`
+
+Uses current style when override args omitted. \`0\` / \`"0"\` skips that pass.
+
+---
+
+## \`drawCircle\`
+
+\`\`\`logts
+drawCircle(cx, cy, radius)
+drawCircle(cx, cy, radius, fillColor)
+drawCircle(cx, cy, radius, fillColor, strokeColor)
+\`\`\`
+
+---
+
+## \`drawLine\`
+
+Uses **stroke** color and width only (no fill).
+
+\`\`\`logts
+styleStroke("ffffff", 1)
+drawLine(0, 0, 100, 100)
+\`\`\`
+
+---
+
+## Text — \`drawText\`, \`fontSize\`, \`textAlign\`, \`textBaseline\`
+
+\`drawText\` uses **fill only** (not outlined text).
+
+\`\`\`logts
+styleFill("ffffff")
+fontSize(24)
+textAlign("center")
+textBaseline("middle")
+drawText(100, 50, "SCORE")
+\`\`\`
+
+| Builtin | Values |
+|---------|--------|
+| \`textAlign\` | \`"left"\`, \`"center"\`, \`"right"\` |
+| \`textBaseline\` | \`"top"\`, \`"middle"\`, \`"alphabetic"\`, \`"bottom"\` |
+| \`fontSize\` | Positive number — pixels |
+
+---
+
+## Runnable showcase
+
+\`\`\`logts-play
+inline [canvas] .showcase:
+
+    demo() {
+        style(0, "223344")
+        drawRect(0, 0, 200, 120)
+
+        style("ffffff", "ff6600", 2)
+        drawCircle(50, 60, 25)
+
+        styleStroke("00ffaa", 3)
+        drawLine(90, 20, 180, 100)
+
+        styleFill("ffffff")
+        fontSize(16)
+        textAlign("center")
+        textBaseline("bottom")
+        drawText(100, 115, "builtins")
+    }
+
+:
+
+comp [canvas] .showCanvas:
+    on: 1
+    width: 200
+    height: 120
+    bgColor: ^000000
+    .showcase { }
+:
+
+1wire run = 1
+.showCanvas:{
+    renderer { demo() }
+    set = run
+}
+\`\`\`
+
+---
+
+## Composition — methods calling methods
+
+\`\`\`logts-play
+inline [canvas] .primitives:
+
+    tile(x, y, color) {
+        style(0, color)
+        drawRect(x, y, 16, 16)
+    }
+
+    grid() {
+        tile(10, 10, "ff0000")
+        tile(30, 10, "00ff00")
+        tile(50, 10, "0000ff")
+    }
+
+:
+
+comp [canvas] .tiles:
+    on: 1
+    width: 80
+    height: 40
+    .primitives { }
+:
+
+1wire go = 1
+.tiles:{
+    renderer { grid() }
+    set = go
+}
+\`\`\`
+
+---
+
+## Runtime errors
+
+Invalid colors, unknown methods, or bad argument counts are **logged and the failing operation is skipped** — execution continues with the next statement.
+
+---
+
+## Related pages
+
+| Page | Content |
+|------|---------|
+| [inline-canvas.md](inline-canvas.md) | Method syntax and language |
+| [comp-canvas.md](comp-canvas.md) | Device and \`renderer\` block |
+`,
     'chip-board-execution.md': `# Chip and board execution
 
 Chip and board instances share the same **two-phase** execution model: **elaboration** when the instance is first created, then **propagation** each time the \`exec\` pin fires. Syntax, property blocks, probes, and pout reads are unchanged — only the internal scheduling is optimized so the body structure is built once and signals flow through a captured wire graph on each exec.
@@ -11390,6 +11618,239 @@ peek(touchOut)
 - [lcd.md](lcd.md) — pixel matrix display
 - [seven-seg.md](seven-seg.md) — 7-segment component
 - [components.md](components.md)
+`,
+    'comp-canvas.md': `# Component canvas — \`comp [canvas]\`
+
+\`comp [canvas]\` is the **runtime layer** for 2D drawing: an HTML \`<canvas>\` in the Devices panel, linked to an \`inline [canvas]\` definition.
+
+Method definitions → [inline-canvas.md](inline-canvas.md). Builtins → [canvas-builtins.md](canvas-builtins.md).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (use \`on: 1\` so the first run executes when \`set = 1\`).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Renderer ref** | \`.inlineName { }\` in comp header (required) |
+| **Exec block** | \`.comp:{ renderer { calls } set = trigger }\` |
+| **Trigger** | \`set\` or \`draw\` pin — respects \`on:\` (\`raise\` / \`edge\` / \`1\`) |
+| **Output** | \`busy\` pout — \`1\` while drawing |
+| **Attrs** | \`width\`, \`height\` required; \`bgColor\` optional (default \`^000000\`) |
+| **Doc** | \`doc(comp.canvas)\`, \`doc(.myCanvas)\` |
+
+---
+
+## Pipeline
+
+\`\`\`mermaid
+sequenceDiagram
+  participant I as inline [canvas]
+  participant C as comp [canvas]
+  participant R as renderer block
+  participant W as canvas widget
+
+  I->>C: .renderer { } link at elaboration
+  R->>C: renderer { drawScene() }
+  C->>W: clear bg + run methods
+  W->>C: busy 0
+\`\`\`
+
+| Step | Where | What happens |
+|------|-------|--------------|
+| 1 | **Elaboration** | \`width\` / \`height\` / \`bgColor\` fixed; inline ref validated |
+| 2 | **Devices** | \`<canvas>\` created at declared size |
+| 3 | **Exec block** | \`renderer { }\` lists method calls; \`set\` or \`draw\` schedules redraw |
+| 4 | **Draw** | Canvas cleared to \`bgColor\`, then renderer calls execute |
+| 5 | **\`busy\`** | \`1\` during draw, \`0\` when finished |
+
+---
+
+## Declaration
+
+\`\`\`logts
+comp [canvas] .myCanvas:
+    on: 1
+
+    width: 320
+    height: 240
+    bgColor: ^000000
+
+    .gameRenderer { }
+
+:
+\`\`\`
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| **\`width\`** | **Yes** | Canvas width in pixels (parse-time only) |
+| **\`height\`** | **Yes** | Canvas height in pixels (parse-time only) |
+| **\`bgColor\`** | No | Background clear color — \`^rrggbb\` (default \`^000000\`) |
+| **\`on:\`** | Recommended | Property-block trigger mode (\`1\`, \`raise\`, \`edge\`, …) |
+| **\`.renderer { }\`** | **Yes** | Links \`inline [canvas]\` (body may be empty) |
+| **\`nl\`** | No | Line break after widget in Devices panel |
+
+**Note:** Component names must not clash with keywords (e.g. avoid \`.board\` — \`board\` is reserved).
+
+---
+
+## Exec block — \`renderer\`, \`set\`, \`draw\`, \`busy\`
+
+\`\`\`logts
+1wire trigger = 1
+1wire redraw = 0
+1wire busyWire = 0
+
+.myCanvas:{
+    renderer {
+        drawBg(0, 0, 320, 240, "112233")
+        drawPlayer(160, 120, "P1")
+    }
+    set = trigger
+    draw = redraw
+    busy >= busyWire
+}
+\`\`\`
+
+| Pin | Direction | Role |
+|-----|-----------|------|
+| **\`set\`** | in | State updated → schedule coalesced redraw |
+| **\`draw\`** | in | Explicit redraw request |
+| **\`busy\`** | out | \`1\` while renderer runs on the canvas context |
+
+The \`renderer { }\` block **invokes** methods from the linked inline — it does not define them.
+
+Arguments in \`renderer\` may be numeric or string **literals** (same rules as method bodies).
+
+---
+
+## Complete runnable example
+
+\`\`\`logts-play
+inline [canvas] .gameRenderer:
+
+    drawBg(x, y, w, h, color) {
+        style(0, color)
+        drawRect(x, y, w, h)
+    }
+
+    drawPlayer(cx, cy) {
+        style("000000", "0000ff", 2)
+        drawCircle(cx, cy, 14)
+        styleFill("ffffff")
+        fontSize(12)
+        textAlign("center")
+        textBaseline("middle")
+        drawText(cx, cy, "P1")
+    }
+
+    drawScene() {
+        drawBg(0, 0, 200, 150, "223344")
+        drawPlayer(100, 75)
+    }
+
+:
+
+comp [canvas] .myCanvas:
+    on: 1
+    width: 200
+    height: 150
+    bgColor: ^000000
+    .gameRenderer { }
+:
+
+1wire trigger = 1
+.myCanvas:{
+    renderer { drawScene() }
+    set = trigger
+}
+\`\`\`
+
+Click **Load & Run** — a 200×150 canvas appears in Devices with a blue circle and label.
+
+---
+
+## Smaller widget
+
+\`\`\`logts-play
+inline [canvas] .icon:
+
+    smile(cx, cy) {
+        style("000000", "ffcc00", 2)
+        drawCircle(cx, cy, 20)
+        styleFill("000000")
+        drawCircle(cx - 7, cy - 5, 2)
+        drawCircle(cx + 7, cy - 5, 2)
+        styleStroke("000000", 2)
+        drawLine(cx - 8, cy + 8, cx + 8, cy + 8)
+    }
+
+:
+
+comp [canvas] .face:
+    on: 1
+    width: 64
+    height: 64
+    .icon { }
+:
+
+1wire go = 1
+.face:{
+    renderer { smile(32, 32) }
+    set = go
+}
+\`\`\`
+
+---
+
+## \`draw\` pin — second redraw
+
+\`\`\`logts-play
+inline [canvas] .dots:
+
+    show(n) {
+        styleFill("00ffaa")
+        i = 0
+        drawCircle(20 + i * 30, 40, 6)
+    }
+
+:
+
+comp [canvas] .dotPanel:
+    on: 1
+    width: 120
+    height: 80
+    .dots { }
+:
+
+1wire pulse = 1
+.dotPanel:{
+    renderer { show(0) }
+    draw = pulse
+}
+\`\`\`
+
+---
+
+## Errors (elaboration)
+
+| Situation | Result |
+|-----------|--------|
+| Missing \`width\` or \`height\` | Parse / elaboration error |
+| No \`.renderer { }\` ref | Elaboration error |
+| Ref not \`inline [canvas]\` | Elaboration error |
+| \`if\` / \`for\` in method body | Parse error |
+
+---
+
+## Related pages
+
+| Page | Content |
+|------|---------|
+| [inline-canvas.md](inline-canvas.md) | Method definitions |
+| [canvas-builtins.md](canvas-builtins.md) | Draw API reference |
+| [clcd.md](clcd.md) | Symbol-based display (different from free drawing) |
 `,
     'comp-logic.md': `# Component logic — \`comp [logic]\`
 
@@ -20732,6 +21193,195 @@ See [protocol-assemble.md — static vs dynamic width](protocol-assemble.md#stat
 - [protocol-assemble.md](protocol-assemble.md) — \`def\`, \`length\`, \`lengthOf\`, \`withLength\`
 - [protocol-lut.md](protocol-lut.md) — \`expand\`, \`collapse\`
 - [assignment-operators.md](assignment-operators.md) — \`=\`, \`=:\`, \`:=\` for dynamic-width wires
+`,
+    'inline-canvas.md': `# Inline canvas — \`inline [canvas]\`
+
+\`inline [canvas]\` defines **reusable drawing methods** for HTML5 Canvas 2D. It is a **definition only** — like \`inline [logic]\` or \`inline [asm]\` — not executed until wired through [\`comp [canvas]\`](comp-canvas.md).
+
+Drawing builtins (\`drawRect\`, \`style\`, …) are documented in [canvas-builtins.md](canvas-builtins.md).
+
+In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run**.
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Role** | Definition layer — methods with bodies |
+| **Execution** | None at inline level; runtime via [comp-canvas.md](comp-canvas.md) \`renderer { }\` block |
+| **Method syntax** | \`name(args) { statements }\` — braces **required** |
+| **Body** | Assignments, method calls, draw builtins |
+| **Colors in body** | \`"rrggbb"\` / \`"rrggbbaa"\` strings, or \`0\` / \`"0"\` to skip a pass |
+| **\`#\`** | Line comment only — **not** a color prefix |
+| **Composition** | Methods may call other methods in the same inline |
+| **Doc** | \`doc(inline.canvas)\`, \`doc(.myRenderer)\` |
+
+---
+
+## Architecture
+
+\`\`\`text
+inline [canvas] .gameRenderer     comp [canvas] .myCanvas
+  drawBg(...) { ... }      -->    .gameRenderer { }
+  drawPlayer(...) { ... }         renderer { drawPlayer(...) }
+  (definition only)               (runtime — see comp-canvas.md)
+\`\`\`
+
+---
+
+## Declaration
+
+\`\`\`logts
+inline [canvas] .gameRenderer:
+
+    drawBg(x, y, w, h, color) {
+        style(0, color)
+        drawRect(x, y, w, h)
+    }
+
+    drawPlayer(cx, cy, label) {
+        style("000000", "0000ff", 2)
+        drawCircle(cx, cy, 12)
+        styleFill("ffffff")
+        fontSize(12)
+        textAlign("center")
+        textBaseline("middle")
+        drawText(cx, cy - 18, label)
+    }
+
+:
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| **Kind** | \`inline [canvas]\` |
+| **Name** | Dot reference (e.g. \`.gameRenderer\`) |
+| **End** | Closing \`:\` on its own line |
+| **Methods** | Name + parameter list + \`{\` body \`}\` |
+| **Parameters** | By-value; locals may shadow parameter names |
+
+---
+
+## Method body language
+
+| Feature | Supported |
+|---------|-----------|
+| **Literals** | Integers (\`1\`, \`34\`), floats (\`1.3\`), strings (\`"hello"\`) |
+| **Variables** | Locals via \`name = expr\` |
+| **Arithmetic** | \`+ - * /\` and parentheses |
+| **Calls** | Draw builtins and other methods in the same inline |
+| **Comments** | \`#\` to end of line |
+
+**Not supported:** \`if\`, \`for\`, \`while\`, comparisons (\`==\`, \`<\`), booleans.
+
+### Example — arithmetic and locals
+
+\`\`\`logts
+inline [canvas] .demo:
+
+  drawBox(x, y, w, h, color) {
+      pad = 2
+      innerW = w - pad * 2
+      innerH = h - pad * 2
+      style(0, color)
+      drawRect(x + pad, y + pad, innerW, innerH)
+  }
+
+:
+\`\`\`
+
+---
+
+## Colors in method bodies
+
+| Form | Meaning |
+|------|---------|
+| \`"rrggbb"\` | Opaque color (6 hex digits, no \`#\`) |
+| \`"rrggbbaa"\` | Color with alpha (8 hex digits) |
+| \`0\` or \`"0"\` | Transparent — skip fill or stroke for that draw call |
+
+Component attribute \`bgColor\` on \`comp [canvas]\` uses the usual \`^rrggbb\` form (see [comp-canvas.md](comp-canvas.md)).
+
+---
+
+## Minimal parse example
+
+\`\`\`logts-play
+inline [canvas] .shapes:
+
+    dot(x, y) {
+        styleFill("00ff00")
+        drawCircle(x, y, 4)
+    }
+
+:
+\`\`\`
+
+---
+
+## Scene with multiple methods
+
+\`\`\`logts-play
+inline [canvas] .scene:
+
+    frame(x, y, w, h) {
+        style("ffffff", 0, 1)
+        drawRect(x, y, w, h)
+    }
+
+    label(x, y, text) {
+        styleFill("aaffaa")
+        fontSize(14)
+        textAlign("left")
+        textBaseline("top")
+        drawText(x, y, text)
+    }
+
+    drawAll() {
+        frame(10, 10, 100, 60)
+        label(14, 14, "Canvas")
+    }
+
+:
+
+comp [canvas] .panel:
+    on: 1
+    width: 160
+    height: 100
+    bgColor: ^000000
+    .scene { }
+:
+
+1wire go = 1
+.panel:{
+    renderer { drawAll() }
+    set = go
+}
+\`\`\`
+
+Use **Load & Run** — the Devices panel shows a 160×100 canvas with a green label on black background.
+
+---
+
+## Allow policy
+
+Restrict with \`Allow\` / \`NotAllow\` like other inline kinds:
+
+\`\`\`logts
+Allow inline.type{canvas}
+Allow comp.type{canvas}
+\`\`\`
+
+---
+
+## Related pages
+
+| Page | Content |
+|------|---------|
+| [comp-canvas.md](comp-canvas.md) | Device, attrs, \`renderer\`, \`set\` / \`draw\` / \`busy\` |
+| [canvas-builtins.md](canvas-builtins.md) | \`drawRect\`, \`style\`, \`drawText\`, … |
+| [component-color-attributes.md](component-color-attributes.md) | \`^rrggbb\` on component attrs |
 `,
     'inline-logic.md': `# Inline logic — \`inline [logic]\`
 

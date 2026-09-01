@@ -2238,7 +2238,19 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic)`);
+    if (inline.kind === 'canvas') {
+      const parseCanvasFn = typeof parseCanvasBody === 'function' ? parseCanvasBody : null;
+      if (!parseCanvasFn) throw Error('Canvas assembler is not loaded');
+      const prog = parseCanvasFn(inline.bodyRaw, `inline ${inline.name}`);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        methods: prog.methods || {},
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -14585,6 +14597,10 @@ if (s.assignment) {
         comp._logicQueryOpts = null;
       }
     }
+
+    if (comp.type === 'canvas') {
+      comp._canvasRendererBlocks = properties.filter((p) => p.property === 'canvasRenderer');
+    }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
     // These blocks should only execute during initial RUN(), not when re-evaluating
@@ -14621,7 +14637,7 @@ if (s.assignment) {
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
-      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>' || property === 'logicMutation' || property === 'logicQueryNone' || property === 'logicQueryList'){
+      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>' || property === 'logicMutation' || property === 'logicQueryNone' || property === 'logicQueryList' || property === 'canvasRenderer'){
         continue;
       }
 

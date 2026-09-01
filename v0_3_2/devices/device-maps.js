@@ -14,6 +14,7 @@ function createDeviceMaps() {
     terminalDisplays: new Map(),
     lcdDisplays: new Map(),
     clcdDisplays: new Map(),
+    canvasDisplays: new Map(),
     alus: new Map(),
     memories: new Map(),
     caches: new Map(),

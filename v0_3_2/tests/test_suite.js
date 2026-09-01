@@ -51605,5 +51605,270 @@ comp [logic] .gameLogic:
   reg(4688, 'logic', 'F108 observe filter p2 no trigger (legacy)', runF108NonMatchFilter);
   reg(4689, 'logic', 'F108 observe filter p2 no trigger (wave)', runF108NonMatchFilter, { propagation: 'wave' });
 
+  // ================= CANVAS (inline [canvas] + comp [canvas]) =================
+
+  const INLINE_CANVAS_DEMO = `inline [canvas] .demo:
+
+    drawBox(x, y, w, h) {
+        pad = 2
+        style("000000", "aaffaa", 2)
+        drawRect(x + pad, y + pad, w - pad * 2, h - pad * 2)
+    }
+
+    drawScene() {
+        drawBox(10, 10, 80, 60)
+        styleFill("ffffff")
+        fontSize(14)
+        textAlign("center")
+        textBaseline("middle")
+        drawText(50, 40, "Hi")
+    }
+
+:`;
+
+  function regCanvasDual(legacyId, waveId, title, run) {
+    reg(legacyId, 'canvas', title + ' (legacy)', run);
+    reg(waveId, 'canvas', title + ' (wave)', run, { propagation: 'wave' });
+  }
+
+  reg(4700, 'canvas', 'parse inline [canvas] minimal', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_CANVAS_DEMO)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('one stmt', stmts.length, 1);
+    h.assert('kind canvas', stmts[0].inline.kind, 'canvas');
+    h.assert('name', stmts[0].inline.name, '.demo');
+  });
+
+  reg(4701, 'canvas', 'parse comp [canvas] attrs + renderer ref', function(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    width: 200
+    height: 120
+    bgColor: ^000000
+    .demo { }
+:`;
+    const p = new Parser(new Tokenizer(preprocessLoop(src)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('comp type', stmts[1].comp.type, 'canvas');
+    h.assert('width', String(stmts[1].comp.attributes.width), '200');
+    h.assert('height', String(stmts[1].comp.attributes.height), '120');
+    h.assert('renderer ref', stmts[1].comp.attributes.canvasPrograms[0].ref, '.demo');
+  });
+
+  reg(4702, 'canvas', 'parse error missing width/height', function(h, session) {
+  const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .bad:
+    height: 100
+    .demo { }
+:`;
+    h.assertThrows('missing width', function() {
+      session.run(src);
+    });
+  });
+
+  reg(4703, 'canvas', 'default bgColor ^000000', function(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    width: 64
+    height: 48
+    .demo { }
+:`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    h.assert('bg', comp.bgColor, '#000000');
+  });
+
+  reg(4704, 'canvas', 'explicit width height bgColor', function(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    width: 320
+    height: 240
+    bgColor: ^112233
+    .demo { }
+:`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    h.assert('w', comp.width, 320);
+    h.assert('h', comp.height, 240);
+    h.assert('bg', comp.bgColor, '#112233');
+  });
+
+  reg(4705, 'canvas', 'missing inline ref elaboration error', function(h, session) {
+    const src = `comp [canvas] .empty:
+    width: 100
+    height: 100
+:`;
+    h.assertThrows('no renderer ref', function() {
+      session.run(src);
+    });
+  });
+
+  reg(4706, 'canvas', 'execInline stores canvas methods', function(h, session) {
+    session.run(INLINE_CANVAS_DEMO);
+    const inst = session.interp.inlineInstances.get('.demo');
+    h.assert('kind', inst.kind, 'canvas');
+    h.assert('drawScene', typeof inst.methods.drawScene, 'object');
+    h.assert('drawBox', typeof inst.methods.drawBox, 'object');
+  });
+
+  reg(4707, 'canvas', 'label attribute optional string', function(h, session) {
+    const srcNoLabel = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    width: 64
+    height: 48
+    .demo { }
+:`;
+    const p1 = new Parser(new Tokenizer(preprocessLoop(srcNoLabel)), session._ensureRegistry());
+    const s1 = p1.parse();
+    h.assert('no label attr', s1[1].comp.attributes.label, undefined);
+
+    const srcLabel = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    width: 64
+    height: 48
+    label: "myLabel"
+    .demo { }
+:`;
+    const p2 = new Parser(new Tokenizer(preprocessLoop(srcLabel)), session._ensureRegistry());
+    const s2 = p2.parse();
+    h.assert('label parsed', s2[1].comp.attributes.label, 'myLabel');
+  });
+
+  reg(4710, 'canvas', 'parse error if forbidden', function(h, session) {
+    const src = `inline [canvas] .bad:
+    draw() {
+        if (1) {
+            drawRect(0, 0, 10, 10)
+        }
+    }
+:`;
+    h.assertThrows('if forbidden', function() {
+      session.run(src);
+    });
+  });
+
+  reg(4711, 'canvas', 'engine drawRect mock ctx', function(h, session) {
+    const prog = parseCanvasBody(`draw() {
+        styleFill("ff0000")
+        drawRect(5, 10, 20, 30)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    h.assert('fillRect', mock.calls.some((c) => c.op === 'fillRect' && c.w === 20), true);
+    h.assert('css color', mock.calls.some((c) => c.fillStyle === '#ff0000'), true);
+  });
+
+  reg(4712, 'canvas', 'engine drawCircle drawLine drawText', function(h, session) {
+    const prog = parseCanvasBody(`scene() {
+        style("0000ff", "00ff00", 2)
+        drawCircle(50, 50, 20)
+        drawLine(0, 0, 100, 100)
+        styleFill("ffffff")
+        fontSize(16)
+        drawText(10, 10, "ok")
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('scene()'), mock.ctx);
+    h.assert('arc', mock.calls.some((c) => c.op === 'arc'), true);
+    h.assert('line', mock.calls.some((c) => c.op === 'lineTo'), true);
+    h.assert('text', mock.calls.some((c) => c.op === 'fillText' && c.text === 'ok'), true);
+  });
+
+  reg(4713, 'canvas', 'transparent color skip 0', function(h, session) {
+    const prog = parseCanvasBody(`draw() {
+        styleFill(0)
+        styleStroke("0")
+        drawRect(0, 0, 10, 10)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx);
+    h.assert('no fill', mock.calls.every((c) => c.op !== 'fillRect'), true);
+  });
+
+  reg(4714, 'canvas', 'method composition D13b', function(h, session) {
+    const prog = parseCanvasBody(`outer() {
+        inner(5)
+        drawRect(0, 0, 10, 10)
+    }
+    inner(n) {
+        drawCircle(n, n, 3)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('outer()'), mock.ctx);
+    h.assert('circle', mock.calls.some((c) => c.op === 'arc' && c.cx === 5), true);
+    h.assert('rect', mock.calls.some((c) => c.op === 'fillRect'), true);
+  });
+
+  reg(4715, 'canvas', 'arithmetic in body', function(h, session) {
+    const prog = parseCanvasBody(`draw(w) {
+        x = 10 + (w / 2) * 2 - 5
+        styleFill("ffffff")
+        drawRect(x, 0, 5, 5)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(10)'), mock.ctx);
+    const rect = mock.calls.find((c) => c.op === 'fillRect');
+    h.assert('x computed', rect && rect.x, 15);
+  });
+
+  function runCanvasCompIntegration(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    on: 1
+    width: 200
+    height: 120
+    bgColor: ^000000
+    .demo { }
+:
+1wire trigger = 1
+1wire busyOut = 0
+.myCanvas:{
+    renderer {
+        drawScene()
+    }
+    set = trigger
+    busy >= busyOut
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    const canvasHandler = session._ensureRegistry().get('canvas');
+    canvasHandler.constructor.flushCanvas(comp, interp);
+    const mock = createCanvasMockCtx();
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawScene()');
+    canvasHandler._runDraw(comp, mock.ctx, interp);
+    h.assert('text drawn', mock.calls.some((c) => c.op === 'fillText'), true);
+    h.assert('busy idle', session.getCompProperty(interp, '.myCanvas', 'busy'), '0');
+  }
+
+  regCanvasDual(4720, 4721, 'comp integration renderer set', runCanvasCompIntegration);
+
+  function runCanvasDrawPin(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    on: 1
+    width: 100
+    height: 80
+    .demo { }
+:
+1wire redraw = 1
+.myCanvas:{
+    renderer { drawBox(5, 5, 40, 30) }
+    draw = redraw
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    const canvasHandler = session._ensureRegistry().get('canvas');
+    canvasHandler.constructor.flushCanvas(comp, interp);
+    h.assert('comp exists', !!comp, true);
+  }
+
+  regCanvasDual(4722, 4723, 'draw pin triggers renderer', runCanvasDrawPin);
+
+  reg(4724, 'canvas', 'canvasToCssColor 6 and 8 hex', function(h) {
+    h.assert('6', canvasToCssColor('aabbcc'), '#aabbcc');
+    h.assert('8', canvasToCssColor('aabbcc80').startsWith('rgba('), true);
+    h.assert('0', canvasToCssColor(0), null);
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

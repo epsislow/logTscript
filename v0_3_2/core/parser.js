@@ -2547,6 +2547,11 @@ parseBoardInstance() {
       const raw = this.parseRawBraceBlock(bracePos);
       return { property: 'logicMutation', raw };
     }
+    if (propName === 'renderer' && this.c.type === 'SYM' && this.c.value === '{') {
+      const bracePos = this.t.i - 1;
+      const raw = this.parseRawBraceBlock(bracePos);
+      return { property: 'canvasRenderer', raw };
+    }
     if (propName === 'query') {
       this.t.skip();
       if (this.c.type === 'ID' && this.c.value === 'none') {
@@ -3684,6 +3689,19 @@ assignment() {
           continue;
         }
         throw Error(`Expected '{' after logic program ref '${logicRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+
+      if (this.c.type === 'SYM' && this.c.value === '.' && compType === 'canvas') {
+        const canvasRef = this.parseDotComponentRef();
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const bodyRaw = this.parseRawBraceBlock(bracePos);
+          if (!attributes.canvasPrograms) attributes.canvasPrograms = [];
+          attributes.canvasPrograms.push({ ref: canvasRef, bodyRaw });
+          continue;
+        }
+        throw Error(`Expected '{' after canvas renderer ref '${canvasRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
 
       if (this.c.type === 'ID' || (this.c.type === 'KEYWORD' && this.c.value === 'MODE')) {
@@ -5604,8 +5622,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic)`);
+    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic' && kind !== 'canvas') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic, canvas)`);
     }
     if (this.usagePolicy) {
       const chk = this.usagePolicy.isModuleAllowed('inline', kind);
