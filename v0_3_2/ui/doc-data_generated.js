@@ -11636,6 +11636,8 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 | **Renderer ref** | \`.inlineName { }\` in comp header (required) |
 | **Exec block** | \`.comp:{ renderer { calls } set = trigger }\` |
 | **Trigger** | \`set\` or \`draw\` pin — respects \`on:\` (\`raise\` / \`edge\` / \`1\`) |
+| **\`clear\`** | Default \`1\` — clear bg before draw; \`0\` additive overlay |
+| **Wire args** | \`pinName/s16\`, \`/ascii\`, \`/bool\` in \`renderer { }\` |
 | **Output** | \`busy\` pout — \`1\` while drawing |
 | **Attrs** | \`width\`, \`height\` required; \`bgColor\` optional (default \`^000000\`) |
 | **Doc** | \`doc(comp.canvas)\`, \`doc(.myCanvas)\` |
@@ -11687,6 +11689,7 @@ comp [canvas] .myCanvas:
 | **\`width\`** | **Yes** | Canvas width in pixels (parse-time only) |
 | **\`height\`** | **Yes** | Canvas height in pixels (parse-time only) |
 | **\`bgColor\`** | No | Background clear color — \`^rrggbb\` (default \`^000000\`) |
+| **\`label\`** | No | Optional caption above the canvas — omit for no label |
 | **\`on:\`** | Recommended | Property-block trigger mode (\`1\`, \`raise\`, \`edge\`, …) |
 | **\`.renderer { }\`** | **Yes** | Links \`inline [canvas]\` (body may be empty) |
 | **\`nl\`** | No | Line break after widget in Devices panel |
@@ -11717,11 +11720,24 @@ comp [canvas] .myCanvas:
 |-----|-----------|------|
 | **\`set\`** | in | State updated → schedule coalesced redraw |
 | **\`draw\`** | in | Explicit redraw request |
+| **\`clear\`** | in | \`1\` (default) — clear canvas to \`bgColor\` before draw; \`0\` — additive / overlay draw |
 | **\`busy\`** | out | \`1\` while renderer runs on the canvas context |
 
 The \`renderer { }\` block **invokes** methods from the linked inline — it does not define them.
 
-Arguments in \`renderer\` may be numeric or string **literals** (same rules as method bodies).
+Arguments in \`renderer\` may be **literals** (numbers, strings) or **wire references** using \`pinName/format\` (e.g. \`xPos/s16\`, \`label/ascii\`, \`flag/bool\`). Pins are inferred automatically from renderer args and can be assigned in the same exec block (\`xPos = myWire\`).
+
+Read **\`busy\`** from another wire or use it to stall a CPU (\`wait = mustWait\`):
+
+\`\`\`logts
+1wire mustWait = .myCanvas:busy
+
+comp [cpu] .u:
+    wait = mustWait
+    /* … */
+\`\`\`
+
+In a property block, redirect the pout: \`busy >= mustWait\`.
 
 ---
 
@@ -11756,6 +11772,7 @@ comp [canvas] .myCanvas:
     on: 1
     width: 200
     height: 150
+    label: "Game view"
     bgColor: ^000000
     .gameRenderer { }
 :
@@ -11801,6 +11818,61 @@ comp [canvas] .face:
     set = go
 }
 \`\`\`
+
+---
+
+## Wire arguments in \`renderer\`
+
+\`\`\`logts
+inline [canvas] .posDraw:
+    mark(x, y) {
+        styleFill("00ffaa")
+        drawRect(x, y, 12, 12)
+    }
+:
+
+comp [canvas] .myCanvas:
+    on: 1
+    width: 100
+    height: 80
+    .posDraw { }
+:
+
+16wire valX = 0000000000011001
+16wire valY = 0000000000100011
+1wire go = 1
+
+.myCanvas:{
+    renderer { mark(xPos/s16, yPos/s16) }
+    xPos = valX
+    yPos = valY
+    set = go
+}
+\`\`\`
+
+| Syntax | Meaning |
+|--------|---------|
+| \`pinName/s16\`, \`/u16\`, … | Signed / unsigned numeric wire (codec matches \`logic-number-formats\`) |
+| \`pinName/ascii\` | Text string from wire bits |
+| \`pinName/bool\` | Boolean (\`1\` / \`0\`) |
+
+Pins are created on first use; assign them in the exec block like any other component pin.
+
+---
+
+## Multiple exec blocks and \`clear\`
+
+Each \`.myCanvas:{ … }\` block can list its own \`renderer { }\` calls. **\`clear\`** defaults to \`1\` (full background clear before draw). Set **\`clear = 0\`** for additive overlays (e.g. a second layer without erasing the first).
+
+\`\`\`logts
+1wire triggerScene = 1
+1wire triggerAdd = 1
+
+.myCanvas:{ renderer { drawScene() }     set = triggerScene }
+.myCanvas:{ renderer { drawOverlay() }   clear = 0           set = triggerAdd }
+\`\`\`
+
+Redraws are coalesced per animation frame (\`requestAnimationFrame\`). If a draw is already running (\`busy = 1\`), a new request is deferred until the current draw finishes.
 
 ---
 
