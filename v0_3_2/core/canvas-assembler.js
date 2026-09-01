@@ -1,11 +1,11 @@
 /* ================= CANVAS ASSEMBLER (inline [canvas]) ================= */
 
 const CANVAS_FORBIDDEN_IDS = new Set([
-  'for', 'while', 'do', 'return', 'true', 'false',
+  'do', 'return', 'true', 'false',
   'and', 'or', 'not', 'break', 'continue',
 ]);
 
-const CANVAS_KEYWORDS = new Set(['if', 'else']);
+const CANVAS_KEYWORDS = new Set(['if', 'else', 'for', 'while']);
 
 const CANVAS_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 const CANVAS_LOGIC_OPS = new Set(['&&', '||']);
@@ -117,7 +117,7 @@ function canvasTokenize(src) {
       i++;
       continue;
     }
-    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',') {
+    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
       continue;
@@ -216,10 +216,90 @@ class CanvasParser {
     return { name: nameTok.value, params, body, line: nameTok.line };
   }
 
+  isPostfixIncDec() {
+    const t = this.peek();
+    if (t.type !== 'SYM' || (t.value !== '+' && t.value !== '-')) return null;
+    const t2 = this.tokens[this.pos + 1];
+    if (!t2 || t2.type !== 'SYM' || t2.value !== t.value) return null;
+    return t.value + t.value;
+  }
+
+  isPostfixIncDecAfterId() {
+    const t1 = this.tokens[this.pos + 1];
+    const t2 = this.tokens[this.pos + 2];
+    if (!t1 || t1.type !== 'SYM' || !t2 || t2.type !== 'SYM') return null;
+    if (t1.value === '+' && t2.value === '+') return '++';
+    if (t1.value === '-' && t2.value === '-') return '--';
+    return null;
+  }
+
+  consumePostfixIncDec() {
+    const op = this.isPostfixIncDec();
+    if (!op) return null;
+    this.pos += 2;
+    return op;
+  }
+
+  parsePostfixUpdate() {
+    const nameTok = this.eat('ID');
+    const op = this.consumePostfixIncDec();
+    if (!op) {
+      canvasError(`expected postfix ++ or -- after '${nameTok.value}'`, nameTok.line);
+    }
+    return { kind: 'postfix', name: nameTok.value, op, line: nameTok.line };
+  }
+
+  parseForClause(beforeCloseParen) {
+    const t = this.peek();
+    if (beforeCloseParen && t.type === 'SYM' && t.value === ')') return null;
+    if (!beforeCloseParen && t.type === 'SYM' && t.value === ';') return null;
+    if (t.type === 'ID') {
+      const next = this.tokens[this.pos + 1];
+      if (next && next.type === 'SYM' && next.value === '=') {
+        return this.parseAssign();
+      }
+      if (this.isPostfixIncDecAfterId()) {
+        return this.parsePostfixUpdate();
+      }
+    }
+    canvasError('expected for clause assign or postfix ++/--', t.line);
+  }
+
+  parseForStmt() {
+    const lineTok = this.eat('KW', 'for');
+    this.eat('SYM', '(');
+    const init = this.parseForClause(false);
+    this.eat('SYM', ';');
+    let cond = null;
+    if (!(this.peek().type === 'SYM' && this.peek().value === ';')) {
+      cond = this.parseCond();
+    }
+    this.eat('SYM', ';');
+    const step = this.parseForClause(true);
+    this.eat('SYM', ')');
+    const body = this.parseBlock();
+    return { kind: 'for', init, cond, step, body, line: lineTok.line };
+  }
+
+  parseWhileStmt() {
+    const lineTok = this.eat('KW', 'while');
+    this.eat('SYM', '(');
+    const cond = this.parseCond();
+    this.eat('SYM', ')');
+    const body = this.parseBlock();
+    return { kind: 'while', cond, body, line: lineTok.line };
+  }
+
   parseStmt() {
     const t = this.peek();
     if (t.type === 'KW' && t.value === 'if') {
       return this.parseIfStmt();
+    }
+    if (t.type === 'KW' && t.value === 'for') {
+      return this.parseForStmt();
+    }
+    if (t.type === 'KW' && t.value === 'while') {
+      return this.parseWhileStmt();
     }
     if (t.type === 'ID') {
       const next = this.tokens[this.pos + 1];
@@ -228,6 +308,9 @@ class CanvasParser {
       }
       if (next && next.type === 'SYM' && next.value === '=') {
         return this.parseAssign();
+      }
+      if (this.isPostfixIncDecAfterId()) {
+        return this.parsePostfixUpdate();
       }
     }
     canvasError(`expected statement, got ${t.type} '${t.value}'`, t.line);
@@ -382,6 +465,9 @@ class CanvasParser {
   }
 
   parseUnary() {
+    if (this.isPostfixIncDec()) {
+      canvasError(`prefix ${this.isPostfixIncDec()} is not allowed, use i${this.isPostfixIncDec()} instead`, this.peek().line);
+    }
     if (this.match('SYM', '-')) {
       return { kind: 'unary', op: '-', expr: this.parseUnary() };
     }
@@ -397,7 +483,8 @@ class CanvasParser {
       return { kind: 'string', value: this.tokens[this.pos - 1].value };
     }
     if (this.match('ID')) {
-      const id = this.tokens[this.pos - 1].value;
+      const idTok = this.tokens[this.pos - 1];
+      const id = idTok.value;
       if (this.match('SYM', '(')) {
         const args = [];
         if (!this.match('SYM', ')')) {
@@ -407,7 +494,11 @@ class CanvasParser {
           }
           this.eat('SYM', ')');
         }
-        return { kind: 'call', name: id, args, line: this.tokens[this.pos - 1].line };
+        return { kind: 'call', name: id, args, line: idTok.line };
+      }
+      const postOp = this.consumePostfixIncDec();
+      if (postOp) {
+        return { kind: 'postfix', name: id, op: postOp, line: idTok.line };
       }
       return { kind: 'var', name: id };
     }

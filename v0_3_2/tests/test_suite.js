@@ -52315,16 +52315,115 @@ comp [canvas] .screen:
 
   regCanvasDual(4766, 4767, 'if && || with parens expr', runCanvasIfLogicOps);
 
-  reg(4768, 'canvas', 'parse error for still forbidden', function(h, session) {
-    const src = `inline [canvas] .bad:
-    draw() {
-        for (i = 0; i < 3; i = i + 1) {
+  reg(4768, 'canvas', 'parse for loop in method body', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        for (i = 0; i < 3; i++) {
             drawRect(0, 0, 1, 1)
         }
-    }
-:`;
-    h.assertThrows('for forbidden', function() {
-      session.run(src);
+    }`);
+    const draw = prog.methods.draw;
+    h.assert('for stmt', draw.body[0].kind, 'for');
+    h.assert('postfix step', draw.body[0].step.kind, 'postfix');
+    h.assert('step op', draw.body[0].step.op, '++');
+  });
+
+  function runCanvasForStrip(h) {
+    const prog = parseCanvasBody(`drawStrip(n, color) {
+        for (i = 0; i < n; i++) {
+            style(0, color)
+            drawRect(i * 18, 10, 16, 16)
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('drawStrip(4, "aaffaa")'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('four rects', rects.length, 4);
+    h.assert('x step', rects[2].x, 36);
+    h.assert('color', rects[0].fillStyle, '#aaffaa');
+  }
+
+  regCanvasDual(4770, 4771, 'for loop strip i++', runCanvasForStrip);
+
+  function runCanvasWhileLoop(h) {
+    const prog = parseCanvasBody(`drawRows(rows) {
+        y = 0
+        row = 0
+        while (row < rows) {
+            styleFill("00ff00")
+            drawRect(0, y, 40, 8)
+            y = y + 12
+            row++
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('drawRows(3)'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('three rows', rects.length, 3);
+    h.assert('y spacing', rects[1].y, 12);
+  }
+
+  regCanvasDual(4772, 4773, 'while loop row scan', runCanvasWhileLoop);
+
+  function runCanvasNestedForGrid(h) {
+    const prog = parseCanvasBody(`drawGrid(cols, rows, tileW, tileH) {
+        for (row = 0; row < rows; row = row + 1) {
+            for (col = 0; col < cols; col++) {
+                style(0, "aaffaa")
+                drawRect(col * tileW, row * tileH, tileW - 2, tileH - 2)
+            }
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('drawGrid(3, 2, 20, 20)'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('six tiles', rects.length, 6);
+    h.assert('corner tile', rects[5].x, 40);
+    h.assert('corner tile y', rects[5].y, 20);
+  }
+
+  regCanvasDual(4774, 4775, 'nested for grid', runCanvasNestedForGrid);
+
+  reg(4776, 'canvas', 'parse for while nested AST', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        for (i = 0; i < 2; i++) {
+            while (j < 3) {
+                j++
+            }
+        }
+    }`);
+    const forStmt = prog.methods.draw.body[0];
+    h.assert('for kind', forStmt.kind, 'for');
+    h.assert('while in for', forStmt.body[0].kind, 'while');
+    h.assert('while postfix', forStmt.body[0].body[0].kind, 'postfix');
+  });
+
+  reg(4777, 'canvas', 'parse error break still forbidden', function(h) {
+    h.assertThrows('break forbidden', function() {
+      parseCanvasBody(`draw() {
+          for (i = 0; i < 3; i++) {
+              break
+          }
+      }`);
+    });
+  });
+
+  reg(4778, 'canvas', 'parse error prefix ++ forbidden', function(h) {
+    h.assertThrows('prefix ++ forbidden', function() {
+      parseCanvasBody(`draw() {
+          ++i
+      }`);
+    });
+  });
+
+  reg(4779, 'canvas', 'loop iteration cap exceeded', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        for (;;) {
+            drawRect(0, 0, 1, 1)
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('loop cap', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
     });
   });
 

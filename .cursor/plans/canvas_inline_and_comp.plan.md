@@ -27,7 +27,7 @@ todos:
     content: "Faza 7: if/else în body canvas — D62–D68 ✅ done"
     status: completed
   - id: canvas-f8
-    content: "Faza 8: for/while loops în body — 1+b → D69–D75 draft"
+    content: "Faza 8: for/while loops în body — 1+b → D69–D75 done"
     status: pending
 isProject: false
 ---
@@ -155,7 +155,7 @@ D28 A ✅
 | **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** | **done** |
 | **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
 | **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
-| **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** draft | **(next)** |
+| **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** ✅ | **done** |
 | *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+n) | — |
 
 ---
@@ -183,7 +183,7 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1–F7** ✅; **F8** (loops) **next**; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F8** ✅; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
 
 ---
 
@@ -1560,7 +1560,7 @@ if (evalCond(cond)) executeBlock(then); else if (else) executeBlock(else);
 
 ## Faza 8 — Loops `for` / `while` (**1+b** promovat)
 
-> **Status:** draft — **D69–D75**; așteaptă confirmare user.  
+> **Status:** **done** — **D69–D75** confirmate user 2026-09-01.  
 > **Depinde:** F7 (condiții `if` — reutilizare `parseCond` / `canvasEvalCond`).  
 > **Promovat din backlog:** **1+b** (user 2026-09-01).
 
@@ -1671,8 +1671,8 @@ while:
 | -- | ------- | ----------- |
 | **D69** | `for` C-style 3 clauze | **A** `for (init; cond; step)` cu `;` și assign init/step |
 | **D70** | `while` | **A** da — `while (cond) { }` |
-| **D71** | `++` / `--` | **A** amânat — folosește `i = i + 1` · **B** adaugă în F8 |
-| **D72** | `break` / `continue` | **A** rămân interzise în F8 |
+| **D71** | `++` / `--` | **B** parțial — postfix `i++` / `i--` da; prefix `++i` / `--i` amânat |
+| **D72** | `break` / `continue` | **A** rămân interzise; `for` imbricat permis |
 | **D73** | Max iterații | **A** cap **10000** per loop → eroare · **B** fără cap |
 | **D74** | Doar în metode | **A** ca F7 — nu în `renderer` direct |
 | **D75** | Teste | **A** **4770–4779** wave+legacy; **4768** → `for` permis |
@@ -1688,23 +1688,23 @@ while:
 
 ### Criterii done F8
 
-- [ ] `for (i = 0; i < n; i = i + 1)` desenează N tile-uri
-- [ ] `while` imbricat (grid)
-- [ ] Condiție F7 în loop (`i < cols && flag`)
-- [ ] Depășire cap iterații → eroare
-- [ ] `break`/`while` în renderer → încă interzis
-- [ ] Doc + suite verde
+- [x] `for (i = 0; i < n; i++)` desenează N tile-uri
+- [x] `while` imbricat (grid)
+- [x] Condiție F7 în loop (`i < cols`)
+- [x] Depășire cap iterații → eroare
+- [x] `break` în body → parse interzis
+- [x] Doc + suite verde (**4770–4779**, **4768** actualizat)
 
 ### Non-goals F8
 
-- `++`/`--` (dacă D71 A)
+- prefix `++i` / `--i`
 - `break` / `continue`
 - `do-while`
 - `for-each` / range syntax
 
 ### Status F8
 
-**(next)** — promovat **1+b**; confirmă **D69–D75**.
+**done** — teste **4768**, **4770–4779**; postfix `i++`/`i--` (D71 parțial).
 
 ---
 

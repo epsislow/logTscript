@@ -102,11 +102,40 @@ function canvasEvalCond(expr, env, callMethodFn, line, pinEnv) {
   }
 }
 
+const CANVAS_MAX_LOOP_ITERATIONS = 10000;
+
+function canvasApplyForClause(clause, env, locals, callMethodFn, line, pinEnv) {
+  if (!clause) return;
+  if (clause.kind === 'assign') {
+    env[clause.name] = canvasEvalExpr(clause.expr, env, callMethodFn, clause.line, pinEnv);
+    locals.add(clause.name);
+    return;
+  }
+  if (clause.kind === 'postfix') {
+    canvasEvalPostfix(clause, env, callMethodFn, clause.line, pinEnv);
+    locals.add(clause.name);
+  }
+}
+
+function canvasEvalPostfix(expr, env, callMethodFn, line, pinEnv) {
+  if (!Object.prototype.hasOwnProperty.call(env, expr.name)) {
+    throw new Error(`canvas: undefined variable '${expr.name}'${line != null ? ` (line ${line})` : ''}`);
+  }
+  const old = env[expr.name];
+  const n = Number(old);
+  env[expr.name] = expr.op === '++' ? n + 1 : n - 1;
+  return old;
+}
+
 function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, callMethodFn, evalArg) {
+  const pinEnv = (options && options.pinEnv) || {};
   for (const stmt of stmts || []) {
     try {
       if (stmt.kind === 'assign') {
         env[stmt.name] = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
+        locals.add(stmt.name);
+      } else if (stmt.kind === 'postfix') {
+        canvasEvalPostfix(stmt, env, callMethodFn, stmt.line, pinEnv);
         locals.add(stmt.name);
       } else if (stmt.kind === 'call') {
         if (CANVAS_BUILTIN_SET.has(stmt.name)) {
@@ -118,11 +147,31 @@ function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, ca
           canvasExecuteMethod(m, vals, program, state, ctx, options);
         }
       } else if (stmt.kind === 'if') {
-        const pinEnv = (options && options.pinEnv) || {};
         if (canvasEvalCond(stmt.cond, env, callMethodFn, stmt.line, pinEnv)) {
           canvasExecuteStmts(stmt.then, env, locals, program, state, ctx, options, callMethodFn, evalArg);
         } else if (stmt.else) {
           canvasExecuteStmts(stmt.else, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+        }
+      } else if (stmt.kind === 'for') {
+        canvasApplyForClause(stmt.init, env, locals, callMethodFn, stmt.line, pinEnv);
+        let iter = 0;
+        while (true) {
+          if (stmt.cond != null && !canvasEvalCond(stmt.cond, env, callMethodFn, stmt.line, pinEnv)) break;
+          if (iter >= CANVAS_MAX_LOOP_ITERATIONS) {
+            throw new Error(`canvas: loop iteration limit (${CANVAS_MAX_LOOP_ITERATIONS}) exceeded (line ${stmt.line})`);
+          }
+          canvasExecuteStmts(stmt.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+          canvasApplyForClause(stmt.step, env, locals, callMethodFn, stmt.line, pinEnv);
+          iter++;
+        }
+      } else if (stmt.kind === 'while') {
+        let iter = 0;
+        while (canvasEvalCond(stmt.cond, env, callMethodFn, stmt.line, pinEnv)) {
+          if (iter >= CANVAS_MAX_LOOP_ITERATIONS) {
+            throw new Error(`canvas: loop iteration limit (${CANVAS_MAX_LOOP_ITERATIONS}) exceeded (line ${stmt.line})`);
+          }
+          canvasExecuteStmts(stmt.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+          iter++;
         }
       }
     } catch (err) {
@@ -154,6 +203,8 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
       }
       return env[expr.name];
     }
+    case 'postfix':
+      return canvasEvalPostfix(expr, env, callMethodFn, line, pinEnv);
     case 'unary': {
       const v = canvasEvalExpr(expr.expr, env, callMethodFn, line, pinEnv);
       return expr.op === '-' ? -v : v;
