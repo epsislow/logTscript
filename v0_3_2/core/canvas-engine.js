@@ -26,13 +26,19 @@ function canvasToCssColor(c) {
   return `#${s}`;
 }
 
-function canvasEvalExpr(expr, env, callMethodFn, line) {
+function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
   if (!expr) return 0;
   switch (expr.kind) {
     case 'number':
       return expr.value;
     case 'string':
       return expr.value;
+    case 'wireRef': {
+      if (!pinEnv || !Object.prototype.hasOwnProperty.call(pinEnv, expr.pinName)) {
+        throw new Error(`canvas: undefined pin '${expr.pinName}'${line != null ? ` (line ${line})` : ''}`);
+      }
+      return pinEnv[expr.pinName];
+    }
     case 'var': {
       if (!Object.prototype.hasOwnProperty.call(env, expr.name)) {
         throw new Error(`canvas: undefined variable '${expr.name}'${line != null ? ` (line ${line})` : ''}`);
@@ -40,12 +46,12 @@ function canvasEvalExpr(expr, env, callMethodFn, line) {
       return env[expr.name];
     }
     case 'unary': {
-      const v = canvasEvalExpr(expr.expr, env, callMethodFn, line);
+      const v = canvasEvalExpr(expr.expr, env, callMethodFn, line, pinEnv);
       return expr.op === '-' ? -v : v;
     }
     case 'binop': {
-      const l = canvasEvalExpr(expr.left, env, callMethodFn, line);
-      const r = canvasEvalExpr(expr.right, env, callMethodFn, line);
+      const l = canvasEvalExpr(expr.left, env, callMethodFn, line, pinEnv);
+      const r = canvasEvalExpr(expr.right, env, callMethodFn, line, pinEnv);
       switch (expr.op) {
         case '+': return l + r;
         case '-': return l - r;
@@ -261,13 +267,14 @@ function canvasExecuteMethod(method, argValues, program, state, ctx, options) {
 
 function executeCanvasRenderer(program, calls, ctx, options) {
   const state = createCanvasDrawState();
+  const pinEnv = (options && options.pinEnv) || {};
   const callMethodFn = (name, args, line) => {
     const m = program.methods[name];
     if (!m) throw new Error(`canvas: unknown method '${name}'${line != null ? ` (line ${line})` : ''}`);
-    const vals = (args || []).map((a) => canvasEvalExpr(a, {}, callMethodFn, line));
+    const vals = (args || []).map((a) => canvasEvalExpr(a, {}, callMethodFn, line, pinEnv));
     return canvasExecuteMethod(m, vals, program, state, ctx, options);
   };
-  const evalArg = (a) => canvasEvalExpr(a, {}, callMethodFn, null);
+  const evalArg = (a) => canvasEvalExpr(a, {}, callMethodFn, null, pinEnv);
 
   for (const stmt of calls || []) {
     if (!stmt || stmt.kind !== 'call') continue;

@@ -17,9 +17,9 @@ function getCanvasDisplay(id) {
   return dm().canvasDisplays.get(id) || null;
 }
 
-function requestCanvasDraw(id) {
+function requestCanvasDraw(id, options) {
   const display = getCanvasDisplay(id);
-  if (display) display.requestDraw();
+  if (display) display.requestDraw(options);
 }
 
 function setCanvasDrawHandler(id, fn) {
@@ -54,6 +54,7 @@ class CanvasDisplay {
     this._drawHandler = null;
     this._dirty = false;
     this._rafId = null;
+    this._drawOptions = null;
 
     this.canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
     if (this.canvas) {
@@ -70,8 +71,9 @@ class CanvasDisplay {
     this._drawHandler = typeof fn === 'function' ? fn : null;
   }
 
-  requestDraw() {
+  requestDraw(options) {
     if (!this.canvas || !this.ctx) return;
+    if (options) this._drawOptions = options;
     if (this._dirty) return;
     this._dirty = true;
     if (typeof requestAnimationFrame === 'function') {
@@ -89,11 +91,16 @@ class CanvasDisplay {
     this._dirty = false;
     this._rafId = null;
     if (!this.ctx) return;
-    this.ctx.fillStyle = this.bgColor;
-    this.ctx.fillRect(0, 0, this.width, this.height);
+    const opts = this._drawOptions || {};
+    this._drawOptions = null;
+    const doClear = opts.clear !== false;
+    if (doClear) {
+      this.ctx.fillStyle = this.bgColor;
+      this.ctx.fillRect(0, 0, this.width, this.height);
+    }
     if (this._drawHandler) {
       try {
-        this._drawHandler(this.ctx);
+        this._drawHandler(this.ctx, opts);
       } catch (err) {
         if (typeof console !== 'undefined' && console.warn) {
           console.warn(`canvas ${this.id}: draw error`, err);

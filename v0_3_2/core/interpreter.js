@@ -14600,6 +14600,10 @@ if (s.assignment) {
 
     if (comp.type === 'canvas') {
       comp._canvasRendererBlocks = properties.filter((p) => p.property === 'canvasRenderer');
+      if (typeof CanvasComponent !== 'undefined'
+          && typeof CanvasComponent.preparePropertyBlock === 'function') {
+        CanvasComponent.preparePropertyBlock(comp, properties, this, component);
+      }
     }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
@@ -15006,6 +15010,18 @@ if (s.assignment) {
         this.updateConnectedComponents(targetName, overValue);
       }
     }
+
+    for (const prop of properties) {
+      if (prop.show || prop.peek) continue;
+      if (prop.property !== 'pout>') continue;
+      const poutName = prop.poutName;
+      const compForPout = this.components.get(component);
+      if (!compForPout || compForPout.type === 'logic') continue;
+      if (!this.componentRegistry || !this.componentRegistry.supportsRedirect(compForPout.type, poutName)) {
+        throw Error(`Component ${component} (type: ${compForPout.type}) does not support :${poutName} property`);
+      }
+      this._applyComponentWireRedirect(component, prop, poutName);
+    }
     } finally {
       if (useEdgeProbe) this.probeReasonContext = 'normal';
     }
@@ -15176,9 +15192,8 @@ if (s.assignment) {
     this._writeWireRedirectDirect(targetName, value);
   }
 
-  // Re-evaluate all wire statements that reference a PCB instance by name
-  // Called after executePcbBody to propagate updated pout values to dependent wires
-  reEvalWiresDependingOnPcb(instanceName){
+  // Re-evaluate wire statements that reference a component (by name or :property).
+  reEvalWiresDependingOnComponent(instanceName){
     const checkExpr = (expr) => {
       if(!Array.isArray(expr)) return false;
       for(const atom of expr){
@@ -15263,8 +15278,12 @@ if (s.assignment) {
     }
   }
 
+  reEvalWiresDependingOnPcb(instanceName) {
+    this.reEvalWiresDependingOnComponent(instanceName);
+  }
+
   reEvalWiresDependingOnChip(instanceName) {
-    this.reEvalWiresDependingOnPcb(instanceName);
+    this.reEvalWiresDependingOnComponent(instanceName);
   }
 
   _compositeInternalPrefix(instanceName) {

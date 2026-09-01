@@ -63,6 +63,7 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       pins: [
         { bits: '1', name: 'set' },
         { bits: '1', name: 'draw' },
+        { bits: '1', name: 'clear' },
       ],
       pouts: [{ bits: '1', name: 'busy' }],
       returns: null,
@@ -70,7 +71,87 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
   }
 
   getSupportedProperties() {
-    return ['set', 'draw'];
+    return ['set', 'draw', 'clear', 'busy'];
+  }
+
+  supportsPropertyName(property) {
+    return property === 'busy';
+  }
+
+  getRedirectProperties() {
+    return ['busy'];
+  }
+
+  _ensurePin(comp, wireRef, ctx, compName) {
+    if (!comp.pinDefs) comp.pinDefs = {};
+    if (!comp.pinStorage) comp.pinStorage = {};
+    const pinName = wireRef.pinName;
+    const existing = comp.pinDefs[pinName];
+    if (existing) {
+      if (existing.bindType !== wireRef.bindType
+          || (existing.numberFormat || null) !== (wireRef.numberFormat || null)) {
+        throw Error(`canvas ${compName}: pin '${pinName}' format mismatch`);
+      }
+      return;
+    }
+    const bitWidthFn = typeof canvasPinBitWidth === 'function' ? canvasPinBitWidth : null;
+    const bits = bitWidthFn
+      ? bitWidthFn(wireRef.bindType, wireRef.numberFormat)
+      : 16;
+    const storageIdx = ctx.storeValue('0'.repeat(bits));
+    comp.pinDefs[pinName] = {
+      bindType: wireRef.bindType,
+      numberFormat: wireRef.numberFormat || null,
+      bits,
+    };
+    comp.pinStorage[pinName] = {
+      ref: `&${storageIdx}`,
+      bits,
+      bindType: wireRef.bindType,
+      numberFormat: wireRef.numberFormat || null,
+    };
+  }
+
+  _ensurePinsFromCalls(comp, calls, ctx, compName) {
+    const collectFn = typeof canvasCollectWireRefsFromCalls === 'function'
+      ? canvasCollectWireRefsFromCalls : null;
+    if (!collectFn) return;
+    for (const ref of collectFn(calls)) {
+      this._ensurePin(comp, ref, ctx, compName);
+    }
+  }
+
+  _ensurePinsFromRendererRaw(comp, raw, ctx, compName) {
+    const parseFn = typeof parseCanvasRendererBlock === 'function'
+      ? parseCanvasRendererBlock : null;
+    if (!parseFn || !raw) return;
+    const calls = parseFn(raw, `canvas ${compName}`);
+    this._ensurePinsFromCalls(comp, calls, ctx, compName);
+  }
+
+  static preparePropertyBlock(comp, properties, ctx, compName) {
+    if (!comp || comp.type !== 'canvas') return;
+    const blocks = (properties || []).filter((p) => p.property === 'canvasRenderer');
+    const handler = new CanvasComponent();
+    for (const block of blocks) {
+      handler._ensurePinsFromRendererRaw(comp, block.raw, ctx, compName);
+    }
+    let clearFlag = true;
+    for (const p of properties || []) {
+      if (p.property !== 'clear' || !p.expr) continue;
+      let value = '';
+      const exprResult = ctx.evalExpr(p.expr, false);
+      for (const part of exprResult) {
+        if (part.value && part.value !== '-') value += part.value;
+        else if (part.ref && part.ref !== '&-') {
+          const val = ctx.getValueFromRef(part.ref);
+          if (val) value += val;
+        }
+      }
+      clearFlag = value === '1' || (value && value[value.length - 1] === '1');
+      break;
+    }
+    comp._canvasClear = clearFlag;
   }
 
   _isActive(val) {
@@ -118,7 +199,12 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       programRef: prog.ref,
       canvasPrograms: programs,
       busyRef,
+      pinDefs: {},
+      pinStorage: {},
       _canvasRendererCalls: null,
+      _canvasClear: true,
+      _canvasDrawing: false,
+      _pendingAfterBusy: false,
       _pendingRedraw: false,
       _drawScheduled: false,
     };
@@ -134,8 +220,8 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       });
       const self = this;
       if (typeof setCanvasDrawHandler === 'function') {
-        setCanvasDrawHandler(baseId, (drawCtx) => {
-          self._runDraw(compInfo, drawCtx, ctx);
+        setCanvasDrawHandler(baseId, (drawCtx, drawOpts) => {
+          self._runDraw(compInfo, drawCtx, ctx, drawOpts);
         });
       }
     }
@@ -155,38 +241,75 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     return { methods: inst.methods };
   }
 
-  _runDraw(comp, drawCtx, interp) {
+  _runDraw(comp, drawCtx, interp, drawOpts) {
     const execFn = typeof executeCanvasRenderer === 'function' ? executeCanvasRenderer : null;
     if (!execFn || !drawCtx) return;
+    const doClear = !drawOpts || drawOpts.clear !== false;
+    if (doClear && drawCtx.fillRect && comp.width && comp.height) {
+      drawCtx.fillStyle = comp.bgColor;
+      drawCtx.fillRect(0, 0, comp.width, comp.height);
+    }
+    comp._canvasDrawing = true;
     if (comp.busyRef) interp.setValueAtRef(comp.busyRef, '1');
+    CanvasComponent.propagateBusy(interp, comp.name);
     try {
       const program = this._getProgram(comp, interp);
       const calls = comp._canvasRendererCalls || [];
-      execFn(program, calls, drawCtx, { logErrors: true, skipOnError: true });
+      const buildEnvFn = typeof canvasBuildPinEnv === 'function' ? canvasBuildPinEnv : null;
+      const pinEnv = buildEnvFn
+        ? buildEnvFn(comp, comp._lastPending, false, interp, (p, key, re, c) => (
+          this.reEvalPendingValue(p, key, re, c)
+        ))
+        : {};
+      execFn(program, calls, drawCtx, {
+        logErrors: true,
+        skipOnError: true,
+        pinEnv,
+      });
     } finally {
+      comp._canvasDrawing = false;
       if (comp.busyRef) interp.setValueAtRef(comp.busyRef, '0');
       comp._pendingRedraw = false;
       CanvasComponent.propagateBusy(interp, comp.name);
+      if (comp._pendingAfterBusy) {
+        comp._pendingAfterBusy = false;
+        this._scheduleDraw(comp, interp);
+      }
     }
   }
 
   static propagateBusy(ctx, compName) {
-    if (ctx && typeof ctx.propagateComponent === 'function') {
-      ctx.propagateComponent(compName);
+    if (ctx && typeof ctx.deferWirePropagation === 'function' && ctx.deferWirePropagation()) {
+      if (typeof ctx._notifyComponentComputedMutation === 'function') {
+        ctx._notifyComponentComputedMutation(compName);
+      }
+    } else if (ctx && typeof ctx.reEvalWiresDependingOnComponent === 'function') {
+      ctx.reEvalWiresDependingOnComponent(compName);
+    }
+    if (ctx && typeof ctx._emitComputedComponentProbes === 'function') {
+      ctx._emitComputedComponentProbes(compName);
+    }
+    if (ctx && typeof ctx._emitWatchForComputedComponent === 'function') {
+      ctx._emitWatchForComputedComponent(compName);
     }
   }
 
   _scheduleDraw(comp, interp) {
+    if (comp._canvasDrawing) {
+      comp._pendingAfterBusy = true;
+      return;
+    }
     comp._pendingRedraw = true;
     const baseId = comp.deviceIds && comp.deviceIds[0];
+    const doClear = comp._canvasClear !== false;
     if (typeof requestCanvasDraw === 'function' && baseId) {
-      requestCanvasDraw(baseId);
+      requestCanvasDraw(baseId, { clear: doClear });
       return;
     }
     const mockFn = typeof createCanvasMockCtx === 'function' ? createCanvasMockCtx : null;
     if (mockFn) {
       const { ctx: mctx } = mockFn();
-      this._runDraw(comp, mctx, interp);
+      this._runDraw(comp, mctx, interp, { clear: doClear });
     }
   }
 
@@ -198,13 +321,14 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     const baseId = comp.deviceIds && comp.deviceIds[0];
     const display = typeof getCanvasDisplay === 'function' ? getCanvasDisplay(baseId) : null;
     if (display && display.ctx) {
+      display._drawOptions = { clear: comp._canvasClear !== false };
       display.drawNow();
       return;
     }
     const mockFn = typeof createCanvasMockCtx === 'function' ? createCanvasMockCtx : null;
     if (mockFn) {
       const { ctx } = mockFn();
-      handler._runDraw(comp, ctx, interp);
+      handler._runDraw(comp, ctx, interp, { clear: comp._canvasClear !== false });
     }
   }
 
@@ -220,6 +344,12 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       && this._isActive(this.reEvalPendingValue(pending, 'draw', reEvaluate, ctx));
     if (!setActive && !drawActive) return;
 
+    if (pending.clear !== undefined) {
+      comp._canvasClear = this._isActive(this.reEvalPendingValue(pending, 'clear', reEvaluate, ctx));
+    } else {
+      comp._canvasClear = true;
+    }
+
     const blocks = comp._canvasRendererBlocks || [];
     if (blocks.length) {
       const parseFn = typeof parseCanvasRendererBlock === 'function'
@@ -227,10 +357,20 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       if (!parseFn) throw Error('Canvas assembler is not loaded');
       const calls = [];
       for (const block of blocks) {
-        calls.push(...parseFn(block.raw, `canvas ${compName}`));
+        const parsed = parseFn(block.raw, `canvas ${compName}`);
+        this._ensurePinsFromCalls(comp, parsed, ctx, compName);
+        calls.push(...parsed);
       }
       comp._canvasRendererCalls = calls;
     }
+
+    const buildEnvFn = typeof canvasBuildPinEnv === 'function' ? canvasBuildPinEnv : null;
+    if (buildEnvFn) {
+      buildEnvFn(comp, pending, reEvaluate, ctx, (p, key, re, c) => (
+        this.reEvalPendingValue(p, key, re, c)
+      ));
+    }
+    comp._lastPending = pending;
 
     this._scheduleDraw(comp, ctx);
     comp._canvasRendererBlocks = null;
@@ -244,7 +384,12 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     if (property === 'busy') {
       let val = '0';
       if (comp.busyRef) val = ctx.getValueFromRef(comp.busyRef) || '0';
-      return { value: val, ref: null, varName: `${a.var}:busy`, bitWidth: 1 };
+      return {
+        value: val,
+        ref: comp.busyRef || null,
+        varName: `${a.var}:busy`,
+        bitWidth: 1,
+      };
     }
     return null;
   }

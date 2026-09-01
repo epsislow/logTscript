@@ -214,19 +214,53 @@ class CanvasParser {
     return { kind: 'assign', name, expr };
   }
 
-  parseCall() {
+  parseCall(isRenderer) {
     const name = this.eat('ID').value;
     const line = this.tokens[this.pos - 1].line;
     this.eat('SYM', '(');
     const args = [];
     if (!this.match('SYM', ')')) {
-      args.push(this.parseExpr());
+      args.push(isRenderer ? this.parseRendererArg() : this.parseExpr());
       while (this.match('SYM', ',')) {
-        args.push(this.parseExpr());
+        args.push(isRenderer ? this.parseRendererArg() : this.parseExpr());
       }
       this.eat('SYM', ')');
     }
     return { name, args, line };
+  }
+
+  parseRendererArg() {
+    if (this.match('NUM') || this.match('FLOAT')) {
+      return { kind: 'number', value: this.tokens[this.pos - 1].value };
+    }
+    if (this.match('STR')) {
+      return { kind: 'string', value: this.tokens[this.pos - 1].value };
+    }
+    if (this.match('ID')) {
+      const pinName = this.tokens[this.pos - 1].value;
+      if (this.match('SYM', '/')) {
+        const fmtTok = this.eat('ID').value;
+        const parseFmt = typeof canvasParseFormatToken === 'function'
+          ? canvasParseFormatToken
+          : null;
+        if (!parseFmt) throw new Error('canvas-wire is not loaded');
+        const fmt = parseFmt(fmtTok, this.ctxLabel);
+        return {
+          kind: 'wireRef',
+          pinName,
+          bindType: fmt.bindType,
+          numberFormat: fmt.numberFormat,
+        };
+      }
+      canvasError(`renderer arg must be literal or pinName/format, not bare '${pinName}'`, this.tokens[this.pos - 1].line);
+    }
+    if (this.match('SYM', '(')) {
+      const expr = this.parseExpr();
+      this.eat('SYM', ')');
+      return expr;
+    }
+    const t = this.peek();
+    canvasError(`expected renderer arg, got ${t.type} '${t.value}'`, t.line);
   }
 
   parseExpr() {
@@ -296,7 +330,7 @@ class CanvasParser {
     while (!this.match('EOF')) {
       const t = this.peek();
       if (t.type === 'ID') {
-        calls.push({ kind: 'call', ...this.parseCall() });
+        calls.push({ kind: 'call', ...this.parseCall(true) });
         continue;
       }
       canvasError(`expected renderer call, got ${t.type} '${t.value}'`, t.line);

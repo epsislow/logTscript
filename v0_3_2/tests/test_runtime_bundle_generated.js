@@ -85,6 +85,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/logic-float-formats.js",
   "core/logic-engine.js",
   "core/canvas-assembler.js",
+  "core/canvas-wire.js",
   "core/canvas-engine.js",
   "core/lut-labels.js",
   "core/lut-decode.js",

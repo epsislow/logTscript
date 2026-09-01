@@ -51870,5 +51870,157 @@ comp [canvas] .myCanvas:
     h.assert('0', canvasToCssColor(0), null);
   });
 
+  reg(4730, 'canvas', 'parse renderer wireRef s16 ascii', function(h) {
+    const calls = parseCanvasRendererBlock('drawBox(xPos/s16, yPos/s16, 40, 30)');
+    h.assert('wire x', calls[0].args[0].kind, 'wireRef');
+    h.assert('pin xPos', calls[0].args[0].pinName, 'xPos');
+    h.assert('fmt s16', calls[0].args[0].numberFormat, 's16');
+    const calls2 = parseCanvasRendererBlock('drawText(10, 10, title/ascii)');
+    h.assert('wire text', calls2[0].args[2].bindType, 'text');
+    h.assert('pin title', calls2[0].args[2].pinName, 'title');
+  });
+
+  reg(4731, 'canvas', 'clear=0 skips full-canvas fillRect on redraw', function(h, session) {
+    session.run(INLINE_CANVAS_DEMO);
+    const interp = session.interp;
+    const comp = {
+      type: 'canvas',
+      name: '.t',
+      width: 100,
+      height: 80,
+      bgColor: '#000000',
+      programRef: '.demo',
+      deviceIds: [],
+      pinDefs: {},
+      pinStorage: {},
+      busyRef: null,
+      _canvasDrawing: false,
+      _pendingAfterBusy: false,
+    };
+    const handler = session._ensureRegistry().get('canvas');
+    const mock = createCanvasMockCtx();
+    const fullBg = (c) => c.op === 'fillRect' && c.w === 100 && c.h === 80;
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawBox(5, 5, 40, 30)');
+    handler._runDraw(comp, mock.ctx, interp, { clear: true });
+    h.assert('one bg clear', mock.calls.filter(fullBg).length, 1);
+    const fillAfterFirst = mock.calls.filter((c) => c.op === 'fillRect').length;
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawBox(60, 60, 15, 15)');
+    handler._runDraw(comp, mock.ctx, interp, { clear: false });
+    h.assert('still one bg', mock.calls.filter(fullBg).length, 1);
+    h.assert('second box drawn', mock.calls.filter((c) => c.op === 'fillRect').length > fillAfterFirst, true);
+  });
+
+  function runCanvasWireS16(h, session) {
+    const src = `inline [canvas] .posDraw:
+    mark(x, y) {
+        style("000000", "aaffaa", 1)
+        drawRect(x, y, 12, 12)
+    }
+:
+comp [canvas] .myCanvas:
+    on: 1
+    width: 100
+    height: 80
+    .posDraw { }
+:
+16wire valX = 0000000000011001
+16wire valY = 0000000000100011
+1wire go = 1
+.myCanvas:{
+    renderer { mark(xPos/s16, yPos/s16) }
+    xPos = valX
+    yPos = valY
+    set = go
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    h.assert('xPos pin', !!comp.pinDefs.xPos, true);
+    h.assert('s16 fmt', comp.pinDefs.xPos.numberFormat, 's16');
+    const canvasHandler = session._ensureRegistry().get('canvas');
+    canvasHandler.constructor.flushCanvas(comp, interp);
+    const mock = createCanvasMockCtx();
+    comp._canvasRendererCalls = parseCanvasRendererBlock('mark(xPos/s16, yPos/s16)');
+    canvasHandler._runDraw(comp, mock.ctx, interp, { clear: true });
+    const rect = mock.calls.find((c) => c.op === 'fillRect' && c.w === 12);
+    h.assert('mark drawn', !!rect, true);
+    h.assert('x from wire', rect && rect.x, 25);
+    h.assert('y from wire', rect && rect.y, 35);
+  }
+
+  regCanvasDual(4732, 4733, 'renderer wire args s16', runCanvasWireS16);
+
+  function runCanvasDualExecClear(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    on: 1
+    width: 100
+    height: 80
+    .demo { }
+:
+1wire scene = 1
+1wire overlay = 1
+.myCanvas:{ renderer { drawScene() } set = scene }
+.myCanvas:{ renderer { drawBox(60, 60, 15, 15) } clear = 0 set = overlay }`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    h.assert('comp ok', !!comp, true);
+    h.assert('last clear off', comp._canvasClear, false);
+    const canvasHandler = session._ensureRegistry().get('canvas');
+    const mock = createCanvasMockCtx();
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawScene()');
+    canvasHandler._runDraw(comp, mock.ctx, interp, { clear: true });
+    const fullBg = (c) => c.op === 'fillRect' && c.w === 100 && c.h === 80;
+    const afterScene = mock.calls.filter(fullBg).length;
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawBox(60, 60, 15, 15)');
+    canvasHandler._runDraw(comp, mock.ctx, interp, { clear: false });
+    h.assert('additive no extra bg', mock.calls.filter(fullBg).length, afterScene);
+  }
+
+  regCanvasDual(4734, 4735, 'dual exec clear=0 additive', runCanvasDualExecClear);
+
+  function runCanvasBusyWireRead(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    width: 100
+    height: 80
+    .demo { }
+:
+1wire mustWait = .myCanvas:busy`;
+    const { interp } = session.run(src);
+    const reg = session._ensureRegistry();
+    const comp = interp.components.get('.myCanvas');
+    h.assert('redirect busy', reg.supportsRedirect('canvas', 'busy'), true);
+    h.assert('mustWait idle', session.getWire(interp, 'mustWait'), '0');
+    interp.setValueAtRef(comp.busyRef, '1');
+    CanvasComponent.propagateBusy(interp, '.myCanvas');
+    h.assert('mustWait follows busy', session.getWire(interp, 'mustWait'), '1');
+  }
+
+  regCanvasDual(4736, 4737, 'busy wire read mustWait = .myCanvas:busy', runCanvasBusyWireRead);
+
+  function runCanvasBusyPoutRedirect(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .myCanvas:
+    on: 1
+    width: 100
+    height: 80
+    .demo { }
+:
+1wire mustWait = 0
+1wire go = 1
+.myCanvas:{
+    busy >= mustWait
+    set = go
+}`;
+    const { interp } = session.run(src);
+    h.assert('mustWait idle after draw', session.getWire(interp, 'mustWait'), '0');
+    const comp = interp.components.get('.myCanvas');
+    interp.setValueAtRef(comp.busyRef, '1');
+    interp._applyComponentWireRedirect('.myCanvas', { target: { var: 'mustWait' } }, 'busy');
+    h.assert('mustWait from redirect', session.getWire(interp, 'mustWait'), '1');
+  }
+
+  regCanvasDual(4738, 4739, 'busy >= mustWait redirect', runCanvasBusyPoutRedirect);
+
   window.LogTScriptTestSuite.finalize();
 })();

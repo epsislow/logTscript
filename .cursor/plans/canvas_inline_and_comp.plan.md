@@ -12,7 +12,7 @@ todos:
     content: "Faza 2: limbaj draw (expr + assign) + builtins drawRect/Text/Line/Circle/style — D13–D28 ✅ ready"
     status: pending
   - id: canvas-f3
-    content: "Faza 3: renderer block + wire args + set/draw/busy/dirty coalesce — D29–D42 draft"
+    content: "Faza 3: renderer block + wire args + set/draw/busy/clear — D29–D40 done"
     status: pending
   - id: canvas-f4
     content: "Faza 4: doc EN + teste + integrare logic/observe/osc — D43–D48 draft"
@@ -1116,15 +1116,16 @@ rAF → busy=1 → [clear?] → run renderer calls → busy=0 → dirty=0
 
 ### Criterii done F3
 
-- [ ] `set` multiplu → un redraw
-- [ ] `set` în timpul `busy` → redraw ulterior, fără eroare
-- [ ] Args literal + wire decode
-- [ ] `busy` pout observabil
-- [ ] `dirty` **nu** e pin public
+- [x] `set` multiplu → un redraw (rAF coalesce)
+- [x] `set` în timpul `busy` → redraw ulterior (`_pendingAfterBusy`)
+- [x] Args literal + wire decode (`pinName/s16`, `/ascii`, `/bool`)
+- [x] `busy` pout observabil
+- [x] `clear` pin (default 1; `clear = 0` additive)
+- [x] `dirty` **nu** e pin public
 
 ### Status F3
 
-**draft**.
+**done** — D29 A, D30 A, D32–D33 A, D35 A, D36 **`clear`** (default 1), D37 A, D38–D40 A. Teste 4730–4735 (wave + legacy unde aplicabil).
 
 ---
 
