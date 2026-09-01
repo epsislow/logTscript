@@ -1172,8 +1172,138 @@ function clcdSymbolFaIconEl(sym, styleNum, extraClass) {
   return el;
 }
 
+var CLCD_PREVIEW_FG = '#6fdc6f';
+var CLCD_PREVIEW_BG = '#1a2e1a';
+
+function clcdPreviewDefaultSize(symName) {
+  if (symName === 'digit7' || symName === 'digit14') return 44;
+  if (symName === 'dp') return 8;
+  if (symName === 'colon') return 32;
+  return 44;
+}
+
+function clcdPreviewDrawDot(ctx, x, y, color, r) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function clcdPreviewDrawDigit7(ctx, x, y, segBits, onColor, offColor, segCount) {
+  const w = 28;
+  const h = 44;
+  const t = 3;
+  const pad = segBits.padEnd(segCount, '0').substring(0, segCount);
+  const seg = function (i) {
+    return pad[i] === '1' ? onColor : offColor;
+  };
+  const drawH = function (sx, sy, len, ci) {
+    ctx.fillStyle = seg(ci);
+    ctx.fillRect(sx, sy, len, t);
+  };
+  const drawV = function (sx, sy, len, ci) {
+    ctx.fillStyle = seg(ci);
+    ctx.fillRect(sx, sy, t, len);
+  };
+  drawH(x + t, y, w - 2 * t, 0);
+  drawV(x, y + t, h / 2 - t, 5);
+  drawV(x + w - t, y + t, h / 2 - t, 1);
+  drawH(x + t, y + h / 2 - t / 2, w - 2 * t, 6);
+  drawV(x, y + h / 2 + t / 2, h / 2 - t, 4);
+  drawV(x + w - t, y + h / 2 + t / 2, h / 2 - t, 2);
+  drawH(x + t, y + h - t, w - 2 * t, 3);
+}
+
+function clcdPreviewDrawCanvasSymbol(ctx, symName, fg, bg, previewSize) {
+  const mockSym = { name: symName, size: previewSize || clcdPreviewDefaultSize(symName) };
+  const scale = (typeof resolveClcdCanvasScale === 'function')
+    ? resolveClcdCanvasScale(mockSym, symName)
+    : 1;
+  ctx.save();
+  ctx.scale(scale, scale);
+  if (symName === 'digit7') {
+    clcdPreviewDrawDigit7(ctx, 0, 0, '1111111', fg, bg, 7);
+  } else if (symName === 'digit14') {
+    clcdPreviewDrawDigit7(ctx, 0, 0, '1111111', fg, bg, 7);
+  } else if (symName === 'dp') {
+    clcdPreviewDrawDot(ctx, 4, 28, fg, 4);
+  } else if (symName === 'colon') {
+    clcdPreviewDrawDot(ctx, 0, 10, fg, 3);
+    clcdPreviewDrawDot(ctx, 0, 22, fg, 3);
+  }
+  ctx.restore();
+}
+
+function clcdPreviewCanvasDimensions(symName, compact) {
+  const previewSize = compact
+    ? (symName === 'digit7' || symName === 'digit14' ? 28 : symName === 'colon' ? 20 : 8)
+    : clcdPreviewDefaultSize(symName);
+  const mockSym = { name: symName, size: previewSize };
+  const scale = (typeof resolveClcdCanvasScale === 'function')
+    ? resolveClcdCanvasScale(mockSym, symName)
+    : 1;
+  if (symName === 'digit7' || symName === 'digit14') {
+    return { w: Math.ceil(28 * scale), h: Math.ceil(44 * scale), previewSize: previewSize };
+  }
+  if (symName === 'dp') {
+    return { w: Math.ceil(12 * scale), h: Math.ceil(36 * scale), previewSize: previewSize };
+  }
+  if (symName === 'colon') {
+    return { w: Math.ceil(8 * scale), h: Math.ceil(32 * scale), previewSize: previewSize };
+  }
+  return { w: 28, h: 44, previewSize: previewSize };
+}
+
+/** Canvas-drawn CLCD symbol preview (digit7, dp, colon, …). */
+function clcdSymbolCanvasEl(sym, extraClass, compact) {
+  if (!sym || sym.kind !== 'canvas') return null;
+  const dims = clcdPreviewCanvasDimensions(sym.name, compact);
+  const canvas = document.createElement('canvas');
+  canvas.width = dims.w;
+  canvas.height = dims.h;
+  canvas.className = (extraClass || 'clcd-symbol-preview-canvas').trim();
+  canvas.setAttribute('aria-hidden', 'true');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  ctx.fillStyle = CLCD_PREVIEW_BG;
+  ctx.fillRect(0, 0, dims.w, dims.h);
+  clcdPreviewDrawCanvasSymbol(ctx, sym.name, CLCD_PREVIEW_FG, CLCD_PREVIEW_BG, dims.previewSize);
+  return canvas;
+}
+
+function clcdSymbolGalleryCell(sym, kindLabel) {
+  const cell = document.createElement('div');
+  cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
+  let iconEl = null;
+  if (sym.kind === 'canvas') {
+    iconEl = clcdSymbolCanvasEl(sym, 'clcd-symbol-preview-canvas');
+  } else if (sym.kind === 'text') {
+    iconEl = document.createElement('span');
+    iconEl.className = 'clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas';
+    iconEl.textContent = 'Aa';
+    iconEl.setAttribute('aria-hidden', 'true');
+  }
+  const nameEl = document.createElement('span');
+  nameEl.className = 'clcd-symbol-preview-name';
+  nameEl.textContent = sym.name;
+  const styleEl = document.createElement('span');
+  styleEl.className = 'clcd-symbol-preview-style';
+  styleEl.textContent = kindLabel;
+  if (iconEl) cell.appendChild(iconEl);
+  cell.appendChild(nameEl);
+  cell.appendChild(styleEl);
+  return cell;
+}
+
 function clcdSymbolMenuIconEl(sym) {
-  return clcdSymbolFaIconEl(sym, sym.defaultStyle, 'clcd-symbol-menu-icon');
+  if (!sym) return null;
+  if (sym.kind === 'fa') return clcdSymbolFaIconEl(sym, sym.defaultStyle, 'clcd-symbol-menu-icon');
+  if (sym.kind === 'canvas') {
+    return clcdSymbolCanvasEl(sym, 'clcd-symbol-menu-icon clcd-symbol-preview-canvas', true);
+  }
+  return null;
 }
 
 function filterClcdSymbolSearch(query) {
@@ -1268,14 +1398,8 @@ function mountClcdSymbolSearch(host) {
   canvasGrid.className = 'clcd-symbol-preview-grid';
 
   CLCD_SYMBOL_REGISTRY.filter(function (s) { return s.kind === 'canvas' || s.kind === 'text'; }).forEach(function (sym) {
-    const cell = document.createElement('div');
-    cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
-    const previewText = sym.kind === 'text' ? 'Aa' : sym.name;
     const kindLabel = sym.kind === 'text' ? 'text' : 'canvas';
-    cell.innerHTML = '<span class="clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas">' + previewText + '</span>'
-      + '<span class="clcd-symbol-preview-name">' + sym.name + '</span>'
-      + '<span class="clcd-symbol-preview-style">' + kindLabel + '</span>';
-    canvasGrid.appendChild(cell);
+    canvasGrid.appendChild(clcdSymbolGalleryCell(sym, kindLabel));
   });
   canvasSection.appendChild(canvasGrid);
 
@@ -1313,21 +1437,8 @@ function mountClcdSymbolSearch(host) {
         grid.appendChild(cell);
       });
       snippet.textContent = clcdSymbolSnippet(sym, sym.defaultStyle);
-    } else if (sym.kind === 'text') {
-      const cell = document.createElement('div');
-      cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
-      cell.innerHTML = '<span class="clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas">Aa</span>'
-        + '<span class="clcd-symbol-preview-name">' + sym.name + '</span>'
-        + '<span class="clcd-symbol-preview-style">text</span>';
-      grid.appendChild(cell);
-      snippet.textContent = clcdSymbolSnippet(sym);
-    } else {
-      const cell = document.createElement('div');
-      cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
-      cell.innerHTML = '<span class="clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas">' + sym.name + '</span>'
-        + '<span class="clcd-symbol-preview-name">' + sym.name + '</span>'
-        + '<span class="clcd-symbol-preview-style">canvas</span>';
-      grid.appendChild(cell);
+    } else if (sym.kind === 'text' || sym.kind === 'canvas') {
+      grid.appendChild(clcdSymbolGalleryCell(sym, sym.kind === 'text' ? 'text' : 'canvas'));
       snippet.textContent = clcdSymbolSnippet(sym);
     }
 

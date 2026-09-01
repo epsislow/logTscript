@@ -1,28 +1,31 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–4 MVP; backlog amânat 1+a…; decizii de la D1 (draft)."
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–4 MVP done; Faza 5 = fontFamily/fontStyle (1+k); backlog 1+a…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
     status: pending
   - id: canvas-f1
-    content: "Faza 1: parse inline/comp [canvas] + attrs width/height/bgColor + device gol — D1–D12 ✅ ready"
-    status: pending
+    content: "Faza 1: parse inline/comp [canvas] + attrs — D1–D12 done"
+    status: completed
   - id: canvas-f2
-    content: "Faza 2: limbaj draw (expr + assign) + builtins drawRect/Text/Line/Circle/style — D13–D28 ✅ ready"
-    status: pending
+    content: "Faza 2: limbaj draw + builtins — D13–D28 done"
+    status: completed
   - id: canvas-f3
-    content: "Faza 3: renderer block + wire args + set/draw/busy/clear — D29–D40 done"
-    status: pending
+    content: "Faza 3: renderer + wire args + clear/busy — D29–D40 done"
+    status: completed
   - id: canvas-f4
-    content: "Faza 4: doc EN + teste + integrare logic/observe — D43–D48 done"
+    content: "Faza 4: doc EN + teste + observe e2e — D43–D48 done"
+    status: completed
+  - id: canvas-f5
+    content: "Faza 5: fontFamily + fontStyle + textAlign start/end — D22e / 1+k → D49–D52 draft"
     status: pending
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–4**; amânări **1+a, 1+b, …**.  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–5** (MVP **1–4** done); amânări **1+a, 1+b, …** (fără **1+k** — promovat **F5**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -136,11 +139,12 @@ D28 A ✅
 
 | Fază | Decizii | Status |
 | ---- | ------- | ------ |
-| **Faza 1** Scaffold parse + device + attrs | **D1–D12** ✅ | **(ready-to-implement)** |
-| **Faza 2** Limbaj draw + builtins | **D13–D28** ✅ | **(ready-to-implement)** |
-| **Faza 3** Renderer + wires + set/draw/busy | **D29–D42** draft | — |
-| **Faza 4** Doc + teste + integrare | **D43–D48** done | — |
-| *(amânate)* | — | **1+a …** |
+| **Faza 1** Scaffold parse + device + attrs | **D1–D12** | **done** |
+| **Faza 2** Limbaj draw + builtins | **D13–D28** | **done** |
+| **Faza 3** Renderer + wires + set/draw/busy/clear | **D29–D40** | **done** |
+| **Faza 4** Doc + teste + integrare observe | **D43–D48** | **done** |
+| **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** draft | **(next)** |
+| *(amânate)* | **1+a …** (fără 1+k) | — |
 
 ---
 
@@ -160,14 +164,14 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ⏳ | **1+h** | Layer / offscreen buffer | Multi-layer compose | — | — |
 | ⏳ | **1+i** | `fill` vs `stroke` separate API | Extindere style | — | D18 |
 | ⏳ | **1+j** | Alpha 8-hex | `"rrggbbaa"` — **D16b** ✅; fără keyword `transparent` |
-| ⏳ | **1+k** | Font family + `fontStyle` | **`fontFamily("monospace"\|…)`** listă mică allowed; **`fontStyle(family, size)`** sugar; + `textAlign` `start`/`end` | post-F2 | D22d, D22e |
+| ✅ | **1+k** | Font family + `fontStyle` | **`fontFamily("mono"\|"sans"\|"serif")`**; **`fontStyle(family, size)`**; + `textAlign` `start`/`end` | **Faza 5** | D22e, D49–D52 |
 | ⏳ | **1+p** | Text contur (`strokeText`) | `drawText` = fill only (**D22c**); contur → backlog | — | D22c |
 | ⏳ | **1+l** | Vector wire args (`shotsXVector/s16`) | Sketch menționează; MVP scalar | — | D33 |
 | ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
 | ⏸ | **1+n** | *(slot liber)* | — | — | — |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată MVP:** **F1 → F2 → F3 → F4**; apoi **1+a** / **1+b** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1 → F2 → F3 → F4** ✅; **F5** (font) în curs; apoi **1+a** / **1+b** la cerere; input **1+f** după observe+games.
 
 ---
 
@@ -841,7 +845,7 @@ drawText(160, 20, "Score: 7")
 | `textAlign("center")` | `ctx.textAlign = 'center'` |
 | `textAlign("right")` | `ctx.textAlign = 'right'` |
 
-**Default:** **`"left"`** (ca JS). `start` / `end` → backlog **1+k**.
+**Default:** **`"left"`** (ca JS). `start` / `end` → **Faza 5** (**D51**).
 
 **Decizie:** **✅** confirmed user 2026-09-01.
 
@@ -877,7 +881,7 @@ Builtin **`fontSize(n)`** — `n` int/float, **pixeli**; setează partea de măr
 | **B** | `drawText(x,y,text,size)` — respins pentru MVP |
 | **C** | amânat — respins (user: vital în MVP) |
 
-**MVP:** familia rămâne **`monospace` fix** — schimbare familie → **1+k** (**D22e**).
+**MVP:** familia rămâne **`monospace` fix** — schimbare familie → **Faza 5** (**D22e** / **D49**).
 
 ```logts
 styleFill("ffffff")
@@ -894,26 +898,9 @@ drawText(10, 10, "FPS")
 
 **Decizie:** **A ✅** — confirmed user 2026-09-01.
 
-### D22e — `fontFamily` + `fontStyle` **(amânat — 1+k, draft)**
+### D22e — `fontFamily` + `fontStyle` → **Faza 5** (promovat din **1+k**)
 
-Fază ulterioară (aceeași sub-fază text **1+k**):
-
-| Builtin (draft) | Semnificație |
-| --------------- | ------------ |
-| **`fontFamily(name)`** | `name` din **listă mică allowed** — ex. `"monospace"`, `"sans"`, `"serif"` (lista exactă la implementare; aliniat CLCD `label` family dacă e cazul) |
-| **`fontStyle(family, size)`** | setează **ambele** dintr-un apel — echivalent `fontFamily(family)` + `fontSize(size)` |
-
-```logts
-# post-MVP (1+k)
-fontStyle("sans", 18)
-drawText(100, 40, "Menu")
-
-fontFamily("serif")
-fontSize(12)
-drawText(10, 200, "caption")
-```
-
-**Decizie:** amânat **1+k** — direcție confirmată user 2026-09-01; listă allowed TBD la promovare.
+Vezi [Faza 5](#faza-5--fontfamily--fontstyle-1k-promovat) — **D49–D52**.
 
 ### Mapping JS (rezumat post-D18b)
 
@@ -930,7 +917,7 @@ drawText(10, 200, "caption")
 | `drawLine(...)` | `stroke` |
 | `drawText(...)` | `fillText` + font/align/baseline curente |
 
-*(D22n închis. **D22e** → **1+k**.)*
+*(D22n închis. **D22e** → **Faza 5**.)*
 
 ### Scope F2
 
@@ -1208,6 +1195,77 @@ comp [canvas] .gameCanvas:
 
 ---
 
+## Faza 5 — `fontFamily` + `fontStyle` (**1+k** promovat)
+
+> **Status:** draft — **D49–D52**.  
+> **Depinde:** F2 (text builtins existente: `fontSize`, `drawText`, `textAlign`, `textBaseline`).  
+> **Promovat din backlog:** **1+k** (user 2026-09-01).
+
+### Scop
+
+| Item | Detaliu |
+| ---- | ------- |
+| **`fontFamily(name)`** | Schimbă familia din lista allowed (aliniat CLCD `label` / `family:`) |
+| **`fontStyle(family, size)`** | Sugar: `fontFamily` + `fontSize` într-un apel |
+| **`textAlign("start"\|"end")`** | Extindere D22a (în MVP doar left/center/right) |
+| **Engine** | `ctx.font = size + "px " + cssStack` — state deja are `fontFamily` intern (fix `monospace` azi) |
+| **Doc + teste** | `canvas-builtins.md`, `logts-play`, **4742+** wave + legacy |
+
+### Sintaxă țintă
+
+```logts
+fontStyle("sans", 18)
+textAlign("start")
+drawText(100, 40, "Menu")
+
+fontFamily("serif")
+fontSize(12)
+textBaseline("alphabetic")
+drawText(10, 200, "caption")
+```
+
+### Mapare familie → CSS (draft — aliniat CLCD)
+
+| Token LogT | `ctx.font` stack (ca CLCD `label`) |
+| ---------- | ----------------------------------- |
+| **`"mono"`** | `ui-monospace, Consolas, monospace` |
+| **`"sans"`** | `system-ui, Segoe UI, sans-serif` |
+| **`"serif"`** | `Georgia, Times New Roman, serif` |
+
+**Notă:** token **`"mono"`** (nu `"monospace"`) — același vocabular ca `comp [clcd]` `family: mono|sans|serif`. Alias `"monospace"` → acceptat sau eroare: **D49**.
+
+### Decizii **D49–D52** (draft)
+
+| ID | Subiect | Opțiuni |
+| -- | ------- | ------- |
+| **D49** | Tokeni `fontFamily` / `fontStyle` | **A (recommended)** `mono` \| `sans` \| `serif` (ca CLCD) · **B** `monospace`/`sans-serif`/`serif` literal JS · **C** ambele (alias) |
+| **D50** | `fontStyle(family, size)` | **A (recommended)** da — 2 args, setează family + size · **B** doar `fontFamily`, fără sugar |
+| **D51** | `textAlign` `start`/`end` | **A (recommended)** da în F5 · **B** amână post-F5 |
+| **D52** | Familie invalidă | **A (recommended)** runtime error clar „allowed: mono, sans, serif” · **B** fallback `mono` |
+
+### Scope F5
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F5a** | Builtins `fontFamily`, `fontStyle` în assembler + engine + mock `fillText` font string |
+| **F5b** | `textAlign("start"\|"end")` |
+| **F5c** | Doc `canvas-builtins.md` + exemplu `logts-play` (Load & Run) |
+| **F5d** | Teste **4742+** (wave + legacy), `doc_verify` |
+
+### Criterii done F5
+
+- [ ] `fontFamily("sans")` + `fontSize` → `ctx.font` corect în widget + mock
+- [ ] `fontStyle("serif", 20)` echivalent cu apelurile separate
+- [ ] `textAlign("start")` / `("end")` acceptate
+- [ ] Familie necunoscută → eroare
+- [ ] Doc EN + verify + suite verde
+
+### Status F5
+
+**(next)** — promovat **1+k**; așteaptă confirmare **D49–D52** (recomandat: toate **A**).
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -1241,7 +1299,11 @@ comp [canvas] .gameCanvas:
 | **D22b** | 2 | `textBaseline` builtin | **✅** default `alphabetic` |
 | **D22c** | 2 | drawText = fill only | **A ✅** |
 | **D22d** | 2 | `fontSize(n)` px, default 14 | **A ✅** |
-| **D22e** | 2 | `fontFamily` / `fontStyle` | **1+k** amânat |
+| **D22e** | 5 | `fontFamily` / `fontStyle` | **F5** (1+k) |
+| **D49** | 5 | tokeni family mono/sans/serif | **A** |
+| **D50** | 5 | builtin `fontStyle(family, size)` | **A** |
+| **D51** | 5 | `textAlign` start/end | **A** |
+| **D52** | 5 | familie invalidă → error | **A** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -1292,6 +1354,7 @@ comp [canvas] .gameCanvas:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
+| 2026-09-01 | **1+k → Faza 5** — `fontFamily`/`fontStyle` + `textAlign` start/end; decizii **D49–D52** draft; teste **4742+** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
 | 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |
 
