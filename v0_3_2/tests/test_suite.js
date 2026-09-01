@@ -52523,5 +52523,129 @@ comp [canvas] .screen:
     });
   });
 
+  reg(4790, 'canvas', 'parse vector param xs[] in method', function(h) {
+    const prog = parseCanvasBody(`drawStrip(xs[]) {
+        drawRect(0, 0, 1, 1)
+    }`);
+    const m = prog.methods.drawStrip;
+    h.assert('param name', m.params[0].name, 'xs');
+    h.assert('param vector', m.params[0].vector, true);
+  });
+
+  reg(4791, 'canvas', 'parse vectorLen and xs[i] AST', function(h) {
+    const prog = parseCanvasBody(`draw(xs[]) {
+        n = vectorLen(xs)
+        x = xs[i]
+    }`);
+    const body = prog.methods.draw.body;
+    h.assert('vectorLen call', body[0].expr.kind, 'call');
+    h.assert('vectorLen name', body[0].expr.name, 'vectorLen');
+    h.assert('index kind', body[1].expr.kind, 'index');
+    h.assert('index var', body[1].expr.object.name, 'xs');
+  });
+
+  function runCanvasVectorStrip(h) {
+    const prog = parseCanvasBody(`drawStrip(xs[]) {
+        for (i = 0; i < vectorLen(xs); i++) {
+            styleFill("ff0000")
+            drawRect(xs[i] * 10, 0, 8, 8)
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('drawStrip(shotsX/s16)'),
+      mock.ctx,
+      { skipOnError: false, pinEnv: { shotsX: [2, 4, 6, 8] } }
+    );
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('four rects', rects.length, 4);
+    h.assert('x0', rects[0].x, 20);
+    h.assert('x2', rects[2].x, 60);
+  }
+
+  regCanvasDual(4792, 4793, 'vector strip pinEnv array', runCanvasVectorStrip);
+
+  function runCanvasVectorEnemies(h) {
+    const prog = parseCanvasBody(`drawEnemies(posx[], posy[]) {
+        for (i = 0; i < vectorLen(posx); i++) {
+            styleFill("00ff00")
+            drawRect(posx[i], posy[i], 6, 6)
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('drawEnemies(enemyX/s16, enemyY/s16)'),
+      mock.ctx,
+      { skipOnError: false, pinEnv: { enemyX: [10, 30, 50], enemyY: [5, 15, 25] } }
+    );
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('three rects', rects.length, 3);
+    h.assert('corner', rects[2].x, 50);
+    h.assert('corner y', rects[2].y, 25);
+  }
+
+  regCanvasDual(4794, 4795, 'vector enemies posx posy', runCanvasVectorEnemies);
+
+  reg(4796, 'canvas', 'vectorLen on scalar param error', function(h) {
+    const prog = parseCanvasBody(`drawOne(x) {
+        n = vectorLen(x)
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('not a vector', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('drawOne(5)'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  reg(4797, 'canvas', 'xs[i] on scalar param error', function(h) {
+    const prog = parseCanvasBody(`drawOne(x) {
+        drawRect(x[0], 0, 5, 5)
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('not a vector', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('drawOne(5)'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  function runCanvasWireVectorE2E(h, session) {
+    const src = `inline [canvas] .posDraw:
+    drawStrip(xs[]) {
+        for (i = 0; i < vectorLen(xs); i++) {
+            style("000000", "aaffaa", 1)
+            drawRect(xs[i] * 4, 40, 6, 6)
+        }
+    }
+:
+comp [canvas] .myCanvas:
+    on: 1
+    width: 100
+    height: 80
+    .posDraw { }
+:
+16wire[4] trajectory = 0000000000000010 + 0000000000000100 + 0000000000000110 + 0000000000001000
+1wire go = 1
+.myCanvas:{
+    renderer { drawStrip(shotsX/s16) }
+    shotsX = trajectory
+    set = go
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.myCanvas');
+    h.assert('shotsX pin', !!comp.pinDefs.shotsX, true);
+    h.assert('vector required', comp.pinDefs.shotsX.vectorRequired, true);
+    h.assert('vector meta', comp.pinDefs.shotsX.vector.elementCount, 4);
+    const canvasHandler = session._ensureRegistry().get('canvas');
+    canvasHandler.constructor.flushCanvas(comp, interp);
+    const mock = createCanvasMockCtx();
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawStrip(shotsX/s16)');
+    canvasHandler._runDraw(comp, mock.ctx, interp, { clear: true });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect' && c.w === 6);
+    h.assert('four tiles', rects.length, 4);
+    h.assert('tile x', rects[1].x, 16);
+  }
+
+  regCanvasDual(4798, 4799, 'vector wire e2e trajectory assign', runCanvasWireVectorE2E);
+
   window.LogTScriptTestSuite.finalize();
 })();

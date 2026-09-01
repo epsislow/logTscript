@@ -117,7 +117,7 @@ function canvasTokenize(src) {
       i++;
       continue;
     }
-    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';') {
+    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === '[' || ch === ']') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
       continue;
@@ -194,14 +194,24 @@ class CanvasParser {
     return { methods };
   }
 
+  parseParam() {
+    const nameTok = this.eat('ID');
+    let vector = false;
+    if (this.match('SYM', '[')) {
+      this.eat('SYM', ']');
+      vector = true;
+    }
+    return { name: nameTok.value, vector, line: nameTok.line };
+  }
+
   parseMethod() {
     const nameTok = this.eat('ID');
     this.eat('SYM', '(');
     const params = [];
     if (!this.match('SYM', ')')) {
-      params.push(this.eat('ID').value);
+      params.push(this.parseParam());
       while (this.match('SYM', ',')) {
-        params.push(this.eat('ID').value);
+        params.push(this.parseParam());
       }
       this.eat('SYM', ')');
     }
@@ -507,6 +517,11 @@ class CanvasParser {
       const postOp = this.consumePostfixIncDec();
       if (postOp) {
         return { kind: 'postfix', name: id, op: postOp, line: idTok.line };
+      }
+      if (this.match('SYM', '[')) {
+        const index = this.parseExpr();
+        this.eat('SYM', ']');
+        return { kind: 'index', object: { kind: 'var', name: id }, index, line: idTok.line };
       }
       return { kind: 'var', name: id };
     }

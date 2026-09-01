@@ -219,6 +219,29 @@ function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, ca
   }
 }
 
+function canvasParamName(param) {
+  if (param && typeof param === 'object') return param.name;
+  return param;
+}
+
+function canvasVectorLength(value, line) {
+  if (!Array.isArray(value)) {
+    throw new Error(`canvas: not a vector${line != null ? ` (line ${line})` : ''}`);
+  }
+  return value.length;
+}
+
+function canvasVectorIndex(obj, idx, line) {
+  if (!Array.isArray(obj)) {
+    throw new Error(`canvas: not a vector${line != null ? ` (line ${line})` : ''}`);
+  }
+  const i = Number(idx);
+  if (!Number.isFinite(i) || i < 0 || i >= obj.length) {
+    throw new Error(`canvas: vector index out of range${line != null ? ` (line ${line})` : ''}`);
+  }
+  return obj[i];
+}
+
 function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
   if (!expr) return 0;
   switch (expr.kind) {
@@ -240,6 +263,11 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
     }
     case 'postfix':
       return canvasEvalPostfix(expr, env, callMethodFn, line, pinEnv);
+    case 'index': {
+      const obj = canvasEvalExpr(expr.object, env, callMethodFn, line, pinEnv);
+      const idx = canvasEvalExpr(expr.index, env, callMethodFn, line, pinEnv);
+      return canvasVectorIndex(obj, idx, expr.line != null ? expr.line : line);
+    }
     case 'unary': {
       const v = canvasEvalExpr(expr.expr, env, callMethodFn, line, pinEnv);
       return expr.op === '-' ? -v : v;
@@ -256,6 +284,13 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
       }
     }
     case 'call':
+      if (expr.name === 'vectorLen') {
+        if (!expr.args || expr.args.length !== 1) {
+          throw new Error(`canvas: vectorLen expects 1 arg${line != null ? ` (line ${line})` : ''}`);
+        }
+        const arr = canvasEvalExpr(expr.args[0], env, callMethodFn, line, pinEnv);
+        return canvasVectorLength(arr, expr.line != null ? expr.line : line);
+      }
       if (CANVAS_BUILTIN_SET.has(expr.name)) {
         throw new Error(`canvas: builtin '${expr.name}' cannot be used as expression`);
       }
@@ -515,9 +550,9 @@ function canvasRunBuiltin(name, args, state, ctx, evalArg, line) {
 function canvasExecuteMethod(method, argValues, program, state, ctx, options) {
   const env = {};
   for (let i = 0; i < method.params.length; i++) {
-    env[method.params[i]] = argValues[i];
+    env[canvasParamName(method.params[i])] = argValues[i];
   }
-  const locals = new Set(method.params);
+  const locals = new Set(method.params.map((p) => canvasParamName(p)));
 
   const callMethodFn = (name, args, line) => {
     const m = program.methods[name];

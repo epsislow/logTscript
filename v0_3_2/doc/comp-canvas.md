@@ -106,6 +106,28 @@ The `renderer { }` block **invokes** methods from the linked inline — it does 
 
 Arguments in `renderer` may be **literals** (numbers, strings) or **wire references** using `pinName/format` (e.g. `xPos/s16`, `label/ascii`, `flag/bool`). Pins are inferred automatically from renderer args and can be assigned in the same exec block (`xPos = myWire`).
 
+**Vector wires:** if the called method declares a vector param (`drawStrip(xs[])`), the matching renderer pin expects a `Nwire[M]` wire at assign time:
+
+```logts
+inline [canvas] .traj:
+    drawStrip(xs[]) {
+        for (i = 0; i < vectorLen(xs); i++) {
+            drawRect(xs[i] * 4, 40, 6, 6)
+        }
+    }
+:
+
+16wire[4] trajectory = ...
+
+.plot:{
+    renderer { drawStrip(shotsX/s16) }
+    shotsX = trajectory
+    set = go
+}
+```
+
+Scalar/scalar mismatch (e.g. `shotsX = valX` when `xs[]`) is a runtime error at assign.
+
 Read **`busy`** from another wire or use it to stall a CPU (`wait = mustWait`):
 
 ```logts

@@ -11816,6 +11816,28 @@ The \`renderer { }\` block **invokes** methods from the linked inline — it doe
 
 Arguments in \`renderer\` may be **literals** (numbers, strings) or **wire references** using \`pinName/format\` (e.g. \`xPos/s16\`, \`label/ascii\`, \`flag/bool\`). Pins are inferred automatically from renderer args and can be assigned in the same exec block (\`xPos = myWire\`).
 
+**Vector wires:** if the called method declares a vector param (\`drawStrip(xs[])\`), the matching renderer pin expects a \`Nwire[M]\` wire at assign time:
+
+\`\`\`logts
+inline [canvas] .traj:
+    drawStrip(xs[]) {
+        for (i = 0; i < vectorLen(xs); i++) {
+            drawRect(xs[i] * 4, 40, 6, 6)
+        }
+    }
+:
+
+16wire[4] trajectory = ...
+
+.plot:{
+    renderer { drawStrip(shotsX/s16) }
+    shotsX = trajectory
+    set = go
+}
+\`\`\`
+
+Scalar/scalar mismatch (e.g. \`shotsX = valX\` when \`xs[]\`) is a runtime error at assign.
+
 Read **\`busy\`** from another wire or use it to stall a CPU (\`wait = mustWait\`):
 
 \`\`\`logts
@@ -21615,6 +21637,47 @@ scanRows(rows) {
 | **Postfix only** | \`i++\` and \`i--\` as statement or in \`for\` step — prefix \`++i\` / \`--i\` not allowed |
 | **\`break\` / \`continue\`** | Only inside \`for\` / \`while\`; \`break\` exits innermost loop, \`continue\` next iteration (\`for\` runs step) |
 | **Safety cap** | Max **10 000** iterations per loop — runtime error if exceeded |
+
+---
+
+## Vector parameters (\`param[]\`)
+
+Declare vector args in the **method signature** with \`[]\`. Connect a \`Nwire[M]\` script wire in the exec block (\`pin = wire\` — same as scalar).
+
+\`\`\`logts
+drawStrip(xs[]) {
+    for (i = 0; i < vectorLen(xs); i++) {
+        styleFill("aaffaa")
+        drawRect(xs[i] * 10, 0, 8, 8)
+    }
+}
+
+drawEnemies(posx[], posy[]) {
+    for (i = 0; i < vectorLen(posx); i++) {
+        drawRect(posx[i], posy[i], 6, 6)
+    }
+}
+\`\`\`
+
+In \`renderer\` and assign (see [comp-canvas.md](comp-canvas.md)):
+
+\`\`\`logts
+16wire[4] trajectory = ...
+
+.plot:{
+    renderer { drawStrip(shotsX/s16) }
+    shotsX = trajectory
+    set = go
+}
+\`\`\`
+
+| Feature | Rules |
+|---------|--------|
+| **\`param[]\`** | Vector param — value is a JS array (\`number[]\` or \`string[]\` per pin format) |
+| **\`xs[i]\`** | Index element — error on scalar param |
+| **\`vectorLen(xs)\`** | Array length — error on scalar param (does not return \`1\`) |
+| **Formats** | Same as scalar pins: \`/s16\`, \`/u16\`, \`/ascii\`, \`/bool\`, … per element |
+| **Assign** | \`pin = wire\` only — wire must match (\`16wire[N]\` for vector, \`16wire\` for scalar) |
 
 ---
 

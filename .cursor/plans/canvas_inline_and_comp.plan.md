@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–8 done; Faza 9 = vector wire args (1+l); backlog 1+c…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–9 done; backlog 1+c…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -30,8 +30,8 @@ todos:
     content: "Faza 8: for/while loops + break/continue — 1+b → D69–D75 done"
     status: completed
   - id: canvas-f9
-    content: "Faza 9: vector wire args — 1+l → D76–D83 (param[] confirmat)"
-    status: pending
+    content: "Faza 9: vector wire args — 1+l → D76–D83 done"
+    status: completed
 isProject: false
 ---
 
@@ -159,7 +159,7 @@ D28 A ✅
 | **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
 | **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
 | **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** | **done** |
-| **Faza 9** Vector wire args (**1+l**) | **D76–D83** | **(ready-to-implement)** |
+| **Faza 9** Vector wire args (**1+l**) | **D76–D83** | **done** |
 | *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+l, 1+n) | — |
 
 ---
@@ -187,7 +187,7 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1–F8** ✅; **F9** (vector wire args) **next**; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F9** ✅; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
 
 ---
 
@@ -1714,7 +1714,7 @@ while:
 
 ## Faza 9 — Vector wire args în `renderer` (**1+l** promovat)
 
-> **Status:** **(ready-to-implement)** — **D76–D83** confirmate user 2026-09-01 (**D76 C** — `param[]` în semnătură metodă).  
+> **Status:** **done** — **D76–D83** confirmate; `param[]` + teste **4790–4799**.  
 > **Depinde:** F3 (wire args scalar + pin inference), F8 (loops pentru iterare pe vector).  
 > **Promovat din backlog:** **1+l** (user 2026-09-01); continuare **D34** amânat MVP.
 
@@ -1897,25 +1897,16 @@ canvasEvalExpr:
 
 ### Criterii done F9
 
-- [ ] `drawShots(xs[])` + `shotsX = trajectory` → 8 `drawRect`
-- [ ] `drawEnemies(posx[], posy[])` nested coords
-- [ ] `vectorLen(xs)` pe param scalar → eroare
-- [ ] `shotsX = scalarWire` la pin vector → eroare la assign
-- [ ] Scalar `mark(x, y)` regresie 4732
-- [ ] Doc + suite **4790+** verde
-
-### Non-goals F9
-
-- `shotsX[] = wire` la assign
-- `pin/s16[]` în renderer
-- Matrix `16wire[r,c]`
-- Mutare elemente `xs[i] = …`
-- Vector în condiții `if (xs)` truthiness array (defer — sau D78 note)
-- Auto-expand `renderer { drawPt(shotsX[i]/s16) }` per index
+- [x] `drawShots(xs[])` + `shotsX = trajectory` → N `drawRect`
+- [x] `drawEnemies(posx[], posy[])` nested coords
+- [x] `vectorLen(xs)` pe param scalar → eroare
+- [x] `shotsX = scalarWire` la pin vector → eroare la assign
+- [x] Scalar `mark(x, y)` regresie 4732
+- [x] Doc + suite **4790+** verde
 
 ### Status F9
 
-**(ready-to-implement)** — **D76–D83** confirmate; model **param[]** + assign `pin = wire`.
+**done** — `param[]` în metodă; assign `pin = wire`; teste **4790–4799**.
 
 ---
 
@@ -2039,7 +2030,7 @@ canvasEvalExpr:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
-| 2026-09-01 | **F9 D76–D83 confirmate** — **D76 C** `param[]` în metodă; assign `pin=wire`; `vectorLen` eroare pe scalar |
+| 2026-09-01 | **F9 done** — `param[]` vector args; `vectorLen`/`xs[i]`; teste **4790–4799** |
 | 2026-09-01 | **1+l → Faza 9** — vector wire args renderer; teste **4790+** |
 | 2026-09-01 | **F8 done** — break/continue; teste **4780–4788** |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |

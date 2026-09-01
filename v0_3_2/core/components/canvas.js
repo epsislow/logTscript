@@ -82,7 +82,7 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     return ['busy'];
   }
 
-  _ensurePin(comp, wireRef, ctx, compName) {
+  _ensurePin(comp, wireRef, ctx, compName, vectorRequired) {
     if (!comp.pinDefs) comp.pinDefs = {};
     if (!comp.pinStorage) comp.pinStorage = {};
     const pinName = wireRef.pinName;
@@ -92,49 +92,76 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
           || (existing.numberFormat || null) !== (wireRef.numberFormat || null)) {
         throw Error(`canvas ${compName}: pin '${pinName}' format mismatch`);
       }
+      if (vectorRequired != null && existing.vectorRequired != null
+          && existing.vectorRequired !== vectorRequired) {
+        throw Error(`canvas ${compName}: pin '${pinName}' vector/scalar mismatch`);
+      }
+      if (vectorRequired != null) existing.vectorRequired = vectorRequired;
       return;
     }
     const bitWidthFn = typeof canvasPinBitWidth === 'function' ? canvasPinBitWidth : null;
     const bits = bitWidthFn
-      ? bitWidthFn(wireRef.bindType, wireRef.numberFormat)
+      ? bitWidthFn(wireRef.bindType, wireRef.numberFormat, null)
       : 16;
     const storageIdx = ctx.storeValue('0'.repeat(bits));
     comp.pinDefs[pinName] = {
       bindType: wireRef.bindType,
       numberFormat: wireRef.numberFormat || null,
       bits,
+      vectorRequired: vectorRequired != null ? !!vectorRequired : false,
+      vector: null,
     };
     comp.pinStorage[pinName] = {
       ref: `&${storageIdx}`,
       bits,
       bindType: wireRef.bindType,
       numberFormat: wireRef.numberFormat || null,
+      vector: null,
     };
   }
 
-  _ensurePinsFromCalls(comp, calls, ctx, compName) {
+  _ensurePinsFromCalls(comp, calls, ctx, compName, methods) {
     const collectFn = typeof canvasCollectWireRefsFromCalls === 'function'
       ? canvasCollectWireRefsFromCalls : null;
     if (!collectFn) return;
-    for (const ref of collectFn(calls)) {
-      this._ensurePin(comp, ref, ctx, compName);
+    const refs = collectFn(calls);
+    for (let i = 0; i < (calls || []).length; i++) {
+      const call = calls[i];
+      const method = methods && methods[call.name];
+      for (let j = 0; j < (call.args || []).length; j++) {
+        const arg = call.args[j];
+        if (!arg || arg.kind !== 'wireRef') continue;
+        const param = method && method.params[j];
+        const vectorRequired = param ? !!param.vector : false;
+        this._ensurePin(comp, arg, ctx, compName, vectorRequired);
+      }
     }
+    const alignFn = typeof canvasAlignPinsFromRendererCalls === 'function'
+      ? canvasAlignPinsFromRendererCalls : null;
+    if (alignFn && methods) alignFn(comp, calls, methods, compName);
   }
 
-  _ensurePinsFromRendererRaw(comp, raw, ctx, compName) {
+  _ensurePinsFromRendererRaw(comp, raw, ctx, compName, methods) {
     const parseFn = typeof parseCanvasRendererBlock === 'function'
       ? parseCanvasRendererBlock : null;
     if (!parseFn || !raw) return;
     const calls = parseFn(raw, `canvas ${compName}`);
-    this._ensurePinsFromCalls(comp, calls, ctx, compName);
+    this._ensurePinsFromCalls(comp, calls, ctx, compName, methods);
   }
 
   static preparePropertyBlock(comp, properties, ctx, compName) {
     if (!comp || comp.type !== 'canvas') return;
     const blocks = (properties || []).filter((p) => p.property === 'canvasRenderer');
     const handler = new CanvasComponent();
+    let methods = null;
+    try {
+      const program = handler._getProgram(comp, ctx);
+      methods = program.methods;
+    } catch (e) {
+      methods = null;
+    }
     for (const block of blocks) {
-      handler._ensurePinsFromRendererRaw(comp, block.raw, ctx, compName);
+      handler._ensurePinsFromRendererRaw(comp, block.raw, ctx, compName, methods);
     }
     let clearFlag = true;
     for (const p of properties || []) {
@@ -355,10 +382,11 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       const parseFn = typeof parseCanvasRendererBlock === 'function'
         ? parseCanvasRendererBlock : null;
       if (!parseFn) throw Error('Canvas assembler is not loaded');
+      const program = this._getProgram(comp, ctx);
       const calls = [];
       for (const block of blocks) {
         const parsed = parseFn(block.raw, `canvas ${compName}`);
-        this._ensurePinsFromCalls(comp, parsed, ctx, compName);
+        this._ensurePinsFromCalls(comp, parsed, ctx, compName, program.methods);
         calls.push(...parsed);
       }
       comp._canvasRendererCalls = calls;

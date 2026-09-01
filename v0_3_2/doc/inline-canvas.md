@@ -198,6 +198,47 @@ scanRows(rows) {
 
 ---
 
+## Vector parameters (`param[]`)
+
+Declare vector args in the **method signature** with `[]`. Connect a `Nwire[M]` script wire in the exec block (`pin = wire` — same as scalar).
+
+```logts
+drawStrip(xs[]) {
+    for (i = 0; i < vectorLen(xs); i++) {
+        styleFill("aaffaa")
+        drawRect(xs[i] * 10, 0, 8, 8)
+    }
+}
+
+drawEnemies(posx[], posy[]) {
+    for (i = 0; i < vectorLen(posx); i++) {
+        drawRect(posx[i], posy[i], 6, 6)
+    }
+}
+```
+
+In `renderer` and assign (see [comp-canvas.md](comp-canvas.md)):
+
+```logts
+16wire[4] trajectory = ...
+
+.plot:{
+    renderer { drawStrip(shotsX/s16) }
+    shotsX = trajectory
+    set = go
+}
+```
+
+| Feature | Rules |
+|---------|--------|
+| **`param[]`** | Vector param — value is a JS array (`number[]` or `string[]` per pin format) |
+| **`xs[i]`** | Index element — error on scalar param |
+| **`vectorLen(xs)`** | Array length — error on scalar param (does not return `1`) |
+| **Formats** | Same as scalar pins: `/s16`, `/u16`, `/ascii`, `/bool`, … per element |
+| **Assign** | `pin = wire` only — wire must match (`16wire[N]` for vector, `16wire` for scalar) |
+
+---
+
 ## Minimal parse example
 
 ```logts-play
