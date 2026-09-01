@@ -157,7 +157,7 @@ drawHud(score, hi, playerName) {
 
 ## Loops (`for` / `while`)
 
-Only inside **method bodies** (not directly in `renderer { }`). No `break` / `continue`. Nested loops are allowed.
+Only inside **method bodies** (not directly in `renderer { }`). Nested loops are allowed. Use **`break`** / **`continue`** inside loops (JS semantics).
 
 ```logts
 drawStrip(n, color) {
@@ -193,6 +193,7 @@ scanRows(rows) {
 | **`while`** | `while (cond) { … }` — same conditions as `if` |
 | **Init / step** | Assign (`i = 0`, `i = i + 1`) or postfix `i++` / `i--` |
 | **Postfix only** | `i++` and `i--` as statement or in `for` step — prefix `++i` / `--i` not allowed |
+| **`break` / `continue`** | Only inside `for` / `while`; `break` exits innermost loop, `continue` next iteration (`for` runs step) |
 | **Safety cap** | Max **10 000** iterations per loop — runtime error if exceeded |
 
 ---

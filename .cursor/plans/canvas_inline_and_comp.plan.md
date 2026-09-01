@@ -1672,7 +1672,7 @@ while:
 | **D69** | `for` C-style 3 clauze | **A** `for (init; cond; step)` cu `;` și assign init/step |
 | **D70** | `while` | **A** da — `while (cond) { }` |
 | **D71** | `++` / `--` | **B** parțial — postfix `i++` / `i--` da; prefix `++i` / `--i` amânat |
-| **D72** | `break` / `continue` | **A** rămân interzise; `for` imbricat permis |
+| **D72** | `break` / `continue` | **A** permise în `for`/`while`; `for` imbricat permis |
 | **D73** | Max iterații | **A** cap **10000** per loop → eroare · **B** fără cap |
 | **D74** | Doar în metode | **A** ca F7 — nu în `renderer` direct |
 | **D75** | Teste | **A** **4770–4779** wave+legacy; **4768** → `for` permis |

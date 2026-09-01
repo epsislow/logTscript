@@ -2,10 +2,10 @@
 
 const CANVAS_FORBIDDEN_IDS = new Set([
   'do', 'return', 'true', 'false',
-  'and', 'or', 'not', 'break', 'continue',
+  'and', 'or', 'not',
 ]);
 
-const CANVAS_KEYWORDS = new Set(['if', 'else', 'for', 'while']);
+const CANVAS_KEYWORDS = new Set(['if', 'else', 'for', 'while', 'break', 'continue']);
 
 const CANVAS_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 const CANVAS_LOGIC_OPS = new Set(['&&', '||']);
@@ -300,6 +300,14 @@ class CanvasParser {
     }
     if (t.type === 'KW' && t.value === 'while') {
       return this.parseWhileStmt();
+    }
+    if (t.type === 'KW' && t.value === 'break') {
+      const lineTok = this.eat('KW', 'break');
+      return { kind: 'break', line: lineTok.line };
+    }
+    if (t.type === 'KW' && t.value === 'continue') {
+      const lineTok = this.eat('KW', 'continue');
+      return { kind: 'continue', line: lineTok.line };
     }
     if (t.type === 'ID') {
       const next = this.tokens[this.pos + 1];

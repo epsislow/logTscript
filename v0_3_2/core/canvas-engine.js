@@ -104,6 +104,20 @@ function canvasEvalCond(expr, env, callMethodFn, line, pinEnv) {
 
 const CANVAS_MAX_LOOP_ITERATIONS = 10000;
 
+function canvasThrowFlow(kind, line) {
+  const err = new Error('canvas flow');
+  err.canvasFlow = kind;
+  err.canvasFlowLine = line;
+  throw err;
+}
+
+function canvasRethrowFlowOutsideLoop(err) {
+  if (err && err.canvasFlow) {
+    throw new Error(`canvas: ${err.canvasFlow} outside loop (line ${err.canvasFlowLine})`);
+  }
+  throw err;
+}
+
 function canvasApplyForClause(clause, env, locals, callMethodFn, line, pinEnv) {
   if (!clause) return;
   if (clause.kind === 'assign') {
@@ -160,7 +174,17 @@ function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, ca
           if (iter >= CANVAS_MAX_LOOP_ITERATIONS) {
             throw new Error(`canvas: loop iteration limit (${CANVAS_MAX_LOOP_ITERATIONS}) exceeded (line ${stmt.line})`);
           }
-          canvasExecuteStmts(stmt.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+          try {
+            canvasExecuteStmts(stmt.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+          } catch (err) {
+            if (err && err.canvasFlow === 'break') break;
+            if (err && err.canvasFlow === 'continue') {
+              canvasApplyForClause(stmt.step, env, locals, callMethodFn, stmt.line, pinEnv);
+              iter++;
+              continue;
+            }
+            throw err;
+          }
           canvasApplyForClause(stmt.step, env, locals, callMethodFn, stmt.line, pinEnv);
           iter++;
         }
@@ -170,11 +194,22 @@ function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, ca
           if (iter >= CANVAS_MAX_LOOP_ITERATIONS) {
             throw new Error(`canvas: loop iteration limit (${CANVAS_MAX_LOOP_ITERATIONS}) exceeded (line ${stmt.line})`);
           }
-          canvasExecuteStmts(stmt.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+          try {
+            canvasExecuteStmts(stmt.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+          } catch (err) {
+            if (err && err.canvasFlow === 'break') break;
+            if (err && err.canvasFlow === 'continue') continue;
+            throw err;
+          }
           iter++;
         }
+      } else if (stmt.kind === 'break') {
+        canvasThrowFlow('break', stmt.line);
+      } else if (stmt.kind === 'continue') {
+        canvasThrowFlow('continue', stmt.line);
       }
     } catch (err) {
+      if (err && err.canvasFlow) throw err;
       if (options && options.logErrors) {
         const msg = err && err.message ? err.message : String(err);
         if (typeof console !== 'undefined' && console.warn) console.warn(msg);
@@ -493,7 +528,11 @@ function canvasExecuteMethod(method, argValues, program, state, ctx, options) {
 
   const evalArg = (a) => canvasEvalExpr(a, env, callMethodFn, null);
 
-  canvasExecuteStmts(method.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+  try {
+    canvasExecuteStmts(method.body, env, locals, program, state, ctx, options, callMethodFn, evalArg);
+  } catch (err) {
+    canvasRethrowFlowOutsideLoop(err);
+  }
   return 0;
 }
 

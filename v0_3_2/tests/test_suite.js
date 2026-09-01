@@ -52397,13 +52397,109 @@ comp [canvas] .screen:
     h.assert('while postfix', forStmt.body[0].body[0].kind, 'postfix');
   });
 
-  reg(4777, 'canvas', 'parse error break still forbidden', function(h) {
-    h.assertThrows('break forbidden', function() {
-      parseCanvasBody(`draw() {
-          for (i = 0; i < 3; i++) {
-              break
-          }
-      }`);
+  reg(4777, 'canvas', 'parse break continue in loop body', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        for (i = 0; i < 3; i++) {
+            if (i == 1) {
+                continue
+            }
+            if (i == 2) {
+                break
+            }
+        }
+    }`);
+    const forBody = prog.methods.draw.body[0].body;
+    h.assert('continue in if', forBody[0].then[0].kind, 'continue');
+    h.assert('break in if', forBody[1].then[0].kind, 'break');
+  });
+
+  function runCanvasBreakFor(h) {
+    const prog = parseCanvasBody(`draw(n) {
+        for (i = 0; i < n; i++) {
+            styleFill("ff0000")
+            drawRect(i * 10, 0, 8, 8)
+            if (i == 2) {
+                break
+            }
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(10)'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('three rects', rects.length, 3);
+    h.assert('last x', rects[2].x, 20);
+  }
+
+  regCanvasDual(4780, 4781, 'break exits for early', runCanvasBreakFor);
+
+  function runCanvasContinueFor(h) {
+    const prog = parseCanvasBody(`draw(n) {
+        for (i = 0; i < n; i++) {
+            if (i == 1) {
+                continue
+            }
+            styleFill("ff0000")
+            drawRect(i * 10, 0, 8, 8)
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(4)'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('three rects', rects.length, 3);
+    h.assert('skip i=1', rects[1].x, 20);
+  }
+
+  regCanvasDual(4782, 4783, 'continue skips for iteration', runCanvasContinueFor);
+
+  function runCanvasBreakNested(h) {
+    const prog = parseCanvasBody(`draw() {
+        for (row = 0; row < 3; row++) {
+            for (col = 0; col < 3; col++) {
+                if (row == 1 && col == 1) {
+                    break
+                }
+                styleFill("00ff00")
+                drawRect(col * 10, row * 10, 8, 8)
+            }
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('seven rects', rects.length, 7);
+  }
+
+  regCanvasDual(4784, 4785, 'break exits inner for only', runCanvasBreakNested);
+
+  function runCanvasContinueWhile(h) {
+    const prog = parseCanvasBody(`draw(n) {
+        i = 0
+        while (i < n) {
+            if (i == 1) {
+                i++
+                continue
+            }
+            styleFill("0000ff")
+            drawRect(i * 12, 0, 8, 8)
+            i++
+        }
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw(4)'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('three rects', rects.length, 3);
+    h.assert('skip i=1', rects[1].x, 24);
+  }
+
+  regCanvasDual(4786, 4787, 'continue in while loop', runCanvasContinueWhile);
+
+  reg(4788, 'canvas', 'runtime error break outside loop', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        break
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('break outside', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
     });
   });
 
