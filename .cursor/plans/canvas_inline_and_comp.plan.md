@@ -6,10 +6,10 @@ todos:
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
     status: pending
   - id: canvas-f1
-    content: "Faza 1: parse inline/comp [canvas] + attrs width/height/bgColor + device gol — D1–D12 draft"
+    content: "Faza 1: parse inline/comp [canvas] + attrs width/height/bgColor + device gol — D1–D12 ✅ ready"
     status: pending
   - id: canvas-f2
-    content: "Faza 2: limbaj draw (expr + assign) + builtins drawRect/Text/Line/Circle/style — D13–D28 draft"
+    content: "Faza 2: limbaj draw (expr + assign) + builtins drawRect/Text/Line/Circle/style — D13–D28 ✅ ready"
     status: pending
   - id: canvas-f3
     content: "Faza 3: renderer block + wire args + set/draw/busy/dirty coalesce — D29–D42 draft"
@@ -36,7 +36,7 @@ User confirmă în scris `D#: literă` (ex. `D1 A`, `D5 A`, …). Ordine: **înt
 ### Batch F1 — confirmat user 2026-08-31
 
 ```text
-D1   (pending — vezi explicație mai jos; recommended A canvas)
+D1 A ✅
 D2 A ✅
 D3 A ✅ — width/height fixe la elaborare; fără resize runtime
 D4 D ✅ — fără default; width și height obligatorii (parse error dacă lipsesc)
@@ -53,9 +53,33 @@ D12 A ✅
 > **D6 B:** braces `{ }` — confirmat cu D5.  
 > **D4:** opțiune nouă **D (change)** — nu exista în tabelul inițial; user respinge A/B/C (defaults).
 
-### Batch F2–F4 — după F1
+### Batch F2 — confirmat user 2026-09-01
 
-Vezi tabelele pe fază; rezumat recommended în [Tabel rezumat decizii](#tabel-rezumat-decizii-toate--draft).
+```text
+D13 A ✅
+D13b A ✅
+D14 A ✅
+D16 A ✅
+D18 A ✅ → **superseded D18b** user 2026-09-01
+D19/D19b → **superseded D19c** ✅
+D21/D21b → **superseded D21c** ✅
+D16b ✅ — user 2026-09-01
+D18b ✅ — user 2026-09-01
+D19c A ✅
+D21c A ✅
+D22a ✅ D22b ✅ D22c ✅ D22d A ✅ — user 2026-09-01
+D20 A ✅
+D15 A ✅
+D17 A ✅
+D23 A ✅
+D24 A ✅
+D25 A ✅
+D26 A ✅
+D27 A ✅
+D28 A ✅
+```
+
+> **F2 (ready-to-implement)** — **D13–D28 ✅** (D17 A user 2026-09-01).
 
 ---
 
@@ -112,8 +136,8 @@ Vezi tabelele pe fază; rezumat recommended în [Tabel rezumat decizii](#tabel-r
 
 | Fază | Decizii | Status |
 | ---- | ------- | ------ |
-| **Faza 1** Scaffold parse + device + attrs | **D1–D12** — D2–D12✅; **D1** pending | **(ready-to-implement)** după **D1** |
-| **Faza 2** Limbaj draw + builtins | **D13–D28** draft | — |
+| **Faza 1** Scaffold parse + device + attrs | **D1–D12** ✅ | **(ready-to-implement)** |
+| **Faza 2** Limbaj draw + builtins | **D13–D28** ✅ | **(ready-to-implement)** |
 | **Faza 3** Renderer + wires + set/draw/busy | **D29–D42** draft | — |
 | **Faza 4** Doc + teste + integrare | **D43–D48** draft | — |
 | *(amânate)* | — | **1+a …** |
@@ -135,8 +159,9 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ⏳ | **1+g** | Clip / partial dirty rect | Optimizare redraw regiuni | — | D36 |
 | ⏳ | **1+h** | Layer / offscreen buffer | Multi-layer compose | — | — |
 | ⏳ | **1+i** | `fill` vs `stroke` separate API | Extindere style | — | D18 |
-| ⏳ | **1+j** | Alpha / rgba / opacity | Dincolo de RGB hex | — | D16 |
-| ⏳ | **1+k** | Font family/size ca API | Extindere `drawText` | — | D22 |
+| ⏳ | **1+j** | Alpha 8-hex | `"rrggbbaa"` — **D16b** ✅; fără keyword `transparent` |
+| ⏳ | **1+k** | Font family + `fontStyle` | **`fontFamily("monospace"\|…)`** listă mică allowed; **`fontStyle(family, size)`** sugar; + `textAlign` `start`/`end` | post-F2 | D22d, D22e |
+| ⏳ | **1+p** | Text contur (`strokeText`) | `drawText` = fill only (**D22c**); contur → backlog | — | D22c |
 | ⏳ | **1+l** | Vector wire args (`shotsXVector/s16`) | Sketch menționează; MVP scalar | — | D33 |
 | ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
 | ⏸ | **1+n** | *(slot liber)* | — | — | — |
@@ -278,7 +303,7 @@ Parserul (`parseInline`) acceptă azi doar lista fixă de kinds; pentru canvas t
 | **B** | `draw` — scurt, dar **confuz** cu pinul de control `draw` (redraw) |
 | **C** | `gfx` — nefolosit în sketch |
 
-**Decizie:** **pending** — recommended **A**; confirmă cu `D1 A` dacă ești de acord.
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
 
 ### D2 — Device UI
 
@@ -494,13 +519,13 @@ flowchart TB
 
 ### Status F1
 
-**(ready-to-implement)** după confirmare **D1 A** — **D2–D12✅** user 2026-08-31.
+**(ready-to-implement)** — **D1–D12✅** (D1 A user 2026-09-01).
 
 ---
 
-## Faza 2 — Limbaj draw: expresii, asignări, builtins **(draft)**
+## Faza 2 — Limbaj draw: expresii, asignări, builtins **(ready-to-implement)**
 
-> **Status:** draft — **D13–D28**.  
+> **Status:** **(ready-to-implement)** — **D13–D28 ✅** (D17 A user 2026-09-01).  
 > **Depinde:** F1.  
 > **Out of scope:** `if`, loops (**1+a**, **1+b**).
 
@@ -539,13 +564,11 @@ inline [canvas] .demo:
 
     drawBox(x, y, w, h, color) {
         pad = 2
-        innerW = w - pad * 2
-        innerH = h - pad * 2
-        style(color)
-        drawRect(x + pad, y + pad, innerW, innerH)
-        style("000000")
+        style(0, color)
+        drawRect(x + pad, y + pad, w - pad * 2, h - pad * 2)
+        style("000000", 0, 1)
         drawLine(x, y, x + w, y + h)
-        drawCircle(x + w / 2, y + h / 2, 4)
+        drawCircle(x + w / 2, y + h / 2, 4, "0000ff", 0)
         drawText(x, y - 12, "box")
     }
 :
@@ -561,10 +584,14 @@ inline [canvas] .demo:
 | **D15** | Params metode | **A (recommended)** by-value la apel; shadow pe locals · **B** mutable ref |
 | **D16** | Literali culoare | **A (recommended)** string hex `"rrggbb"` / `"rgb"` (3 sau 6) · **B** doar `^rrggbb` (ecosistem comps) · **C (change)** ambele `"…"` și `^…` · **D** interzis `#…` (obligatoriu — aliniat user) |
 | **D17** | Normalizare culoare intern | **A (recommended)** → CSS `#rrggbb` doar în widget JS · **B** păstrează fără `#` în tot stack-ul |
-| **D18** | `style(...)` semantică | **A (recommended)** setează fillStyle **și** strokeStyle · **B** doar fill · **C** `style(fill, stroke)` 2 args · **D** `styleFill`/`styleStroke` separate (**1+i**) |
-| **D19** | `drawRect` | **A (recommended)** filled rect (x,y,w,h) · **B** stroke · **C** flag fill/stroke arg |
-| **D20** | `drawLine` | **A (recommended)** (x1,y1,x2,y2); folosește stroke din style · **B** + thickness arg |
-| **D21** | `drawCircle` | **A (recommended)** filled (cx,cy,r) · **B** stroke · **C** + start/end angle (**1+e**) |
+| **D18** | `style(...)` | **superseded → D18b** |
+| **D19** | `drawRect` | **superseded → D19c** |
+| **D20** | `drawLine` | **A ✅** stroke din styleStroke |
+| **D21** | `drawCircle` | **superseded → D21c** |
+| **D16b** | transparență | **✅** `0`/`"0"` + `"rrggbb"` / `"rrggbbaa"` |
+| **D18b** | styleFill / styleStroke / style | **✅** |
+| **D19c** | drawRect fill+stroke | **✅** |
+| **D21c** | drawCircle fill+stroke | **✅** |
 | **D22** | `drawText` | **A (recommended)** (x,y,text) font default monospace 14 · **B** + size · **C** + font args (**1+k**) |
 | **D23** | Operatori aritmetici MVP | **A (recommended)** `+ - * /` + paranteze · **B** + `%` · **C** + `//` floor div |
 | **D24** | Diviziune | **A (recommended)** float JS (`/`) · **B** int trunc · **C** eroare dacă mix int/float fără cast |
@@ -581,7 +608,7 @@ inline [canvas] .demo:
 | **B** | + statements brute în `renderer` |
 | **C (change)** | Totul în `renderer` — slăbește reuzarea |
 
-**Decizie:** draft.
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
 
 ### D13b — Compoziție metode
 
@@ -600,7 +627,7 @@ drawFrame(x, y) {
 
 Cicluri statice → elab error; overflow → **D27**.
 
-**Decizie:** draft.
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
 
 ### D14 — Locals vs state între frame-uri
 
@@ -612,7 +639,7 @@ Starea animației trăiește în **logic**, nu în canvas.
 | **B** | State pe comp — **(change)** față de principiu |
 | **C** | `static` — post-MVP |
 
-**Decizie:** draft.
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
 
 ### D16 — Culori **(important)**
 
@@ -622,28 +649,288 @@ Starea animației trăiește în **logic**, nu în canvas.
 | **B** | Doar `^rrggbb` |
 | **C (change)** | `"…"` **și** `^…` |
 
-Constraint: `#rrggbb` **nu** e literal culoare. Attr `bgColor` pe comp = aceeași regulă.
+Constraint: `#rrggbb` **nu** e literal culoare. Attr `bgColor` pe comp = `^…` (ca CLCD).
 
-**Decizie:** draft.
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
 
-### D18–D22 — Mapping JS
-
-| Builtin LogT | JS 2D (recommended A) |
-| ------------ | --------------------- |
-| `style(c)` | `fillStyle = strokeStyle = normalize(c)` |
-| `drawRect(x,y,w,h)` | `fillRect` |
-| `drawLine(…)` | `moveTo`/`lineTo`/`stroke` |
-| `drawCircle(cx,cy,r)` | `arc` + `fill` |
-| `drawText(x,y,s)` | `fillText` |
-
-#### D22n — Text baseline
+### D15 — Parametri metode
 
 | | |
 | - | - |
-| **A (recommended)** | `textBaseline = 'top'` — (x,y) = stânga-sus |
-| **B** | `alphabetic` (JS default) |
+| **A ✅** | By-value la apel; parametrii nu modifică variabilele din apelant; locals pot shadow param names |
+| **B** | Mutable ref — respins MVP |
 
-Precedență: `*` `/` înainte de `+` `-`; stânga-asociativ; paranteze OK.
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+### D17 — Normalizare culoare intern ✅
+
+În LogTScript canvas **nu folosim `#`** în sursă (`"ff0000"`, `0`, `"ff000080"`). API-ul browser **`ctx.fillStyle`** totuși acceptă forme CSS — de obicei **`"#rrggbb"`** sau **`rgba(...)`**.
+
+| | |
+| - | - |
+| **A ✅** | Până la widget, culorile rămân **string fără `#`** (sau sentinel `0`). **Doar în widget** (ultimul pas): `toCssColor(c)` → `"#ff0000"` / `"rgba(...)"` apoi `ctx.fillStyle = …` |
+| **B** | **Nici în runtime JS** nu producem string cu `#` — widget setează `fillStyle` via **`rgb(r,g,b)`** sau **`rgba(r,g,b,a)`** parse din hex intern; `#` nu apare nicăieri în stack |
+
+**Practic pentru user:** identic vizual. Diferența e doar în implementare:
+
+| | **A** | **B** |
+| - | ----- | ----- |
+| Unde se convertește | o funcție la granița engine → ctx | parse hex → rgb() fără `#` |
+| Simplitate | **mai simplu** — o mapare directă la ce așteaptă Canvas | puțin mai mult cod |
+| Debug / log | poate apărea `#` în string-uri JS interne | `#` zero ori în tot procesul |
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+### D23 — Operatori aritmetici
+
+**Decizie:** **A ✅** — `+ - * /` + paranteze — confirmed user 2026-09-01.
+
+### D24 — Diviziune
+
+**Decizie:** **A ✅** — float JS (`/`) — confirmed user 2026-09-01.
+
+### D25 — Tipuri expr
+
+**Decizie:** **A ✅** — number unificat IEEE — confirmed user 2026-09-01.
+
+### D26 — Comparații / bool
+
+**Decizie:** **A ✅** — interzis MVP — confirmed user 2026-09-01.
+
+### D27 — Erori runtime draw
+
+**Decizie:** **A ✅** — log + skip op — confirmed user 2026-09-01.
+
+### D28 — Comentarii
+
+**Decizie:** **A ✅** — `#` line comment — confirmed user 2026-09-01.
+
+---
+
+### Revizie stroke / fill — **D16b, D18b, D19c, D21c** ✅ user 2026-09-01
+
+> Înlocuiește semantic **D18 A**, **D19/D19b**, **D21/D21b**.  
+> **Nu** folosim keyword `"transparent"` — vezi **D16b**.
+
+#### D16b — transparență / alpha ✅
+
+| Formă culoare | Semnificație |
+| ------------- | ------------ |
+| `"rrggbb"` (6 hex) | opac — alpha **FF** implicit |
+| `"rrggbbaa"` (8 hex) | alpha explicit (ex. `"ff000080"` = roșu 50%, `"ff000000"` = roșu invizibil) |
+| **`0`** sau **`"0"`** | **transparent** — skip fill sau skip stroke la desen (nu e culoare validă CSS) |
+
+**Respins:** literal `"transparent"` ca keyword.
+
+```logts
+styleFill(0)                    # fără fill la drawRect/drawCircle
+styleStroke("0")                # fără stroke
+drawRect(x, y, w, h, 0, "ff0000")   # doar contur roșu
+drawRect(x, y, w, h, "00ff00", 0)   # doar fill verde
+```
+
+**Decizie:** **✅** confirmed user 2026-09-01.
+
+#### D18b — API `style*` ✅
+
+| Builtin | Semnificație |
+| ------- | ------------ |
+| **`styleFill(fillColor)`** | setează doar fill; stroke / strokeWidth **neschimbate** |
+| **`styleStroke(strokeColor)`** | setează doar strokeColor; strokeWidth **neschimbat** |
+| **`styleStroke(strokeColor, strokeWidth)`** | strokeColor + strokeWidth (px) |
+| **`style(strokeColor, fillColor)`** | setează **ambele** — ordine: **stroke întâi, fill al doilea** |
+| **`style(strokeColor, fillColor, strokeWidth)`** | stroke + fill + lățime contur |
+
+**Default:** `strokeWidth = 1` la primul `styleStroke` / `style(..., width)` dacă nu a fost setat.
+
+**Fără** builtin separat `styleStrokeWidth` — lățimea intră doar în `styleStroke(c, w)` și `style(cStroke, cFill, w)`.
+
+```logts
+styleFill("aaffaa")
+styleStroke("000000", 2)
+drawRect(x, y, w, h)
+
+style("000000", "aaffaa", 2)    # echivalent: stroke negru 2px, fill verde
+
+styleFill(0)
+styleStroke("ff0000")
+drawRect(x, y, w, h)            # doar contur roșu
+```
+
+**Notă ordine `style`:** primul arg = **stroke**, al doilea = **fill** (diferit de unele API-uri grafice — documentat explicit).
+
+**Decizie:** **✅** confirmed user 2026-09-01.
+
+#### D19c — `drawRect` fill + stroke ✅
+
+| Formă | Semnificație |
+| ----- | ------------ |
+| `drawRect(x, y, w, h)` | fill + stroke din `styleFill` / `styleStroke` curente |
+| `drawRect(x, y, w, h, fill)` | override **doar fill**; stroke din style |
+| `drawRect(x, y, w, h, fill, stroke)` | override ambele; **`0` / `"0"`** = skip acel pas |
+
+La fiecare apel: dacă fill **nu** e transparent → `fillRect`; dacă stroke **nu** e transparent → `strokeRect`.
+
+```logts
+drawRect(x, y, w, h, 0, "ff0000")           # doar contur
+drawRect(x, y, w, h, "00ff00", 0)           # doar fill
+drawRect(x, y, w, h, "aaffaa", "000000")    # ambele, culori diferite
+```
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+#### D21c — `drawCircle` fill + stroke ✅
+
+Aceeași regulă ca **D19c** (inclusiv `0` / `"0"`).
+
+```logts
+drawCircle(x, y, 12, "0000ff", "ffffff")
+drawCircle(x, y, 12, 0, "ff0000")            # doar inel
+```
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+#### Matrice rapidă
+
+| Scop | Exemplu |
+| ---- | ------- |
+| fill roșu, fără stroke | `drawRect(x,y,w,h,"ff0000",0)` |
+| stroke roșu, fără fill | `drawRect(x,y,w,h,0,"ff0000")` |
+| fill + stroke diferite | `style("000000","aaffaa",2)` + `drawRect(...)` sau args pe draw |
+| nimic | `drawRect(x,y,w,h,0,0)` → noop |
+
+---
+
+### D18 — `style(...)` *(superseded de **D18b** ✅)*
+
+### D19 / D19b *(superseded de **D19c** ✅)*
+
+### D20 — `drawLine`
+
+Folosește **strokeColor** + **strokeWidth** din `styleStroke` / `style` (nu fill).
+
+```logts
+styleStroke("ff0000", 3)
+drawLine(x1, y1, x2, y2)
+```
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+### D22 — `drawText` ✅
+
+`(x, y, text)` — font default **`14px monospace`** (vezi **D22d**).
+
+**Culoare:** **`styleFill`** → JS `fillText` (**D22c**).
+
+**Tipografie:** `fontSize` + `textAlign` + `textBaseline` — stare pe context (**D22a**, **D22b**, **D22d**).
+
+```logts
+styleFill("ffffff")
+textAlign("center")
+textBaseline("top")
+drawText(160, 20, "Score: 7")
+```
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+### D22a — builtin `textAlign` ✅
+
+| Apel | JS |
+| ---- | -- |
+| `textAlign("left")` | `ctx.textAlign = 'left'` |
+| `textAlign("center")` | `ctx.textAlign = 'center'` |
+| `textAlign("right")` | `ctx.textAlign = 'right'` |
+
+**Default:** **`"left"`** (ca JS). `start` / `end` → backlog **1+k**.
+
+**Decizie:** **✅** confirmed user 2026-09-01.
+
+### D22b — builtin `textBaseline` ✅
+
+| Apel | JS |
+| ---- | -- |
+| `textBaseline("top")` | `ctx.textBaseline = 'top'` |
+| `textBaseline("middle")` | `ctx.textBaseline = 'middle'` |
+| `textBaseline("alphabetic")` | `ctx.textBaseline = 'alphabetic'` |
+| `textBaseline("bottom")` | `ctx.textBaseline = 'bottom'` |
+
+**Default:** **`"alphabetic"`** (ca JS). `hanging` / `ideographic` → backlog **1+k**.
+
+**Decizie:** **✅** confirmed user 2026-09-01.
+
+### D22c — `drawText` fill vs stroke ✅
+
+| | |
+| - | - |
+| **A ✅** | `drawText` → **`fillText`** — culoare din **`styleFill`**; **nu** folosește `styleStroke` / strokeWidth |
+| **B** | și contur — ar necesita `strokeText` (backlog **1+p**) |
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+### D22d — `fontSize` ✅
+
+Builtin **`fontSize(n)`** — `n` int/float, **pixeli**; setează partea de mărime din `ctx.font`.
+
+| | |
+| - | - |
+| **A ✅** | `fontSize(n)` — stare pe context; **default `14`** la init renderer |
+| **B** | `drawText(x,y,text,size)` — respins pentru MVP |
+| **C** | amânat — respins (user: vital în MVP) |
+
+**MVP:** familia rămâne **`monospace` fix** — schimbare familie → **1+k** (**D22e**).
+
+```logts
+styleFill("ffffff")
+fontSize(24)
+textAlign("center")
+textBaseline("top")
+drawText(160, 30, "GAME OVER")
+
+fontSize(14)
+drawText(10, 10, "FPS")
+```
+
+**JS intern:** `ctx.font = fontSize + "px monospace"` (family din state, default `monospace`).
+
+**Decizie:** **A ✅** — confirmed user 2026-09-01.
+
+### D22e — `fontFamily` + `fontStyle` **(amânat — 1+k, draft)**
+
+Fază ulterioară (aceeași sub-fază text **1+k**):
+
+| Builtin (draft) | Semnificație |
+| --------------- | ------------ |
+| **`fontFamily(name)`** | `name` din **listă mică allowed** — ex. `"monospace"`, `"sans"`, `"serif"` (lista exactă la implementare; aliniat CLCD `label` family dacă e cazul) |
+| **`fontStyle(family, size)`** | setează **ambele** dintr-un apel — echivalent `fontFamily(family)` + `fontSize(size)` |
+
+```logts
+# post-MVP (1+k)
+fontStyle("sans", 18)
+drawText(100, 40, "Menu")
+
+fontFamily("serif")
+fontSize(12)
+drawText(10, 200, "caption")
+```
+
+**Decizie:** amânat **1+k** — direcție confirmată user 2026-09-01; listă allowed TBD la promovare.
+
+### Mapping JS (rezumat post-D18b)
+
+| Builtin LogT | JS 2D |
+| ------------ | ----- |
+| `styleFill(c)` | `fillStyle` |
+| `styleStroke(c)` / `styleStroke(c,w)` | `strokeStyle` + `lineWidth` |
+| `style(stroke, fill)` / `style(stroke, fill, w)` | ambele + width |
+| `fontSize(n)` | parte din `ctx.font` (px) |
+| `textAlign(...)` | `ctx.textAlign` |
+| `textBaseline(...)` | `ctx.textBaseline` |
+| `drawRect(...)` | `fillRect` +/sau `strokeRect` |
+| `drawCircle(...)` | `arc` + fill/stroke |
+| `drawLine(...)` | `stroke` |
+| `drawText(...)` | `fillText` + font/align/baseline curente |
+
+*(D22n închis. **D22e** → **1+k**.)*
 
 ### Scope F2
 
@@ -656,7 +943,7 @@ Precedență: `*` `/` înainte de `+` `-`; stânga-asociativ; paranteze OK.
 
 ### Criterii done F2
 
-- [ ] Assign + 5 builtins pe mock/real ctx
+- [ ] Builtins text: `fontSize`, `textAlign`, `textBaseline` + draw primitives
 - [ ] `#` ≠ culoare; `"ff00aa"` OK
 - [ ] `if`/`for` → parse error
 - [ ] Compoziție metode (D13b)
@@ -664,7 +951,7 @@ Precedență: `*` `/` înainte de `+` `-`; stânga-asociativ; paranteze OK.
 
 ### Status F2
 
-**draft**.
+**(ready-to-implement)** — **D13–D28 ✅** (D17 A user 2026-09-01).
 
 ---
 
@@ -924,7 +1211,7 @@ comp [canvas] .gameCanvas:
 
 | ID | Fază | Subiect | Recommended |
 | -- | ---- | ------- | ----------- |
-| **D1** | 1 | Kind `canvas` | **A** (pending) |
+| **D1** | 1 | Kind `canvas` | **A ✅** |
 | **D2** | 1 | Device UI Devices panel | **A ✅** |
 | **D3** | 1 | size fixe elaborare | **A ✅** |
 | **D4** | 1 | width/height obligatorii | **D ✅** |
@@ -936,18 +1223,24 @@ comp [canvas] .gameCanvas:
 | **D10** | 1 | Allow policy | **A ✅** |
 | **D11** | 1 | fișiere split | **A ✅** |
 | **D12** | 1 | teste 4700+ | **A ✅** |
-| **D13b** | 2 | apel metodă→metodă | **A** |
-| **D22n** | 2 | text baseline | **A** top |
-| **D13** | 2 | statements în metode | **A** |
-| **D14** | 2 | locals per call | **A** |
-| **D15** | 2 | params by value | **A** |
-| **D16** | 2 | color `"hex"` (+opt `^`) | **A** sau **C** |
-| **D17** | 2 | `#` doar în widget JS | **A** |
-| **D18** | 2 | `style` fill+stroke | **A** |
-| **D19** | 2 | `drawRect` fill | **A** |
-| **D20** | 2 | `drawLine` stroke | **A** |
-| **D21** | 2 | `drawCircle` fill | **A** |
-| **D22** | 2 | `drawText` basic | **A** |
+| **D13** | 2 | statements în metode | **A ✅** |
+| **D13b** | 2 | apel metodă→metodă | **A ✅** |
+| **D14** | 2 | locals per call | **A ✅** |
+| **D16** | 2 | color `"hex"` | **A ✅** |
+| **D16b** | 2 | `0`/`"0"` + 8hex alpha | **✅** |
+| **D18b** | 2 | styleFill/Stroke/style | **✅** |
+| **D19c** | 2 | drawRect fill+stroke | **✅** |
+| **D21c** | 2 | drawCircle fill+stroke | **✅** |
+| **D18** | 2 | *(superseded D18b)* | — |
+| **D19** | 2 | *(superseded D19c)* | — |
+| **D20** | 2 | `drawLine` stroke | **A ✅** |
+| **D21** | 2 | *(superseded D21c)* | — |
+| **D22** | 2 | `drawText` basic | **A ✅** |
+| **D22a** | 2 | `textAlign` builtin | **✅** default `left` |
+| **D22b** | 2 | `textBaseline` builtin | **✅** default `alphabetic` |
+| **D22c** | 2 | drawText = fill only | **A ✅** |
+| **D22d** | 2 | `fontSize(n)` px, default 14 | **A ✅** |
+| **D22e** | 2 | `fontFamily` / `fontStyle` | **1+k** amânat |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -997,7 +1290,9 @@ comp [canvas] .gameCanvas:
 | Data | Eveniment |
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
-| 2026-08-31 | **D2–D12✅** user — D3 fixe; **D4 D** obligatorii width/height; D7 `^000000`; D5/D6 body+braces; F1 așteaptă **D1** |
+| 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
+| 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
+| 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |
 
 ---
 
