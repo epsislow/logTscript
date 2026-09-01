@@ -11816,7 +11816,96 @@ The \`renderer { }\` block **invokes** methods from the linked inline — it doe
 
 Arguments in \`renderer\` may be **literals** (numbers, strings) or **wire references** using \`pinName/format\` (e.g. \`xPos/s16\`, \`label/ascii\`, \`flag/bool\`). Pins are inferred automatically from renderer args and can be assigned in the same exec block (\`xPos = myWire\`).
 
-**Vector wires:** if the called method declares a vector param (\`drawStrip(xs[])\`), the matching renderer pin expects a \`Nwire[M]\` wire at assign time:
+**Vector wires:** if the called method declares a vector param (\`drawStrip(xs[])\`), the matching renderer pin expects a \`Nwire[M]\` wire at assign time (\`pin = wire\` — same as scalar). See runnable examples below.
+
+Scalar/scalar mismatch (e.g. \`shotsX = valX\` when \`xs[]\`) is a runtime error at assign.
+
+### Vector of numbers (\`/s16\`)
+
+Four signed positions from a \`16wire[4]\` wire — green tiles spaced by \`xs[i] * 8\`.
+
+\`\`\`logts-play
+inline [canvas] .trajectory:
+
+    drawStrip(xs[]) {
+        for (i = 0; i < vectorLen(xs); i++) {
+            style("000000", "44ff88", 1)
+            drawRect(xs[i] * 8 + 8, 50, 10, 10)
+        }
+    }
+
+:
+
+comp [canvas] .plot:
+    on: 1
+    width: 120
+    height: 80
+    label: "Trajectory"
+    bgColor: ^001122
+    .trajectory { }
+:
+
+16wire[4] trajectory = 0000000000000010 + 0000000000000100 + 0000000000000110 + 0000000000001000
+1wire go = 1
+
+.plot:{
+    renderer { drawStrip(shotsX/s16) }
+    shotsX = trajectory
+    set = go
+}
+\`\`\`
+
+Click **Load** to open the script, then **Load & Run** — four green squares at **x = 24, 40, 56, 72** (values **2, 4, 6, 8** from the wire).
+
+### Vector of text labels (\`/ascii\`)
+
+Three one-character labels from an \`8wire[3]\` wire (one byte per element).
+
+\`\`\`logts-play
+inline [canvas] .labels:
+
+    drawRow(labels[]) {
+        styleFill("aaddff")
+        fontSize(16)
+        textAlign("center")
+        textBaseline("middle")
+        for (i = 0; i < vectorLen(labels); i++) {
+            drawText(24 + i * 32, 36, labels[i])
+        }
+    }
+
+:
+
+comp [canvas] .tagPanel:
+    on: 1
+    width: 120
+    height: 64
+    label: "Tags"
+    bgColor: ^000000
+    .labels { }
+:
+
+8wire[3] tagChars = 01000001 + 01000010 + 01000011
+1wire go = 1
+
+.tagPanel:{
+    renderer { drawRow(caption/ascii) }
+    caption = tagChars
+    set = go
+}
+\`\`\`
+
+Click **Load** / **Load & Run** — letters **A**, **B**, **C** centered on the canvas (\`01000001\` + \`01000010\` + \`01000011\`).
+
+| Vector feature | Rules |
+|----------------|--------|
+| **\`param[]\`** | Declared in the inline method — pin width comes from the wire at assign |
+| **\`vectorLen(xs)\`** | Array length — error on scalar param |
+| **\`xs[i]\`** | Index element — error on scalar param |
+| **Formats** | \`/s16\`, \`/u16\`, \`/ascii\`, \`/bool\`, … per element (same as scalar pins) |
+| **Assign** | \`pin = wire\` only — \`Nwire[M]\` for vector, \`Nwire\` for scalar |
+
+Syntax recap (non-runnable):
 
 \`\`\`logts
 inline [canvas] .traj:
@@ -11835,8 +11924,6 @@ inline [canvas] .traj:
     set = go
 }
 \`\`\`
-
-Scalar/scalar mismatch (e.g. \`shotsX = valX\` when \`xs[]\`) is a runtime error at assign.
 
 Read **\`busy\`** from another wire or use it to stall a CPU (\`wait = mustWait\`):
 
