@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–4 MVP done; Faza 5 = fontFamily/fontStyle (1+k); backlog 1+a…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–5 done; Faza 6 = CLCD symbols drawSymbol (1+n); backlog 1+a…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -20,12 +20,15 @@ todos:
   - id: canvas-f5
     content: "Faza 5: fontFamily + fontStyle + textAlign start/end — D49–D52 ✅ done"
     status: completed
+  - id: canvas-f6
+    content: "Faza 6: drawSymbol + symbolSize/symbolStyle — 1+n → D53–D61 draft"
+    status: pending
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–5** (MVP **1–4** done); amânări **1+a, 1+b, …** (fără **1+k** — promovat **F5**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–6**; amânări **1+a, 1+b, …** (fără **1+k**, **1+n** — promovate **F5**, **F6**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -144,7 +147,8 @@ D28 A ✅
 | **Faza 3** Renderer + wires + set/draw/busy/clear | **D29–D40** | **done** |
 | **Faza 4** Doc + teste + integrare observe | **D43–D48** | **done** |
 | **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** | **done** |
-| *(amânate)* | **1+a …** (fără 1+k) | — |
+| **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** draft | **(next)** |
+| *(amânate)* | **1+a …** (fără 1+k, 1+n) | — |
 
 ---
 
@@ -168,110 +172,16 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ⏳ | **1+p** | Text contur (`strokeText`) | `drawText` = fill only (**D22c**); contur → backlog | — | D22c |
 | ⏳ | **1+l** | Vector wire args (`shotsXVector/s16`) | Sketch menționează; MVP scalar | — | D33 |
 | ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
-| ⏳ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | Un singur API pentru FA + canvas symbols; `symbolSize` / `symbolStyle`; registry shared | post-F5 | [detaliu 1+n](#backlog-1n--clcd-symbols-pe-canvas-drawsymbol) |
+| ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1 → F2 → F3 → F4** ✅; **F5** (font) în curs; apoi **1+a** / **1+b** la cerere; **1+n** (CLCD symbols) după F5 + shared draw refactor; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F5** ✅; **F6** (`drawSymbol`) **next**; apoi **1+a** / **1+b** la cerere; input **1+f** după observe+games.
 
 ---
 
-## Backlog **1+n** — CLCD symbols pe canvas (`drawSymbol`)
+## Backlog **1+n** → **Faza 6** (promovat)
 
-> **Status:** ⏳ amânat — direcție confirmată user 2026-09-01; **nu** se implementează acum.  
-> **Nu** înlocuiește **F5** (`fontFamily` / `fontStyle` pentru **text** `drawText`).  
-> **Nu** folosi `drawIcon` — un singur builtin **`drawSymbol`** pentru tot catalogul CLCD (minus `label`).
-
-### Idee
-
-Reutilizare **același vocabular de nume** ca `comp [clcd]` și [clcd-symbols.md](../../v0_3_2/doc/clcd-symbols.md): `battery`, `wifi`, `digit7`, `colon`, `dp`, … Numele e **unic** în `CLCD_SYMBOL_REGISTRY`; engine-ul face dispatch pe `kind` exact ca CLCD widget.
-
-| `kind` (registry) | Exemple | Desen pe canvas |
-| ----------------- | ------- | ---------------- |
-| **`fa`** | `battery`, `check`, `wifi` | `fillText` glyph + Font Awesome (ca `_drawFaIcon`) |
-| **`canvas`** | `digit7`, `digit14`, `colon`, `dp` | procedural (ca `_drawCanvasSymbol`) |
-| **`text`** (`label`) | — | **exclus** din `drawSymbol` — rămâne `drawText` + `fontFamily` (**F5**) |
-
-### API draft (builtins)
-
-```logts
-symbolSize(24)           # același sens numeric ca CLCD attr size:
-symbolStyle(1)             # doar FA: 1=solid, 2=regular, 3=brands (default din registry)
-drawSymbol(40, 20, "battery")
-
-symbolSize(44)
-drawSymbol(10, 50, "digit7")   # segmente — vezi D56 (bits)
-drawSymbol(50, 50, "colon")
-```
-
-| Builtin | Rol |
-| ------- | --- |
-| **`drawSymbol(x, y, name)`** | Lookup `getClcdSymbolDef(name)` → rutare `fa` / `canvas` |
-| **`symbolSize(n)`** | **Același calcul ca CLCD** — nu un singur „px” universal |
-| **`symbolStyle(n)`** | Pentru `kind === 'fa'`; ignorat (sau no-op) pentru `canvas` symbols |
-
-### `symbolSize` — aliniere CLCD (shared helpers)
-
-Refolosim funcțiile existente din `clcd-symbols_generated.js`:
-
-| `kind` | Helper CLCD | Semnificație `size` |
-| ------ | ----------- | ------------------- |
-| **`fa`** | `resolveClcdFaIconSize(sym)` | **înălțime icon în px** (default **22**) → `ctx.font = weight + " " + px + "px " + FA family` |
-| **`canvas`** | `resolveClcdCanvasScale(sym, renderer)` | **înălțime țintă** → `scale = targetH / nat.h` (`CLCD_CANVAS_NATIVE`: digit7 44px, colon 32px, …) |
-
-**Decizie direcție:** un singur builtin `symbolSize(n)` setează state-ul folosit la următorul `drawSymbol`; engine-ul aplică regula potrivită **după** ce știe `kind`-ul simbolului — exact ca la CLCD unde același attr `size` înseamnă lucruri diferite pe FA vs digit7.
-
-### `symbolStyle` — aliniere CLCD
-
-- `resolveClcdFaStyle(symDef, styleNum)` — glyph + `"Font Awesome 5 Free"` / Brands + weight 400/900.
-- Default: `symDef.defaultStyle` dacă `symbolStyle` neapelat.
-- **`canvas`** symbols (`digit7`, …): fără `style` pe CLCD → `symbolStyle` **ignorat** la draw.
-
-### Shared implementation (refactor)
-
-| Fișier / modul | Acțiune |
-| -------------- | ------- |
-| `devices/clcd-symbols_generated.js` | deja: registry + `resolveClcdFa*` + `resolveClcdCanvasScale` |
-| `devices/clcd-widget.js` | extrage `_drawFaIcon`, `_drawCanvasSymbol`, `_drawDigit7`, `_drawDot` → modul shared (ex. `devices/clcd-symbol-draw.js`) |
-| `core/canvas-engine.js` | builtins `drawSymbol`, `symbolSize`, `symbolStyle`; preload FA fonts (ca `clcd-widget`) |
-| `devices/canvas-widget.js` | `document.fonts.load` FA la init dacă lipsește |
-
-**Nu** duplicăm registry-ul; **nu** `fontFamily("fa")` — icoanele rămân pe API symbol, textul pe F5.
-
-### Deschidere: `digit7` / `digit14` și segmente
-
-Pe CLCD, biții vin din `bits` / `bit` pe symbol block. Pe canvas inline, TBD la promovare:
-
-| Opțiune | Exemplu |
-| ------- | ------- |
-| **A** | `symbolBits("1110111")` state înainte de `drawSymbol(..., "digit7")` |
-| **B** | al 4-lea arg: `drawSymbol(x, y, "digit7", bits)` |
-| **C** | wire arg separat (doar `comp [canvas]` renderer) |
-
-Recomandare draft: **A** sau **B** — consistent cu „state + draw” (ca `styleFill`).
-
-### Decizii draft **D53–D57** (la promovare)
-
-| ID | Subiect | Recommended |
-| -- | ------- | ----------- |
-| **D53** | Nume API | **A** `drawSymbol` (nu `drawIcon`) — un entry point pentru FA + canvas symbols |
-| **D54** | `symbolSize` / `symbolStyle` | **A** builtins separate; size/style în draw state |
-| **D55** | Size semantics | **A** identic CLCD (`resolveClcdFaIconSize` / `resolveClcdCanvasScale`) |
-| **D56** | Segmente digit7 | **A** `symbolBits` state · **B** arg extra la `drawSymbol` |
-| **D57** | `label` | **A** exclus — `drawText` + F5 |
-
-### Criterii done (când se promovează)
-
-- [ ] `drawSymbol` + `battery` / `colon` / `digit7` în widget + mock ctx
-- [ ] `symbolSize(44)` scalează digit7 ca pe CLCD; `symbolSize(32)` mărește FA icon
-- [ ] `symbolStyle(2)` schimbă regular vs solid unde registry permite
-- [ ] Cod draw shared CLCD + canvas (fără copy-paste segmente)
-- [ ] Doc cross-link `clcd-symbols.md`; teste noi (bloc **48xx** TBD)
-- [ ] Eroare clară la nume necunoscut (același mesaj ca parser CLCD)
-
-### Legături
-
-- [clcd-symbols.md](../../v0_3_2/doc/clcd-symbols.md) — catalog searchable
-- [comp_clcd.plan.md](comp_clcd.plan.md) — semantics `size` / `style` pe symbol blocks
+Vezi [Faza 6](#faza-6--clcd-symbols-drawsymbol-1n-promovat) — `drawSymbol(x,y,name[,bits])`, `symbolSize`, `symbolStyle`, shared draw CLCD.
 
 ---
 
@@ -1366,6 +1276,177 @@ drawText(10, 200, "caption")
 
 ---
 
+## Faza 6 — CLCD symbols (`drawSymbol`, **1+n** promovat)
+
+> **Status:** draft — **D56 B**, **D58 A**, **D61 A** ✅; **D60** închis; **D53–D55**, **D57**, **D59** implicit A.
+> **Depinde:** F2 (style/color), F5 (text separat de simboluri).  
+> **Promovat din backlog:** **1+n** (user 2026-09-01).
+
+### Scop
+
+Același **catalog de nume** ca `comp [clcd]` (~500 FA + `digit7`/`digit14`/`colon`/`dp`), desenate liber pe `comp [canvas]` via builtins — fără symbol blocks, fără `bit`/`bits` CLCD.
+
+| Separare clară | API |
+| -------------- | --- |
+| Text liber | `drawText` + `fontFamily` / `fontStyle` (**F5**) |
+| Simbol catalog | `drawSymbol` + `symbolSize` / `symbolStyle` (**F6**) |
+| `label` | **nu** pe `drawSymbol` — rămâne text |
+
+### Dispatch (identic CLCD widget)
+
+```
+drawSymbol(x, y, name [, bits])
+    → getClcdSymbolDef(name)
+        kind 'fa'     → 3 args; fillText(FA glyph)     [clcd-symbol-draw]
+        kind 'canvas' → 4 args obligatoriu (bits)      [clcd-symbol-draw]
+        kind 'text'   → ERROR (use drawText)
+        missing       → ERROR (unknown symbol)
+```
+
+### API țintă
+
+```logts
+# Font Awesome icon (3 args)
+styleFill("00ff00")
+symbolSize(28)
+symbolStyle(1)
+drawSymbol(20, 10, "battery")
+
+# 7-segment digit (4 args — bits în apel)
+style("334455", "00ff00")    # off / on — D58
+symbolSize(44)
+drawSymbol(60, 10, "digit7", "1101010")
+
+# dp — 1 bit
+drawSymbol(80, 10, "dp", "1")
+drawSymbol(90, 10, "dp", "0")
+
+# colon — 2 biți (top, bottom); nume registry: colon
+drawSymbol(100, 20, "colon", "10")
+drawSymbol(110, 20, "colon", "00")
+```
+
+### Builtins
+
+| Builtin | Rol |
+| ------- | --- |
+| **`drawSymbol(x, y, name)`** | FA și simboluri fără biți — **3 argumente** |
+| **`drawSymbol(x, y, name, bits)`** | Simboluri **canvas** care acceptă biți — **4 argumente obligatorii** |
+| **`symbolSize(n)`** | State pentru următorul `drawSymbol`; semantica **per kind** (CLCD) |
+| **`symbolStyle(n)`** | FA only: `1` solid, `2` regular, `3` brands; default **D61** `symDef.defaultStyle` |
+
+**Nu** există `symbolBits` builtin — biții sunt **doar** al 4-lea parametru la `drawSymbol`.
+
+### Al 4-lea arg `bits` — **D56 B ✅**
+
+| Simbol | `bits` | Semnificație |
+| ------ | ------ | ------------ |
+| **`digit7`** | string **7** × `0`\|`1` | segmente on/off → `styleFill` / `styleStroke` |
+| **`digit14`** | string **7** sau **14** × `0`\|`1` | desen 7-seg (ca CLCD: primele 7 folosite) |
+| **`dp`** | **1** × `0`\|`1` | `1` = dot on (`fillColor`), `0` = off (`strokeColor`) |
+| **`colon`** | **2** × `0`\|`1` | bit0 = punct superior, bit1 = punct inferior |
+| **`fa`** | — | al 4-lea arg **interzis** (eroare) |
+
+Validare: lungime și caractere `0`/`1` only; mesaj clar la mismatch.
+
+**CLCD widget (refactor):** mapează `bit`/`bits` register → același `bits` string pentru shared draw (`colon` cu un singur `bit` → `"11"` / `"00"`).
+
+### `symbolSize` — reuse CLCD helpers
+
+Engine construiește un obiect `sym` sintetic `{ size: state.symbolSize }` și apelează:
+
+| `kind` | Helper | Default size | Validare (ca parser CLCD) |
+| ------ | ------ | ------------ | ------------------------- |
+| **`fa`** | `resolveClcdFaIconSize(sym)` | **22** px înălțime | **8–64** (**D59**) |
+| **`canvas`** | `resolveClcdCanvasScale(sym, renderer)` | nat.h (44 / 32 / …) | **8–120** (**D59**) |
+
+Un singur `symbolSize(n)` — interpretarea depinde de **numele** din `drawSymbol`, nu de un tip declarat de user.
+
+### Culori — **D58 A ✅**
+
+Fără builtins noi de culoare; refolosim `styleFill` / `styleStroke` / `style`:
+
+| `kind` | Culoare | Mapare canvas state |
+| ------ | ------- | ------------------- |
+| **`fa`** | icon | `styleFill` → `fillColor` (ca `drawText`) |
+| **`digit7`**, **`digit14`** | segment on / off | `styleFill` = on, `styleStroke` = off |
+| **`dp`**, **`colon`** | dot on / off | din **biții** arg-ului 4: `1` → `fillColor`, `0` → `strokeColor` per dot/segment |
+
+**D60:** închis — **nu** `symbolOn` separat; totul din `bits` la `drawSymbol`.
+
+### Refactor shared (obligatoriu în F6)
+
+| Pas | Fișier | Acțiune |
+| --- | ------ | ------- |
+| **F6a** | `devices/clcd-symbol-draw.js` **(nou)** | `drawClcdFaIcon(ctx, opts)`, `drawClcdCanvasSymbol(ctx, opts)` — extras din `clcd-widget.js` |
+| **F6b** | `devices/clcd-widget.js` | delegă la `clcd-symbol-draw.js` (zero schimbare vizuală CLCD) |
+| **F6c** | `core/canvas-engine.js` | state `symbolSize`, `symbolStyle`; builtin `drawSymbol` 3–4 args; shared draw |
+| **F6d** | `devices/canvas-widget.js` | `document.fonts.load` FA (3 faces, ca CLCD) la primul draw sau mount |
+| **F6e** | `core/canvas-assembler.js` | înregistrare builtins noi |
+| **F6f** | test bundle | `clcd-symbols_generated.js` deja în bundle ✓ |
+
+`opts` pentru shared draw: `{ x, y, name, symDef, size, style, bits, fg, bg }` — `bits` string; CLCD widget derivă din register; canvas din arg 4.
+
+### Mock ctx / teste
+
+| Test | Verificare |
+| ---- | ---------- |
+| FA `battery` | `fillText` glyph `\uf240` |
+| `symbolStyle(2)` vs `1` | weight 400 vs 900 |
+| `digit7` + `"1101010"` | `fillRect` segmente |
+| `dp` `"1"` / `"0"` | `arc` cu culori fg/bg |
+| `colon` `"10"` / `"00"` | 2× `arc`, culori per bit |
+| FA cu 4 args | eroare |
+| `digit7` fără bits | eroare |
+| unknown `foo` | eroare |
+
+**Alocare teste:** **4750–4759** (wave perechi, ca F5).
+
+### Decizii **D53–D61**
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D53** | Nume API | **A** `drawSymbol` |
+| **D54** | `symbolSize` / `symbolStyle` | **A** builtins separate în draw state |
+| **D55** | Size semantics | **A** identic CLCD helpers |
+| **D56** | Biți canvas symbols | **B ✅** al 4-lea arg `drawSymbol(x,y,name,bits)` — user 2026-09-01 |
+| **D57** | `label` exclus | **A** — doar `drawText` |
+| **D58** | Culori simboluri | **A ✅** `styleFill`+`styleStroke` |
+| **D59** | Validare `symbolSize` | **A** limite CLCD (FA 8–64, canvas 8–120) |
+| **D60** | `symbolOn` separat | **respins** — on/off din `bits` arg (**D56**) |
+| **D61** | `symbolStyle` neapelat | **A ✅** `symDef.defaultStyle` |
+
+### Scope F6
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F6a** | `clcd-symbol-draw.js` + refactor widget |
+| **F6b** | Builtins canvas + draw state |
+| **F6c** | FA font preload pe canvas widget |
+| **F6d** | Doc `canvas-builtins.md` + secțiune „Symbols” + link `clcd-symbols.md` + `logts-play` |
+| **F6e** | Teste **4750+** wave + legacy |
+
+### Criterii done F6
+
+- [ ] `drawSymbol` 3-arg (FA) + 4-arg (canvas + bits)
+- [ ] `symbolSize` / `symbolStyle` conform CLCD
+- [ ] CLCD widget neschimbat vizual după refactor shared
+- [ ] Doc + exemplu runnable (battery + digit7)
+- [ ] Suite verde **4750–4759**
+
+### Non-goals F6
+
+- Touch / hit-test pe simboluri canvas (**1+f**)
+- `label` pe `drawSymbol`
+- Wire args pentru `bits` la `drawSymbol` (post-F6 / **1+l**)
+- Duplicare catalog — un singur `CLCD_SYMBOL_REGISTRY`
+
+### Status F6
+
+**(next)** — **D56 B**, **D58 A**, **D61 A** confirmate; **D60** închis. Rămân implicite **D53–D55**, **D57**, **D59** (recommended A). Gata de implementare la „go”.
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -1404,6 +1485,15 @@ drawText(10, 200, "caption")
 | **D50** | 5 | builtin `fontStyle(family, size)` | **A ✅** |
 | **D51** | 5 | `textAlign` start/end | **A ✅** |
 | **D52** | 5 | familie invalidă → error | **A ✅** |
+| **D53** | 6 | `drawSymbol` API | **A** |
+| **D54** | 6 | `symbolSize` / `symbolStyle` | **A** |
+| **D55** | 6 | size semantics CLCD | **A** |
+| **D56** | 6 | biți în `drawSymbol` | **B ✅** arg 4 |
+| **D57** | 6 | `label` exclus | **A** |
+| **D58** | 6 | culori simboluri | **A ✅** |
+| **D59** | 6 | validare size 8–64/120 | **A** |
+| **D60** | 6 | `symbolOn` | **respins** (bits arg) |
+| **D61** | 6 | default symbolStyle | **A ✅** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -1454,6 +1544,7 @@ drawText(10, 200, "caption")
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
+| 2026-09-01 | **F6 D56–D61** — bits ca arg 4 la `drawSymbol`; D58/D61 A; D60 respins (`colon`/`dp` din bits) |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
 | 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |
@@ -1464,5 +1555,5 @@ drawText(10, 200, "caption")
 
 - [inline_logic2.plan.md](inline_logic2.plan.md) — `observe` (F108) ca sursă de inputuri
 - [comp_clcd.plan.md](comp_clcd.plan.md) — pattern device canvas (nu API draw)
-- [clcd-symbols.md](../../v0_3_2/doc/clcd-symbols.md) — catalog simboluri (țintă **1+n**)
+- [clcd-symbols.md](../../v0_3_2/doc/clcd-symbols.md) — catalog simboluri (**Faza 6**)
 - [hotkey_on_comps.plan.md](hotkey_on_comps.plan.md) — structură plan + legendă (referință format)
