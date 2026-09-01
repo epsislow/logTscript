@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–7 done; backlog 1+b…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–7 done; Faza 8 = loops for/while (1+b); backlog 1+c…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -26,12 +26,15 @@ todos:
   - id: canvas-f7
     content: "Faza 7: if/else în body canvas — D62–D68 ✅ done"
     status: completed
+  - id: canvas-f8
+    content: "Faza 8: for/while loops în body — 1+b → D69–D75 draft"
+    status: pending
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–7**; amânări **1+b, …** (fără **1+k**, **1+n**, **1+a** — promovate **F5**, **F6**, **F7**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–8**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b** — promovate **F5–F8**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -152,7 +155,8 @@ D28 A ✅
 | **Faza 5** Font family + `fontStyle` (**1+k**) | **D49–D52** | **done** |
 | **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
 | **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
-| *(amânate)* | **1+b …** (fără 1+a, 1+k, 1+n) | — |
+| **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** draft | **(next)** |
+| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+n) | — |
 
 ---
 
@@ -163,7 +167,7 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | Stare | ID | Subiect | Detaliu | Fază draft | Legat de |
 | ----- | -- | ------- | ------- | ---------- | -------- |
 | ✅ | **1+a** | `if` / conditional draw | `if` / `else` în body metodă; comparații în condiție | **Faza 7** | D62–D68, D26 |
-| ⏳ | **1+b** | Loops `for` / `while` | Iterație desen (ex. N tiles) | — | user: fără loops |
+| ✅ | **1+b** | Loops `for` / `while` | C-style `for`; `while (cond)`; body metodă | **Faza 8** | D69–D75 |
 | ⏳ | **1+c** | Imagini / sprite sheet | `drawImage`, load asset | — | post-MVP |
 | ⏳ | **1+d** | Transform (rotate/scale/translate) | Stack `save`/`restore` JS | — | post-MVP |
 | ⏳ | **1+e** | Path / arc / bezier / polygon | Dincolo de rect/line/circle | — | post-MVP |
@@ -179,13 +183,13 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1–F6** ✅; **F7** (`if`) **next**; apoi **1+b** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F7** ✅; **F8** (loops) **next**; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
 
 ---
 
-## Backlog **1+a** → **Faza 7** (promovat)
+## Backlog **1+b** → **Faza 8** (promovat)
 
-Vezi [Faza 7](#faza-7--if--else-în-body-1a-promovat) — `if (cond) { … }` / `else { … }` în metode canvas.
+Vezi [Faza 8](#faza-8--loops-for--while-1b-promovat) — `for` / `while` în metode canvas.
 
 ---
 
@@ -1554,6 +1558,156 @@ if (evalCond(cond)) executeBlock(then); else if (else) executeBlock(else);
 
 ---
 
+## Faza 8 — Loops `for` / `while` (**1+b** promovat)
+
+> **Status:** draft — **D69–D75**; așteaptă confirmare user.  
+> **Depinde:** F7 (condiții `if` — reutilizare `parseCond` / `canvasEvalCond`).  
+> **Promovat din backlog:** **1+b** (user 2026-09-01).
+
+### Scop
+
+Iterație în **body metodă** — grid de tile-uri, animații procedurale simple, scan linii — fără `break`/`continue` în F8.
+
+| În scope F8 | În afara scope |
+| ----------- | -------------- |
+| `for (init; cond; step) { … }` | `do` / `do-while` |
+| `while (cond) { … }` | `break` / `continue` (rămân interzise) |
+| Condiții ca F7 (`&&` `||` `!`, comparații, truthiness) | `for`/`while` în `renderer { }` direct (**D74**) |
+| Init/step: assign expr (`i = 0`, `i = i + 1`) | Operatori `++` / `--` (draft: amânat sau D71) |
+| Locals loop var în același `env` (**D14**) | Recursivitate nouă |
+
+### Sintaxă țintă (JS/C obișnuit)
+
+```logts
+inline [canvas] .tiles:
+
+    drawGrid(cols, rows, tileW, tileH) {
+        y = 0
+        row = 0
+        while (row < rows) {
+            x = 0
+            col = 0
+            while (col < cols) {
+                style(0, "aaffaa")
+                drawRect(x, y, tileW - 2, tileH - 2)
+                x = x + tileW
+                col = col + 1
+            }
+            y = y + tileH
+            row = row + 1
+        }
+    }
+
+    drawStrip(n, color) {
+        for (i = 0; i < n; i = i + 1) {
+            style(0, color)
+            drawRect(i * 18, 10, 16, 16)
+        }
+    }
+
+:
+
+comp [canvas] .board:
+    width: 200
+    height: 120
+    .tiles { }
+:
+
+# renderer: drawGrid(cols/s16, rows/s16, 20, 20)
+```
+
+### Gramatică `for` (draft)
+
+```text
+forStmt   := 'for' '(' forInit ';' cond ';' forStep ')' block
+forInit   := assignStmt | empty
+forStep   := assignStmt | empty
+cond      := parseCond()   # aceeași ca F7
+block     := '{' stmt* '}'
+```
+
+- **Clauze goale permise:** `for (;;)` — infinit → protejat de **D73** max iterations.
+- **Init/step:** o singură assign per clauză (`i = 0`, `i = i + 1`) — nu listă cu `,`.
+
+### Gramatică `while`
+
+```text
+whileStmt := 'while' '(' cond ')' block
+```
+
+### Execuție (engine)
+
+```text
+for:
+  eval forInit (assign în env)
+  iter = 0
+  while canvasEvalCond(cond) && iter < MAX:
+    executeBlock(body)
+    eval forStep
+    iter++
+
+while:
+  iter = 0
+  while canvasEvalCond(cond) && iter < MAX:
+    executeBlock(body)
+    iter++
+```
+
+**MAX** — cap siguranță browser (**D73**), ex. **10 000** iterații → runtime error sau log+stop.
+
+### Tokenizer / parser
+
+| Schimbare | Detaliu |
+| --------- | ------- |
+| **KW** | `for`, `while` (ca `if`/`else`) |
+| **CANVAS_FORBIDDEN_IDS** | scoate `for`, `while`; păstrează `do`, `break`, `continue` |
+| **parseStmt** | + `parseForStmt`, `parseWhileStmt` |
+| **AST** | `{ kind: 'for', init, cond, step, body }`, `{ kind: 'while', cond, body }` |
+| **canvasExecuteStmts** | + exec `for` / `while` |
+
+### Decizii **D69–D75** (draft)
+
+| ID | Subiect | Recommended |
+| -- | ------- | ----------- |
+| **D69** | `for` C-style 3 clauze | **A** `for (init; cond; step)` cu `;` și assign init/step |
+| **D70** | `while` | **A** da — `while (cond) { }` |
+| **D71** | `++` / `--` | **A** amânat — folosește `i = i + 1` · **B** adaugă în F8 |
+| **D72** | `break` / `continue` | **A** rămân interzise în F8 |
+| **D73** | Max iterații | **A** cap **10000** per loop → eroare · **B** fără cap |
+| **D74** | Doar în metode | **A** ca F7 — nu în `renderer` direct |
+| **D75** | Teste | **A** **4770–4779** wave+legacy; **4768** → `for` permis |
+
+### Scope F8
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F8a** | KW `for`/`while` + parser |
+| **F8b** | Exec loop + iteration cap |
+| **F8c** | Doc `inline-canvas.md` secțiune Loops |
+| **F8d** | Teste **4770+**; actualizare **4768** |
+
+### Criterii done F8
+
+- [ ] `for (i = 0; i < n; i = i + 1)` desenează N tile-uri
+- [ ] `while` imbricat (grid)
+- [ ] Condiție F7 în loop (`i < cols && flag`)
+- [ ] Depășire cap iterații → eroare
+- [ ] `break`/`while` în renderer → încă interzis
+- [ ] Doc + suite verde
+
+### Non-goals F8
+
+- `++`/`--` (dacă D71 A)
+- `break` / `continue`
+- `do-while`
+- `for-each` / range syntax
+
+### Status F8
+
+**(next)** — promovat **1+b**; confirmă **D69–D75**.
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -1608,6 +1762,13 @@ if (evalCond(cond)) executeBlock(then); else if (else) executeBlock(else);
 | **D66** | 7 | `&&` `||` `!` | **A ✅** |
 | **D67** | 7 | `if` doar în metode | **A ✅** |
 | **D68** | 7 | teste 4760+ | **A ✅** |
+| **D69** | 8 | `for` C-style | **A** |
+| **D70** | 8 | `while` | **A** |
+| **D71** | 8 | `++`/`--` | **A** amânat |
+| **D72** | 8 | `break`/`continue` | **A** interzise |
+| **D73** | 8 | max iterations | **A** 10000 |
+| **D74** | 8 | doar în metode | **A** |
+| **D75** | 8 | teste 4770+ | **A** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -1646,7 +1807,7 @@ if (evalCond(cond)) executeBlock(then); else if (else) executeBlock(else);
 | `renderer` în exec vs body | **D29** | Sketch sugerează exec |
 | Culori `"hex"` vs `^hex` | **D16** | User: fără `#`; string OK |
 | `busy` aproape instant pe JS | **D38** | Tot util pentru sync cu alte comps |
-| Fără `if`/loops | **1+a → F7** / **1+b** | F7 = `if`; loops amânate |
+| Fără loops | **1+b → F8** | `for`/`while` în body metodă |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
 
@@ -1658,7 +1819,7 @@ if (evalCond(cond)) executeBlock(then); else if (else) executeBlock(else);
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
-| 2026-09-01 | **F7 done** — `if`/`else if`/`else`; `&&` `||` `!`; truthiness ascii; teste **4760–4768** |
+| 2026-09-01 | **1+b → Faza 8** — `for`/`while` în body; D69–D75 draft; teste **4770+** |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
 | 2026-09-01 | **D13/13b/14/16/18–22✅** + **D19b/D21b** fillColor opțional; **D22n** explicat (pending) |
