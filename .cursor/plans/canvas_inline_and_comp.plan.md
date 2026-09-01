@@ -30,7 +30,7 @@ todos:
     content: "Faza 8: for/while loops + break/continue — 1+b → D69–D75 done"
     status: completed
   - id: canvas-f9
-    content: "Faza 9: vector wire args în renderer — 1+l → D76–D83 draft"
+    content: "Faza 9: vector wire args — 1+l → D76–D83 (param[] confirmat)"
     status: pending
 isProject: false
 ---
@@ -159,7 +159,7 @@ D28 A ✅
 | **Faza 6** CLCD symbols `drawSymbol` (**1+n**) | **D53–D61** | **done** |
 | **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
 | **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** | **done** |
-| **Faza 9** Vector wire args renderer (**1+l**) | **D76–D83** draft | **(next)** |
+| **Faza 9** Vector wire args (**1+l**) | **D76–D83** | **(ready-to-implement)** |
 | *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+l, 1+n) | — |
 
 ---
@@ -1714,7 +1714,7 @@ while:
 
 ## Faza 9 — Vector wire args în `renderer` (**1+l** promovat)
 
-> **Status:** draft — **D76–D83**; așteaptă confirmare user.  
+> **Status:** **(ready-to-implement)** — **D76–D83** confirmate user 2026-09-01 (**D76 C** — `param[]` în semnătură metodă).  
 > **Depinde:** F3 (wire args scalar + pin inference), F8 (loops pentru iterare pe vector).  
 > **Promovat din backlog:** **1+l** (user 2026-09-01); continuare **D34** amânat MVP.
 
@@ -1722,16 +1722,15 @@ while:
 
 Astăzi F3 acceptă doar **scalar** în `renderer`: `mark(xPos/s16, yPos/s16)` cu `16wire` → un număr per pin.
 
-F9 adaugă **vector wire** conectat la același stil de arg `pinName/s16`, dar wire-ul sursă e `16wire[N]` (sau `Ewire[N]`). Metoda canvas primește un **array de valori decodate** și poate desena N sprite-uri / puncte / bare fără N pinuri separate.
+F9 adaugă parametri **vector** în semnătura metodei (`xs[]`), wire `16wire[N]` conectat la pin, decode per element, `xs[i]` și `vectorLen(xs)` în body.
 
 | În scope F9 | În afara scope |
 | ----------- | -------------- |
-| `renderer { drawShots(shotsX/s16) }` + `shotsX = trajectory` (wire `16wire[8] trajectory` declarat în script) | Vector în args **metodă→metodă** fără pin (defer) |
-| Decode per element `/s16` `/u16` (reuse `logicDecodeNumberBits`) | `/ascii` vector per element (defer **D81 B**) |
-| Index `xs[i]` în expr body metodă | `xs[i] = …` assign în vector (defer) |
-| `vectorLen(xs)` builtin | Slice `xs[i:j]` (defer) |
-| Validare scalar↔vector mismatch | Matrix `wire[r,c]` (defer **2+z**) |
-| Loops + `vectorLen` pentru desen serie | Vector ca arg în `renderer` fără metodă intermediară |
+| **`drawShots(xs[])`** — vector declarat în semnătură metodă | `shotsX[] = wire` la assign (respins — assign rămâne `pin = wire`) |
+| `renderer { drawShots(shotsX/s16) }` + `shotsX = trajectory` | Vector în args **metodă→metodă** fără pin (defer) |
+| Decode per element — toate formatele scalar F3 | Matrix `wire[r,c]` (defer) |
+| `xs[i]`, `vectorLen(xs)` — eroare pe param scalar | `xs[i] = …` assign în vector (defer) |
+| Match **param `[]`** ↔ wire shape la assign (D82) | Slice `xs[i:j]` (defer) |
 
 ### Sintaxă țintă
 
@@ -1740,7 +1739,7 @@ F9 adaugă **vector wire** conectat la același stil de arg `pinName/s16`, dar w
 ```logts
 inline [canvas] .traj:
 
-    drawShots(xs) {
+    drawShots(xs[]) {
         n = vectorLen(xs)
         for (i = 0; i < n; i++) {
             style(0, "aaffaa")
@@ -1748,14 +1747,21 @@ inline [canvas] .traj:
         }
     }
 
-    drawBars(vals) {
-        for (i = 0; i < vectorLen(vals); i++) {
-            h = vals[i]
-            if (h > 0) {
-                styleFill("00ff00")
-                drawRect(i * 12, 80 - h, 10, h)
-            }
+    drawEnemies(posx[], posy[]) {
+        for (i = 0; i < vectorLen(posx); i++) {
+            styleFill("ff0000")
+            drawRect(posx[i], posy[i], 8, 8)
         }
+    }
+
+    drawLabels(names[]) {
+        for (i = 0; i < vectorLen(names); i++) {
+            drawText(10, 10 + i * 14, names[i])
+        }
+    }
+
+    mark(x, y) {
+        drawRect(x, y, 12, 12)
     }
 
 :
@@ -1774,42 +1780,45 @@ comp [canvas] .plot:
 .plot:{
     renderer {
         drawShots(shotsX/s16)
-        drawBars(barHeights/u16)
+        drawEnemies(enemyX/s16, enemyY/s16)
     }
     shotsX = trajectory
-    barHeights = heights
+    enemyX = trajectory
+    enemyY = heights
     set = go
 }
 ```
 
-> **Pin vs wire:** `shotsX` / `barHeights` sunt **pinii** inferați din `renderer` (ca `xPos` la scalar). `trajectory` / `heights` sunt **wire-urile** scriptului — deja declarate `16wire[N]`; assign-ul e doar `pin = wire`, **fără** repetarea tipului (identic cu `xPos = valX` din F3).
+> **Semnătură `param[]`:** vector declarat în **metodă** (`xs[]`, `posx[]`). **Assign** rămâne `pin = wire` (fără `[]` pe stânga). **Renderer** rămâne `pin/s16` — shape vector vine din param-ul metodei apelate + wire conectat.
 
-### Model pin vector (draft)
+### Model vector (confirmat **D76 C**)
 
 ```text
-renderer parse:  shotsX/s16  →  wireRef { pinName, bindType:number, numberFormat:s16, vector:null }
-prima assign:    shotsX = trajectory  →  pin.vector din metadata wire trajectory (16wire[8])
-pin.bits:        16 * 8 = 128  (storage flat, MSB element order ca wire-vectors)
-exec decode:     env.shotsX = [2, 4, 6, 8, 10, 12, 14, 16]   // s16 per element
-body index:      xs[i]  →  canvasEvalExpr index pe array
+parseMethod:     drawShots(xs[])  →  params: [{ name: xs, vector: true }]
+parseRenderer:   drawShots(shotsX/s16)  →  pin shotsX → maps to param[0] xs (vector)
+elaboration:     pin shotsX expects vector wire (from param xs[])
+first assign:    shotsX = trajectory  →  wire 16wire[8] OK; pin.vector = { ew:16, count:8 }; bits=128
+                 shotsX = valX        →  ERROR: param xs[] requires vector wire
+exec decode:     env.xs = [2, 4, 6, …]   // array JS
+body:            xs[i], vectorLen(xs)  →  require Array (error if not — backup pentru bug intern)
 ```
 
-**Scalar rămâne neschimbat:** `xPos/s16` + `xPos = valX` (`16wire`) → pin scalar → `env.xPos = 25` (number).
+**Scalar neschimbat:** `mark(x, y)` + `mark(xPos/s16, yPos/s16)` + `xPos = valX` (`16wire`) → number.
 
-### Când știm scalar vs vector? (răspuns D82)
-
-Fără sintaxă explicită în `renderer`, shape-ul **nu** e cunoscut la parse `shotsX/s16` — doar **formatul** (`/s16`, `/ascii`, …).
+### Când știm scalar vs vector? (**D76 C** + **D82**)
 
 | Moment | Ce știm |
 | ------ | ------- |
-| **Parse `renderer`** | pin `shotsX`, format `/s16` — shape **nelegat** |
-| **Prima `shotsX = wire`** | din metadata wire: `16wire` → pin **scalar**; `16wire[8]` → pin **vector** (resize storage, `elementCount: 8`) |
-| **Assign ulterior** | wire scalar la pin vector (sau invers) → **eroare D82** |
-| **Exec metodă** | `xs[i]` / `vectorLen(xs)` → dacă valoarea e number/string scalar → **runtime error** `not a vector` |
+| **Parse inline metodă** | `xs[]` → param vector; `x` → param scalar |
+| **Parse `renderer`** | pin `shotsX/s16` — format only; shape legat la elaborare |
+| **Elaborare** | `drawShots(shotsX/s16)` → pin `shotsX` **must be vector** (param 0 = `xs[]`) |
+| **Assign `shotsX = wire`** | wire `16wire[N]` dacă pin vector; `16wire` dacă pin scalar; mismatch → **eroare** |
+| **Exec `vectorLen(xs)`** | param `xs[]` → array; apel pe param scalar `x` → **eroare** `not a vector` |
+| **Exec `xs[i]`** | la fel — doar pe param vector (sau variabilă locală array dacă apare mai târziu) |
 
-> **Nu** putem respinge `xs[i]` la parse inline fără a ști ce wire se conectează. Metoda e generică; verificarea e la **draw** (sau la assign dacă shape-ul pin ≠ ce așteaptă body-ul — enhancement opțional F9+).
+**`vectorLen` pe scalar:** **eroare** (nu `1`) — confirmat user.
 
-**`vectorLen` pe scalar:** eroare (nu `1`) — altfel ascunde bug-uri; scalar rămâne un singur număr, nu „vector de lungime 1” implicit.
+**Respins:** `shotsX[] = trajectory` — redundant; shape vine din `param[]` + wire metadata.
 
 ### Formate vector (D81)
 
@@ -1821,11 +1830,15 @@ Aceleași ca scalar F3 — per element, aceeași decodare:
 | `/ascii`, `/text` | `string` (NUL-trim ca scalar) |
 | `/bool` | `0` / `1` |
 
-### Gramatică index (body metodă)
+### Gramatică
 
 ```text
+method    := ID '(' paramList ')' block
+paramList := param (',' param)*
+param     := ID ('[' ']')?          # xs[] = vector param; x = scalar
+
 primary   += var '[' expr ']'
-builtin   += vectorLen(id)
+builtin   += vectorLen(id)          # id must be vector param / array — else error
 ```
 
 - `i` în `xs[i]` = orice expr numerică (ca F8).
@@ -1850,47 +1863,51 @@ canvasEvalExpr:
 
 | Schimbare | Detaliu |
 | --------- | ------- |
-| **parseRendererArg** | `wireRef` neschimbat la suprafață (D76 A) sau flag `vectorHint` (D76 B) |
-| **canvas-wire.js** | `canvasPinBitWidth`, `canvasPinBitsToValue`, `canvasBuildPinEnv` — branch vector |
-| **canvas.js `_ensurePin`** | stochează `vector: { elementWidth, elementCount }` după prima assign validă |
-| **assign validation** | la `pinName = wire` verifică scalar vs vector (D82) |
-| **CANVAS_BUILTINS** | + `vectorLen` |
-| **canvas-assembler** | `parsePrimary` + `xs[i]`; parse call `vectorLen(x)` |
+| **parseMethod** | `param[]` → `{ name, vector: true }` |
+| **elaboration** | map renderer arg position → method param; pin `vectorRequired` |
+| **parseRendererArg** | `wireRef` neschimbat (`pin/s16`) |
+| **canvas-wire.js** | vector decode + `canvasPinBitWidth` cu `elementCount` |
+| **canvas.js `_ensurePin`** | `vectorRequired` din elaboration; resize la assign |
+| **assign validation** | param vector ↔ `Nwire[N]`; param scalar ↔ `Nwire` (D82) |
+| **CANVAS_BUILTINS** | + `vectorLen` (vector args only) |
+| **canvas-assembler** | `xs[i]`; `vectorLen(x)` call |
 
-### Decizii **D76–D83** (draft)
+### Decizii **D76–D83** (confirmate user 2026-09-01)
 
-| ID | Subiect | Recommended |
-| -- | ------- | ----------- |
-| **D76** | Cum marchezi arg vector în `renderer` | **A** aceeași sintaxă `pin/s16` — vector vs scalar din **wire-ul conectat** la assign · **B** sintaxă explicită `pin/s16[N]` sau `pin[]/s16` la parse |
-| **D77** | Când se fixează lățimea pin | **A** la **prima** `pinName = wire` (metadata `Nwire[N]` din wire) · **B** count literal în renderer (D76 B) |
-| **D78** | Valoare param metodă | **A** array JS: `number[]` pentru formate numerice, `string[]` pentru `/ascii` · **B** handle opaque |
-| **D79** | Acces element în body | **A** `xs[i]` — **runtime error** dacă valoarea nu e array (`not a vector`) |
-| **D80** | Lungime | **A** `vectorLen(xs)` — **runtime error** pe non-vector (nu return 1) |
-| **D81** | Formate vector | **A** toate formatele scalar existente per element (`/s16`, `/u16`, `/ascii`, `/bool`, `/s8`, …) — reuse `canvasParseFormatToken` + `logicDecodeNumberBits` |
-| **D82** | Scalar vs vector fără sintaxă explicită | **A** **pin shape** fixat la **prima** `pin = wire` din metadata wire; mismatch la assign ulterior → eroare · opțional: body folosește `xs[i]` dar prima assign scalar → eroare la **draw**, nu la assign |
-| **D83** | Teste | **A** **4790–4799** wave+legacy; parse + exec + mismatch error |
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D76** | Marcare vector | **C ✅** `param[]` în semnătură metodă (`drawShots(xs[])`) — **nu** `pin[]` la assign · **A** respins (infer doar din wire) |
+| **D77** | Lățime pin vector | **A ✅** `elementCount` din wire la assign; `elementWidth` din wire + format pin |
+| **D78** | Valoare param | **A ✅** `number[]` sau `string[]` (după format) |
+| **D79** | `xs[i]` | **A ✅** permis pe param `[]`; **eroare** pe param scalar |
+| **D80** | `vectorLen` | **A ✅** **eroare** pe non-vector (nu return `1`) |
+| **D81** | Formate | **A ✅** toate formatele scalar F3 per element |
+| **D82** | Match shape | **A ✅** elaborare: pin vector dacă param `[]`; assign: vector wire obligatoriu / scalar interzis |
+| **D83** | Teste | **A ✅** **4790–4799** wave+legacy |
 
 ### Scope F9
 
 | Subfază | Conținut |
 | ------- | -------- |
-| **F9a** | Pin vector metadata + resize bits la assign |
-| **F9b** | Decode vector în `canvasBuildPinEnv` |
+| **F9a** | `param[]` parser + elaboration pin↔param |
+| **F9b** | Pin vector metadata + assign validation + decode |
 | **F9c** | `xs[i]` + `vectorLen` parser/engine |
 | **F9d** | Doc `comp-canvas.md` + `inline-canvas.md` secțiune Vector pins |
 | **F9e** | Teste **4790+** |
 
 ### Criterii done F9
 
-- [ ] `trajectory` (`16wire[8]`) → `shotsX = trajectory` → `drawShots(shotsX/s16)` → 8 `drawRect`
-- [ ] `vectorLen(xs)` în `for` condiție
-- [ ] Scalar `xPos/s16` încă funcționează (regresie 4732)
-- [ ] `shotsX = scalarWire` după pin vector → eroare clară
-- [ ] Doc + suite verde
+- [ ] `drawShots(xs[])` + `shotsX = trajectory` → 8 `drawRect`
+- [ ] `drawEnemies(posx[], posy[])` nested coords
+- [ ] `vectorLen(xs)` pe param scalar → eroare
+- [ ] `shotsX = scalarWire` la pin vector → eroare la assign
+- [ ] Scalar `mark(x, y)` regresie 4732
+- [ ] Doc + suite **4790+** verde
 
 ### Non-goals F9
 
-- Vector args fără pin (literal array în renderer)
+- `shotsX[] = wire` la assign
+- `pin/s16[]` în renderer
 - Matrix `16wire[r,c]`
 - Mutare elemente `xs[i] = …`
 - Vector în condiții `if (xs)` truthiness array (defer — sau D78 note)
@@ -1898,7 +1915,7 @@ canvasEvalExpr:
 
 ### Status F9
 
-**(next)** — promovat **1+l**; confirmă **D76–D83**.
+**(ready-to-implement)** — **D76–D83** confirmate; model **param[]** + assign `pin = wire`.
 
 ---
 
@@ -1963,14 +1980,14 @@ canvasEvalExpr:
 | **D73** | 8 | max iterations | **A ✅** 10000 |
 | **D74** | 8 | doar în metode | **A ✅** |
 | **D75** | 8 | teste 4770+ | **A ✅** |
-| **D76** | 9 | marcare arg vector | **A ✅** din wire assign |
-| **D77** | 9 | lățime pin vector | **A ✅** la prima assign |
-| **D78** | 9 | valoare param | **A ✅** array number sau string |
-| **D79** | 9 | `xs[i]` | **A ✅** + runtime `not a vector` |
-| **D80** | 9 | lungime | **A ✅** `vectorLen` + eroare pe scalar |
-| **D81** | 9 | formate vector | **A ✅** toate formatele scalar |
-| **D82** | 9 | scalar vs vector | **A ✅** prima assign fixează shape |
-| **D83** | 9 | teste 4790+ | **A** |
+| **D76** | 9 | marcare vector | **C ✅** `param[]` în metodă |
+| **D77** | 9 | lățime pin | **A ✅** din wire assign |
+| **D78** | 9 | valoare param | **A ✅** array number/string |
+| **D79** | 9 | `xs[i]` | **A ✅** doar pe param `[]` |
+| **D80** | 9 | `vectorLen` | **A ✅** eroare pe scalar |
+| **D81** | 9 | formate | **A ✅** toate scalar F3 |
+| **D82** | 9 | match shape | **A ✅** param `[]` ↔ wire vector |
+| **D83** | 9 | teste 4790+ | **A ✅** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -2010,7 +2027,7 @@ canvasEvalExpr:
 | Culori `"hex"` vs `^hex` | **D16** | User: fără `#`; string OK |
 | `busy` aproape instant pe JS | **D38** | Tot util pentru sync cu alte comps |
 | Fără loops | **1+b → F8** ✅ | `for`/`while` + break/continue |
-| Fără vector renderer | **1+l → F9** | `16wire[N]` → pin array + `xs[i]` |
+| Fără vector renderer | **1+l → F9** | `param[]` + `16wire[N]` → array + `xs[i]` |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
 
@@ -2022,7 +2039,8 @@ canvasEvalExpr:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
-| 2026-09-01 | **1+l → Faza 9** — vector wire args renderer; D76–D83 draft; teste **4790+** |
+| 2026-09-01 | **F9 D76–D83 confirmate** — **D76 C** `param[]` în metodă; assign `pin=wire`; `vectorLen` eroare pe scalar |
+| 2026-09-01 | **1+l → Faza 9** — vector wire args renderer; teste **4790+** |
 | 2026-09-01 | **F8 done** — break/continue; teste **4780–4788** |
 | 2026-09-01 | **F5 done** — `fontFamily`/`fontStyle`/`textAlign` start|end; D49–D52 A; teste **4742–4749** |
 | 2026-09-01 | **D16b/D18b/D19c/D21c** draft — stroke+fill separat (înlocuit de confirmare de mai sus) |
