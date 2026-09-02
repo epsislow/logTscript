@@ -150,3 +150,15 @@ daca o faza e implementata poti sa scrii (completed)
  as vrea sa analizezi sa vezi directia, sa vezi cam ce se doreste, posibil sa fie si greseli la ce am zis eu, ce ti se pare neclar sau daca vezi modificari de la directie da-mi optiuni, in tabel as vrea tot asa D1, D2, D3, Dx si sa continuam de la numarul Dx la care suntem in plan, si pt fiecare decizie poti sa imi dai optiunile detaliate sub tabelul deciziilor, vezi cum am facut la ultimele faze din planul @.cursor/plans/inline_logic2.plan.md 
 
 -------
+
+
+incepe implementarea F12 si te rog sa adaugi o pagina de documentatie noua cu comp canvas hitbox care sa aibe mai multe exemple cu butoane load si load and Run 
+
+sa scrii documentatie cu comportamentul/ functionalitatile noi si exemple care sa mearga conform
+pentru pouturi trebuie sa existe si teste pe wave nu doar legacy, am observat diferente la rulari intre wave si legacy , au fost corectate dar posibil ca din nou sa apara rezultate diferite, si asta nu este ok, rezultatele trebuie sa fie aceleasi intre wave si legacy
+
+sa te asiguri ca toate testele trec cu success, si ca blocurile din paginiile de documentatie care au blocuri canvas ruleza cu success. poti verifica blocurile cu: node v0_3_2/node/_verify_doc_examples.js *canvas* -f
+
+nu scrii in documentatie despre fazele amanate sau faze viitoare, scrii in engleza, si nu exista breaking changes. inline canvas si comp canvas nu sunt in productie inca.
+
+
