@@ -52820,5 +52820,174 @@ comp [canvas] .myCanvas:
     });
   });
 
+  reg(4820, 'canvas', 'parse array literal and append stmt', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs = [1, 2]
+        xs[] = 3
+    }`);
+    h.assert('assign', prog.methods.draw.body[0].kind, 'assign');
+    h.assert('array', prog.methods.draw.body[0].expr.kind, 'array');
+    h.assert('append', prog.methods.draw.body[1].kind, 'append');
+  });
+
+  function runCanvasLocalVectorLiteral(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs = [10, 20, 30]
+        n = vectorLen(xs)
+        drawRect(xs[1] * 2, 0, 8, 8)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const rect = mock.calls.find((c) => c.op === 'fillRect' && c.w === 8);
+    h.assert('x from xs[1]', rect.x, 40);
+  }
+
+  regCanvasDual(4822, 4823, 'local vector literal and index read', runCanvasLocalVectorLiteral);
+
+  function runCanvasVectorCopyAssign(h) {
+    const prog = parseCanvasBody(`draw(points[]) {
+        xs = points
+        xs[0] = 99
+        drawRect(points[0], 0, 5, 5)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('draw(pts/s16)'),
+      mock.ctx,
+      { skipOnError: false, pinEnv: { pts: [10, 20] } }
+    );
+    const rect = mock.calls.find((c) => c.op === 'fillRect');
+    h.assert('points unchanged', rect.x, 10);
+  }
+
+  regCanvasDual(4824, 4825, 'xs = points copy by value', runCanvasVectorCopyAssign);
+
+  function runCanvasVectorConcat(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs = [1]
+        ys = [2, 3]
+        xs += ys
+        drawRect(xs[2] * 10, 0, 6, 6)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const rect = mock.calls.find((c) => c.op === 'fillRect');
+    h.assert('third elem', rect.x, 30);
+  }
+
+  regCanvasDual(4826, 4827, 'xs += points concat', runCanvasVectorConcat);
+
+  reg(4828, 'canvas', 'index assign i >= len error', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs = [1, 2]
+        xs[2] = 9
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('index out of range', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  function runCanvasRotatePoint(h) {
+    const prog = parseCanvasBody(`draw() {
+        pt = rotatePoint(10, 0, 0, 0, 90)
+        drawRect(pt[0], pt[1], 4, 4)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const rect = mock.calls.find((c) => c.op === 'fillRect');
+    h.assert('rotated x ~0', Math.abs(rect.x) < 0.01, true);
+    h.assert('rotated y ~10', Math.abs(rect.y - 10) < 0.01, true);
+  }
+
+  regCanvasDual(4830, 4831, 'rotatePoint returns vector', runCanvasRotatePoint);
+
+  reg(4832, 'canvas', 'nested vector append error', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs = []
+        inner = [1, 2]
+        xs[] = inner
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('nested vector', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  reg(4833, 'canvas', 'polygon non-numeric error', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs = ["a", 10, 20]
+        ys = [0, 0, 0]
+        beginPath()
+        polygon(xs, ys)
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('numeric coordinates', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  function runCanvasWireParamCopy(h) {
+    const prog = parseCanvasBody(`mutate(shotsX[]) {
+        shotsX[0] = 99
+    }`);
+    const pinEnv = { vals: [2, 4, 6] };
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('mutate(vals/s16)'),
+      mock.ctx,
+      { skipOnError: false, pinEnv }
+    );
+    h.assert('pin unchanged', pinEnv.vals[0], 2);
+  }
+
+  regCanvasDual(4834, 4835, 'wire vector param copied on bind', runCanvasWireParamCopy);
+
+  function runCanvasRotatedSquare(h) {
+    const prog = parseCanvasBody(`drawSquare(cx, cy, half, deg) {
+        xs = []
+        ys = []
+        pt = rotatePoint(cx - half, cy - half, cx, cy, deg)
+        xs[] = pt[0]
+        ys[] = pt[1]
+        pt = rotatePoint(cx + half, cy - half, cx, cy, deg)
+        xs[] = pt[0]
+        ys[] = pt[1]
+        pt = rotatePoint(cx + half, cy + half, cx, cy, deg)
+        xs[] = pt[0]
+        ys[] = pt[1]
+        pt = rotatePoint(cx - half, cy + half, cx, cy, deg)
+        xs[] = pt[0]
+        ys[] = pt[1]
+        styleFill("44aaff")
+        beginPath()
+        polygon(xs, ys)
+        fill()
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('drawSquare(50, 50, 20, 45)'),
+      mock.ctx,
+      { skipOnError: false }
+    );
+    h.assert('fill', mock.calls.some((c) => c.op === 'fill'), true);
+    h.assert('closePath', mock.calls.some((c) => c.op === 'closePath'), true);
+  }
+
+  regCanvasDual(4836, 4837, 'rotated square polygon e2e', runCanvasRotatedSquare);
+
+  reg(4838, 'canvas', 'append without vector error', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        xs[] = 1
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('not a vector', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

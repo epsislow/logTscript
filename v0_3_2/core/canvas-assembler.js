@@ -119,6 +119,11 @@ function canvasTokenize(src) {
       i++;
       continue;
     }
+    if (i + 1 < src.length && ch === '+' && src[i + 1] === '=') {
+      tokens.push({ type: 'SYM', value: '+=', line });
+      i += 2;
+      continue;
+    }
     if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === '[' || ch === ']') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
@@ -326,6 +331,12 @@ class CanvasParser {
       if (next && next.type === 'SYM' && next.value === '(') {
         return { kind: 'call', ...this.parseCall() };
       }
+      if (next && next.type === 'SYM' && next.value === '[') {
+        return this.parseVectorAssign();
+      }
+      if (next && next.type === 'SYM' && next.value === '+=') {
+        return this.parseConcatAssign();
+      }
       if (next && next.type === 'SYM' && next.value === '=') {
         return this.parseAssign();
       }
@@ -409,6 +420,28 @@ class CanvasParser {
     this.eat('SYM', '=');
     const expr = this.parseExpr();
     return { kind: 'assign', name, expr };
+  }
+
+  parseVectorAssign() {
+    const nameTok = this.eat('ID');
+    this.eat('SYM', '[');
+    if (this.match('SYM', ']')) {
+      this.eat('SYM', '=');
+      const expr = this.parseExpr();
+      return { kind: 'append', name: nameTok.value, expr, line: nameTok.line };
+    }
+    const index = this.parseExpr();
+    this.eat('SYM', ']');
+    this.eat('SYM', '=');
+    const expr = this.parseExpr();
+    return { kind: 'indexAssign', name: nameTok.value, index, expr, line: nameTok.line };
+  }
+
+  parseConcatAssign() {
+    const nameTok = this.eat('ID');
+    this.eat('SYM', '+=');
+    const expr = this.parseExpr();
+    return { kind: 'concatAssign', name: nameTok.value, expr, line: nameTok.line };
   }
 
   parseCall(isRenderer) {
@@ -501,6 +534,18 @@ class CanvasParser {
     }
     if (this.match('STR')) {
       return { kind: 'string', value: this.tokens[this.pos - 1].value };
+    }
+    if (this.match('SYM', '[')) {
+      const lineTok = this.tokens[this.pos - 1];
+      const elements = [];
+      if (!this.match('SYM', ']')) {
+        elements.push(this.parseExpr());
+        while (this.match('SYM', ',')) {
+          elements.push(this.parseExpr());
+        }
+        this.eat('SYM', ']');
+      }
+      return { kind: 'array', elements, line: lineTok.line };
     }
     if (this.match('ID')) {
       const idTok = this.tokens[this.pos - 1];

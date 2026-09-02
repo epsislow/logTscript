@@ -10215,7 +10215,8 @@ In the **documentation viewer**, use **Load** and **Load & Run** on \`logts-play
 | \`closePath()\` | Close current sub-path |
 | \`fill()\` / \`stroke()\` | Render current path (uses \`styleFill\` / \`styleStroke\`) |
 | \`polygon(xs[], ys[])\` | Closed polygon from vectors — **after** \`beginPath\`, before \`fill\`/\`stroke\` |
-| \`drawText(x, y, text)\` | Filled text (current fill + font) |
+| \`rotatePoint(x,y,cx,cy,deg)\` | Returns \`[xRot, yRot]\` — rotation in degrees (expression) |
+| \`vectorLen(xs)\` | Array length — error on scalar |
 | \`fontSize(n)\` | Font size in pixels (default **14**) |
 | \`fontFamily("mono"\\|"sans"\\|"serif")\` | Text family (default **\`mono\`**, same tokens as CLCD \`label\`) |
 | \`fontStyle(family, size)\` | Set family and size in one call |
@@ -10388,6 +10389,28 @@ drawZone(xs[], ys[]) {
 | After | call \`fill()\` and/or \`stroke()\` |
 
 \`drawRect\`, \`drawCircle\`, and \`drawLine\` remain shortcuts (unchanged).
+
+### \`rotatePoint\`
+
+\`\`\`logts
+pt = rotatePoint(x, y, centerX, centerY, rotationDeg)
+drawRect(pt[0], pt[1], 4, 4)
+\`\`\`
+
+Integer **degrees**; returns a 2-element vector. Trigonometry stays inside the engine (not exposed in the script language).
+
+### Local vector literals and mutation
+
+\`\`\`logts
+xs = [10, 20]
+xs = []
+xs = other          # copy by value
+xs[0] = 5           # index 0-based; i >= len → error
+xs[] = 99           # append
+xs += points        # append all elements from points
+\`\`\`
+
+Nested vectors (\`xs[] = inner\` where \`inner\` is a vector) → runtime error.
 
 ---
 
@@ -21844,6 +21867,30 @@ In \`renderer\` and assign (see [comp-canvas.md](comp-canvas.md)):
 | **\`vectorLen(xs)\`** | Array length — error on scalar param (does not return \`1\`) |
 | **Formats** | Same as scalar pins: \`/s16\`, \`/u16\`, \`/ascii\`, \`/bool\`, … per element |
 | **Assign** | \`pin = wire\` only — wire must match (\`16wire[N]\` for vector, \`16wire\` for scalar) |
+
+Wire params \`xs[]\` are **copied** on method entry — local changes do not alter the pin.
+
+### Local vectors
+
+\`\`\`logts
+out = []
+out += xs
+out[] = 99
+labels = ["A", "B"]
+labels[0] = "X"
+pt = rotatePoint(10, 0, 50, 50, 45)
+drawRect(pt[0], pt[1], 6, 6)
+\`\`\`
+
+| Form | Meaning |
+|------|---------|
+| \`xs = [1, 2]\` / \`xs = []\` | Literal |
+| \`xs = points\` | Copy by value |
+| \`xs[i] = v\` | Index \`0 … len-1\` only |
+| \`xs[] = v\` | Append |
+| \`xs += points\` | Append all elements |
+
+Nested vectors not allowed. Details → [canvas-builtins.md](canvas-builtins.md).
 
 ---
 

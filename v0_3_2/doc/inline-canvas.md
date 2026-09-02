@@ -237,6 +237,30 @@ In `renderer` and assign (see [comp-canvas.md](comp-canvas.md)):
 | **Formats** | Same as scalar pins: `/s16`, `/u16`, `/ascii`, `/bool`, … per element |
 | **Assign** | `pin = wire` only — wire must match (`16wire[N]` for vector, `16wire` for scalar) |
 
+Wire params `xs[]` are **copied** on method entry — local changes do not alter the pin.
+
+### Local vectors
+
+```logts
+out = []
+out += xs
+out[] = 99
+labels = ["A", "B"]
+labels[0] = "X"
+pt = rotatePoint(10, 0, 50, 50, 45)
+drawRect(pt[0], pt[1], 6, 6)
+```
+
+| Form | Meaning |
+|------|---------|
+| `xs = [1, 2]` / `xs = []` | Literal |
+| `xs = points` | Copy by value |
+| `xs[i] = v` | Index `0 … len-1` only |
+| `xs[] = v` | Append |
+| `xs += points` | Append all elements |
+
+Nested vectors not allowed. Details → [canvas-builtins.md](canvas-builtins.md).
+
 ---
 
 ## Minimal parse example

@@ -123,7 +123,10 @@ function canvasRethrowFlowOutsideLoop(err) {
 function canvasApplyForClause(clause, env, locals, callMethodFn, line, pinEnv) {
   if (!clause) return;
   if (clause.kind === 'assign') {
-    env[clause.name] = canvasEvalExpr(clause.expr, env, callMethodFn, clause.line, pinEnv);
+    env[clause.name] = canvasAssignValue(
+      canvasEvalExpr(clause.expr, env, callMethodFn, clause.line, pinEnv),
+      clause.line
+    );
     locals.add(clause.name);
     return;
   }
@@ -148,7 +151,23 @@ function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, ca
   for (const stmt of stmts || []) {
     try {
       if (stmt.kind === 'assign') {
-        env[stmt.name] = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
+        env[stmt.name] = canvasAssignValue(
+          canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line, pinEnv),
+          stmt.line
+        );
+        locals.add(stmt.name);
+      } else if (stmt.kind === 'indexAssign') {
+        const value = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line, pinEnv);
+        const idx = canvasEvalExpr(stmt.index, env, callMethodFn, stmt.line, pinEnv);
+        canvasVectorIndexAssign(env, stmt.name, idx, value, stmt.line);
+        locals.add(stmt.name);
+      } else if (stmt.kind === 'append') {
+        const value = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line, pinEnv);
+        canvasVectorAppend(env, stmt.name, value, stmt.line);
+        locals.add(stmt.name);
+      } else if (stmt.kind === 'concatAssign') {
+        const rhs = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line, pinEnv);
+        canvasVectorConcat(env, stmt.name, rhs, stmt.line);
         locals.add(stmt.name);
       } else if (stmt.kind === 'postfix') {
         canvasEvalPostfix(stmt, env, callMethodFn, stmt.line, pinEnv);
@@ -233,6 +252,81 @@ function canvasVectorLength(value, line) {
   return value.length;
 }
 
+function canvasAssertScalarVectorElement(value, line) {
+  if (Array.isArray(value)) {
+    throw new Error(`canvas: nested vector not allowed${line != null ? ` (line ${line})` : ''}`);
+  }
+}
+
+function canvasCopyVector(value, line) {
+  if (!Array.isArray(value)) {
+    throw new Error(`canvas: expected vector${line != null ? ` (line ${line})` : ''}`);
+  }
+  const out = [];
+  for (let i = 0; i < value.length; i++) {
+    canvasAssertScalarVectorElement(value[i], line);
+    out.push(value[i]);
+  }
+  return out;
+}
+
+function canvasAssignValue(value, line) {
+  if (Array.isArray(value)) {
+    return canvasCopyVector(value, line);
+  }
+  return value;
+}
+
+function canvasRequireVector(env, name, line) {
+  if (!Object.prototype.hasOwnProperty.call(env, name) || !Array.isArray(env[name])) {
+    throw new Error(`canvas: not a vector${line != null ? ` (line ${line})` : ''}`);
+  }
+  return env[name];
+}
+
+function canvasVectorIndexAssign(env, name, idx, value, line) {
+  const arr = canvasRequireVector(env, name, line);
+  const i = Number(idx);
+  if (!Number.isFinite(i) || i < 0 || i >= arr.length) {
+    throw new Error(`canvas: vector index out of range${line != null ? ` (line ${line})` : ''}`);
+  }
+  canvasAssertScalarVectorElement(value, line);
+  arr[i] = value;
+}
+
+function canvasVectorAppend(env, name, value, line) {
+  const arr = canvasRequireVector(env, name, line);
+  canvasAssertScalarVectorElement(value, line);
+  arr.push(value);
+}
+
+function canvasVectorConcat(env, name, rhs, line) {
+  const arr = canvasRequireVector(env, name, line);
+  const src = canvasCopyVector(rhs, line);
+  for (let i = 0; i < src.length; i++) {
+    arr.push(src[i]);
+  }
+}
+
+function canvasRotatePoint(x, y, cx, cy, deg) {
+  const rad = canvasDegToRad(deg);
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = Number(x) - Number(cx);
+  const dy = Number(y) - Number(cy);
+  return [
+    Number(cx) + dx * cos - dy * sin,
+    Number(cy) + dx * sin + dy * cos,
+  ];
+}
+
+function canvasPolygonCoord(n, line) {
+  if (typeof n !== 'number' || Number.isNaN(n)) {
+    throw new Error(`canvas: polygon expects numeric coordinates${line != null ? ` (line ${line})` : ''}`);
+  }
+  return n;
+}
+
 function canvasVectorIndex(obj, idx, line) {
   if (!Array.isArray(obj)) {
     throw new Error(`canvas: not a vector${line != null ? ` (line ${line})` : ''}`);
@@ -251,6 +345,15 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
       return expr.value;
     case 'string':
       return expr.value;
+    case 'array': {
+      const out = [];
+      for (const el of expr.elements || []) {
+        const v = canvasEvalExpr(el, env, callMethodFn, line, pinEnv);
+        canvasAssertScalarVectorElement(v, expr.line != null ? expr.line : line);
+        out.push(v);
+      }
+      return out;
+    }
     case 'wireRef': {
       if (!pinEnv || !Object.prototype.hasOwnProperty.call(pinEnv, expr.pinName)) {
         throw new Error(`canvas: undefined pin '${expr.pinName}'${line != null ? ` (line ${line})` : ''}`);
@@ -292,6 +395,17 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
         }
         const arr = canvasEvalExpr(expr.args[0], env, callMethodFn, line, pinEnv);
         return canvasVectorLength(arr, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'rotatePoint') {
+        if (!expr.args || expr.args.length !== 5) {
+          throw new Error(`canvas: rotatePoint expects 5 args${line != null ? ` (line ${line})` : ''}`);
+        }
+        const x = canvasEvalExpr(expr.args[0], env, callMethodFn, line, pinEnv);
+        const y = canvasEvalExpr(expr.args[1], env, callMethodFn, line, pinEnv);
+        const cx = canvasEvalExpr(expr.args[2], env, callMethodFn, line, pinEnv);
+        const cy = canvasEvalExpr(expr.args[3], env, callMethodFn, line, pinEnv);
+        const deg = canvasEvalExpr(expr.args[4], env, callMethodFn, line, pinEnv);
+        return canvasRotatePoint(x, y, cx, cy, deg);
       }
       if (CANVAS_BUILTIN_SET.has(expr.name)) {
         throw new Error(`canvas: builtin '${expr.name}' cannot be used as expression`);
@@ -654,9 +768,11 @@ function canvasRunBuiltin(name, args, state, ctx, evalArg, line) {
       if (xs.length < 3) {
         throw new Error(`canvas: polygon requires at least 3 points${line != null ? ` (line ${line})` : ''}`);
       }
-      ctx.moveTo(Number(xs[0]), Number(ys[0]));
+      const x0 = canvasPolygonCoord(Number(xs[0]), line);
+      const y0 = canvasPolygonCoord(Number(ys[0]), line);
+      ctx.moveTo(x0, y0);
       for (let i = 1; i < xs.length; i++) {
-        ctx.lineTo(Number(xs[i]), Number(ys[i]));
+        ctx.lineTo(canvasPolygonCoord(Number(xs[i]), line), canvasPolygonCoord(Number(ys[i]), line));
       }
       ctx.closePath();
       return;
@@ -669,7 +785,12 @@ function canvasRunBuiltin(name, args, state, ctx, evalArg, line) {
 function canvasExecuteMethod(method, argValues, program, state, ctx, options) {
   const env = {};
   for (let i = 0; i < method.params.length; i++) {
-    env[canvasParamName(method.params[i])] = argValues[i];
+    const param = method.params[i];
+    let val = argValues[i];
+    if (param && param.vector && Array.isArray(val)) {
+      val = canvasCopyVector(val, param.line);
+    }
+    env[canvasParamName(param)] = val;
   }
   const locals = new Set(method.params.map((p) => canvasParamName(p)));
 

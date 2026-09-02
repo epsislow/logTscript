@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–10 done; backlog 1+c…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–11 done; backlog 1+c…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -35,12 +35,15 @@ todos:
   - id: canvas-f10
     content: "Faza 10: path API + fill/stroke — 1+e + 1+i → D84–D90 done"
     status: completed
+  - id: canvas-f11
+    content: "Faza 11: vectori locali + rotatePoint — 1+q → D91–D101 done"
+    status: completed
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–10**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l**, **1+e**, **1+i** — promovate **F5–F10**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–11**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l**, **1+e**, **1+i**, **1+q** — promovate **F5–F11**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -164,7 +167,8 @@ D28 A ✅
 | **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** | **done** |
 | **Faza 9** Vector wire args (**1+l**) | **D76–D83** | **done** |
 | **Faza 10** Path / arc / bezier / polygon + `fill`/`stroke` (**1+e** + **1+i**) | **D84–D90** | **done** |
-| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+e, 1+i, 1+k, 1+l, 1+n) | — |
+| **Faza 11** Vectori locali + `rotatePoint` (**1+q**) | **D91–D101** | **done** |
+| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+e, 1+i, 1+k, 1+l, 1+n, 1+q) | — |
 
 ---
 
@@ -189,9 +193,10 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+l** | Vector wire args (`shotsXVector/s16`) | D34 amânat MVP scalar F3 | **Faza 9** | D76–D83, D33, D34 |
 | ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
-| ⏸ | **1+o** | *(slot liber)* | — | — | — |
+| ✅ | **1+q** | Vectori locali + `rotatePoint` | Literali `[]`, append, `+=`, fără nested MVP | **Faza 11** | D91–D101 |
+| ⏳ | **1+o** | Vectori nested (`xs[i]=vector`) | Amânat post-F11 | — | D92 |
 
-**Ordine recomandată:** **F1–F9** ✅; **F10** (path) draft; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F10** ✅; **F11** (vectori locali) draft; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
 
 ---
 
@@ -204,6 +209,12 @@ Vezi [Faza 9](#faza-9--vector-wire-args-renderer-1l-promovat) — pin vector din
 ## Backlog **1+e** + **1+i** → **Faza 10** (promovat)
 
 Vezi [Faza 10](#faza-10--path-api--fillstroke-1e--1i-promovat) — API path imperativ Canvas 2D + `fill()` / `stroke()` pe path curent.
+
+---
+
+## Backlog **1+q** → **Faza 11** (promovat)
+
+Vezi [Faza 11](#faza-11--vectori-locali--rotatepoint-1q-promovat) — literali vector, mutare locală, `rotatePoint`, `polygon` numeric strict.
 
 ---
 
@@ -2199,6 +2210,180 @@ fill()
 
 ---
 
+## Faza 11 — Vectori locali + `rotatePoint` (**1+q** promovat)
+
+> **Status:** **done** — **D91–D101**; teste **4820–4838**.  
+> **Depinde:** F9 (read `xs[i]`, `vectorLen`), F10 (`polygon` — extins validare numeric).  
+> **Promovat din backlog:** **1+q** (vectori în body metodă, fără `sin`/`cos`/`PI` în limbaj).
+
+### Scop
+
+F9 oferă vectori doar ca **param** din wire (`shotsX[]` + `16wire[N]`). Nu poți construi sau modifica liste în metodă (`xs = [1,2,3]`, append, rotație punct fără trig).
+
+F11 adaugă **vectori locali** în body + builtin **`rotatePoint`** (returnează `[xRot, yRot]`).
+
+| În scope F11 | În afara scope |
+| ------------ | -------------- |
+| `xs = [1, 2, 3]` / `xs = []` literal | Vectori nested — **1+o** (D92 amânat) |
+| `xs = points` copie **by value** (D93) | `sin` / `cos` / `PI` în limbaj |
+| `xs[i] = expr` index assign (D96) | `xs[i] =` cu `i > len` (eroare) |
+| `xs[] = expr` append (D95) | `xs[] = vector` (nested → eroare) |
+| `xs += points` concat la coadă (D98) | Matrix `wire[r,c]` |
+| `rotatePoint(x,y,cx,cy,deg)` → `[x,y]` (D97) | Destructuring `x,y = rotatePoint(...)` |
+| Param `xs[]` wire: **copie** la intrare metodă (D91) | Reference sharing între variabile |
+| `polygon`: fiecare element **number** (D99) | Heterogen în `polygon` |
+
+### Sintaxă țintă
+
+```logts
+buildTrail(shotsX[]) {
+    xs = []
+    ys = []
+
+    xs += shotsX          # append toate elementele din shotsX (copie element cu element)
+    i = 0
+    while (i < vectorLen(xs)) {
+        ys[] = xs[i] * 2
+        i++
+    }
+
+    labels = ["A", "B", "C"]
+    labels[0] = "X"       # index 0-based (D94)
+
+    pt = rotatePoint(10, 20, 50, 50, 45)
+    drawRect(pt[0], pt[1], 6, 6)
+
+    beginPath()
+    polygon(xs, ys)
+    fill()
+}
+
+drawSquare(cx, cy, half, deg) {
+    xs = []
+    ys = []
+    pt = rotatePoint(cx - half, cy - half, cx, cy, deg)
+    xs[] = pt[0]
+    ys[] = pt[1]
+    pt = rotatePoint(cx + half, cy - half, cx, cy, deg)
+    xs[] = pt[0]
+    ys[] = pt[1]
+    pt = rotatePoint(cx + half, cy + half, cx, cy, deg)
+    xs[] = pt[0]
+    ys[] = pt[1]
+    pt = rotatePoint(cx - half, cy + half, cx, cy, deg)
+    xs[] = pt[0]
+    ys[] = pt[1]
+    beginPath()
+    polygon(xs, ys)
+    stroke()
+}
+```
+
+### Reguli vector (confirmate)
+
+| Formă | Semnificație |
+| ----- | ------------ |
+| `xs = [e1, e2, …]` | Literal — elemente scalar (`number` / `string`) |
+| `xs = []` | Vector gol |
+| `xs = points` | **Copie shallow by value** — `points.slice()`; modificările pe `xs` nu afectează `points` (D93) |
+| `xs[i] = v` | Scriere la index **`0 … len-1`**; **`i >= len` → eroare** (D96); append doar via `xs[] =` |
+| `xs[] = v` | Append scalar `v` la final (D95) |
+| `xs += points` | Append **fiecare element** din copia iterată a `points`; `points` neschimbat (D98) |
+| `vectorLen(xs)` | Lungime (deja F9) — funcționează pe locali |
+| `xs[i]` | Citire index **0-based** (D94) |
+
+**Fără nested (D92 → 1+o):** `xs[] = otherVector`, `xs[i] = otherVector`, element literal `[…]` în interiorul altui literal → **runtime error** (`nested vector not allowed`).
+
+**Param wire `xs[]` (D91):** la bind în `canvasExecuteMethod`, `env[xs] = argValues[i].slice()` — mutarea locală nu alterează pin / `pinEnv`.
+
+### `rotatePoint` — **D97**
+
+```logts
+pt = rotatePoint(x, y, centerX, centerY, rotationDeg)
+# pt[0] = x rotit, pt[1] = y rotit
+```
+
+| Regulă | Detaliu |
+| ------ | ------- |
+| Nume | **`rotatePoint` only** — nu există `getPointRotatedAt` |
+| Unghi | Grade întregi (ca `arc` F10) |
+| Return | Array JS cu **2** numere `[xRot, yRot]` |
+| Unde | **Expression builtin** (ca `vectorLen`) — folosit în `pt = rotatePoint(...)` sau `xs[] = rotatePoint(...)[0]` via `pt[0]` |
+| Intern | `Math.cos` / `Math.sin` în engine — **nu** expuse în limbaj |
+
+### `polygon` — validare numeric (**D99**)
+
+Extinde F10: la execuție, fiecare `xs[i]` / `ys[i]` trebuie `typeof === 'number'` (după `Number()` dacă e cazul). String sau alt tip → **eroare** (`polygon expects numeric coordinates`).
+
+### Gramatică (extinderi)
+
+```text
+primary   += '[' (expr (',' expr)*)? ']'     # [] sau [1,2,3]
+stmt      += name '[' expr ']' '=' expr    # index assign
+stmt      += name '[' ']' '=' expr         # append
+stmt      += name '+=' expr                # vector concat (rhs trebuie array)
+expr      += rotatePoint '(' expr ')'      # 5 args, returns array
+```
+
+**Tokenizer:** `[` `]` deja folosite la `param[]` în semnătură — reutilizate în expr/stmt.
+
+**`+=`:** doar pentru variabile vector locale (și eventual param copiat); rhs array → concat; rhs scalar → eroare sau tratat ca `[scalar]`? **Confirmat user:** `xs += points` = append valorile din `points` — rhs **trebuie** fi array.
+
+### Execuție (engine)
+
+| Schimbare | Detaliu |
+| --------- | ------- |
+| **canvas-assembler** | parse array literal, index assign, append, `+=` |
+| **canvas-engine** | `env` poate ține `Array` local; `canvasEvalExpr` array literal; `rotatePoint` în `case 'call'` |
+| **canvasExecuteMethod** | `slice()` pe param `vector` la bind (D91) |
+| **canvasRunBuiltin polygon** | validare numeric per element (D99) |
+| **assign / append** | refuz nested la store |
+
+### Decizii **D91–D101** (confirmate user 2026-09-02)
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D91** | Param `[]` din wire | **A ✅** copie `slice()` la intrare în metodă |
+| **D92** | Vectori nested | **Amânat** → backlog **1+o**; MVP F11 **interzis** |
+| **D93** | `xs = points` | **A ✅** copie shallow **by value** |
+| **D94** | Index | **A ✅** **0-based** (`xs[0]` primul element) |
+| **D95** | Append | **A ✅** `xs[] = expr` |
+| **D96** | Index assign | **A ✅** `xs[i] = v` doar `i < len`; **`i >= len` → eroare** |
+| **D97** | Rotație punct | **A ✅** builtin expr **`rotatePoint(x,y,cx,cy,deg)`** → `[x,y]`; fără `getPointRotatedAt` |
+| **D98** | Concat | **A ✅** `xs += points` append toate elementele din `points` (scalar each) |
+| **D99** | `polygon` numeric | **A ✅** verificare `number` per element; altfel eroare |
+| **D100** | Literali | **A ✅** `[]` și `[e1, e2, …]` |
+| **D101** | Teste | **A ✅** alocare draft **4820–4839** wave+legacy |
+
+### Scope F11
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F11a** | Parser: literal `[]`, index assign, `[] =`, `+=` |
+| **F11b** | Engine: local arrays, copy bind, append/assign rules |
+| **F11c** | `rotatePoint` expression |
+| **F11d** | `polygon` numeric check + nested guard |
+| **F11e** | Doc `inline-canvas.md` + `canvas-builtins.md` |
+| **F11f** | Teste **4820+** |
+
+### Criterii done F11
+
+- [x] `xs = [1,2,3]`, `xs = []`, `xs[] = 4`, `xs += other`
+- [x] `xs = points` copie — mutare pe `xs` nu afectează `points`
+- [x] `xs[i] = v` cu `i >= len` → eroare
+- [x] `xs[] = nested` → eroare
+- [x] Param wire copiat — mutare locală nu schimbă pin
+- [x] `rotatePoint` → `pt[0]`, `pt[1]` draw
+- [x] `polygon` cu string în `xs` → eroare
+- [x] Regresie F9/F10
+- [x] Doc + suite **4820–4838** verde
+
+### Status F11
+
+**done** — vectori locali, `+=`, `rotatePoint`; teste **4820–4838**.
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -2275,6 +2460,17 @@ fill()
 | **D88** | 10 | bezier | **A ✅** în F10 |
 | **D89** | 10 | `polygon` | **A ✅** după `beginPath`; erori len mismatch / <3 |
 | **D90** | 10 | teste 4800+ | **A ✅** |
+| **D91** | 11 | param wire copie | **A ✅** `slice()` la bind |
+| **D92** | 11 | nested | **amânat 1+o** |
+| **D93** | 11 | assign copie | **A ✅** by value |
+| **D94** | 11 | index 0-based | **A ✅** |
+| **D95** | 11 | append `[]=` | **A ✅** |
+| **D96** | 11 | index assign | **A ✅** `i>=len` eroare |
+| **D97** | 11 | `rotatePoint` | **A ✅** expr → `[x,y]` |
+| **D98** | 11 | `+=` concat | **A ✅** |
+| **D99** | 11 | polygon numeric | **A ✅** |
+| **D100** | 11 | literali `[]` | **A ✅** |
+| **D101** | 11 | teste 4820+ | **A ✅** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -2317,6 +2513,8 @@ fill()
 | Fără vector renderer | **1+l → F9** | `param[]` + `16wire[N]` → array + `xs[i]` |
 | Fără path API user | **1+e → F10** | `beginPath` … `fill`/`stroke`; `polygon` după `beginPath` |
 | `fill`/`stroke` doar pe shortcuts | **1+i → F10** | `fill()` / `stroke()` pe path activ |
+| Vectori doar din wire | **1+q → F11** | literali locali, `+=`, `rotatePoint` |
+| Nested vectors | **1+o** amânat | post-F11 |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
 
@@ -2328,6 +2526,7 @@ fill()
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
+| 2026-09-02 | **F11 done** — vectori locali, `+=`, `rotatePoint`, `polygon` numeric; teste **4820–4838** |
 | 2026-09-02 | **F10 done** — path API; `polygon`; `arc` grade + `counter` default 0; teste **4800–4819** |
 | 2026-09-02 | **D85 B** — `arc(..., counter)` sens explicit CCW/CW (nu infer din start/end) |
 | 2026-09-02 | **1+e + 1+i → Faza 10** — path API; `arc` grade + `counter`; `polygon` după `beginPath`; D84–D90 |
