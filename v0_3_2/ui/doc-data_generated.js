@@ -11904,7 +11904,7 @@ comp [canvas] .panel:
 | **\`touchType\`** | No | \`1\` (default), \`2\`, or \`3\` — see table below |
 | **\`stroke("rrggbb")\`** | No | 1 px debug outline while drawing |
 | **\`pout :event as name\`** | No | Bool pout for \`press\`, \`release\`, \`drag\`, or \`move\` |
-| **\`pout :drag:eventX as pin/s16\`** | No | Numeric pout with explicit format (\`/s16\`, \`/ascii\`, …) |
+| **\`pout :drag:eventX as pin/s16\`** | No | Numeric pout — updates **only while dragging** that zone (pointer down inside zone) |
 
 Pout names must be unique across the whole \`hitbox\` block.
 
@@ -11966,7 +11966,7 @@ probe(.panel:dragX)
 | **Probe wire** | \`probe(outX)\` |
 | **Probe pout** | \`probe(.panel:dragX)\` or \`probe(.panel:btnPress)\` |
 
-You do **not** need an exec block (\`.panel:{ }\`) for hitbox-only interaction. The canvas redraws on pointer events when the comp has \`initDraw\`, \`renderer when\`, or hitbox zones.
+\`pout :drag:eventX\` behaves like \`renderer when(zone:drag)\` — the value is published **only during an active drag** on that hitbox (press inside the zone, then move). Hovering or moving the mouse elsewhere does not update the pout or wires bound to it (\`16wire outX = .panel:dragX\`).
 
 Exec block redirects (\`btnPress >= outWire\`) are still supported when you also use \`set\` / \`draw\` scheduling — see below.
 
