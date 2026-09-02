@@ -74,6 +74,38 @@ comp [canvas] .panel:
       },
     },
     {
+      name: 'no exec block initDraw draws',
+      src: `inline [canvas] .ui:
+
+    drawTrack(x, y, w, h) {
+        styleFill("444444")
+        drawRect(x, y, w, h)
+    }
+
+:
+
+comp [canvas] .panel:
+    on: 1
+    width: 100
+    height: 60
+    hitbox {
+        slider: {
+            rect(50, 10, 40, 40)
+            pout :drag:eventX as dragX/s16
+        }
+    }
+    .ui {
+        initDraw { drawTrack(50, 10, 40, 40) }
+    }
+:
+
+16wire outX = .panel:dragX`,
+      check: (interp) => {
+        const comp = interp.components.get('.panel');
+        return !!(comp && comp.attributes.hitboxPoutNames && comp.attributes.hitboxPoutNames.includes('dragX'));
+      },
+    },
+    {
       name: 'drag eventX pout s16',
       src: `inline [canvas] .ui:
 

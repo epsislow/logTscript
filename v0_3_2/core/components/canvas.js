@@ -305,9 +305,17 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
   }
 
   _scheduleInputRedraw(comp, ctx) {
-    if (!comp._canvasRendererCalls || !comp._canvasRendererCalls.length) return;
     comp._canvasClear = true;
     this._scheduleDraw(comp, ctx);
+  }
+
+  _hasProgramDraw(comp) {
+    const pb = comp.programBlock;
+    const hasInit = !!(pb && pb.initDraw && pb.initDraw.length);
+    const hasWhen = !!(pb && pb.whenRenderers && pb.whenRenderers.length);
+    const hasExec = !!(comp._canvasRendererCalls && comp._canvasRendererCalls.length);
+    const hasHitbox = !!(comp.hitboxZones && Object.keys(comp.hitboxZones).length);
+    return hasInit || hasWhen || hasExec || hasHitbox;
   }
 
   getDef() {
@@ -335,8 +343,18 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     return ['set', 'draw', 'clear', 'busy'];
   }
 
-  supportsPropertyName(property) {
-    return property === 'busy';
+  supportsPropertyName(property, attributes) {
+    if (property === 'busy') return true;
+    const names = attributes && attributes.hitboxPoutNames;
+    return !!(names && names.includes(property));
+  }
+
+  getReadableProperties(comp) {
+    const props = ['busy'];
+    if (comp && comp.hitboxPouts) {
+      for (const name of Object.keys(comp.hitboxPouts)) props.push(name);
+    }
+    return props;
   }
 
   getRedirectProperties() {
@@ -510,6 +528,9 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     };
 
     this._setupHitboxPouts(compInfo, ctx, name);
+    if (attributes) {
+      attributes.hitboxPoutNames = Object.keys(compInfo.hitboxPouts || {});
+    }
 
     const self = this;
     const onPress = (px, py) => {
@@ -548,33 +569,17 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       }
     }
 
-    this._runInitDraw(compInfo, ctx);
+    if (this._hasProgramDraw(compInfo)) {
+      compInfo._canvasClear = true;
+      this._scheduleDraw(compInfo, ctx);
+    }
 
     return { earlyReturn: true, compInfo };
   }
 
   _runInitDraw(comp, ctx) {
-    if (!comp || comp._initDrawDone) return;
-    const initCalls = comp.programBlock && comp.programBlock.initDraw;
-    if (!initCalls || !initCalls.length) {
-      comp._initDrawDone = true;
-      return;
-    }
-    const mockFn = typeof createCanvasMockCtx === 'function' ? createCanvasMockCtx : null;
-    if (!mockFn) {
-      comp._initDrawDone = true;
-      return;
-    }
-    const program = this._getProgram(comp, ctx);
-    const execFn = typeof executeCanvasRenderer === 'function' ? executeCanvasRenderer : null;
-    if (!execFn) return;
-    const { ctx: mctx } = mockFn();
-    if (mctx && comp.width && comp.height) {
-      mctx.fillStyle = comp.bgColor;
-      mctx.fillRect(0, 0, comp.width, comp.height);
-    }
-    execFn(program, initCalls, mctx, { logErrors: true, skipOnError: true, pinEnv: {} });
-    comp._initDrawDone = true;
+    // initDraw runs inside _runDraw on each cleared redraw
+    if (comp) comp._initDrawDone = true;
   }
 
   _getProgram(comp, ctx) {
@@ -643,6 +648,15 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     CanvasComponent.propagateBusy(interp, comp.name);
     try {
       const program = this._getProgram(comp, interp);
+      const initCalls = comp.programBlock && comp.programBlock.initDraw;
+      if (initCalls && initCalls.length) {
+        execFn(program, initCalls, drawCtx, {
+          logErrors: true,
+          skipOnError: true,
+          pinEnv: {},
+        });
+        comp._initDrawDone = true;
+      }
       const calls = comp._canvasRendererCalls || [];
       const buildEnvFn = typeof canvasBuildPinEnv === 'function' ? canvasBuildPinEnv : null;
       const pinEnv = buildEnvFn

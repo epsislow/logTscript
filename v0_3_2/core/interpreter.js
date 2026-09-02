@@ -2362,7 +2362,12 @@ class Interpreter {
     const map = new Map();
     for (const [compName, comp] of this.components) {
       const handler = this.componentRegistry && this.componentRegistry.get(comp.type);
-      const props = handler && handler.getSupportedProperties ? handler.getSupportedProperties() : [];
+      let props = [];
+      if (handler && typeof handler.getReadableProperties === 'function') {
+        props = handler.getReadableProperties(comp);
+      } else if (handler && handler.getSupportedProperties) {
+        props = handler.getSupportedProperties();
+      }
       for (const property of props) {
         if (this.componentRegistry && !this.componentRegistry.supportsProperty(comp.type, property, comp.attributes)) {
           continue;

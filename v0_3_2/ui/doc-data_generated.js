@@ -11940,7 +11940,7 @@ The linked \`inline [canvas]\` ref uses a **program block** (curly body) instead
 
 | Block | When it runs | Clear behaviour |
 |-------|--------------|-----------------|
-| **\`initDraw { }\`** | Once after the canvas widget is created | Full clear + draw |
+| **\`initDraw { }\`** | On each cleared redraw (incl. first paint) | Drawn before exec \`renderer\` |
 | **\`renderer when(zone)\`** | While \`zone\` **press** is active (default event) | **Overlay** — no bg clear |
 | **\`renderer when(zone:event)\`** | While that event is active (\`press\`, \`release\`, \`drag\`, \`move\`) | **Overlay** |
 
@@ -11950,9 +11950,31 @@ Omit \`:event\` to mean **\`:press\`** — \`renderer when(btn)\` ≡ \`renderer
 
 ---
 
-## Exec block — base renderer, pouts, \`set\`
+## Reading pouts — no exec block required
 
-Every exec block that schedules drawing **must** include a **\`renderer { }\`** block (even if it only redirects pouts):
+Hitbox pouts are **component properties**. Read them like any other pout — with a wire assignment or \`probe\`:
+
+\`\`\`logts
+16wire outX = .panel:dragX
+probe(outX)
+probe(.panel:dragX)
+\`\`\`
+
+| Form | Example |
+|------|---------|
+| **Wire bind** | \`16wire outX = .panel:dragX\` |
+| **Probe wire** | \`probe(outX)\` |
+| **Probe pout** | \`probe(.panel:dragX)\` or \`probe(.panel:btnPress)\` |
+
+You do **not** need an exec block (\`.panel:{ }\`) for hitbox-only interaction. The canvas redraws on pointer events when the comp has \`initDraw\`, \`renderer when\`, or hitbox zones.
+
+Exec block redirects (\`btnPress >= outWire\`) are still supported when you also use \`set\` / \`draw\` scheduling — see below.
+
+---
+
+## Exec block (optional) — \`set\` + \`renderer\`
+
+When you **do** use an exec block to drive \`set\` / \`draw\`, it **must** include **\`renderer { }\`**:
 
 \`\`\`logts
 1wire go = 1
@@ -11968,14 +11990,71 @@ Every exec block that schedules drawing **must** include a **\`renderer { }\`** 
 | Pin / stmt | Role |
 |------------|------|
 | **\`renderer { }\`** | Base scene (cleared to \`bgColor\` before draw) |
-| **\`btnPress >= outPress\`** | Redirect hitbox pout to a wire |
+| **\`btnPress >= outPress\`** | Optional redirect of hitbox pout to a wire |
 | **\`set\`** | Schedule redraw (coalesced) |
 
-On pointer **press** inside \`btn\`, the canvas redraws: base \`renderer\`, then the red \`renderer when(btn)\` overlay. On **release**, \`:press\` pout returns to \`0\`.
+On pointer **press** inside \`btn\`, the canvas redraws: \`initDraw\` + exec \`renderer\`, then the red \`renderer when(btn)\` overlay.
 
 ---
 
-## Runnable — button + press overlay
+## Runnable — slider drag (no exec block)
+
+\`\`\`logts-play
+inline [canvas] .ui:
+
+    drawTrack(x, y, w, h) {
+        styleFill("444444")
+        drawRect(x, y, w, h)
+    }
+
+    drawKnob(x, y, xC, yC, xD, yD) {
+        xF = x
+        yF = y
+        if (x < xC) { xF = xC }
+        if (y < yC) { yF = yC }
+        if (x > xC + xD) { xF = xC + xD }
+        if (y > yC + yD) { yF = yC + yD }
+        styleFill("ffcc00")
+        drawCircle(xF, yF, 6)
+    }
+
+:
+
+comp [canvas] .panel:
+    on: 1
+    width: 140
+    height: 140
+    bgColor: ^000000
+
+    hitbox {
+        slider: {
+            rect(50, 10, 40, 40)
+            touchType = 1
+            stroke("ff0000")
+            pout :drag:eventX as dragX/s16
+        }
+    }
+
+    .ui {
+        initDraw {
+            drawTrack(50, 10, 40, 40)
+        }
+        renderer when(slider:drag) {
+            drawKnob(eventX, eventY, 50, 10, 40, 40)
+        }
+    }
+
+:
+
+16wire outX = .panel:dragX
+probe(outX)
+\`\`\`
+
+**Load & Run** — grey track appears immediately. Drag inside the red-outlined zone — yellow knob follows (clamped), \`outX\` updates. No \`.panel:{ }\` exec block needed.
+
+---
+
+## Runnable — button + press overlay (with exec \`set\`)
 
 \`\`\`logts-play
 inline [canvas] .ui:
@@ -12023,11 +12102,11 @@ comp [canvas] .panel:
 }
 \`\`\`
 
-**Load & Run**, then click the grey button in **Devices** — it turns red while held; \`outPress\` wire becomes \`1\`.
+**Load & Run**, then click the grey button in **Devices** — it turns red while held; use \`probe(.panel:btnPress)\` or \`1wire outPress = .panel:btnPress\` to observe the pout.
 
 ---
 
-## Runnable — slider drag with \`eventX\`
+## Runnable — slider drag with exec \`set\` (alternative)
 
 \`\`\`logts-play
 inline [canvas] .ui:

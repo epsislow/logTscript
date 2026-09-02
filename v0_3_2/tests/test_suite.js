@@ -53163,5 +53163,39 @@ comp [canvas] .bad:
     });
   });
 
+  function runCanvasNoExecInitDraw(h, session) {
+    const src = COMP_CANVAS_HITBOX + `16wire outX = 0000000000000000`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.panel');
+    const handler = session._ensureRegistry().get('canvas');
+    const mock = createCanvasMockCtx();
+    handler._runDraw(comp, mock.ctx, interp, { clear: true });
+    const track = mock.calls.filter((c) => c.op === 'fillRect' && c.fillStyle === '#333333').length;
+    h.assert('initDraw track', track >= 1, true);
+  }
+
+  regCanvasDual(4851, 4852, 'hitbox initDraw without exec block', runCanvasNoExecInitDraw);
+
+  function runCanvasNoExecDragWire(h, session) {
+    const src = COMP_CANVAS_HITBOX + `16wire outX = .panel:dragX`;
+    const { interp } = session.run(src);
+    session.triggerCanvasTouch(interp, '.panel', { x: 60, y: 20, phase: 'press' });
+    session.triggerCanvasTouch(interp, '.panel', { x: 72, y: 22, phase: 'move' });
+    session._propagateIfNeeded(interp);
+    const bits = session.getWire(interp, 'outX');
+    const decodeFn = typeof logicDecodeNumberBits === 'function' ? logicDecodeNumberBits : null;
+    const val = decodeFn ? decodeFn(bits, 's16') : parseInt(bits, 2);
+    h.assert('outX from pout', val, 72);
+  }
+
+  regCanvasDual(4853, 4854, 'hitbox pout wire bind without exec', runCanvasNoExecDragWire);
+
+  reg(4855, 'canvas', 'hitbox pout probe target', function(h, session) {
+    const src = COMP_CANVAS_HITBOX + `probe(.panel:dragX)`;
+    const { interp } = session.run(src);
+    const target = interp.probeTargets.find((t) => t.kind === 'componentComputed' && t.property === 'dragX');
+    h.assert('probe target', !!target, true);
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
