@@ -53216,5 +53216,25 @@ probe(outX)`;
 
   regCanvasDual(4856, 4857, 'hitbox pout probe emits on touch', runCanvasHitboxProbeEmit);
 
+  function runCanvasDragPoutOnlyOnDrag(h, session) {
+    const src = COMP_CANVAS_HITBOX + `16wire outX = .panel:dragX`;
+    const { interp } = session.run(src);
+    const zero16 = '0'.repeat(16);
+    session.triggerCanvasTouch(interp, '.panel', { x: 20, y: 20, phase: 'move' });
+    session.triggerCanvasTouch(interp, '.panel', { x: 80, y: 30, phase: 'move' });
+    session._propagateIfNeeded(interp);
+    h.assert('dragX idle on hover move', session.getCompProperty(interp, '.panel', 'dragX'), zero16);
+    h.assert('outX idle on hover move', session.getWire(interp, 'outX'), zero16);
+    session.triggerCanvasTouch(interp, '.panel', { x: 60, y: 20, phase: 'press' });
+    session.triggerCanvasTouch(interp, '.panel', { x: 72, y: 22, phase: 'move' });
+    session._propagateIfNeeded(interp);
+    const decodeFn = typeof logicDecodeNumberBits === 'function' ? logicDecodeNumberBits : null;
+    const bits = session.getWire(interp, 'outX');
+    const val = decodeFn ? decodeFn(bits, 's16') : parseInt(bits, 2);
+    h.assert('outX on drag', val, 72);
+  }
+
+  regCanvasDual(4858, 4859, 'drag pout only while dragging hitbox', runCanvasDragPoutOnlyOnDrag);
+
   window.LogTScriptTestSuite.finalize();
 })();

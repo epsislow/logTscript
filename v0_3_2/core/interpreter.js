@@ -1055,7 +1055,7 @@ class Interpreter {
     }
   }
 
-  _notifyComponentComputedMutation(compName) {
+  _notifyComponentComputedMutation(compName, propertyFilter) {
     if (this._componentComputedMutationNotifyDepth) return;
     const strategy = this.signalPropagationStrategy;
     const index = strategy && strategy._componentDependentsIndex;
@@ -1067,6 +1067,11 @@ class Interpreter {
       const executed = new Set(toExec);
       const changedWires = new Set();
       for (const ws of toExec) {
+        const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+        if (propertyFilter
+          && !this.exprReferencesComponentProperty(expr, compName, propertyFilter)) {
+          continue;
+        }
         const outputs = this.execWireStatement(ws, true);
         for (const wName of this._applyWireStatementOutputs(outputs, strategy)) {
           changedWires.add(wName);
@@ -4407,6 +4412,24 @@ class Interpreter {
         return;
       }
       this.updateComponentConnections(compName);
+      this._emitComputedComponentProbes(compName);
+      if (typeof showVars === 'function') showVars();
+    });
+  }
+
+  scheduleHitboxPoutChange(compName, poutName) {
+    this.runSafely(() => {
+      if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+        const executed = new Set();
+        if (this.signalPropagationStrategy._scheduleWiresDependingOnComponent(
+          compName, executed, poutName)) {
+          this.signalPropagationStrategy.propagate();
+        }
+        this._emitComputedComponentProbes(compName);
+        if (typeof showVars === 'function') showVars();
+        return;
+      }
+      this.reEvalWiresDependingOnComponent(compName, poutName);
       this._emitComputedComponentProbes(compName);
       if (typeof showVars === 'function') showVars();
     });
@@ -15198,11 +15221,14 @@ if (s.assignment) {
   }
 
   // Re-evaluate wire statements that reference a component (by name or :property).
-  reEvalWiresDependingOnComponent(instanceName){
+  reEvalWiresDependingOnComponent(instanceName, propertyFilter){
     const checkExpr = (expr) => {
       if(!Array.isArray(expr)) return false;
       for(const atom of expr){
-        if(atom.var === instanceName) return true;
+        if(atom.var === instanceName) {
+          if (!propertyFilter) return true;
+          return atom.property === propertyFilter;
+        }
         if(atom.args && atom.args.some(arg => checkExpr(arg))) return true;
       }
       return false;

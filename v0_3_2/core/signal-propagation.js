@@ -524,7 +524,7 @@ class SignalPropagationStrategy {
     }
   }
 
-  _scheduleWiresDependingOnComponent(compName, executedThisPropagate) {
+  _scheduleWiresDependingOnComponent(compName, executedThisPropagate, propertyFilter) {
     const interp = this.interp;
     if (!interp) return false;
     let anyScheduled = false;
@@ -536,6 +536,11 @@ class SignalPropagationStrategy {
     if (toExec) {
       for (const ws of toExec) {
         if (executedThisPropagate.has(ws)) continue;
+        const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+        if (propertyFilter
+          && !interp.exprReferencesComponentProperty(expr, compName, propertyFilter)) {
+          continue;
+        }
         executedThisPropagate.add(ws);
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
@@ -972,6 +977,20 @@ Interpreter.prototype.exprReferencesComponent = function(expr, compName, compRef
     if (nestedRef) return true;
   }
   
+  return false;
+};
+
+Interpreter.prototype.exprReferencesComponentProperty = function(expr, compName, property) {
+  if (!expr || !property) return false;
+  if (!Array.isArray(expr)) return false;
+  for (const atom of expr) {
+    if (atom.var === compName && atom.property === property) return true;
+    let nestedRef = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedRef && this.exprReferencesComponentProperty(sub, compName, property)) nestedRef = true;
+    });
+    if (nestedRef) return true;
+  }
   return false;
 };
 

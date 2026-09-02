@@ -149,8 +149,12 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     const pout = comp.hitboxPouts && comp.hitboxPouts[poutName];
     if (!pout || !pout.ref) return;
     const bits = this._encodePoutValue(pout, rawValue);
+    const prev = ctx.getValueFromRef(pout.ref);
+    if (prev === bits) return;
     ctx.setValueAtRef(pout.ref, bits);
-    if (typeof ctx.scheduleTouchOutChange === 'function') {
+    if (typeof ctx.scheduleHitboxPoutChange === 'function') {
+      ctx.scheduleHitboxPoutChange(compName, poutName);
+    } else if (typeof ctx.scheduleTouchOutChange === 'function') {
       ctx.scheduleTouchOutChange(compName);
     } else {
       CanvasComponent.propagateBusy(ctx, compName);
@@ -284,27 +288,44 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     }
   }
 
+  _hasWhenEvent(comp, event) {
+    const list = comp.programBlock && comp.programBlock.whenRenderers;
+    return !!(list && list.some((w) => w.event === event));
+  }
+
   _applyPointerMove(comp, compName, x, y, ctx) {
     if (!comp.hitboxZones || !Object.keys(comp.hitboxZones).length) return;
     this._ensureTouchState(comp);
+    const dragging = comp._pointerDown && comp.touchPressZones && comp.touchPressZones.size > 0;
+    const trackMove = !dragging && this._hasWhenEvent(comp, 'move');
+    if (!dragging && !trackMove) return;
+
     comp._eventX = Math.trunc(x);
     comp._eventY = Math.trunc(y);
     const hits = CanvasComponent.hitTestAt(comp.hitboxZones, x, y);
-    for (const hit of hits) {
-      this._publishZonePouts(comp, compName, hit.name, 'move', ctx);
-      this._setActiveWhen(comp, hit.name, 'move', true);
+    if (trackMove) {
+      for (const hit of hits) {
+        this._publishZonePouts(comp, compName, hit.name, 'move', ctx);
+        this._setActiveWhen(comp, hit.name, 'move', true);
+      }
     }
-    if (comp._pointerDown) {
+    if (dragging) {
       for (const zoneName of comp.touchPressZones) {
         this._publishZonePouts(comp, compName, zoneName, 'drag', ctx);
         this._setActiveWhen(comp, zoneName, 'drag', true);
       }
     }
     this._scheduleInputRedraw(comp, ctx);
-    for (const zoneName of Object.keys(comp.hitboxZones || {})) {
-      this._setActiveWhen(comp, zoneName, 'move', false);
-      if (!comp._pointerDown || !comp.touchPressZones.has(zoneName)) {
-        this._setActiveWhen(comp, zoneName, 'drag', false);
+    if (trackMove) {
+      for (const zoneName of Object.keys(comp.hitboxZones || {})) {
+        this._setActiveWhen(comp, zoneName, 'move', false);
+      }
+    }
+    if (dragging) {
+      for (const zoneName of Object.keys(comp.hitboxZones || {})) {
+        if (!comp.touchPressZones.has(zoneName)) {
+          this._setActiveWhen(comp, zoneName, 'drag', false);
+        }
       }
     }
   }
@@ -693,10 +714,10 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
   static propagateBusy(ctx, compName) {
     if (ctx && typeof ctx.deferWirePropagation === 'function' && ctx.deferWirePropagation()) {
       if (typeof ctx._notifyComponentComputedMutation === 'function') {
-        ctx._notifyComponentComputedMutation(compName);
+        ctx._notifyComponentComputedMutation(compName, 'busy');
       }
     } else if (ctx && typeof ctx.reEvalWiresDependingOnComponent === 'function') {
-      ctx.reEvalWiresDependingOnComponent(compName);
+      ctx.reEvalWiresDependingOnComponent(compName, 'busy');
     }
     if (ctx && typeof ctx._emitComputedComponentProbes === 'function') {
       ctx._emitComputedComponentProbes(compName);
