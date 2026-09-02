@@ -10207,6 +10207,14 @@ In the **documentation viewer**, use **Load** and **Load & Run** on \`logts-play
 | \`drawCircle(cx, cy, r)\` | Filled + stroked circle |
 | \`drawCircle(cx, cy, r, fill)\` / \`(…, fill, stroke)\` | Circle with overrides |
 | \`drawLine(x1, y1, x2, y2)\` | Line using current stroke |
+| \`beginPath()\` | Start a new path (required before segments / \`fill\` / \`stroke\`) |
+| \`moveTo(x, y)\` / \`lineTo(x, y)\` | Path segments |
+| \`arc(cx, cy, r, startDeg, endDeg)\` | Arc in **integer degrees**; optional 6th arg \`counter\` (\`0\` CW default, \`1\` CCW) |
+| \`quadraticCurveTo(cpx, cpy, x, y)\` | Quadratic Bézier segment |
+| \`bezierCurveTo(c1x, c1y, c2x, c2y, x, y)\` | Cubic Bézier segment |
+| \`closePath()\` | Close current sub-path |
+| \`fill()\` / \`stroke()\` | Render current path (uses \`styleFill\` / \`styleStroke\`) |
+| \`polygon(xs[], ys[])\` | Closed polygon from vectors — **after** \`beginPath\`, before \`fill\`/\`stroke\` |
 | \`drawText(x, y, text)\` | Filled text (current fill + font) |
 | \`fontSize(n)\` | Font size in pixels (default **14**) |
 | \`fontFamily("mono"\\|"sans"\\|"serif")\` | Text family (default **\`mono\`**, same tokens as CLCD \`label\`) |
@@ -10309,6 +10317,77 @@ Uses **stroke** color and width only (no fill).
 styleStroke("ffffff", 1)
 drawLine(0, 0, 100, 100)
 \`\`\`
+
+---
+
+## Path API — \`beginPath\`, \`moveTo\`, \`lineTo\`, \`arc\`, \`fill\`, \`stroke\`, \`polygon\`
+
+Low-level Canvas 2D paths for shapes beyond \`drawRect\` / \`drawCircle\`. **Always call \`beginPath()\` first** — \`moveTo\`, \`lineTo\`, \`arc\`, \`closePath\`, \`fill\`, \`stroke\`, and \`polygon\` error without an active path.
+
+### Triangle (manual)
+
+\`\`\`logts
+drawTriangle(x1, y1, x2, y2, x3, y3) {
+    style("000000", "ff4444", 2)
+    beginPath()
+    moveTo(x1, y1)
+    lineTo(x2, y2)
+    lineTo(x3, y3)
+    closePath()
+    fill()
+    stroke()
+}
+\`\`\`
+
+### \`arc\` — degrees + optional \`counter\`
+
+\`\`\`logts
+beginPath()
+arc(cx, cy, r, 0, 360)        # full circle, clockwise (default counter=0)
+arc(cx, cy, r, 0, 360, 1)     # full circle, counter-clockwise
+arc(cx, cy, r, -45, 0)        # 45° slice, clockwise
+\`\`\`
+
+| Arg | Meaning |
+|-----|---------|
+| \`startDeg\`, \`endDeg\` | Integer **degrees** (any integer, e.g. \`-45\` … \`360\`) |
+| \`counter\` (optional) | \`0\` or omitted → clockwise · \`1\` → counter-clockwise |
+
+### Curves
+
+\`\`\`logts
+beginPath()
+moveTo(0, 40)
+quadraticCurveTo(60, 0, 120, 40)
+stroke()
+
+beginPath()
+moveTo(0, 0)
+bezierCurveTo(20, 40, 60, -20, 80, 30)
+fill()
+\`\`\`
+
+### \`polygon(xs[], ys[])\` — vector helper
+
+Adds a closed polygon to the **current** path. Does **not** call \`beginPath\` or draw by itself.
+
+\`\`\`logts
+drawZone(xs[], ys[]) {
+    styleFill("224488")
+    beginPath()
+    polygon(xs, ys)
+    fill()
+}
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| Precondition | \`beginPath()\` already called |
+| \`vectorLen(xs) == vectorLen(ys)\` | required — runtime error on mismatch |
+| \`vectorLen >= 3\` | required — runtime error if fewer points |
+| After | call \`fill()\` and/or \`stroke()\` |
+
+\`drawRect\`, \`drawCircle\`, and \`drawLine\` remain shortcuts (unchanged).
 
 ---
 

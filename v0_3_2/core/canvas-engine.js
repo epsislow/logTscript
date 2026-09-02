@@ -24,6 +24,8 @@ const CANVAS_BUILTIN_SET = (typeof CANVAS_BUILTINS !== 'undefined')
     'drawRect', 'drawCircle', 'drawLine', 'drawText',
     'textAlign', 'textBaseline', 'fontSize', 'fontFamily', 'fontStyle',
     'symbolSize', 'symbolStyle', 'drawSymbol',
+    'beginPath', 'moveTo', 'lineTo', 'arc', 'closePath',
+    'quadraticCurveTo', 'bezierCurveTo', 'fill', 'stroke', 'polygon',
   ]);
 
 function canvasIsTransparentColor(c) {
@@ -300,6 +302,33 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
   }
 }
 
+function canvasDegToRad(deg) {
+  return Math.trunc(Number(deg)) * Math.PI / 180;
+}
+
+function canvasEnsurePathActive(state, line) {
+  if (!state.pathActive) {
+    throw new Error(`canvas: no active path (call beginPath first)${line != null ? ` (line ${line})` : ''}`);
+  }
+}
+
+function canvasApplyStroke(ctx, state) {
+  if (canvasIsTransparentColor(state.strokeColor)) return false;
+  const css = canvasToCssColor(state.strokeColor);
+  if (!css) return false;
+  ctx.strokeStyle = css;
+  ctx.lineWidth = state.strokeWidth;
+  return true;
+}
+
+function canvasApplyFill(ctx, state) {
+  if (canvasIsTransparentColor(state.fillColor)) return false;
+  const css = canvasToCssColor(state.fillColor);
+  if (!css) return false;
+  ctx.fillStyle = css;
+  return true;
+}
+
 function canvasSymbolColors(state) {
   return {
     fg: canvasToCssColor(state.fillColor) || '#ffffff',
@@ -318,6 +347,7 @@ function createCanvasDrawState() {
     textBaseline: 'alphabetic',
     symbolSize: null,
     symbolStyle: null,
+    pathActive: false,
   };
 }
 
@@ -542,6 +572,95 @@ function canvasRunBuiltin(name, args, state, ctx, evalArg, line) {
       ctx.fillText(String(nargs[2]), Number(nargs[0]), Number(nargs[1]));
       return;
     }
+    case 'beginPath': {
+      if (nargs.length !== 0) throw new Error(`canvas: beginPath expects 0 args (line ${line})`);
+      state.pathActive = true;
+      ctx.beginPath();
+      return;
+    }
+    case 'moveTo': {
+      if (nargs.length !== 2) throw new Error(`canvas: moveTo expects 2 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      ctx.moveTo(Number(nargs[0]), Number(nargs[1]));
+      return;
+    }
+    case 'lineTo': {
+      if (nargs.length !== 2) throw new Error(`canvas: lineTo expects 2 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      ctx.lineTo(Number(nargs[0]), Number(nargs[1]));
+      return;
+    }
+    case 'arc': {
+      if (nargs.length < 5 || nargs.length > 6) {
+        throw new Error(`canvas: arc expects 5 or 6 args (line ${line})`);
+      }
+      canvasEnsurePathActive(state, line);
+      const cx = Number(nargs[0]);
+      const cy = Number(nargs[1]);
+      const r = Number(nargs[2]);
+      const startRad = canvasDegToRad(nargs[3]);
+      const endRad = canvasDegToRad(nargs[4]);
+      const counter = nargs.length === 6 ? nargs[5] : 0;
+      ctx.arc(cx, cy, r, startRad, endRad, !!counter);
+      return;
+    }
+    case 'closePath': {
+      if (nargs.length !== 0) throw new Error(`canvas: closePath expects 0 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      ctx.closePath();
+      return;
+    }
+    case 'quadraticCurveTo': {
+      if (nargs.length !== 4) throw new Error(`canvas: quadraticCurveTo expects 4 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      ctx.quadraticCurveTo(Number(nargs[0]), Number(nargs[1]), Number(nargs[2]), Number(nargs[3]));
+      return;
+    }
+    case 'bezierCurveTo': {
+      if (nargs.length !== 6) throw new Error(`canvas: bezierCurveTo expects 6 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      ctx.bezierCurveTo(
+        Number(nargs[0]), Number(nargs[1]),
+        Number(nargs[2]), Number(nargs[3]),
+        Number(nargs[4]), Number(nargs[5])
+      );
+      return;
+    }
+    case 'fill': {
+      if (nargs.length !== 0) throw new Error(`canvas: fill expects 0 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      if (!canvasApplyFill(ctx, state)) return;
+      ctx.fill();
+      return;
+    }
+    case 'stroke': {
+      if (nargs.length !== 0) throw new Error(`canvas: stroke expects 0 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      if (!canvasApplyStroke(ctx, state)) return;
+      ctx.stroke();
+      return;
+    }
+    case 'polygon': {
+      if (nargs.length !== 2) throw new Error(`canvas: polygon expects 2 args (line ${line})`);
+      canvasEnsurePathActive(state, line);
+      const xs = nargs[0];
+      const ys = nargs[1];
+      if (!Array.isArray(xs) || !Array.isArray(ys)) {
+        throw new Error(`canvas: polygon expects vector args${line != null ? ` (line ${line})` : ''}`);
+      }
+      if (xs.length !== ys.length) {
+        throw new Error(`canvas: polygon xs/ys length mismatch${line != null ? ` (line ${line})` : ''}`);
+      }
+      if (xs.length < 3) {
+        throw new Error(`canvas: polygon requires at least 3 points${line != null ? ` (line ${line})` : ''}`);
+      }
+      ctx.moveTo(Number(xs[0]), Number(ys[0]));
+      for (let i = 1; i < xs.length; i++) {
+        ctx.lineTo(Number(xs[i]), Number(ys[i]));
+      }
+      ctx.closePath();
+      return;
+    }
     default:
       throw new Error(`canvas: unknown builtin '${name}' (line ${line})`);
   }
@@ -620,11 +739,20 @@ function createCanvasMockCtx() {
     fillRect(x, y, w, h) { calls.push({ op: 'fillRect', x, y, w, h, fillStyle: this.fillStyle }); },
     strokeRect(x, y, w, h) { calls.push({ op: 'strokeRect', x, y, w, h, strokeStyle: this.strokeStyle, lineWidth: this.lineWidth }); },
     beginPath() { calls.push({ op: 'beginPath' }); },
-    arc(cx, cy, r, sa, ea) { calls.push({ op: 'arc', cx, cy, r, sa, ea }); },
+    arc(cx, cy, r, sa, ea, acw) {
+      calls.push({ op: 'arc', cx, cy, r, sa, ea, anticlockwise: !!acw });
+    },
     fill() { calls.push({ op: 'fill', fillStyle: this.fillStyle }); },
     stroke() { calls.push({ op: 'stroke', strokeStyle: this.strokeStyle, lineWidth: this.lineWidth }); },
     moveTo(x, y) { calls.push({ op: 'moveTo', x, y }); },
     lineTo(x, y) { calls.push({ op: 'lineTo', x, y }); },
+    closePath() { calls.push({ op: 'closePath' }); },
+    quadraticCurveTo(cpx, cpy, x, y) {
+      calls.push({ op: 'quadraticCurveTo', cpx, cpy, x, y });
+    },
+    bezierCurveTo(c1x, c1y, c2x, c2y, x, y) {
+      calls.push({ op: 'bezierCurveTo', c1x, c1y, c2x, c2y, x, y });
+    },
     fillText(text, x, y) { calls.push({ op: 'fillText', text, x, y, font: this.font, fillStyle: this.fillStyle }); },
   };
   return { ctx, calls, getCalls() { return calls.slice(); }, clearCalls() { calls.length = 0; } };

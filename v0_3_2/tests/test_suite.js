@@ -52647,5 +52647,178 @@ comp [canvas] .myCanvas:
 
   regCanvasDual(4798, 4799, 'vector wire e2e trajectory assign', runCanvasWireVectorE2E);
 
+  reg(4800, 'canvas', 'path builtins registered', function(h) {
+    h.assert('beginPath', CANVAS_BUILTINS.has('beginPath'), true);
+    h.assert('polygon', CANVAS_BUILTINS.has('polygon'), true);
+    h.assert('fill', CANVAS_BUILTINS.has('fill'), true);
+    h.assert('stroke', CANVAS_BUILTINS.has('stroke'), true);
+  });
+
+  function runCanvasPathTriangle(h) {
+    const prog = parseCanvasBody(`drawTri(x1, y1, x2, y2, x3, y3) {
+        style("000000", "ff4444", 2)
+        beginPath()
+        moveTo(x1, y1)
+        lineTo(x2, y2)
+        lineTo(x3, y3)
+        closePath()
+        fill()
+        stroke()
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('drawTri(10, 10, 50, 10, 30, 40)'),
+      mock.ctx,
+      { skipOnError: false }
+    );
+    h.assert('beginPath', mock.calls.some((c) => c.op === 'beginPath'), true);
+    h.assert('moveTo', mock.calls.some((c) => c.op === 'moveTo' && c.x === 10), true);
+    h.assert('lineTo', mock.calls.filter((c) => c.op === 'lineTo').length, 2);
+    h.assert('closePath', mock.calls.some((c) => c.op === 'closePath'), true);
+    h.assert('fill', mock.calls.some((c) => c.op === 'fill'), true);
+    h.assert('stroke', mock.calls.some((c) => c.op === 'stroke'), true);
+  }
+
+  regCanvasDual(4802, 4803, 'path triangle fill stroke', runCanvasPathTriangle);
+
+  function runCanvasArcDefaultCw(h) {
+    const prog = parseCanvasBody(`draw() {
+        beginPath()
+        arc(50, 50, 20, 0, 360)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const a = mock.calls.find((c) => c.op === 'arc');
+    h.assert('arc', !!a, true);
+    h.assert('full circle end', Math.abs(a.ea - Math.PI * 2) < 1e-9, true);
+    h.assert('cw default', a.anticlockwise, false);
+  }
+
+  regCanvasDual(4804, 4805, 'arc 5 args default CW', runCanvasArcDefaultCw);
+
+  function runCanvasArcCounterCcw(h) {
+    const prog = parseCanvasBody(`draw() {
+        beginPath()
+        arc(50, 50, 20, 0, 360, 1)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const a = mock.calls.find((c) => c.op === 'arc');
+    h.assert('ccw', a.anticlockwise, true);
+  }
+
+  regCanvasDual(4806, 4807, 'arc counter CCW', runCanvasArcCounterCcw);
+
+  function runCanvasArcNegativeDeg(h) {
+    const prog = parseCanvasBody(`draw() {
+        beginPath()
+        arc(40, 40, 10, -45, 0)
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const a = mock.calls.find((c) => c.op === 'arc');
+    h.assert('start rad', Math.abs(a.sa - (-Math.PI / 4)) < 1e-9, true);
+    h.assert('end rad', Math.abs(a.ea) < 1e-9, true);
+    h.assert('cw', a.anticlockwise, false);
+  }
+
+  regCanvasDual(4808, 4809, 'arc negative degrees default CW', runCanvasArcNegativeDeg);
+
+  reg(4810, 'canvas', 'lineTo without beginPath error', function(h) {
+    const prog = parseCanvasBody(`draw() {
+        lineTo(10, 10)
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('no active path', function() {
+      executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  function runCanvasQuadraticBezier(h) {
+    const prog = parseCanvasBody(`draw() {
+        styleStroke("aaffaa", 2)
+        beginPath()
+        moveTo(0, 40)
+        quadraticCurveTo(60, 0, 120, 40)
+        stroke()
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    h.assert('quad', mock.calls.some((c) => c.op === 'quadraticCurveTo'), true);
+    h.assert('stroke', mock.calls.some((c) => c.op === 'stroke'), true);
+  }
+
+  regCanvasDual(4812, 4813, 'quadraticCurveTo stroke', runCanvasQuadraticBezier);
+
+  function runCanvasBezier(h) {
+    const prog = parseCanvasBody(`draw() {
+        beginPath()
+        moveTo(0, 0)
+        bezierCurveTo(20, 40, 60, -20, 80, 30)
+        fill()
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    h.assert('bezier', mock.calls.some((c) => c.op === 'bezierCurveTo'), true);
+    h.assert('fill', mock.calls.some((c) => c.op === 'fill'), true);
+  }
+
+  regCanvasDual(4814, 4815, 'bezierCurveTo fill', runCanvasBezier);
+
+  function runCanvasPolygonVectors(h) {
+    const prog = parseCanvasBody(`drawZone(xs[], ys[]) {
+        styleFill("224488")
+        beginPath()
+        polygon(xs, ys)
+        fill()
+    }`);
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(
+      prog,
+      parseCanvasRendererBlock('drawZone(zoneX/s16, zoneY/s16)'),
+      mock.ctx,
+      { skipOnError: false, pinEnv: { zoneX: [10, 50, 30], zoneY: [10, 10, 40] } }
+    );
+    h.assert('moveTo', mock.calls.some((c) => c.op === 'moveTo' && c.x === 10), true);
+    h.assert('lineTo count', mock.calls.filter((c) => c.op === 'lineTo').length, 2);
+    h.assert('closePath', mock.calls.some((c) => c.op === 'closePath'), true);
+    h.assert('fill', mock.calls.some((c) => c.op === 'fill'), true);
+  }
+
+  regCanvasDual(4816, 4817, 'polygon vector args', runCanvasPolygonVectors);
+
+  reg(4818, 'canvas', 'polygon length mismatch error', function(h) {
+    const prog = parseCanvasBody(`draw(xs[], ys[]) {
+        beginPath()
+        polygon(xs, ys)
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('length mismatch', function() {
+      executeCanvasRenderer(
+        prog,
+        parseCanvasRendererBlock('draw(a/s16, b/s16)'),
+        mock.ctx,
+        { skipOnError: false, pinEnv: { a: [1, 2, 3], b: [1, 2] } }
+      );
+    });
+  });
+
+  reg(4819, 'canvas', 'polygon fewer than 3 points error', function(h) {
+    const prog = parseCanvasBody(`draw(xs[], ys[]) {
+        beginPath()
+        polygon(xs, ys)
+    }`);
+    const mock = createCanvasMockCtx();
+    h.assertThrows('at least 3', function() {
+      executeCanvasRenderer(
+        prog,
+        parseCanvasRendererBlock('draw(a/s16, b/s16)'),
+        mock.ctx,
+        { skipOnError: false, pinEnv: { a: [1, 2], b: [3, 4] } }
+      );
+    });
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

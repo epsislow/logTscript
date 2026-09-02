@@ -15,6 +15,8 @@ const CANVAS_BUILTINS = new Set([
   'drawRect', 'drawCircle', 'drawLine', 'drawText',
   'textAlign', 'textBaseline', 'fontSize', 'fontFamily', 'fontStyle',
   'symbolSize', 'symbolStyle', 'drawSymbol',
+  'beginPath', 'moveTo', 'lineTo', 'arc', 'closePath',
+  'quadraticCurveTo', 'bezierCurveTo', 'fill', 'stroke', 'polygon',
 ]);
 
 function canvasError(msg, line) {

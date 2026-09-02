@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–9 done; backlog 1+c…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–10 done; backlog 1+c…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -32,12 +32,15 @@ todos:
   - id: canvas-f9
     content: "Faza 9: vector wire args — 1+l → D76–D83 done"
     status: completed
+  - id: canvas-f10
+    content: "Faza 10: path API + fill/stroke — 1+e + 1+i → D84–D90 done"
+    status: completed
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–9**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l** — promovate **F5–F9**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–10**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l**, **1+e**, **1+i** — promovate **F5–F10**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -160,7 +163,8 @@ D28 A ✅
 | **Faza 7** `if` / `else` în body (**1+a**) | **D62–D68** | **done** |
 | **Faza 8** Loops `for` / `while` (**1+b**) | **D69–D75** | **done** |
 | **Faza 9** Vector wire args (**1+l**) | **D76–D83** | **done** |
-| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+k, 1+l, 1+n) | — |
+| **Faza 10** Path / arc / bezier / polygon + `fill`/`stroke` (**1+e** + **1+i**) | **D84–D90** | **done** |
+| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+e, 1+i, 1+k, 1+l, 1+n) | — |
 
 ---
 
@@ -174,11 +178,11 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+b** | Loops `for` / `while` | C-style `for`; `while (cond)`; body metodă | **Faza 8** | D69–D75 |
 | ⏳ | **1+c** | Imagini / sprite sheet | `drawImage`, load asset | — | post-MVP |
 | ⏳ | **1+d** | Transform (rotate/scale/translate) | Stack `save`/`restore` JS | — | post-MVP |
-| ⏳ | **1+e** | Path / arc / bezier / polygon | Dincolo de rect/line/circle | — | post-MVP |
+| ✅ | **1+e** | Path / arc / bezier / polygon | `beginPath` … `fill`/`stroke` | **Faza 10** | D84–D90 |
 | ⏳ | **1+f** | Input mouse/touch pe canvas | Hit-test → pout / logic | — | CLCD touch pattern |
 | ⏳ | **1+g** | Clip / partial dirty rect | Optimizare redraw regiuni | — | D36 |
 | ⏳ | **1+h** | Layer / offscreen buffer | Multi-layer compose | — | — |
-| ⏳ | **1+i** | `fill` vs `stroke` separate API | Extindere style | — | D18 |
+| ✅ | **1+i** | `fill` vs `stroke` separate API | `fill()` / `stroke()` pe path | **Faza 10** | D87, D18 |
 | ⏳ | **1+j** | Alpha 8-hex | `"rrggbbaa"` — **D16b** ✅; fără keyword `transparent` |
 | ✅ | **1+k** | Font family + `fontStyle` | **`fontFamily("mono"\|"sans"\|"serif")`**; **`fontStyle(family, size)`**; + `textAlign` `start`/`end` | **Faza 5** | D22e, D49–D52 |
 | ⏳ | **1+p** | Text contur (`strokeText`) | `drawText` = fill only (**D22c**); contur → backlog | — | D22c |
@@ -187,13 +191,19 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ⏸ | **1+o** | *(slot liber)* | — | — | — |
 
-**Ordine recomandată:** **F1–F9** ✅; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F9** ✅; **F10** (path) draft; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
 
 ---
 
 ## Backlog **1+l** → **Faza 9** (promovat)
 
 Vezi [Faza 9](#faza-9--vector-wire-args-renderer-1l-promovat) — pin vector din `renderer`, decode per element, index în body metodă.
+
+---
+
+## Backlog **1+e** + **1+i** → **Faza 10** (promovat)
+
+Vezi [Faza 10](#faza-10--path-api--fillstroke-1e--1i-promovat) — API path imperativ Canvas 2D + `fill()` / `stroke()` pe path curent.
 
 ---
 
@@ -1910,6 +1920,285 @@ canvasEvalExpr:
 
 ---
 
+## Faza 10 — Path API + `fill` / `stroke` (**1+e** + **1+i** promovat)
+
+> **Status:** **done** — **D84–D90**; teste **4800–4819**.  
+> **Depinde:** F2 (style fill/stroke), F9 (`polygon` cu `xs[]` / `ys[]` vector).  
+> **Promovat din backlog:** **1+e** (path / arc / bezier / polygon) + **1+i** (`fill()` / `stroke()` separate pe path).
+
+### Scop
+
+Astăzi `drawRect` / `drawCircle` / `drawLine` sunt **shortcut-uri** care ascund `beginPath` intern. Nu poți construi forme compuse (poligon, arc parțial, bezier, mai multe sub-path-uri într-un singur `fill`).
+
+F10 expune API **imperativ** aliniat la Canvas 2D + randare explicită `fill()` / `stroke()` pe path-ul curent.
+
+| În scope F10 | În afara scope |
+| ------------ | -------------- |
+| `beginPath`, `moveTo`, `lineTo`, `arc`, `closePath` | `save` / `restore` / transform → **1+d** |
+| `quadraticCurveTo`, `bezierCurveTo` | `clip()` → **1+g** |
+| `fill()`, `stroke()` pe path activ | `strokeText` → **1+p** |
+| `polygon(xs[], ys[])` — helper vector (F9) | `polygon` fără `beginPath` (respins) |
+| Unghiuri `arc` în **grade întregi** (inclusiv negative) | Radiani în script |
+| `arc(..., counter?)` — `counter` opțional, **default `0`** (CW) | Infer sens doar din ordinea start/end |
+| `drawRect` / `drawCircle` / `drawLine` neschimbate (shortcut) | Rescriere shortcuts pe path API |
+
+### Model path (stare renderer)
+
+```text
+pathActive: false          # set true la beginPath(); false după fill()/stroke()? → rămâne true până la beginPath nou
+subpathOpen: false         # moveTo/lineTo/arc deschid subpath
+
+beginPath()     → pathActive=true; ctx.beginPath()
+moveTo(x,y)     → require pathActive; ctx.moveTo
+lineTo(x,y)     → require pathActive + subpath deschis
+arc(cx,cy,r,s,e,counter?)→ require pathActive; grade→rad; anticlockwise = truthy(counter ?? 0)
+closePath()     → require pathActive
+fill()          → require pathActive; ctx.fill() cu fillColor curent (skip dacă transparent)
+stroke()        → require pathActive; ctx.stroke() cu strokeColor + strokeWidth
+```
+
+**D86:** `moveTo` / `lineTo` / `arc` / `closePath` / `fill` / `stroke` **fără** `beginPath()` precedent în același „segment” → **runtime error** (`no active path`).
+
+**D87:** pe același path, `fill()` apoi `stroke()` (sau invers) — **ambele permise**; același pattern ca `drawCircle`.
+
+### Unghiuri `arc` — **D84**, **D85**
+
+```logts
+arc(cx, cy, radius, startDeg, endDeg)
+arc(cx, cy, radius, startDeg, endDeg, counter)   # echivalent când counter omis = 0
+```
+
+| Regulă | Detaliu |
+| ------ | ------- |
+| **D84 A** | `startDeg` / `endDeg` = **grade întregi** (expresii numerice; rotunjire la int la eval dacă float) |
+| Interval | **Orice** întreg — tipic `-360…360`, dar valori mai mari permise (ex. `720`); **nu** radiani |
+| Negative | **Da** — ex. `arc(cx, cy, r, -45, 0)` = arc de la -45° la 0° (CW, default) |
+| **D85 B** | Al 6-lea arg **`counter`** opțional — **default `0`** (orar / CW) dacă omis · **`1`** (truthy) → CCW · **`0`** (falsy) → CW — **nu** se deduce din ordinea start/end |
+| Exemple | `arc(cx,cy,r, 0, 360)` = `arc(cx,cy,r, 0, 360, 0)` cerc CW · `arc(cx,cy,r, 0, 360, 1)` cerc CCW · `arc(cx,cy,r, -45, 0)` felie 45° CW |
+
+**Implementare JS:**
+
+```javascript
+const startRad = startDeg * Math.PI / 180;
+const endRad   = endDeg   * Math.PI / 180;
+const anticlockwise = counter != null && !!counter;   // omit → 0 → CW
+ctx.arc(cx, cy, r, startRad, endRad, anticlockwise);
+```
+
+> **Notă:** `startDeg` / `endDeg` definesc capetele arcului; **`counter`** (opțional) alege sensul parcurgerii între ele (ca în Canvas 2D).
+
+### Builtins noi (rezumat)
+
+| Builtin | Args | Rol |
+| ------- | ---- | --- |
+| `beginPath()` | — | Începe path nou; obligatoriu înainte de segmente |
+| `moveTo(x, y)` | 2 | Pen fără linie; deschide subpath |
+| `lineTo(x, y)` | 2 | Segment la (x,y) |
+| `arc(cx, cy, r, startDeg, endDeg)` | 5 | Arc CW (default `counter=0`) |
+| `arc(cx, cy, r, startDeg, endDeg, counter)` | 6 | Arc cu sens explicit (**D85**) |
+| `quadraticCurveTo(cpx, cpy, x, y)` | 4 | Curba quadratică |
+| `bezierCurveTo(c1x, c1y, c2x, c2y, x, y)` | 6 | Curba cubică Bezier |
+| `closePath()` | — | Închide subpath la ultimul `moveTo` |
+| `fill()` | — | Umple path curent (`styleFill` / `style` fill) |
+| `stroke()` | — | Contur path (`styleStroke` / `style` stroke + width) |
+| `polygon(xs[], ys[])` | 2 vectori | Vezi **D89** — construiește path; **nu** randează |
+
+### `polygon(xs[], ys[])` — **D89** (cum se folosește)
+
+**Răspuns scurt:** `polygon` se folosește **după** `beginPath()` și **înainte** de `fill()` / `stroke()`. **Nu** apelează `beginPath` singur și **nu** desenează pe ecran (fără `draw` în nume — doar adaugă contur închis la path-ul curent).
+
+Echivalent cu:
+
+```logts
+moveTo(xs[0], ys[0])
+for (i = 1; i < vectorLen(xs); i++) {
+    lineTo(xs[i], ys[i])
+}
+closePath()
+```
+
+| Regulă | Detaliu |
+| ------ | ------- |
+| Precondiție | `beginPath()` deja apelat (D86) |
+| **`vectorLen(xs) == vectorLen(ys)`** | obligatoriu; **eroare** la runtime dacă lungimi diferite |
+| **`vectorLen(xs) >= 3`** | obligatoriu; **eroare** dacă `< 3` puncte |
+| Post | caller apelează `fill()` și/sau `stroke()` (D87) |
+| Compoziție | Poți `polygon` + `moveTo` + `arc` + `closePath` pe **același** path înainte de un singur `fill()` |
+
+**De ce nu fără `beginPath`?** Consistență cu restul API-ului: `beginPath` deschide, segmente construiesc, `fill`/`stroke` randează. `polygon` e **zahăr sintactic** peste buclă `lineTo`, nu un shortcut one-shot ca `drawRect`.
+
+### Sintaxă țintă — exemple script
+
+**1. Triunghi simplu (coordonate locale):**
+
+```logts
+drawTriangle(x1, y1, x2, y2, x3, y3) {
+    style("ffffff", "ff4444", 2)
+    beginPath()
+    moveTo(x1, y1)
+    lineTo(x2, y2)
+    lineTo(x3, y3)
+    closePath()
+    fill()
+    stroke()
+}
+```
+
+**2. Felie pie (`arc` grade negative):**
+
+```logts
+drawSlice(cx, cy, r) {
+    styleFill("44aaff")
+    beginPath()
+    moveTo(cx, cy)
+    arc(cx, cy, r, -45, 0)
+    closePath()
+    fill()
+}
+```
+
+**3. `polygon` + vectori din wire (F9 + F10):**
+
+```logts
+inline [canvas] .zones:
+
+    drawZone(xs[], ys[]) {
+        style("000000", "224488", 2)
+        beginPath()
+        polygon(xs, ys)
+        fill()
+        stroke()
+    }
+
+    drawArrow(x, y, len) {
+        styleStroke("ffffff", 2)
+        beginPath()
+        moveTo(x, y)
+        lineTo(x + len, y)
+        quadraticCurveTo(x + len, y, x + len - 6, y - 8)
+        stroke()
+    }
+
+:
+
+comp [canvas] .map:
+    on: 1
+    width: 160
+    height: 120
+    bgColor: ^001100
+    .zones { }
+:
+
+16wire[4] polyX = 0000000000001010 + 0000000000001111 + 0000000000010000 + 0000000000000110
+16wire[4] polyY = 0000000000001010 + 0000000000000110 + 0000000000001111 + 0000000000001111
+1wire go = 1
+
+.map:{
+    renderer { drawZone(zoneX/s16, zoneY/s16) }
+    zoneX = polyX
+    zoneY = polyY
+    set = go
+}
+```
+
+**4. Bezier + fill/stroke separat (doar contur):**
+
+```logts
+drawWave(y) {
+    styleStroke("aaffaa", 3)
+    beginPath()
+    moveTo(0, y)
+    bezierCurveTo(40, y - 30, 80, y + 30, 120, y)
+    stroke()
+}
+```
+
+**5. Compară: `polygon` vs buclă manuală** — același rezultat:
+
+```logts
+# Cu helper
+beginPath()
+polygon(xs, ys)
+fill()
+
+# Fără helper
+beginPath()
+moveTo(xs[0], ys[0])
+for (i = 1; i < vectorLen(xs); i++) {
+    lineTo(xs[i], ys[i])
+}
+closePath()
+fill()
+```
+
+### Mapping JS (extindere D22)
+
+| Builtin LogT | JS 2D |
+| ------------ | ----- |
+| `beginPath()` | `ctx.beginPath()` |
+| `moveTo(x,y)` | `ctx.moveTo(x,y)` |
+| `lineTo(x,y)` | `ctx.lineTo(x,y)` |
+| `arc(cx,cy,r,s,e,counter?)` | `ctx.arc(..., rad, rad, !!(counter??0))` |
+| `quadraticCurveTo(...)` | `ctx.quadraticCurveTo(...)` |
+| `bezierCurveTo(...)` | `ctx.bezierCurveTo(...)` |
+| `closePath()` | `ctx.closePath()` |
+| `fill()` | `ctx.fill()` (skip dacă fill transparent) |
+| `stroke()` | `ctx.stroke()` (skip dacă stroke transparent) |
+| `polygon(xs,ys)` | loop `moveTo`+`lineTo`+`closePath` pe path activ |
+
+`drawRect` / `drawCircle` / `drawLine` — **neschimbate** (nu trec prin path API user-facing).
+
+### Execuție (engine)
+
+| Schimbare | Detaliu |
+| --------- | ------- |
+| **state** | `pathActive` flag per draw context |
+| **canvas-engine.js** | cases noi + validare precondiții |
+| **CANVAS_BUILTINS** | + toate builtins F10 |
+| **mock ctx** | înregistrează `beginPath`, `arc`, `fill`, `stroke`, `quadraticCurveTo`, … |
+| **regresie** | `drawCircle` / `drawLine` / `drawRect` teste existente verzi |
+
+### Decizii **D84–D90** (confirmate user 2026-09-02)
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D84** | Unghiuri `arc` | **A ✅** grade **întregi**; interval liber (ex. `-45…0`, `0…360`); **nu** radiani |
+| **D85** | Sens arc | **B ✅** arg opțional **`counter`**, **default `0`** (CW); `1` → CCW; nu se inferă din start/end |
+| **D86** | Path fără `beginPath` | **A ✅** `moveTo` / `lineTo` / `arc` / `closePath` / `fill` / `stroke` / `polygon` → **eroare** dacă nu există path activ |
+| **D87** | `fill` + `stroke` | **A ✅** ambele apeluri pe același path permise (ca `drawCircle`) |
+| **D88** | Bezier în MVP | **A ✅** `quadraticCurveTo` + `bezierCurveTo` în F10 |
+| **D89** | `polygon` | **A ✅** `polygon(xs[], ys[])` — **după** `beginPath`, **înainte** de `fill`/`stroke`; **eroare** dacă `len(xs)!=len(ys)` sau `len<3` |
+| **D90** | Teste | **A ✅** alocare draft **4800–4819** wave+legacy |
+
+### Scope F10
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F10a** | Parser: nume builtins noi în `CANVAS_BUILTINS` |
+| **F10b** | Engine: path state + `arc` grade + `counter` → anticlockwise |
+| **F10c** | `polygon(xs[], ys[])` + validare vector (len match, >=3) |
+| **F10d** | Mock ctx + teste **4800+** |
+| **F10e** | Doc `canvas-builtins.md` + exemplu `logts-play` în `comp-canvas.md` |
+
+### Criterii done F10
+
+- [x] `beginPath` → `moveTo` → `lineTo` → `closePath` → `fill` / `stroke`
+- [x] `arc(cx,cy,r,0,360)` = `arc(cx,cy,r,0,360,0)` — default CW
+- [x] `arc(cx,cy,r,0,360,1)` — CCW
+- [x] `arc(cx,cy,r,-45,0)` — felie 45° CW (default counter)
+- [x] `quadraticCurveTo` / `bezierCurveTo` înregistrate în mock
+- [x] `polygon(xs, ys)` după `beginPath` + wire vector e2e
+- [x] `polygon` cu `len(xs)!=len(ys)` sau `len<3` → eroare
+- [x] `lineTo` fără `beginPath` → eroare (D86)
+- [x] `drawRect` / `drawCircle` regresie
+- [x] Doc + suite **4800+** verde
+
+### Status F10
+
+**done** — path API; `polygon`; `arc` grade + `counter` opțional; teste **4800–4819**.
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -1979,6 +2268,13 @@ canvasEvalExpr:
 | **D81** | 9 | formate | **A ✅** toate scalar F3 |
 | **D82** | 9 | match shape | **A ✅** param `[]` ↔ wire vector |
 | **D83** | 9 | teste 4790+ | **A ✅** |
+| **D84** | 10 | unghiuri `arc` | **A ✅** grade întregi |
+| **D85** | 10 | sens `arc` | **B ✅** `counter` opțional, default 0 |
+| **D86** | 10 | fără `beginPath` | **A ✅** eroare |
+| **D87** | 10 | `fill`+`stroke` | **A ✅** ambele |
+| **D88** | 10 | bezier | **A ✅** în F10 |
+| **D89** | 10 | `polygon` | **A ✅** după `beginPath`; erori len mismatch / <3 |
+| **D90** | 10 | teste 4800+ | **A ✅** |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -2019,6 +2315,8 @@ canvasEvalExpr:
 | `busy` aproape instant pe JS | **D38** | Tot util pentru sync cu alte comps |
 | Fără loops | **1+b → F8** ✅ | `for`/`while` + break/continue |
 | Fără vector renderer | **1+l → F9** | `param[]` + `16wire[N]` → array + `xs[i]` |
+| Fără path API user | **1+e → F10** | `beginPath` … `fill`/`stroke`; `polygon` după `beginPath` |
+| `fill`/`stroke` doar pe shortcuts | **1+i → F10** | `fill()` / `stroke()` pe path activ |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
 
@@ -2030,6 +2328,9 @@ canvasEvalExpr:
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
+| 2026-09-02 | **F10 done** — path API; `polygon`; `arc` grade + `counter` default 0; teste **4800–4819** |
+| 2026-09-02 | **D85 B** — `arc(..., counter)` sens explicit CCW/CW (nu infer din start/end) |
+| 2026-09-02 | **1+e + 1+i → Faza 10** — path API; `arc` grade + `counter`; `polygon` după `beginPath`; D84–D90 |
 | 2026-09-01 | **F9 done** — `param[]` vector args; `vectorLen`/`xs[i]`; teste **4790–4799** |
 | 2026-09-01 | **1+l → Faza 9** — vector wire args renderer; teste **4790+** |
 | 2026-09-01 | **F8 done** — break/continue; teste **4780–4788** |
