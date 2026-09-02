@@ -1,6 +1,6 @@
 ---
 name: inline canvas + comp canvas
-overview: "Plan nou — `inline [canvas]` + `comp [canvas]` (device HTML canvas 2D). Faze 1–11 done; backlog 1+c…"
+overview: "Plan nou — `inline [canvas]` + `comp [canvas]`. Faze 1–11 done; Faza 12 ready (hitbox/input 1+f); backlog 1+c…"
 todos:
   - id: canvas-deferred-table
     content: Menține tabel backlog 1+a … (if/loops/sprite/input/…)
@@ -38,12 +38,15 @@ todos:
   - id: canvas-f11
     content: "Faza 11: vectori locali + rotatePoint — 1+q → D91–D101 done"
     status: completed
+  - id: canvas-f12
+    content: "Faza 12: hitbox + input events + pouts — 1+f → D102–D117 (ready)"
+    status: pending
 isProject: false
 ---
 
 # Plan: `inline [canvas]` + `comp [canvas]` — desen 2D
 
-> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–11**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l**, **1+e**, **1+i**, **1+q** — promovate **F5–F11**).  
+> **Plan nou** (nu continuare logic2). Decizii de la **D1**; faze **1–12**; amânări **1+c, …** (fără **1+k**, **1+n**, **1+a**, **1+b**, **1+l**, **1+e**, **1+i**, **1+q**, **1+f** promovat **F12**).  
 > **Sketch sursă:** [canvas_component.md](../my_ideas/canvas_component.md) (chat 2026-08-31).  
 > **Separat de:** [inline_logic2.plan.md](inline_logic2.plan.md) (`observe` → pout → canvas inputs); [comp_clcd.plan.md](comp_clcd.plan.md) (CLCD = simboluri pe biți, **nu** API draw liber).  
 > **Continuare globală teste:** alocare draft **4700+** (după hotkey/CLCD ~4663).
@@ -101,6 +104,29 @@ D28 A ✅
 ```
 
 > **F2 (ready-to-implement)** — **D13–D28 ✅** (D17 A user 2026-09-01).
+
+### Batch F12 — confirmat user 2026-09-02
+
+```text
+D102 A ✅
+D103 A ✅ — doar rect; circle/polygon/path → backlog 1+s
+D104 A ✅
+D105 A ✅
+D106 A ✅
+D107 C ✅
+D108 A ✅
+D109 B ✅
+D110 A ✅
+D111 A ✅
+D112 C ✅ — format explicit pe pout; eventX/eventY în when = number obișnuit
+D113 A ✅ — litereale only; fără wireRefs în rect
+D114 A ✅
+D115 A ✅
+D116 A ✅
+D117 A ✅ — initDraw + exec renderer obligatoriu
+```
+
+> **F12 (ready-to-implement)** — **D102–D117 ✅**.
 
 ---
 
@@ -168,7 +194,8 @@ D28 A ✅
 | **Faza 9** Vector wire args (**1+l**) | **D76–D83** | **done** |
 | **Faza 10** Path / arc / bezier / polygon + `fill`/`stroke` (**1+e** + **1+i**) | **D84–D90** | **done** |
 | **Faza 11** Vectori locali + `rotatePoint` (**1+q**) | **D91–D101** | **done** |
-| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+e, 1+i, 1+k, 1+l, 1+n, 1+q) | — |
+| **Faza 12** Hitbox + input + event pouts (**1+f**) | **D102–D117** | **ready-to-implement** |
+| *(amânate)* | **1+c …** (fără 1+a, 1+b, 1+e, 1+i, 1+f, 1+k, 1+l, 1+n, 1+q) | — |
 
 ---
 
@@ -183,20 +210,22 @@ Tabel master — itemi **amânați**. **Stare:** ⏳ deschis · ✅ promovat/liv
 | ⏳ | **1+c** | Imagini / sprite sheet | `drawImage`, load asset | — | post-MVP |
 | ⏳ | **1+d** | Transform (rotate/scale/translate) | Stack `save`/`restore` JS | — | post-MVP |
 | ✅ | **1+e** | Path / arc / bezier / polygon | `beginPath` … `fill`/`stroke` | **Faza 10** | D84–D90 |
-| ⏳ | **1+f** | Input mouse/touch pe canvas | Hit-test → pout / logic | — | CLCD touch pattern |
+| ✅ | **1+f** | Input mouse/touch — hitbox + events | `hitbox { }`, `renderer when`, pouts | **Faza 12** | D102–D115, CLCD touch |
 | ⏳ | **1+g** | Clip / partial dirty rect | Optimizare redraw regiuni | — | D36 |
 | ⏳ | **1+h** | Layer / offscreen buffer | Multi-layer compose | — | — |
 | ✅ | **1+i** | `fill` vs `stroke` separate API | `fill()` / `stroke()` pe path | **Faza 10** | D87, D18 |
 | ⏳ | **1+j** | Alpha 8-hex | `"rrggbbaa"` — **D16b** ✅; fără keyword `transparent` |
 | ✅ | **1+k** | Font family + `fontStyle` | **`fontFamily("mono"\|"sans"\|"serif")`**; **`fontStyle(family, size)`**; + `textAlign` `start`/`end` | **Faza 5** | D22e, D49–D52 |
 | ⏳ | **1+p** | Text contur (`strokeText`) | `drawText` = fill only (**D22c**); contur → backlog | — | D22c |
+| ⏳ | **1+r** | Builtin `clear()` canvas | Clear parțial / `bgColor` din script | — | D115 |
+| ⏳ | **1+s** | Hitbox geometrie extinsă | `circle`, `polygon`, path hit-test — post-F12 rect MVP | — | D103 |
 | ✅ | **1+l** | Vector wire args (`shotsXVector/s16`) | D34 amânat MVP scalar F3 | **Faza 9** | D76–D83, D33, D34 |
 | ⏳ | **1+m** | Multiple `inline [canvas]` pe un comp | Switch renderer runtime | — | D8 |
 | ✅ | **1+n** | **CLCD symbols pe canvas** (`drawSymbol`) | **`drawSymbol`**, `symbolSize`, `symbolStyle`, `symbolBits`; registry shared | **Faza 6** | D53–D61 |
 | ✅ | **1+q** | Vectori locali + `rotatePoint` | Literali `[]`, append, `+=`, fără nested MVP | **Faza 11** | D91–D101 |
 | ⏳ | **1+o** | Vectori nested (`xs[i]=vector`) | Amânat post-F11 | — | D92 |
 
-**Ordine recomandată:** **F1–F10** ✅; **F11** (vectori locali) draft; apoi **1+c** / **1+d** la cerere; input **1+f** după observe+games.
+**Ordine recomandată:** **F1–F11** ✅; **F12** (hitbox/input) draft; apoi **1+c** / **1+d** la cerere.
 
 ---
 
@@ -215,6 +244,12 @@ Vezi [Faza 10](#faza-10--path-api--fillstroke-1e--1i-promovat) — API path impe
 ## Backlog **1+q** → **Faza 11** (promovat)
 
 Vezi [Faza 11](#faza-11--vectori-locali--rotatepoint-1q-promovat) — literali vector, mutare locală, `rotatePoint`, `polygon` numeric strict.
+
+---
+
+## Backlog **1+f** → **Faza 12** (promovat)
+
+Vezi [Faza 12](#faza-12--hitbox--input-events--pouts-1f-promovat) — hitbox / `initDraw` / `renderer when` / pouts; decizii **D102–D117** confirmate.
 
 ---
 
@@ -2384,6 +2419,421 @@ expr      += rotatePoint '(' expr ')'      # 5 args, returns array
 
 ---
 
+## Faza 12 — Hitbox + input events + pouts (**1+f** promovat)
+
+> **Status:** **ready-to-implement** — **D102–D117** confirmate user 2026-09-02 (vezi batch F12).  
+> **Depinde:** F3 (`set`/`draw`/`busy`, exec block), F10 (path — viitor `circle`/`polygon` hitbox), CLCD touch (`touchType` 1/2/3).  
+> **Promovat din backlog:** **1+f** (mouse/touch pe canvas).  
+> **Sursă sketch:** documentație hitbox / `renderer when` / pouts (chat 2026-09-02).
+
+### Direcție (rezumat sketch)
+
+Canvas rămâne **fără stare de aplicație** între execuții renderer — corect și aliniat cu F3/F9/F11. Interacțiunea se modelează astfel:
+
+```text
+pointer → hitbox (geometrie) → eveniment (press/release/drag/move)
+         → renderer when(...) [opțional, overlay vizual]
+         → pout → wire → logic → wire → renderer normal
+```
+
+**Ce adaugă F12 față de azi:**
+
+| Azi (F1–F11) | F12 (sketch) |
+|--------------|--------------|
+| `renderer { }` la `set`/`draw` | + `renderer when(hitbox[:event]) { }` |
+| Fără hit-test | `hitbox { name: { rect(...); touchType; pout } }` |
+| Pin `set`/`draw`/`busy` | + pouts per eveniment (`:press`, `:drag:eventX`, …) |
+| CLCD are touch pe simboluri | Canvas liber — zone declarative pe pixeli |
+
+### Analiză sketch — ce e solid
+
+| # | Observație | Verdict |
+| - | ---------- | ------- |
+| 1 | **Stateless renderer** — wire-uri la fiecare exec, fără variabile Canvas persistente | ✅ Aliniat F3, D29 |
+| 2 | **`set` vs `draw`** — coalescing, busy | ✅ Deja implementat (D35–D40) |
+| 3 | **`touchType` 1/2/3** — momentary / pulse / latch | ✅ Reuse CLCD — cod + teste existente |
+| 4 | **Evenimente ca tranziții** `0→1` press, `1→0` release | ✅ Model digital clar |
+| 5 | **`eventX`/`eventY`** — unificat mouse+touch | ✅ Bun pentru API simplu |
+| 6 | **`drag` vs `move`** — pressed move vs hover move | ✅ Distincție utilă (slider) |
+| 7 | **Geometrie separată de nume** — `rect` azi, `circle`/`polygon` mai târziu | ✅ Extensibil |
+| 8 | **Stare hitbox minimală** (pressed/latch) ≠ stare aplicație | ✅ Principiu corect |
+| 9 | **Pipeline pout → logic → wire → canvas** | ✅ Identic observe/CLCD |
+
+### Analiză sketch — erori / neclarități
+
+| # | Problemă în sketch | Impact | Propunere plan |
+| - | ------------------ | ------ | -------------- |
+| 1 | **`bgColor: "101010"`** în comp | Comp attrs folosesc **`^rrggbb`** (D16, D7) — nu string cu ghilimele | Doc sketch → `bgColor: ^101010` |
+| 2 | **`drawText(label, x, y)`** | Ordinea noastră: **`drawText(x, y, text)`** (F2) | Sketch corectat |
+| 3 | **`stroke()` în hitbox** | Nu e coliziune reală — **gramatică hitbox separată** (ca CLCD symbols) | **D109 B** — `stroke(color)` în hitbox body; alt parser decât inline canvas |
+| 4 | **`renderer` în comp body** (ex. „Basic Canvas”) | **D29 A** — `renderer` doar în **exec block** `.game:{ }` | Exemplu sketch mutat în exec |
+| 5 | **Unde trăiește `hitbox { }`?** | Sketch îl pune în **comp body** lângă `width`; noi n-avem încă attrs program block în body | **D102** |
+| 6 | **`renderer when` + redraw** | Overlay vs full frame — trebuie **`clear`** per when | **D110**, **D111**, **D115** |
+| 7 | **`pout :press as name`** | Sintaxă nouă; CLCD folosește `:out` + redirect în exec | **D107** |
+| 8 | **`rect(x,y,w,h)`** — litereale vs wire | Slider dinamic vrea `rect` cu wire sau mutare hitbox? | **D113** |
+| 9 | **Exemplu `stroke()` după `drawRect`** în `drawButton` | Pare typo — `styleStroke` + path `stroke()` sau doar `drawRect` outline | Clarificat în doc țintă |
+| 10 | **`enter`/`leave`** | Marcat „future” — OK backlog post-F12 | Out of scope MVP |
+
+### Gramatică hitbox (separată de `inline [canvas]`)
+
+Ca la **CLCD** (symbol blocks cu `x`, `bitOut`, `touchType`), **`hitbox { }`** are **parser propriu** în comp body — **nu** execută `inline [canvas]` builtins.
+
+```text
+comp [canvas] body
+    ├── attrs (width, height, bgColor, …)
+    ├── hitbox { }          ← HITBOX_GRAMMAR (parse-time, fără clear)
+    │       ├── rect(...)
+    │       ├── touchType = N
+    │       ├── stroke("rrggbb")
+    │       └── pout :event as name [/format]
+    └── .inlineRef { }      ← program block canvas (D116, D117)
+            ├── initDraw { }            ← o singură rulare la init componentă (D117)
+            └── renderer when(hb[:ev]) { … }   ← overlay; implicit clear=0 (D115)
+
+exec block .comp:{ }        ← obligatoriu `renderer { }` (D29 A, D117)
+    ├── renderer { }        ← scenă la fiecare set/draw (clear pin exec, default 1)
+    ├── pin assign
+    ├── pout redirect
+    └── set / draw
+```
+
+| Context | Parser | Exemple |
+| ------- | ------ | ------- |
+| **Hitbox body** | `canvas-hitbox-assembler` | `rect`, `touchType`, `pout`, **`stroke(color)`** |
+| **`.inlineRef { }` program block** | `canvas-assembler` + when | **`initDraw { }`**, **`renderer when(...)`** |
+| **Inline method body** | `canvas-assembler` | `drawRect`, `beginPath`, **`stroke()`** path, `fill()` |
+| **Exec block** | existent (obligatoriu) | **`renderer { }`**, `set`, `draw`, `clear`, redirects |
+
+**D109 B:** același identificator `stroke` în **două limbaje diferite** — fără rename `debugStroke`, pentru că nu există ambiguitate la parse (blocuri disjuncte).
+
+### Sintaxă țintă (sketch corectat la implementare)
+
+**Comp body** — attrs + **hitbox** + program block `.inlineRef { }` (**D102 A✅**, **D116**, **D117**):
+
+```logts
+comp [canvas] .symDemo:
+    on: 1
+    width: 800
+    height: 600
+    bgColor: ^101010
+
+    hitbox {
+        rollButton: {
+            rect(650, 500, 100, 50)
+            touchType = 2
+            stroke("ffff00")
+
+            pout :press as rollPressed
+            pout :press:eventX as rollX/s16
+            pout :press:eventY as rollY/s16
+        }
+
+        sliderX: {
+            rect(100, 100, 200, 20)
+            touchType = 1
+            stroke("ff0")
+
+            pout :press as sliderPressed
+            pout :drag:eventX as sliderDragX/s16
+            pout :drag:eventY as sliderDragY/s16
+            pout :release as sliderReleased
+        }
+    }
+
+    .icons {
+        initDraw {
+            drawBoardBg()
+        }
+
+        renderer when(rollButton) {
+            drawButtonPressed(650, 500, 100, 50, "ROLL")
+        }
+
+        renderer when(sliderX:drag) {
+            drawKnob(eventX, eventY)
+        }
+    }
+:
+```
+
+**Exec block** — `renderer` obligatoriu + wiring (**D29 A**, **D117**):
+
+```logts
+1wire redraw = 0
+16wire sliderValue = 0000000000000000
+
+.symDemo:{
+    renderer {
+        drawButton(650, 500, 100, 50, "ROLL")
+        drawSlider(sliderValue/s16)
+    }
+
+    sliderValue = trajectory
+    rollPressed >= rollWire
+    sliderDragX >= sliderValue
+    set = redraw
+}
+```
+
+**`clear` (D115 A✅):** `renderer when` = **întotdeauna overlay** (implicit `clear=0`, fără attr în body F12). **`clear` nu există în hitbox.** Exec `renderer` + pin `clear` (default `1`) ca F3. Backlog **1+r**: builtin `clear()` în inline canvas.
+
+**Evenimente MVP** (sketch):
+
+| Formă | Eveniment |
+| ----- | --------- |
+| `when(button)` | **press** (implicit) |
+| `when(button:release)` | release |
+| `when(slider:drag)` | drag (pressed move) |
+| `when(slider:move)` | move (fără press) |
+
+**Locals în `when` body:** `eventX`, `eventY` (D106).
+
+**Locals în `when` body:** `eventX`, `eventY` — numere întregi canvas obișnuite (**D106 A✅**); nu sunt pout-uri, deci fără `/s16` în body.
+
+### Decizii **D102–D117** — confirmate
+
+| ID | Subiect | Decizie |
+| -- | ------- | ------- |
+| **D102** | Locație `hitbox { }` | **A ✅** comp body (parse-time) — ca CLCD hit zones |
+| **D103** | Geometrie MVP | **A ✅** `rect(x,y,w,h)` only — `circle`/`polygon`/path → **1+s** |
+| **D104** | Sintaxă `renderer when` | **A ✅** cuvânt `when` + hitbox ref |
+| **D105** | Evenimente MVP | **A ✅** press, release, drag, move |
+| **D106** | `eventX` / `eventY` | **A ✅** variabile implicite în body `renderer when` only |
+| **D107** | Declarație pouts | **C ✅** `pout :event as name[/format]` + exec redirect |
+| **D108** | `touchType` | **A ✅** reuse CLCD 1/2/3 identic |
+| **D109** | `stroke` în hitbox | **B ✅** gramatică hitbox separată |
+| **D110** | Ordine draw la eveniment | **A ✅** exec `renderer` apoi `when` overlay |
+| **D111** | Eveniment → redraw | **A ✅** coalesced redraw + pouts + `when` |
+| **D112** | Format coordonate pout | **C ✅** explicit `as name/s16` pe **pout**; în `when` body `eventX`/`eventY` = **number** obișnuit |
+| **D113** | Coordonate `rect` | **A ✅** litereale/int only — **fără wireRefs** (mecanism separat, amânat) |
+| **D114** | Teste | **A** alocare **4840–4869** wave+legacy |
+| **D115** | `clear` overlay | **A ✅** `renderer when` mereu overlay (implicit `clear=0`); fără `clear` în hitbox |
+| **D116** | Locație `renderer when` | **A ✅** program block `.inlineRef { }` |
+| **D117** | Draw init vs exec | **A ✅** `initDraw { }` + exec `renderer { }` obligatoriu |
+
+---
+
+#### **D102** — Unde se declară `hitbox { }`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | În **comp body** (sub attrs, înainte de `:`) | Vizibilitate declarativă; o singură definiție per comp; sketch | Extinde parser comp body (program block attrs) |
+| **B** | În **exec block** `.game:{ hitbox { } … }` | Reuse parser exec | Hitbox per exec instanță; duplicare dacă mai multe exec |
+| **C** | `inline [canvas-hitbox]` separat | Reutilizare | Fragmentare; sketch nu propune |
+
+---
+
+#### **D103** — Geometrie hitbox MVP
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A ✅** | Doar **`rect(x,y,w,h)`** litereale | Simplu; acoperă butoane/slider | Cercuri mai târziu |
+| **B** | `rect` + **`circle(cx,cy,r)`** | Knob rotund | **Amânat → 1+s** |
+| **C** | + `polygon` / path hit-test | Forme arbitrare | **Amânat → 1+s** |
+
+---
+
+#### **D104** — Sintaxă `renderer when`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | Bloc separat: `renderer when(rollButton) { }` / `when(slider:drag)` | Citește ca sketch; separare clară draw reactiv | Parser nou pe program block `.inlineRef { }` |
+| **B** | `renderer { … }` cu prefix `on rollButton:press` în interior | Un singur bloc | Mai greu de citit; amestecă normal + event |
+
+**Locație:** vezi **D116** — `renderer when` **nu** în exec block.
+
+---
+
+#### **D116** — Locație `renderer when`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A ✅** | **`renderer when`** doar în program block `.inlineRef { }` | Co-locat cu `hitbox`; exec rămâne wiring + `renderer` | Parser program block extins |
+
+**Nu** în exec block. Vezi **D117** pentru `initDraw` vs `renderer` exec.
+
+---
+
+#### **D117** — `initDraw` (program block) vs `renderer` (exec)
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A ✅ (user)** | **`initDraw { }`** în `.inlineRef { }` — o singură rulare la init componentă; **`renderer { }` obligatoriu în exec** la fiecare `set`/`draw` | Nume explicit one-shot; exec rămâne ca F3 | Două blocuri draw de documentat |
+| **B** | `renderer { }` în program block (semantica init implicită) | Un singur cuvânt `renderer` | Confuzie cu `renderer` exec |
+| **C** | `onInit { }` | Event-style | Mai puțin aliniat cu vocabular draw |
+
+**Semantica `initDraw`:** echivalent cu un **exec block la montarea componentei** — inferă pinii din args (union cu exec `renderer`), rulează **o dată** (clear `bgColor` ca draw normal). La primul `set`/`draw`, exec `renderer` preia (de obicei cu `clear=1` → înlocuiește frame-ul).
+
+**Exec fără `renderer`:** elaboration error (actualizare **D41** la implementare F12 — comps interactive cer ambele).
+
+**Pin inference:** union args din `initDraw` + exec `renderer` (ca două liste renderer într-un singur comp).
+
+---
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | **press** (implicit), **release**, **drag**, **move** | Sketch complet; slider + hover | Mai mult în F12 |
+| **B** | Doar **press** + **release** | MVP mic | Fără slider drag; F12b obligatoriu |
+
+---
+
+#### **D106** — `eventX` / `eventY`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | Identificatori **rezervați** în body `renderer when` only | Sketch; simplu pentru `drawCircle(eventX, eventY, 5)` | Nu în renderer normal |
+| **B** | Injectate ca parametri fictivi ai unei metode anonime | Consistent cu metode | Sintaxă mai greoaie |
+
+---
+
+#### **D107** — Pouts pe hitbox
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A** | `pout :press as rollPressed` — nume pout pe comp | Sketch literal | Format wire neclar |
+| **B** | Fără `pout` în hitbox — doar `rollPressed >= wire` în exec | Ca busy redirect | Mai verbose; pierde legătura event→pin |
+| **C (recommended)** | **`pout :press as rollPressed`** + opțional **`/s16`** pe nume; exec **`rollPressed >= wire`** | Declarativ + wiring existent F3 | Parser nou dar simetric cu pins |
+
+Forme pout (sketch):
+
+```text
+pout :press as isPressed
+pout :release as isReleased
+pout :drag:eventX as dragX/s16
+pout :drag:eventY as dragY/s16
+```
+
+---
+
+#### **D108** — `touchType`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | **Identic CLCD** — `1` momentary, `2` pulse, `3` latch | Reuse `clcd.js` logic / teste 1418+; doc unificat | — |
+| **B** | Semnificații canvas-only | — | Duplicare, confuzie |
+
+---
+
+#### **D109** — `stroke` în hitbox vs inline canvas
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A** | Rename `debugStroke` / `hitboxStroke` | Evită confuzie în doc | Sketch schimbat; user respinge — limbaje diferite |
+| **B ✅** | **Gramatică hitbox separată** — `stroke("rrggbb")` = contur debug geometrie hit-test; **inline** `stroke()` = path render (F10) | Ca CLCD; parse disjunct; sketch păstrat | Doc trebuie să explice cele două contexte |
+| **C** | Attr comp global `hitboxColor` | Un singur flag debug | Nu per-hitbox |
+
+**Implementare B:** fișier nou `canvas-hitbox-assembler.js` (sau secțiune în `canvas.js` parse) — tokenizer/stmt proprii; **fără** `CANVAS_BUILTINS` partajat.
+
+---
+
+#### **D115** — `clear` pe overlay `renderer when`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A ✅** | **`renderer when`** = **întotdeauna overlay** (implicit `clear=0`; fără attr `clear` în body F12) | Simplu; buton pressed fără full redraw | Fără full-replace per when în MVP |
+| **B** | `clear` pe fiecare **hitbox** `{ … }` | — | **Respins** — nu are sens în hitbox |
+| **C** | Attr comp `whenClear: 0` global | — | Respins |
+
+**Backlog 1+r:** builtin **`clear()`** sau clear parțial cu `bgColor` în inline canvas — **nu** F12.
+
+**Flux (D110 A + D111 A + D115 A + D117):**
+
+```text
+init componentă:
+    → initDraw { } (o dată, clear bgColor)
+
+set/draw sau eveniment input:
+  → hit-test → pouts → schedule redraw coalesced
+  → clear (pin exec, default 1)
+  → renderer { } exec (scenă dinamică)
+  → renderer when active (overlay, mereu clear=0)
+  → busy 0
+```
+
+---
+
+#### **D110** — Layering renderer + `when`
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | Pe frame: **clear** → renderer principal → **toate `when` active** pe acel frame (overlay) | Buton pressed vizibil peste board | Trebuie definit „active when” per eveniment |
+| **B** | La eveniment: **doar** body `when`, fără renderer principal | Rapid | Flicker; fundal lipsește |
+| **C** | `when` amânat la următorul `set` | Simplu | Feedback vizual întârziat |
+
+**Propunere detaliu A:** `when(rollButton)` rulează în frame-ul evenimentului **press** (și opțional cât `touchType 1` ține apăsat); `when(:release)` la release.
+
+---
+
+#### **D111** — Eveniment declanșează redraw?
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A (recommended)** | Eveniment hitbox → schedule **coalesced redraw** (echivalent pulse `set`) + evaluare pouts + `when` overlay | UI reactiv fără script `set` manual | Coupling input→draw |
+| **B** | Doar pouts; user trebuie `set = redraw` în logic | Separare strictă | Mai mult wiring |
+
+---
+
+#### **D112** — Format coordonate: pout vs `when` body
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **C ✅** | **Pout:** format explicit în declarație — **`as dragX/s16`**, **`as tapX/u16`**, etc. (codec F3). **`when` body:** `eventX` / `eventY` = **number** canvas obișnuit (pixel întreg), ca orice coordonată la `drawRect` / `drawCircle` — **fără** suffix `/s16` în expresie | Separă wire encoding (pout) de draw API (when) | — |
+
+**Exemplu:**
+
+```logts
+# hitbox — format pe pout (wire)
+pout :drag:eventX as dragX/s16
+
+# renderer when — coordonate draw normale
+renderer when(slider:drag) {
+    drawKnob(eventX, eventY)    # eventX, eventY sunt number, nu pout
+}
+```
+
+---
+
+#### **D113** — `rect` args
+
+| Opțiune | Descriere | Pro | Contra |
+| ------- | --------- | --- | ------ |
+| **A ✅** | **Literale** (int) în hitbox la parse — **fără wireRefs** | Hitbox declarativ fix; parse simplu | Zone mobile → logic + pout, nu mutare hitbox |
+| **B** | Wire refs `rect(xPos/s16, …)` | Dinamic | **Respins F12** — necesită alt mecanism; multe întrebări deschise |
+| **C** | Ambele | — | Respins |
+
+**Notă:** hitbox dinamic (slider care se mută) = alt design post-F12, nu wire în `rect()`.
+
+---
+
+### Scope F12 (sub-faze propuse)
+
+| Subfază | Conținut |
+| ------- | -------- |
+| **F12a** | Parse `hitbox { }` — gramatică separată: `rect`, `touchType`, `stroke`, `pout` |
+| **F12b** | Hit-test widget (mouse+touch), stare momentary/pulse/latch (reuse CLCD) |
+| **F12c** | Evenimente press/release/drag/move + `renderer when` |
+| **F12d** | `eventX`/`eventY` + pouts (`pout :event[:field] as name`) |
+| **F12e** | Integrare redraw (D110/D111/D115) + doc `comp-canvas.md` |
+| **F12f** | Teste **4840+** |
+
+### Criterii done F12 (draft)
+
+- [ ] `hitbox { button: { rect(...); touchType = 1 } }` parse OK
+- [ ] Click în rect → pout `:press` pulse/latch per touchType
+- [ ] `stroke("ffff00")` în hitbox body — parser separat, fără conflict inline
+- [ ] `renderer when` cu `clear = 0` overlay
+- [ ] `slider:drag` + `eventX`/`eventY` în when body
+- [ ] `pout :drag:eventX` → wire → renderer pin
+- [ ] Fără variabile canvas persistente între exec
+- [ ] Regresie F3/F10/F11
+- [ ] Doc + suite **4840+**
+
+### Status F12
+
+**(draft — așteaptă confirmare D102–D114)** — sketch analizat; implementare după `D#: literă`.
+
+---
+
 ## Tabel rezumat decizii (toate — draft)
 
 | ID | Fază | Subiect | Recommended |
@@ -2471,6 +2921,22 @@ expr      += rotatePoint '(' expr ')'      # 5 args, returns array
 | **D99** | 11 | polygon numeric | **A ✅** |
 | **D100** | 11 | literali `[]` | **A ✅** |
 | **D101** | 11 | teste 4820+ | **A ✅** |
+| **D102** | 12 | locație hitbox | **A ✅** comp body |
+| **D103** | 12 | geometrie MVP | **A ✅** rect only → **1+s** |
+| **D104** | 12 | `renderer when` | **A ✅** |
+| **D105** | 12 | evenimente MVP | **A ✅** |
+| **D106** | 12 | eventX/Y | **A ✅** number în when |
+| **D107** | 12 | pouts | **C ✅** |
+| **D108** | 12 | touchType | **A ✅** CLCD |
+| **D109** | 12 | stroke hitbox | **B ✅** |
+| **D110** | 12 | layering draw | **A ✅** |
+| **D111** | 12 | event→redraw | **A ✅** |
+| **D112** | 12 | format coords | **C ✅** pout explicit; when = number |
+| **D113** | 12 | rect args | **A ✅** literal, fără wireRefs |
+| **D114** | 12 | teste 4840+ | **A** |
+| **D115** | 12 | clear overlay | **A ✅** when mereu overlay; fără clear în hitbox |
+| **D116** | 12 | locație when | **A ✅** program block |
+| **D117** | 12 | init vs exec draw | **A ✅** `initDraw` + exec `renderer` obligatoriu |
 | **D23** | 2 | ops `+ - * /` | **A** |
 | **D24** | 2 | `/` float | **A** |
 | **D25** | 2 | number unificat | **A** |
@@ -2514,6 +2980,7 @@ expr      += rotatePoint '(' expr ')'      # 5 args, returns array
 | Fără path API user | **1+e → F10** | `beginPath` … `fill`/`stroke`; `polygon` după `beginPath` |
 | `fill`/`stroke` doar pe shortcuts | **1+i → F10** | `fill()` / `stroke()` pe path activ |
 | Vectori doar din wire | **1+q → F11** | literali locali, `+=`, `rotatePoint` |
+| Fără input canvas | **1+f → F12** | hitbox, when renderer, pouts |
 | Nested vectors | **1+o** amânat | post-F11 |
 | Depend observe | **D45** | Canvas MVP independent |
 | Confuzie CLCD vs canvas | doc | CLCD = layout + touch + symbol blocks; canvas = draw API; **1+n** = același catalog simboluri via `drawSymbol` |
@@ -2526,6 +2993,11 @@ expr      += rotatePoint '(' expr ')'      # 5 args, returns array
 | ---- | --------- |
 | 2026-08-31 | Creat **canvas_inline_and_comp.plan.md** — analiză sketch; **F1–F4** draft; **D1–D48** draft; backlog **1+a …**; numerotare **D1** (plan nou) |
 | 2026-09-01 | **D22d A✅** — `fontSize(n)` MVP default 14; **D22e** draft `fontFamily`/`fontStyle` → **1+k** |
+| 2026-09-02 | **Batch F12** — **D102–D117 ✅**; Faza 12 **ready-to-implement** |
+| 2026-09-02 | **D115 A, D117 A** — when overlay fix; `initDraw` program block + exec `renderer` obligatoriu |
+| 2026-09-02 | **D116 A** — `renderer when` în program block `.inlineRef { }` |
+| 2026-09-02 | **D102 A, D105 A, D109 B** confirmate — hitbox comp body; gramatică separată; `clear` pe `when` |
+| 2026-09-02 | **1+f → Faza 12** — analiză sketch hitbox/input; D102–D115 draft |
 | 2026-09-02 | **F11 done** — vectori locali, `+=`, `rotatePoint`, `polygon` numeric; teste **4820–4838** |
 | 2026-09-02 | **F10 done** — path API; `polygon`; `arc` grade + `counter` default 0; teste **4800–4819** |
 | 2026-09-02 | **D85 B** — `arc(..., counter)` sens explicit CCW/CW (nu infer din start/end) |
