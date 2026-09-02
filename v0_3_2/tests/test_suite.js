@@ -53197,5 +53197,24 @@ comp [canvas] .bad:
     h.assert('probe target', !!target, true);
   });
 
+  function runCanvasHitboxProbeEmit(h, session) {
+    const src = COMP_CANVAS_HITBOX + `
+probe(.panel:dragX)
+16wire outX = .panel:dragX
+probe(outX)`;
+    const { interp } = session.run(src);
+    const before = interp.out.length;
+    session.triggerCanvasTouch(interp, '.panel', { x: 60, y: 20, phase: 'press' });
+    session.triggerCanvasTouch(interp, '.panel', { x: 72, y: 22, phase: 'move' });
+    session._propagateIfNeeded(interp);
+    h.assert('probe output grew', interp.out.length > before, true);
+    const dragChanged = interp.out.some((line) => line.includes('.panel:dragX') && line.includes('changed'));
+    const wireChanged = interp.out.some((line) => line.includes('outX') && line.includes('changed'));
+    h.assert('dragX probe changed', dragChanged, true);
+    h.assert('outX probe changed', wireChanged, true);
+  }
+
+  regCanvasDual(4856, 4857, 'hitbox pout probe emits on touch', runCanvasHitboxProbeEmit);
+
   window.LogTScriptTestSuite.finalize();
 })();

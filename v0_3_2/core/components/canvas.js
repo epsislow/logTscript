@@ -150,7 +150,12 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     if (!pout || !pout.ref) return;
     const bits = this._encodePoutValue(pout, rawValue);
     ctx.setValueAtRef(pout.ref, bits);
-    CanvasComponent.propagateBusy(ctx, compName);
+    if (typeof ctx.scheduleTouchOutChange === 'function') {
+      ctx.scheduleTouchOutChange(compName);
+    } else {
+      CanvasComponent.propagateBusy(ctx, compName);
+      if (typeof showVars === 'function') showVars();
+    }
   }
 
   _clearZonePouts(comp, compName, zoneName, event, ctx) {
