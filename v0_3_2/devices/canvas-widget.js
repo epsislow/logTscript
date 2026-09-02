@@ -27,6 +27,11 @@ function setCanvasDrawHandler(id, fn) {
   if (display) display.setDrawHandler(fn);
 }
 
+function setCanvasTouchHandler(id, handler) {
+  const display = getCanvasDisplay(id);
+  if (display) display.setTouchHandler(handler);
+}
+
 function removeCanvas(id) {
   if (typeof dm !== 'function') return;
   const display = dm().canvasDisplays.get(id);
@@ -52,9 +57,11 @@ class CanvasDisplay {
     this.label = label;
     this.nl = nl;
     this._drawHandler = null;
+    this._touchHandler = null;
     this._dirty = false;
     this._rafId = null;
     this._drawOptions = null;
+    this._pointerDown = false;
 
     this.canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
     if (this.canvas) {
@@ -72,6 +79,70 @@ class CanvasDisplay {
 
   setDrawHandler(fn) {
     this._drawHandler = typeof fn === 'function' ? fn : null;
+  }
+
+  setTouchHandler(handler) {
+    this._touchHandler = handler || null;
+    this._bindTouch();
+  }
+
+  _canvasCoords(clientX, clientY) {
+    if (!this.canvas) return { x: 0, y: 0 };
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / (rect.width || this.canvas.width);
+    const scaleY = this.canvas.height / (rect.height || this.canvas.height);
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
+
+  _bindTouch() {
+    if (!this.canvas || !this._touchHandler) return;
+    const canvas = this.canvas;
+    const self = this;
+    if (canvas._canvasTouchBound) return;
+    canvas._canvasTouchBound = true;
+
+    const onDown = (e) => {
+      e.preventDefault();
+      const pt = self._clientPoint(e);
+      if (!pt) return;
+      const { x, y } = self._canvasCoords(pt.x, pt.y);
+      self._pointerDown = true;
+      if (self._touchHandler.onPress) self._touchHandler.onPress(x, y);
+    };
+    const onUp = (e) => {
+      const pt = self._clientPoint(e);
+      const { x, y } = pt ? self._canvasCoords(pt.x, pt.y) : { x: 0, y: 0 };
+      self._pointerDown = false;
+      if (self._touchHandler.onRelease) self._touchHandler.onRelease(x, y);
+    };
+    const onMove = (e) => {
+      const pt = self._clientPoint(e);
+      if (!pt) return;
+      const { x, y } = self._canvasCoords(pt.x, pt.y);
+      if (self._touchHandler.onMove) self._touchHandler.onMove(x, y);
+    };
+
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mouseup', onUp);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('touchstart', onDown, { passive: false });
+    canvas.addEventListener('touchend', onUp);
+    canvas.addEventListener('touchmove', onMove, { passive: false });
+  }
+
+  _clientPoint(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    if (e.changedTouches && e.changedTouches.length) {
+      return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    }
+    if (e.clientX != null) return { x: e.clientX, y: e.clientY };
+    return null;
   }
 
   requestDraw(options) {
@@ -144,5 +215,13 @@ class CanvasDisplay {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { addCanvas, getCanvasDisplay, requestCanvasDraw, setCanvasDrawHandler, removeCanvas, CanvasDisplay };
+  module.exports = {
+    addCanvas,
+    getCanvasDisplay,
+    requestCanvasDraw,
+    setCanvasDrawHandler,
+    setCanvasTouchHandler,
+    removeCanvas,
+    CanvasDisplay,
+  };
 }

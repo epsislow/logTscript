@@ -3716,6 +3716,7 @@ assignment() {
         let wireRefAttrs = [];
         let literalAttrs = [];
         let regionsBlockAttrs = [];
+        let hitboxBlockAttrs = [];
         let plcMappingBlockAttrs = [];
         let plcGlobalsBlockAttrs = [];
         if (this.componentRegistry) {
@@ -3728,9 +3729,17 @@ assignment() {
             if (special && special.wireRefAttrs) wireRefAttrs = special.wireRefAttrs;
             if (special && special.literalAttrs) literalAttrs = special.literalAttrs;
             if (special && special.regionsBlockAttrs) regionsBlockAttrs = special.regionsBlockAttrs;
+            if (special && special.hitboxBlockAttrs) hitboxBlockAttrs = special.hitboxBlockAttrs;
             if (special && special.plcMappingBlockAttrs) plcMappingBlockAttrs = special.plcMappingBlockAttrs;
             if (special && special.plcGlobalsBlockAttrs) plcGlobalsBlockAttrs = special.plcGlobalsBlockAttrs;
           }
+        }
+        if (hitboxBlockAttrs.includes(attrName) && this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          this.eat('SYM', '{');
+          const bodyRaw = this.parseRawBraceBlock(bracePos);
+          attributes.canvasHitboxRaw = bodyRaw;
+          continue;
         }
         if (literalAttrs.includes(attrName) && this.c.value === ':') {
           this.eat('SYM', ':');

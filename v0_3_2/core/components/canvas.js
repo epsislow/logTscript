@@ -10,6 +10,7 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
   getSpecialParseAttributes() {
     return {
       canvasProgramBlockAttrs: true,
+      hitboxBlockAttrs: ['hitbox'],
       literalAttrs: [],
     };
   }
@@ -22,6 +23,15 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     return s.toLowerCase();
   }
 
+  static normalizeHitboxStrokeColor(val) {
+    if (val === undefined || val === null || val === '') return '#ffff00';
+    let s = String(val);
+    if (s.charAt(0) === '^') s = '#' + s.slice(1);
+    else if (s.charAt(0) !== '#') s = '#' + s;
+    if (s.length === 4) s = '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+  return s.toLowerCase();
+  }
+
   static parsePositiveInt(val, name, attr, compName) {
     if (val === undefined || val === null || val === '') {
       throw Error(`canvas ${compName}: '${attr}' is required`);
@@ -31,6 +41,38 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       throw Error(`canvas ${compName}: '${attr}' must be a positive integer`);
     }
     return n;
+  }
+
+  static hitTestAt(zones, px, py) {
+    const hits = [];
+    if (!zones) return hits;
+    for (const name of Object.keys(zones)) {
+      const zone = zones[name];
+      if (!zone || !zone.rect) continue;
+      const r = zone.rect;
+      if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
+        hits.push({ name, zone });
+      }
+    }
+    return hits;
+  }
+
+  static whenKey(zoneName, event) {
+    return `${zoneName}:${event || 'press'}`;
+  }
+
+  _parseHitbox(attributes, compName) {
+    const parseFn = typeof parseCanvasHitboxBlock === 'function'
+      ? parseCanvasHitboxBlock : null;
+    if (!parseFn || !attributes.canvasHitboxRaw) return { zones: {} };
+    return parseFn(attributes.canvasHitboxRaw, `canvas ${compName}`);
+  }
+
+  _parseProgramBlock(bodyRaw, compName) {
+    const parseFn = typeof parseCanvasProgramBlock === 'function'
+      ? parseCanvasProgramBlock : null;
+    if (!parseFn) return { initDraw: null, whenRenderers: [] };
+    return parseFn(bodyRaw || '', `canvas ${compName}`);
   }
 
   _parsePrograms(attributes, ctx, compName) {
@@ -47,6 +89,225 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       programs.push({ ref: block.ref, inst, bodyRaw: block.bodyRaw || '' });
     }
     return programs;
+  }
+
+  _poutBitWidth(pout) {
+    if (pout.bindType === 'bool') return 1;
+    if (pout.bindType === 'text') return 256;
+    const widthFn = typeof logicNumberFormatBitWidth === 'function'
+      ? logicNumberFormatBitWidth : null;
+    if (widthFn && pout.numberFormat) return widthFn(pout.numberFormat, 16);
+    return 16;
+  }
+
+  _setupHitboxPouts(comp, ctx, compName) {
+    comp.hitboxPouts = {};
+    const zones = comp.hitboxZones || {};
+    const names = new Set();
+    for (const zoneName of Object.keys(zones)) {
+      const zone = zones[zoneName];
+      for (const pout of zone.pouts || []) {
+        if (names.has(pout.name)) {
+          throw Error(`canvas ${compName}: duplicate hitbox pout '${pout.name}'`);
+        }
+        names.add(pout.name);
+        const bits = this._poutBitWidth(pout);
+        const storageIdx = ctx.storeValue('0'.repeat(bits));
+        comp.hitboxPouts[pout.name] = {
+          ref: `&${storageIdx}`,
+          bits,
+          bindType: pout.bindType,
+          numberFormat: pout.numberFormat || null,
+          event: pout.event,
+          field: pout.field,
+          zoneName,
+        };
+      }
+    }
+  }
+
+  _encodePoutValue(pout, rawValue) {
+    if (pout.bindType === 'bool') {
+      return rawValue ? '1' : '0';
+    }
+    if (pout.bindType === 'text') {
+      const s = String(rawValue == null ? '' : rawValue);
+      let bits = '';
+      for (let i = 0; i < s.length && bits.length < pout.bits; i++) {
+        bits += s.charCodeAt(i).toString(2).padStart(8, '0');
+      }
+      return bits.padEnd(pout.bits, '0').slice(-pout.bits);
+    }
+    const encFn = typeof logicEncodeNumberValue === 'function' ? logicEncodeNumberValue : null;
+    const n = Number(rawValue);
+  const v = Number.isFinite(n) ? n : 0;
+    if (encFn) return encFn(v, pout.bits, pout.numberFormat);
+    return (v >>> 0).toString(2).padStart(pout.bits, '0').slice(-pout.bits);
+  }
+
+  _setHitboxPout(comp, compName, poutName, rawValue, ctx) {
+    const pout = comp.hitboxPouts && comp.hitboxPouts[poutName];
+    if (!pout || !pout.ref) return;
+    const bits = this._encodePoutValue(pout, rawValue);
+    ctx.setValueAtRef(pout.ref, bits);
+    CanvasComponent.propagateBusy(ctx, compName);
+  }
+
+  _clearZonePouts(comp, compName, zoneName, event, ctx) {
+    const zones = comp.hitboxZones || {};
+    const zone = zones[zoneName];
+    if (!zone) return;
+    for (const decl of zone.pouts || []) {
+      if (decl.event !== event || decl.field) continue;
+      if (decl.bindType !== 'bool') continue;
+      this._setHitboxPout(comp, compName, decl.name, 0, ctx);
+    }
+  }
+
+  _publishZonePouts(comp, compName, zoneName, event, ctx) {
+    const zones = comp.hitboxZones || {};
+    const zone = zones[zoneName];
+    if (!zone) return;
+    for (const decl of zone.pouts || []) {
+      if (decl.event !== event) continue;
+      let value = 1;
+      if (decl.field === 'eventX') value = comp._eventX != null ? comp._eventX : 0;
+      else if (decl.field === 'eventY') value = comp._eventY != null ? comp._eventY : 0;
+      else if (decl.bindType !== 'bool') continue;
+      else if (event === 'release') value = 0;
+      this._setHitboxPout(comp, compName, decl.name, value, ctx);
+    }
+  }
+
+  _ensureTouchState(comp) {
+    if (!comp.touchPressZones) comp.touchPressZones = new Set();
+    if (!comp.touchLatchZones) comp.touchLatchZones = new Set();
+    if (!comp.activeWhenKeys) comp.activeWhenKeys = new Set();
+    if (comp._pointerDown == null) comp._pointerDown = false;
+  }
+
+  _setActiveWhen(comp, zoneName, event, active) {
+    this._ensureTouchState(comp);
+    const key = CanvasComponent.whenKey(zoneName, event);
+    if (active) comp.activeWhenKeys.add(key);
+    else comp.activeWhenKeys.delete(key);
+  }
+
+  _syncPressWhenKeys(comp) {
+    this._ensureTouchState(comp);
+    const zones = comp.hitboxZones || {};
+    for (const zoneName of Object.keys(zones)) {
+      const zone = zones[zoneName];
+      const pressed = comp.touchPressZones.has(zoneName)
+        || (zone.touchType === 3 && comp.touchLatchZones.has(zoneName));
+      this._setActiveWhen(comp, zoneName, 'press', pressed);
+      if (zone.touchType !== 3) {
+        this._setActiveWhen(comp, zoneName, 'press', pressed);
+      }
+    }
+  }
+
+  _applyPointerPress(comp, compName, x, y, ctx) {
+    if (!comp.hitboxZones || !Object.keys(comp.hitboxZones).length) return;
+    this._ensureTouchState(comp);
+    comp._eventX = Math.trunc(x);
+    comp._eventY = Math.trunc(y);
+    comp._pointerDown = true;
+    const hits = CanvasComponent.hitTestAt(comp.hitboxZones, x, y);
+    comp._lastHitZones = hits.map((h) => h.name);
+    const pulseZones = [];
+
+    for (const hit of hits) {
+      const zone = hit.zone;
+      const tt = zone.touchType || 1;
+      if (tt === 1) {
+        comp.touchPressZones.add(hit.name);
+      } else if (tt === 2) {
+        comp.touchPressZones.add(hit.name);
+        pulseZones.push(hit.name);
+      } else if (tt === 3) {
+        if (comp.touchLatchZones.has(hit.name)) comp.touchLatchZones.delete(hit.name);
+        else comp.touchLatchZones.add(hit.name);
+      }
+      this._publishZonePouts(comp, compName, hit.name, 'press', ctx);
+      this._setActiveWhen(comp, hit.name, 'press', true);
+      this._setActiveWhen(comp, hit.name, 'release', false);
+    }
+    this._syncPressWhenKeys(comp);
+    this._scheduleInputRedraw(comp, ctx);
+
+    if (pulseZones.length > 0) {
+      const self = this;
+      const releasePulse = () => {
+        for (const zn of pulseZones) comp.touchPressZones.delete(zn);
+        self._syncPressWhenKeys(comp);
+        self._scheduleInputRedraw(comp, ctx);
+      };
+      if (typeof ctx.runSafely === 'function') ctx.runSafely(releasePulse);
+      else releasePulse();
+    }
+  }
+
+  _applyPointerRelease(comp, compName, x, y, ctx) {
+    if (!comp.hitboxZones || !Object.keys(comp.hitboxZones).length) return;
+    this._ensureTouchState(comp);
+    comp._eventX = Math.trunc(x);
+    comp._eventY = Math.trunc(y);
+    comp._pointerDown = false;
+    const hits = CanvasComponent.hitTestAt(comp.hitboxZones, x, y);
+    const lastHits = comp._lastHitZones || [];
+
+    for (const zoneName of lastHits) {
+      const zone = comp.hitboxZones[zoneName];
+      if (!zone) continue;
+      if ((zone.touchType || 1) === 1) {
+        comp.touchPressZones.delete(zoneName);
+        this._clearZonePouts(comp, compName, zoneName, 'press', ctx);
+      }
+      this._publishZonePouts(comp, compName, zoneName, 'release', ctx);
+      this._setActiveWhen(comp, zoneName, 'release', true);
+      this._setActiveWhen(comp, zoneName, 'drag', false);
+    }
+    for (const hit of hits) {
+      this._setActiveWhen(comp, hit.name, 'release', true);
+    }
+    comp._lastHitZones = [];
+    this._syncPressWhenKeys(comp);
+    this._scheduleInputRedraw(comp, ctx);
+    for (const zoneName of Object.keys(comp.hitboxZones || {})) {
+      this._setActiveWhen(comp, zoneName, 'release', false);
+    }
+  }
+
+  _applyPointerMove(comp, compName, x, y, ctx) {
+    if (!comp.hitboxZones || !Object.keys(comp.hitboxZones).length) return;
+    this._ensureTouchState(comp);
+    comp._eventX = Math.trunc(x);
+    comp._eventY = Math.trunc(y);
+    const hits = CanvasComponent.hitTestAt(comp.hitboxZones, x, y);
+    for (const hit of hits) {
+      this._publishZonePouts(comp, compName, hit.name, 'move', ctx);
+      this._setActiveWhen(comp, hit.name, 'move', true);
+    }
+    if (comp._pointerDown) {
+      for (const zoneName of comp.touchPressZones) {
+        this._publishZonePouts(comp, compName, zoneName, 'drag', ctx);
+        this._setActiveWhen(comp, zoneName, 'drag', true);
+      }
+    }
+    this._scheduleInputRedraw(comp, ctx);
+    for (const zoneName of Object.keys(comp.hitboxZones || {})) {
+      this._setActiveWhen(comp, zoneName, 'move', false);
+      if (!comp._pointerDown || !comp.touchPressZones.has(zoneName)) {
+        this._setActiveWhen(comp, zoneName, 'drag', false);
+      }
+    }
+  }
+
+  _scheduleInputRedraw(comp, ctx) {
+    if (!comp._canvasRendererCalls || !comp._canvasRendererCalls.length) return;
+    comp._canvasClear = true;
+    this._scheduleDraw(comp, ctx);
   }
 
   getDef() {
@@ -80,6 +341,11 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
 
   getRedirectProperties() {
     return ['busy'];
+  }
+
+  supportsRedirectProperty(property, comp) {
+    if (property === 'busy') return true;
+    return !!(comp && comp.hitboxPouts && comp.hitboxPouts[property]);
   }
 
   _ensurePin(comp, wireRef, ctx, compName, vectorRequired) {
@@ -124,7 +390,6 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     const collectFn = typeof canvasCollectWireRefsFromCalls === 'function'
       ? canvasCollectWireRefsFromCalls : null;
     if (!collectFn) return;
-    const refs = collectFn(calls);
     for (let i = 0; i < (calls || []).length; i++) {
       const call = calls[i];
       const method = methods && methods[call.name];
@@ -211,6 +476,8 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       : null;
     const programs = this._parsePrograms(attributes, ctx, name);
     const prog = programs[0];
+    const hitboxParsed = this._parseHitbox(attributes, name);
+    const programBlock = this._parseProgramBlock(prog.bodyRaw, name);
 
     const busyIdx = ctx.storeValue('0');
     const busyRef = `&${busyIdx}`;
@@ -225,16 +492,42 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       bgColor,
       programRef: prog.ref,
       canvasPrograms: programs,
+      hitboxZones: hitboxParsed.zones,
+      programBlock,
       busyRef,
       pinDefs: {},
       pinStorage: {},
+      hitboxPouts: {},
       _canvasRendererCalls: null,
       _canvasClear: true,
       _canvasDrawing: false,
       _pendingAfterBusy: false,
       _pendingRedraw: false,
       _drawScheduled: false,
+      _initDrawDone: false,
+      _eventX: 0,
+      _eventY: 0,
     };
+
+    this._setupHitboxPouts(compInfo, ctx, name);
+
+    const self = this;
+    const onPress = (px, py) => {
+      const comp = ctx.components.get(name);
+      if (!comp) return;
+      self._applyPointerPress(comp, name, px, py, ctx);
+    };
+    const onRelease = (px, py) => {
+      const comp = ctx.components.get(name);
+      if (!comp) return;
+      self._applyPointerRelease(comp, name, px, py, ctx);
+    };
+    const onMove = (px, py) => {
+      const comp = ctx.components.get(name);
+      if (!comp) return;
+      self._applyPointerMove(comp, name, px, py, ctx);
+    };
+    compInfo.touchHandler = { onPress, onRelease, onMove };
 
     if (typeof addCanvas === 'function') {
       addCanvas({
@@ -245,15 +538,43 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
         label,
         nl: !!attributes.nl,
       });
-      const self = this;
       if (typeof setCanvasDrawHandler === 'function') {
         setCanvasDrawHandler(baseId, (drawCtx, drawOpts) => {
           self._runDraw(compInfo, drawCtx, ctx, drawOpts);
         });
       }
+      if (typeof setCanvasTouchHandler === 'function' && Object.keys(hitboxParsed.zones).length) {
+        setCanvasTouchHandler(baseId, { onPress, onRelease, onMove });
+      }
     }
 
+    this._runInitDraw(compInfo, ctx);
+
     return { earlyReturn: true, compInfo };
+  }
+
+  _runInitDraw(comp, ctx) {
+    if (!comp || comp._initDrawDone) return;
+    const initCalls = comp.programBlock && comp.programBlock.initDraw;
+    if (!initCalls || !initCalls.length) {
+      comp._initDrawDone = true;
+      return;
+    }
+    const mockFn = typeof createCanvasMockCtx === 'function' ? createCanvasMockCtx : null;
+    if (!mockFn) {
+      comp._initDrawDone = true;
+      return;
+    }
+    const program = this._getProgram(comp, ctx);
+    const execFn = typeof executeCanvasRenderer === 'function' ? executeCanvasRenderer : null;
+    if (!execFn) return;
+    const { ctx: mctx } = mockFn();
+    if (mctx && comp.width && comp.height) {
+      mctx.fillStyle = comp.bgColor;
+      mctx.fillRect(0, 0, comp.width, comp.height);
+    }
+    execFn(program, initCalls, mctx, { logErrors: true, skipOnError: true, pinEnv: {} });
+    comp._initDrawDone = true;
   }
 
   _getProgram(comp, ctx) {
@@ -266,6 +587,47 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
       inst.methods = parsed.methods;
     }
     return { methods: inst.methods };
+  }
+
+  _drawHitboxDebug(comp, drawCtx) {
+    const zones = comp.hitboxZones || {};
+    for (const zoneName of Object.keys(zones)) {
+      const zone = zones[zoneName];
+      if (!zone || !zone.rect || !zone.stroke) continue;
+      const r = zone.rect;
+      if (drawCtx.strokeStyle !== undefined) {
+        drawCtx.strokeStyle = CanvasComponent.normalizeHitboxStrokeColor(zone.stroke);
+      }
+      if (drawCtx.lineWidth !== undefined) drawCtx.lineWidth = 1;
+      if (drawCtx.strokeRect) drawCtx.strokeRect(r.x + 0.5, r.y + 0.5, r.w, r.h);
+    }
+  }
+
+  _runWhenOverlays(comp, drawCtx, interp) {
+    const whenList = (comp.programBlock && comp.programBlock.whenRenderers) || [];
+    if (!whenList.length || !comp.activeWhenKeys || !comp.activeWhenKeys.size) return;
+    const execFn = typeof executeCanvasRenderer === 'function' ? executeCanvasRenderer : null;
+    if (!execFn) return;
+    const program = this._getProgram(comp, interp);
+    const buildEnvFn = typeof canvasBuildPinEnv === 'function' ? canvasBuildPinEnv : null;
+    const basePinEnv = buildEnvFn
+      ? buildEnvFn(comp, comp._lastPending, false, interp, (p, key, re, c) => (
+        this.reEvalPendingValue(p, key, re, c)
+      ))
+      : {};
+    const eventPinEnv = Object.assign({}, basePinEnv, {
+      eventX: comp._eventX != null ? comp._eventX : 0,
+      eventY: comp._eventY != null ? comp._eventY : 0,
+    });
+    for (const when of whenList) {
+      const key = CanvasComponent.whenKey(when.hitbox, when.event);
+      if (!comp.activeWhenKeys.has(key)) continue;
+      execFn(program, when.calls || [], drawCtx, {
+        logErrors: true,
+        skipOnError: true,
+        pinEnv: eventPinEnv,
+      });
+    }
   }
 
   _runDraw(comp, drawCtx, interp, drawOpts) {
@@ -288,11 +650,15 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
           this.reEvalPendingValue(p, key, re, c)
         ))
         : {};
-      execFn(program, calls, drawCtx, {
-        logErrors: true,
-        skipOnError: true,
-        pinEnv,
-      });
+      if (calls.length) {
+        execFn(program, calls, drawCtx, {
+          logErrors: true,
+          skipOnError: true,
+          pinEnv,
+        });
+      }
+      this._runWhenOverlays(comp, drawCtx, interp);
+      this._drawHitboxDebug(comp, drawCtx);
     } finally {
       comp._canvasDrawing = false;
       if (comp.busyRef) interp.setValueAtRef(comp.busyRef, '0');
@@ -340,7 +706,6 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     }
   }
 
-  /** Synchronous draw for tests (node). */
   static flushCanvas(comp, interp) {
     if (!comp || comp.type !== 'canvas') return;
     const handler = CanvasComponent._handlerInstance();
@@ -390,6 +755,9 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
         calls.push(...parsed);
       }
       comp._canvasRendererCalls = calls;
+      comp._canvasRendererBlocks = null;
+    } else if (!comp._canvasRendererCalls || !comp._canvasRendererCalls.length) {
+      throw Error(`canvas ${compName}: exec block requires renderer { }`);
     }
 
     const buildEnvFn = typeof canvasBuildPinEnv === 'function' ? canvasBuildPinEnv : null;
@@ -401,7 +769,6 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
     comp._lastPending = pending;
 
     this._scheduleDraw(comp, ctx);
-    comp._canvasRendererBlocks = null;
   }
 
   shouldApplyAfterPropertyBlock(propertyNames) {
@@ -417,6 +784,16 @@ var CanvasComponent = class CanvasComponent extends BuiltinComponent {
         ref: comp.busyRef || null,
         varName: `${a.var}:busy`,
         bitWidth: 1,
+      };
+    }
+    const pout = comp.hitboxPouts && comp.hitboxPouts[property];
+    if (pout && pout.ref) {
+      let val = ctx.getValueFromRef(pout.ref) || '0'.repeat(pout.bits);
+      return {
+        value: val,
+        ref: pout.ref,
+        varName: `${a.var}:${property}`,
+        bitWidth: pout.bits,
       };
     }
     return null;

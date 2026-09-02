@@ -59,9 +59,12 @@ var ComponentRegistry = class ComponentRegistry {
     return comp.getSupportedProperties().includes(property);
   }
 
-  supportsRedirect(type, redirectProp) {
+  supportsRedirect(type, redirectProp, compInstance) {
     const comp = this._components.get(type);
     if (!comp) return false;
+    if (compInstance && typeof comp.supportsRedirectProperty === 'function') {
+      if (comp.supportsRedirectProperty(redirectProp, compInstance)) return true;
+    }
     return comp.getRedirectProperties().includes(redirectProp);
   }
 };

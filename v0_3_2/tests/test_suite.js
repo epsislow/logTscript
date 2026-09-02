@@ -52010,6 +52010,7 @@ comp [canvas] .myCanvas:
 1wire mustWait = 0
 1wire go = 1
 .myCanvas:{
+    renderer { drawScene() }
     busy >= mustWait
     set = go
 }`;
@@ -52986,6 +52987,179 @@ comp [canvas] .myCanvas:
     const mock = createCanvasMockCtx();
     h.assertThrows('not a vector', function() {
       executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    });
+  });
+
+  const INLINE_CANVAS_HITBOX = `inline [canvas] .ui:
+
+    drawBtn(x, y, w, h, color) {
+        styleFill(color)
+        drawRect(x, y, w, h)
+    }
+
+    drawKnob(x, y) {
+        styleFill("ffcc00")
+        drawCircle(x, y, 6)
+    }
+
+:`;
+
+  const COMP_CANVAS_HITBOX = INLINE_CANVAS_HITBOX + `
+comp [canvas] .panel:
+    on: 1
+    width: 100
+    height: 60
+    bgColor: ^000000
+    hitbox {
+        btn: {
+            rect(10, 10, 30, 30)
+            touchType = 1
+            stroke("ffff00")
+            pout :press as btnPress
+        }
+        slider: {
+            rect(50, 10, 40, 40)
+            touchType = 1
+            stroke("00ffff")
+            pout :drag:eventX as dragX/s16
+            pout :release as sliderReleased
+        }
+    }
+    .ui {
+        initDraw {
+            drawBtn(10, 10, 30, 30, "333333")
+        }
+        renderer when(btn) {
+            drawBtn(10, 10, 30, 30, "ff0000")
+        }
+        renderer when(slider:drag) {
+            drawKnob(eventX, eventY)
+        }
+    }
+:
+`;
+
+  reg(4840, 'canvas', 'parse hitbox rect + pout', function(h, session) {
+    const src = COMP_CANVAS_HITBOX + `1wire go = 1\n.panel:{ renderer { drawBtn(10,10,30,30,"666") } set = go }`;
+    const p = new Parser(new Tokenizer(preprocessLoop(src)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('hitbox raw', !!stmts[1].comp.attributes.canvasHitboxRaw, true);
+    const parsed = parseCanvasHitboxBlock(stmts[1].comp.attributes.canvasHitboxRaw, 'test');
+    h.assert('btn zone', !!parsed.zones.btn, true);
+    h.assert('rect w', parsed.zones.btn.rect.w, 30);
+    h.assert('pout name', parsed.zones.btn.pouts[0].name, 'btnPress');
+  });
+
+  reg(4841, 'canvas', 'parse program block initDraw + when', function(h) {
+    const block = `initDraw { drawBtn(0,0,10,10,"0") }
+renderer when(btn:press) { drawBtn(0,0,10,10,"f") }
+renderer when(slider:drag) { drawKnob(eventX, eventY) }`;
+    const parsed = parseCanvasProgramBlock(block, 'test');
+    h.assert('initDraw', parsed.initDraw && parsed.initDraw.length, 1);
+    h.assert('when count', parsed.whenRenderers.length, 2);
+    h.assert('when event', parsed.whenRenderers[1].event, 'drag');
+  });
+
+  reg(4842, 'canvas', 'hitTestAt inside rect', function(h) {
+    const zones = { btn: { rect: { x: 10, y: 10, w: 30, h: 30 }, touchType: 1, pouts: [] } };
+    const hits = CanvasComponent.hitTestAt(zones, 20, 20);
+    h.assert('hit', hits.length, 1);
+    h.assert('name', hits[0].name, 'btn');
+  });
+
+  function runCanvasHitboxPressPout(h, session) {
+    const src = COMP_CANVAS_HITBOX + `
+1wire go = 1
+1wire outPress = 0
+.panel:{
+    renderer { drawBtn(10, 10, 30, 30, "666666") }
+    btnPress >= outPress
+    set = go
+}`;
+    const { interp } = session.run(src);
+    h.assert('initial pout', session.getCompProperty(interp, '.panel', 'btnPress'), '0');
+    session.triggerCanvasTouch(interp, '.panel', { x: 20, y: 20, phase: 'press' });
+    session._propagateIfNeeded(interp);
+    h.assert('press pout', session.getCompProperty(interp, '.panel', 'btnPress'), '1');
+    session.triggerCanvasTouch(interp, '.panel', { x: 20, y: 20, phase: 'release' });
+    session._propagateIfNeeded(interp);
+    h.assert('release pout', session.getCompProperty(interp, '.panel', 'btnPress'), '0');
+  }
+
+  regCanvasDual(4843, 4844, 'hitbox press pout touchType 1', runCanvasHitboxPressPout);
+
+  function runCanvasHitboxDragPout(h, session) {
+    const src = COMP_CANVAS_HITBOX + `
+1wire go = 1
+16wire outX = 0000000000000000
+.panel:{
+    renderer { drawBtn(10, 10, 30, 30, "666666") }
+    dragX >= outX
+    set = go
+}`;
+    const { interp } = session.run(src);
+    session.triggerCanvasTouch(interp, '.panel', { x: 60, y: 20, phase: 'press' });
+    session.triggerCanvasTouch(interp, '.panel', { x: 70, y: 25, phase: 'move' });
+    session._propagateIfNeeded(interp);
+    const comp = interp.components.get('.panel');
+    const pout = comp.hitboxPouts.dragX;
+    const bits = interp.getValueFromRef(pout.ref);
+    const decodeFn = typeof logicDecodeNumberBits === 'function' ? logicDecodeNumberBits : null;
+    const val = decodeFn ? decodeFn(bits, 's16') : parseInt(bits, 2);
+    h.assert('dragX updated', val, 70);
+    session.triggerCanvasTouch(interp, '.panel', { x: 70, y: 25, phase: 'release' });
+    session._propagateIfNeeded(interp);
+  }
+
+  regCanvasDual(4845, 4846, 'hitbox drag eventX pout s16', runCanvasHitboxDragPout);
+
+  function runCanvasWhenOverlay(h, session) {
+    const src = COMP_CANVAS_HITBOX + `
+1wire go = 1
+.panel:{
+    renderer { drawBtn(10, 10, 30, 30, "666666") }
+    set = go
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.panel');
+    const handler = session._ensureRegistry().get('canvas');
+    CanvasComponent.flushCanvas(comp, interp);
+    const mock = createCanvasMockCtx();
+    comp._canvasRendererCalls = parseCanvasRendererBlock('drawBtn(10, 10, 30, 30, "666666")');
+    handler._runDraw(comp, mock.ctx, interp, { clear: true });
+    const baseRed = mock.calls.filter((c) => c.op === 'fillRect' && c.fillStyle === '#666666').length;
+    session.triggerCanvasTouch(interp, '.panel', { x: 20, y: 20, phase: 'press' });
+    const mock2 = createCanvasMockCtx();
+    handler._runDraw(comp, mock2.ctx, interp, { clear: true });
+    const pressedRed = mock2.calls.filter((c) => c.op === 'fillRect' && c.fillStyle === '#ff0000').length;
+    h.assert('base drawn', baseRed >= 1, true);
+    h.assert('when overlay', pressedRed >= 1, true);
+  }
+
+  regCanvasDual(4847, 4848, 'renderer when overlay on press', runCanvasWhenOverlay);
+
+  reg(4849, 'canvas', 'exec without renderer errors', function(h, session) {
+    const src = INLINE_CANVAS_DEMO + `
+comp [canvas] .bad:
+    on: 1
+    width: 80
+    height: 60
+    .demo { }
+:
+1wire go = 1
+.bad:{ set = go }`;
+    h.assertThrows('requires renderer', function() {
+      session.run(src);
+    });
+  });
+
+  reg(4850, 'canvas', 'hitbox parse error duplicate pout', function(h) {
+    h.assertThrows('duplicate hitbox pout', function() {
+      parseCanvasHitboxBlock(`a: {
+        rect(0,0,10,10)
+        pout :press as x
+        pout :press as x
+      }`, 'test');
     });
   });
 

@@ -3291,7 +3291,7 @@ class Interpreter {
       ? (this.componentRegistry
         ? this.componentRegistry.supportsProperty(comp.type, sourceProp, comp.attributes)
         : true)
-      : (this.componentRegistry && this.componentRegistry.supportsRedirect(comp.type, sourceProp));
+      : (this.componentRegistry && this.componentRegistry.supportsRedirect(comp.type, sourceProp, comp));
     if (!supports) {
       throw Error(`Component ${component} (type: ${comp.type}) does not support :${sourceProp} property`);
     }
@@ -15017,7 +15017,7 @@ if (s.assignment) {
       const poutName = prop.poutName;
       const compForPout = this.components.get(component);
       if (!compForPout || compForPout.type === 'logic') continue;
-      if (!this.componentRegistry || !this.componentRegistry.supportsRedirect(compForPout.type, poutName)) {
+      if (!this.componentRegistry || !this.componentRegistry.supportsRedirect(compForPout.type, poutName, compForPout)) {
         throw Error(`Component ${component} (type: ${compForPout.type}) does not support :${poutName} property`);
       }
       this._applyComponentWireRedirect(component, prop, poutName);

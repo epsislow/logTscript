@@ -470,6 +470,7 @@ comp [canvas] .dotPanel:
 | Page | Content |
 |------|---------|
 | [inline-canvas.md](inline-canvas.md) | Method definitions |
+| [comp-canvas-hitbox.md](comp-canvas-hitbox.md) | Hit zones, touch pouts, `renderer when` overlays |
 | [canvas-builtins.md](canvas-builtins.md) | Draw API reference |
 | [logic-observers.md](logic-observers.md) | `observe` pins → wires (e2e with canvas) |
 | [clcd.md](clcd.md) | Symbol-based display (different from free drawing) |

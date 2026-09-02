@@ -5,7 +5,7 @@ const CANVAS_FORBIDDEN_IDS = new Set([
   'and', 'or', 'not',
 ]);
 
-const CANVAS_KEYWORDS = new Set(['if', 'else', 'for', 'while', 'break', 'continue']);
+const CANVAS_KEYWORDS = new Set(['if', 'else', 'for', 'while', 'break', 'continue', 'when']);
 
 const CANVAS_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 const CANVAS_LOGIC_OPS = new Set(['&&', '||']);
@@ -124,7 +124,7 @@ function canvasTokenize(src) {
       i += 2;
       continue;
     }
-    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === '[' || ch === ']') {
+    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === ':' || ch === '[' || ch === ']') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
       continue;
@@ -159,10 +159,11 @@ function canvasTokenize(src) {
 }
 
 class CanvasParser {
-  constructor(tokens, ctxLabel) {
+  constructor(tokens, ctxLabel, options) {
     this.tokens = tokens;
     this.pos = 0;
     this.ctxLabel = ctxLabel || 'canvas';
+    this.allowEventLocals = !!(options && options.allowEventLocals);
   }
 
   peek() {
@@ -468,6 +469,9 @@ class CanvasParser {
     }
     if (this.match('ID')) {
       const pinName = this.tokens[this.pos - 1].value;
+      if (this.allowEventLocals && (pinName === 'eventX' || pinName === 'eventY')) {
+        return { kind: 'wireRef', pinName, bindType: 'number', numberFormat: null };
+      }
       if (this.match('SYM', '/')) {
         const fmtTok = this.eat('ID').value;
         const parseFmt = typeof canvasParseFormatToken === 'function'
@@ -582,8 +586,10 @@ class CanvasParser {
 
   parseRendererBody() {
     const calls = [];
-    while (!this.match('EOF')) {
+    while (true) {
       const t = this.peek();
+      if (!t || t.type === 'EOF') break;
+      if (t.type === 'SYM' && t.value === '}') break;
       if (t.type === 'ID') {
         calls.push({ kind: 'call', ...this.parseCall(true) });
         continue;
@@ -591,6 +597,63 @@ class CanvasParser {
       canvasError(`expected renderer call, got ${t.type} '${t.value}'`, t.line);
     }
     return calls;
+  }
+
+  parseRendererBraceBody() {
+    this.eat('SYM', '{');
+    const calls = this.parseRendererBody();
+    this.eat('SYM', '}');
+    return calls;
+  }
+
+  parseWhenRef() {
+    this.eat('KW', 'when');
+    this.eat('SYM', '(');
+    const hitboxTok = this.eat('ID');
+    let event = 'press';
+    if (this.peek().type === 'SYM' && this.peek().value === ':') {
+      this.eat('SYM', ':');
+      const evTok = this.eat('ID');
+      event = evTok.value;
+      const allowed = typeof HITBOX_EVENTS !== 'undefined' && HITBOX_EVENTS
+        ? HITBOX_EVENTS
+        : new Set(['press', 'release', 'drag', 'move']);
+      if (!allowed.has(event)) {
+        canvasError(`unknown when event '${event}'`, evTok.line);
+      }
+    }
+    this.eat('SYM', ')');
+    return { hitbox: hitboxTok.value, event, line: hitboxTok.line };
+  }
+
+  parseProgramBlock() {
+    const result = { initDraw: null, whenRenderers: [] };
+    while (!this.match('EOF')) {
+      const t = this.peek();
+      if (t.type === 'ID' && t.value === 'initDraw') {
+        this.eat('ID');
+        const calls = this.parseRendererBraceBody();
+        result.initDraw = calls;
+        continue;
+      }
+      if (t.type === 'ID' && t.value === 'renderer') {
+        this.eat('ID');
+        const whenRef = this.parseWhenRef();
+        const saved = this.allowEventLocals;
+        this.allowEventLocals = true;
+        const calls = this.parseRendererBraceBody();
+        this.allowEventLocals = saved;
+        result.whenRenderers.push({
+          hitbox: whenRef.hitbox,
+          event: whenRef.event,
+          calls,
+          line: whenRef.line,
+        });
+        continue;
+      }
+      canvasError(`expected initDraw or renderer when, got ${t.type} '${t.value}'`, t.line);
+    }
+    return result;
   }
 }
 
@@ -602,12 +665,20 @@ function parseCanvasBody(bodyRaw, ctxLabel) {
   return parser.parseProgram();
 }
 
-function parseCanvasRendererBlock(bodyRaw, ctxLabel) {
+function parseCanvasRendererBlock(bodyRaw, ctxLabel, options) {
   const src = (bodyRaw || '').trim();
   if (!src) return [];
   const tokens = canvasTokenize(src);
-  const parser = new CanvasParser(tokens, ctxLabel);
+  const parser = new CanvasParser(tokens, ctxLabel, options);
   return parser.parseRendererBody();
+}
+
+function parseCanvasProgramBlock(bodyRaw, ctxLabel) {
+  const src = (bodyRaw || '').trim();
+  if (!src) return { initDraw: null, whenRenderers: [] };
+  const tokens = canvasTokenize(src);
+  const parser = new CanvasParser(tokens, ctxLabel);
+  return parser.parseProgramBlock();
 }
 
 function canvasValidateColorLiteral(value, line) {
@@ -626,6 +697,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     parseCanvasBody,
     parseCanvasRendererBlock,
+    parseCanvasProgramBlock,
     canvasTokenize,
     canvasValidateColorLiteral,
     CANVAS_BUILTINS,

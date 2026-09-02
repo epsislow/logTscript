@@ -179,7 +179,13 @@
           comp.touchHandler.onPress(x, y);
         } else if (phase === 'release' && typeof comp.touchHandler.onRelease === 'function') {
           comp.touchHandler.onRelease(x, y);
+        } else if (phase === 'move' && typeof comp.touchHandler.onMove === 'function') {
+          comp.touchHandler.onMove(x, y);
         }
+      },
+
+      triggerCanvasTouch(interp, compName, opts) {
+        this.triggerClcdTouch(interp, compName, opts);
       },
 
       triggerKeyPress(interp, compName, opts) {

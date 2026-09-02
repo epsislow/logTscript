@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11810,6 +11810,300 @@ peek(touchOut)
 - [seven-seg.md](seven-seg.md) — 7-segment component
 - [components.md](components.md)
 `,
+    'comp-canvas-hitbox.md': `# Canvas hitbox — \`hitbox { }\`, \`initDraw\`, \`renderer when\`
+
+Interactive **\`comp [canvas]\`** adds pointer hit zones on the HTML canvas widget, optional **pouts** for touch events, and **conditional draw overlays** in the linked \`inline [canvas]\` program block.
+
+Base drawing pipeline → [comp-canvas.md](comp-canvas.md). Method definitions → [inline-canvas.md](inline-canvas.md).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (\`on: 1\` runs the first \`set\` when you click **Load & Run**). Click or drag on the canvas in **Devices** to exercise hit zones.
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **\`hitbox { }\`** | Comp body — named zones with literal \`rect(x,y,w,h)\` |
+| **\`touchType\`** | \`1\` momentary, \`2\` pulse, \`3\` latch/toggle (same semantics as CLCD) |
+| **\`pout\`** | \`pout :event as name\` or \`pout :drag:eventX as dragX/s16\` |
+| **Program block** | \`.inline { initDraw { } renderer when(zone) { } }\` |
+| **\`renderer when\`** | Overlay draw while event active — **no** background clear |
+| **\`eventX\` / \`eventY\`** | Numbers in \`when\` body — pointer position in canvas pixels |
+| **Exec block** | **\`renderer { }\` required** whenever \`set\` / \`draw\` schedules a redraw |
+| **Redirect** | \`btnPress >= outWire\` in exec (same as other component pouts) |
+| **\`stroke\`** | Optional debug border around zone (\`"rrggbb"\`) |
+
+---
+
+## Architecture
+
+\`\`\`mermaid
+flowchart LR
+  subgraph compBody [comp body]
+    HB[hitbox zones + pouts]
+    PB[inline program block]
+  end
+  subgraph exec [exec block]
+    R[renderer base scene]
+    P[pout redirects]
+    S[set / draw]
+  end
+  HB -->|pointer| Pouts[pout values]
+  PB -->|initDraw once| Widget[canvas widget]
+  R --> Widget
+  PB -->|when overlay| Widget
+  S --> R
+  Pouts --> P
+\`\`\`
+
+| Layer | Where | Role |
+|-------|-------|------|
+| **Hit zones** | \`hitbox { }\` on comp | Parse-time rectangles; pointer hit-test |
+| **Pouts** | per zone | \`press\`, \`release\`, \`drag\`, \`move\` (+ \`eventX\`/\`eventY\` fields) |
+| **\`initDraw\`** | inline program block | Runs **once** after widget creation (static chrome) |
+| **\`renderer when\`** | inline program block | Drawn **on top** of exec \`renderer\` while event is active |
+| **Exec \`renderer\`** | \`.comp:{ }\` | Base scene; cleared to \`bgColor\` unless \`clear = 0\` |
+
+---
+
+## \`hitbox { }\` — zones and pouts
+
+Declare zones in the **component body** (not in the inline):
+
+\`\`\`logts
+comp [canvas] .panel:
+    on: 1
+    width: 100
+    height: 60
+    bgColor: ^000000
+
+    hitbox {
+        btn: {
+            rect(10, 10, 30, 30)
+            touchType = 1
+            stroke("ffff00")
+            pout :press as btnPress
+        }
+        slider: {
+            rect(50, 10, 40, 40)
+            touchType = 1
+            stroke("00ffff")
+            pout :drag:eventX as dragX/s16
+            pout :release as sliderReleased
+        }
+    }
+
+    .ui { }
+:
+\`\`\`
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| **\`rect(x,y,w,h)\`** | **Yes** | Axis-aligned hit box — **literal** integers only |
+| **\`touchType\`** | No | \`1\` (default), \`2\`, or \`3\` — see table below |
+| **\`stroke("rrggbb")\`** | No | 1 px debug outline while drawing |
+| **\`pout :event as name\`** | No | Bool pout for \`press\`, \`release\`, \`drag\`, or \`move\` |
+| **\`pout :drag:eventX as pin/s16\`** | No | Numeric pout with explicit format (\`/s16\`, \`/ascii\`, …) |
+
+Pout names must be unique across the whole \`hitbox\` block.
+
+### \`touchType\` (per zone)
+
+Same behaviour as CLCD symbol touch — see [clcd.md](clcd.md#touchtype-1-2-and-3).
+
+| Value | Behaviour |
+|-------|-----------|
+| **\`1\`** | Momentary — active while pointer is down inside zone |
+| **\`2\`** | Pulse — brief press on pointer down |
+| **\`3\`** | Latch / toggle — each press flips latched state |
+
+---
+
+## Inline program block — \`initDraw\` and \`renderer when\`
+
+The linked \`inline [canvas]\` ref uses a **program block** (curly body) instead of an empty \`{ }\`:
+
+\`\`\`logts
+    .ui {
+        initDraw {
+            drawBtn(10, 10, 30, 30, "333333")
+        }
+        renderer when(btn) {
+            drawBtn(10, 10, 30, 30, "ff0000")
+        }
+        renderer when(slider:drag) {
+            drawKnob(eventX, eventY)
+        }
+    }
+\`\`\`
+
+| Block | When it runs | Clear behaviour |
+|-------|--------------|-----------------|
+| **\`initDraw { }\`** | Once after the canvas widget is created | Full clear + draw |
+| **\`renderer when(zone)\`** | While \`zone\` **press** is active (default event) | **Overlay** — no bg clear |
+| **\`renderer when(zone:event)\`** | While that event is active (\`press\`, \`release\`, \`drag\`, \`move\`) | **Overlay** |
+
+Inside \`renderer when(...)\`, **\`eventX\`** and **\`eventY\`** are plain numbers (pointer position in canvas coordinates). Use them as method arguments — e.g. \`drawKnob(eventX, eventY)\`.
+
+Omit \`:event\` to mean **\`:press\`** — \`renderer when(btn)\` ≡ \`renderer when(btn:press)\`.
+
+---
+
+## Exec block — base renderer, pouts, \`set\`
+
+Every exec block that schedules drawing **must** include a **\`renderer { }\`** block (even if it only redirects pouts):
+
+\`\`\`logts
+1wire go = 1
+1wire outPress = 0
+
+.panel:{
+    renderer { drawBtn(10, 10, 30, 30, "666666") }
+    btnPress >= outPress
+    set = go
+}
+\`\`\`
+
+| Pin / stmt | Role |
+|------------|------|
+| **\`renderer { }\`** | Base scene (cleared to \`bgColor\` before draw) |
+| **\`btnPress >= outPress\`** | Redirect hitbox pout to a wire |
+| **\`set\`** | Schedule redraw (coalesced) |
+
+On pointer **press** inside \`btn\`, the canvas redraws: base \`renderer\`, then the red \`renderer when(btn)\` overlay. On **release**, \`:press\` pout returns to \`0\`.
+
+---
+
+## Runnable — button + press overlay
+
+\`\`\`logts-play
+inline [canvas] .ui:
+
+    drawBtn(x, y, w, h, color) {
+        styleFill(color)
+        drawRect(x, y, w, h)
+    }
+
+:
+
+comp [canvas] .panel:
+    on: 1
+    width: 100
+    height: 60
+    bgColor: ^000000
+
+    hitbox {
+        btn: {
+            rect(10, 10, 30, 30)
+            touchType = 1
+            stroke("ffff00")
+            pout :press as btnPress
+        }
+    }
+
+    .ui {
+        initDraw {
+            drawBtn(10, 10, 30, 30, "333333")
+        }
+        renderer when(btn) {
+            drawBtn(10, 10, 30, 30, "ff0000")
+        }
+    }
+
+:
+
+1wire go = 1
+1wire outPress = 0
+
+.panel:{
+    renderer { drawBtn(10, 10, 30, 30, "666666") }
+    btnPress >= outPress
+    set = go
+}
+\`\`\`
+
+**Load & Run**, then click the grey button in **Devices** — it turns red while held; \`outPress\` wire becomes \`1\`.
+
+---
+
+## Runnable — slider drag with \`eventX\`
+
+\`\`\`logts-play
+inline [canvas] .ui:
+
+    drawTrack(x, y, w, h) {
+        styleFill("444444")
+        drawRect(x, y, w, h)
+    }
+
+    drawKnob(x, y) {
+        styleFill("ffcc00")
+        drawCircle(x, y, 6)
+    }
+
+:
+
+comp [canvas] .panel:
+    on: 1
+    width: 100
+    height: 60
+    bgColor: ^000000
+
+    hitbox {
+        slider: {
+            rect(50, 10, 40, 40)
+            touchType = 1
+            pout :drag:eventX as dragX/s16
+        }
+    }
+
+    .ui {
+        initDraw {
+            drawTrack(50, 10, 40, 40)
+        }
+        renderer when(slider:drag) {
+            drawKnob(eventX, 30)
+        }
+    }
+
+:
+
+1wire go = 1
+16wire outX = 0000000000000000
+
+.panel:{
+    renderer { drawTrack(50, 10, 40, 40) }
+    dragX >= outX
+    set = go
+}
+\`\`\`
+
+**Load & Run**, then press and drag inside the track — yellow knob follows \`eventX\`; \`outX\` wire tracks horizontal position.
+
+---
+
+## Errors (parse / elaboration)
+
+| Situation | Result |
+|-----------|--------|
+| Zone without \`rect(...)\` | Parse error |
+| Duplicate pout name | Parse error |
+| Unknown \`pout :event\` | Parse error |
+| Exec block with \`set\` / \`draw\` but no \`renderer { }\` | Elaboration error |
+| Redirect unknown pout | Elaboration error |
+
+---
+
+## Related pages
+
+| Page | Content |
+|------|---------|
+| [comp-canvas.md](comp-canvas.md) | Base \`comp [canvas]\` — \`renderer\`, \`busy\`, \`clear\` |
+| [inline-canvas.md](inline-canvas.md) | Draw method definitions |
+| [canvas-builtins.md](canvas-builtins.md) | \`drawRect\`, \`styleFill\`, … |
+| [clcd.md](clcd.md) | \`touchType\` semantics (shared with hitbox) |
+`,
     'comp-canvas.md': `# Component canvas — \`comp [canvas]\`
 
 \`comp [canvas]\` is the **runtime layer** for 2D drawing: an HTML \`<canvas>\` in the Devices panel, linked to an \`inline [canvas]\` definition.
@@ -12282,6 +12576,7 @@ comp [canvas] .dotPanel:
 | Page | Content |
 |------|---------|
 | [inline-canvas.md](inline-canvas.md) | Method definitions |
+| [comp-canvas-hitbox.md](comp-canvas-hitbox.md) | Hit zones, touch pouts, \`renderer when\` overlays |
 | [canvas-builtins.md](canvas-builtins.md) | Draw API reference |
 | [logic-observers.md](logic-observers.md) | \`observe\` pins → wires (e2e with canvas) |
 | [clcd.md](clcd.md) | Symbol-based display (different from free drawing) |
