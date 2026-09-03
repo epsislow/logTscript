@@ -74,11 +74,11 @@ inline [asm] .a32:
   set: arm-a32
   :
 
-64wire mem = .a32 {
+128wire mem = .a32 {
   mov r0, 0
   mov r1, 42
-  str r1, [r0, #0]
-  ldr r2, [r0, #0]
+  str r1, [r0, 0]
+  ldr r2, [r0, 0]
 }
 show(mem; asm)
 ```

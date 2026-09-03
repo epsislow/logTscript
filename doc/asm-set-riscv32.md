@@ -96,7 +96,7 @@ inline [asm] .rv:
   set: riscv32
   :
 
-64wire p = .rv {
+96wire p = .rv {
   addi x2, x0, 100
   sw x1, 0(x2)
   lw x3, 0(x2)
@@ -270,7 +270,7 @@ comp [cpu] .u:
     length: 4
   prog:
     depth: 32
-    length: 4
+    length: 5
     = .rv {
       addi x1, x0, 6
       addi x2, x0, 7

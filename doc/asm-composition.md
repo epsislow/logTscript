@@ -178,7 +178,7 @@ inline [asm] .th:
   :
 
 16wire init = .th { movs r0, 1 }
-32wire main = .th {
+48wire main = .th {
   use init
   movs r1, 2
   adds r2, r0, r1

@@ -253,7 +253,10 @@ inline [asm] .rv:
 
 comp [cpu] .u:
   isa: .rv
-  registers: 2
+  registers: 32
+  ram:
+    depth: 32
+    length: 16
   on: 1
   prog:
     depth: 32

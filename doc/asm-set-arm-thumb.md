@@ -58,7 +58,7 @@ inline [asm] .th:
   set: arm-thumb
   :
 
-32wire p = .th {
+64wire p = .th {
   movs r0, 10
   movs r1, 3
   adds r2, r0, r1
@@ -76,7 +76,7 @@ inline [asm] .th:
   set: arm-thumb
   :
 
-32wire p = .th {
+64wire p = .th {
   movs r0, 0
 again:
   adds r0, r0, r1
@@ -156,7 +156,7 @@ inline [asm] .th:
   set: arm-thumb
   :
 
-32wire p = .th {
+64wire p = .th {
   movs r1, 0
   movs r2, 42
   str r2, 0, r1
