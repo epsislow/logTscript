@@ -367,8 +367,118 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .filelist .dir { padding: 4px; color: yellowgreen;  cursor: pointer; }
 .filelist .file:hover { color: cyan; }
 .filelist .dir:hover { color: yellow; }
-// button.cls { background-color: #7a7; }
-// button.cls:hover { background-color: #afa; }
+/*
+ button.cls { background-color: #7a7; }
+ button.cls:hover { background-color: #afa; }
+ */
+
+/* Containerul principal al cardului */
+.cm-comp-card-main {
+  cursor: auto;
+  background: #002800;
+  border: 1px solid #444;
+  padding: 12px;
+  position: relative;
+  width: 400px;
+  font-family: monospace;
+  margin: 10px 0;
+  font-size: 15px;
+  color: #0f0;
+  box-sizing: border-box;
+  margin-left: 15px;
+}
+
+/* Butonul de ștergere X */
+.cm-comp-card-delete {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  /*border: 2px solid #f00;
+  background: #fff;*/
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* Header-ul care conține Numele și Tipul */
+.cm-comp-card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+/* Inputul pentru Nume (.net) */
+.cm-comp-card-name-input {
+  border: 2px solid #16a34a;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+  font-size: 14px;
+  width: 120px;
+}
+
+/* Selectorul Dropdown pentru Componente */
+.cm-comp-card-type-select {
+  color: #5583fb;
+  font-weight: bold;
+  margin-right: 11px;
+  background: #000;
+  border: 1px solid #444;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Option-urile din interiorul dropdown-ului */
+.cm-comp-card-type-select option {
+  background: #000;
+  color: #fff;
+}
+.cm-comp-card-type-select optgroup {
+  background: #111;
+  color: #5583fb;
+  font-style: normal;
+}
+
+/* Grid-ul pentru atribute (2 coloane egale) */
+.cm-comp-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+/* Fiecare rând/element din grid */
+.cm-comp-card-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* Stilul comun pentru inputurile de atribute */
+.cm-comp-card-attribute-input {
+  border: 2px solid #ea580c;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-weight: bold;
+  background-color: #000;
+  color: #fff;
+  font-family: monospace;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+
 .hidden { display: none;}
 
 .btn {

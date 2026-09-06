@@ -598,6 +598,186 @@ function updateStepControlsUI() {
   });
 }
 
+const LOGT_COMPONENTS_CATALOG = {
+  "Interactive inputs": ["switch", "key", "keyboard", "dip", "ioport", "rotary", "slider", "sensor", "scanner"], //
+  "Displays": ["led", "bar", "7seg", "14seg", "lcd", "clcd", "canvas", "alu", "terminal", "dots", "motor", "servo"], //
+  "Arithmetic & logic": ["adder", "subtract", "multiplier", "divider", "shifter", "counter"], //
+  "Storage & timing": ["mem", "cpu", "plc", "dma", "reg", "queue", "network", "stack", "osc"] //
+};
+
+function attachLogTScriptWidgets(editor) {
+  let activeWidgets = [];
+
+  function updateWidgets() {
+    activeWidgets.forEach(w => w.clear());
+    activeWidgets = [];
+
+    const lineCount = editor.lineCount();
+    let currentBlock = null;
+
+    for (let i = 0; i < lineCount; i++) {
+      const lineText = editor.getLine(i);
+
+      // Potrivire flexibilă pentru orice tip de componentă din catalog
+      const matchStart = lineText.match(/comp\s+\[([^\]]+)\]\s+([\.\w]+):/);
+      if (matchStart) {
+        currentBlock = {
+          startLine: i,
+          type: matchStart[1].trim(),
+          name: matchStart[2].trim(),
+          data: {}
+        };
+        continue;
+      }
+
+      if (currentBlock) {
+        const matchProp = lineText.match(/^\s*([\w\-]+):\s*(.+)/);
+        if (matchProp) {
+          let val = matchProp[2].trim();
+          // Curățăm ghilimelele dacă valoarea este un string (ex: 'chat-demo')
+          if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+            val = val.substring(1, val.length - 1);
+          }
+          currentBlock.data[matchProp[1].trim()] = val;
+        }
+
+        if (lineText.trim() === ":") {
+          currentBlock.endLine = i;
+          createComponentCard(editor, currentBlock);
+          currentBlock = null;
+        }
+      }
+    }
+  }
+
+  function createComponentCard(editor, block) {
+    const div = document.createElement("div");
+    div.className = "cm-comp-card-main";
+
+    // 1. Generăm Selectorul Inteligent cu Categoriile din Documentație
+    let selectHTML = `<select class="cm-comp-card-type-select">`;
+    for (const [category, items] of Object.entries(LOGT_COMPONENTS_CATALOG)) {
+      selectHTML += `<optgroup label="${category}">`;
+      items.forEach(item => {
+        const selected = item === block.type ? "selected" : "";
+        selectHTML += `<option value="${item}" ${selected}>[${item}]</option>`;
+      });
+      selectHTML += `</optgroup>`;
+    }
+    selectHTML += `</select>`;
+
+    // 2. Generăm Grid-ul Dinamic pentru Atribute (Stânga/Dreapta)
+    let gridHTML = `<div class="cm-comp-card-grid">`;
+    for (const [key, val] of Object.entries(block.data)) {
+      const isNumber = !isNaN(val) && val !== "";
+      const inputType = 'text'; // isNumber ? "number" : "text";
+      const inputWidth = isNumber ? (key === "channel" ? "100px" : "55px") : "100px";
+
+      gridHTML += `
+        <div class="cm-comp-card-item">
+          <span>${key}</span>
+          <input type="${inputType}" data-attr="${key}" class="cm-comp-card-attribute-input" value="${val}" style="width: ${inputWidth};">
+        </div>
+      `;
+    }
+    gridHTML += `</div>`;
+
+    // 3. Asamblăm HTML-ul final în interiorul cardului
+    div.innerHTML = `
+      <button class="cm-comp-card-delete">❌</button>
+      <div class="cm-comp-card-header">
+        <input type="text" class="cm-comp-card-name-input" value="${block.name}">
+        ${selectHTML}
+      </div>
+      ${gridHTML}
+    `;
+
+    // Funcția centrală de sincronizare UI -> CodeMirror Text
+    const updateCodeInEditor = () => {
+      const newName = div.querySelector(".cm-comp-card-name-input").value.trim();
+      const newType = div.querySelector(".cm-comp-card-type-select").value;
+      
+      const updatedLines = [`comp [${newType}] ${newName.startsWith('.') ? newName : '.' + newName}:`];
+
+      // Colectăm valorile din inputurile din grid
+      div.querySelectorAll(".cm-comp-card-attribute-input").forEach(input => {
+        const attrName = input.getAttribute("data-attr");
+        let attrVal = input.value;
+        
+        // Dacă este string pur (nu e număr), îl salvăm cu ghilimele simple înapoi în cod
+        if (input.type === "text" && isNaN(attrVal)) {
+          attrVal = `'${attrVal}'`;
+        }
+        updatedLines.push(`  ${attrName}: ${attrVal}`);
+      });
+      
+      updatedLines.push("  :");
+
+      editor.operation(() => {
+        editor.replaceRange(
+          updatedLines.join("\n"),
+          { line: block.startLine, ch: 0 },
+          { line: block.endLine, ch: editor.getLine(block.endLine).length }
+        );
+      });
+    };
+
+    // Atașăm evenimente pe toate elementele interactive și oprim propagarea în CodeMirror
+    div.querySelectorAll("input, select").forEach(elem => {
+      elem.addEventListener("change", updateCodeInEditor);
+      elem.addEventListener("keydown", (e) => e.stopPropagation());
+    });
+
+    // Event handler pentru Butonul de Ștergere (X)
+    div.querySelector(".cm-comp-card-delete").addEventListener("click", () => {
+      editor.replaceRange(
+        "",
+        { line: block.startLine, ch: 0 },
+        { line: block.endLine + 1, ch: 0 }
+      );
+    });
+
+    // Ascundem textul original și injectăm cardul sub linie
+    const marker = editor.markText(
+      { line: block.startLine, ch: 0 },
+      { line: block.endLine, ch: editor.getLine(block.endLine).length },
+      { collapsed: true }
+    );
+    activeWidgets.push(marker);
+
+    const lineWidget = editor.addLineWidget(block.startLine, div, { coverGutter: false, noHScroll: true });
+    activeWidgets.push(lineWidget);
+  }
+
+  editor.on("change", () => {
+    editor.operation(updateWidgets);
+  });
+
+  updateWidgets();
+}
+
+function editorOnSpace(editor) {
+  // Adaugă asta imediat după definirea editorului tău CodeMirror
+  editor.setOption("extraKeys", {
+    "Space": function(cm) {
+      const cursor = cm.getCursor();
+      const lineText = cm.getLine(cursor.line).substring(0, cursor.ch);
+
+      // Dacă utilizatorul a scris exact "comp" și acum a apăsat Space
+      if (lineText.trim() === "comp") {
+        const template = ` [network] .net:\n  width: 100\n  length: 5\n  channel: 'demo'\n  on: 0\n  :`;
+        cm.replaceRange(template, cursor);
+        
+        // Mutăm cursorul frumos după introducere
+        cm.setCursor({ line: cursor.line, ch: cursor.ch + template.length });
+      } else {
+        // Altfel, lăsăm spațiul normal să se comporte cum trebuie
+        return CodeMirror.Pass;
+      }
+    }
+  });
+}
+
 async function init() {
   initFiles();
   const elCode = document.getElementById('code');
@@ -630,6 +810,9 @@ async function init() {
     lineWrapping: false,
     extraKeys: { "Ctrl-Space": "autocomplete" }
   });
+
+  attachLogTScriptWidgets(cmEditor);
+  editorOnSpace(cmEditor);
 
   window.code = {
     get value()  { return cmEditor.getValue(); },
