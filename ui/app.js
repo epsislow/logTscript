@@ -672,21 +672,17 @@ function updateCompCardWidgetsToggleUI() {
 }
 
 function editorOnSpace(editor) {
-  // Adaugă asta imediat după definirea editorului tău CodeMirror
   editor.setOption("extraKeys", {
     "Space": function(cm) {
       const cursor = cm.getCursor();
       const lineText = cm.getLine(cursor.line).substring(0, cursor.ch);
 
-      // Dacă utilizatorul a scris exact "comp" și acum a apăsat Space (doar cu Cards activ)
       if (lineText.trim() === "comp" && isCompCardWidgetsEnabled()) {
-        const template = ` [key] .name:\n  :`;
+        const template = ` [key] .:\n  :\n`;
+        const startLine = cursor.line;
         cm.replaceRange(template, cursor);
-        
-        // Mutăm cursorul frumos după introducere
-        cm.setCursor({ line: cursor.line, ch: cursor.ch + template.length });
+        setTimeout(function () { focusCompCardNameAtLine(startLine); }, 0);
       } else {
-        // Altfel, lăsăm spațiul normal să se comporte cum trebuie
         return CodeMirror.Pass;
       }
     }

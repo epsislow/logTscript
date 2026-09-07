@@ -1747,8 +1747,8 @@
       if (debounceTimer) {
         clearTimeout(debounceTimer);
         debounceTimer = null;
-        updateWidgets();
       }
+      updateWidgets();
       let widget = active.get(line + ':0');
       if (!widget) {
         active.forEach(function (entry) {

@@ -828,8 +828,11 @@ function insertComp(name) {
     return;
   }
   const startLine = cmEditor.getCursor('from').line;
-  insertTextAtCursor(cmEditor, snippets[name]);
-  if (typeof focusCompCardNameAtLine === 'function') {
+  let text = snippets[name];
+  const cardsOn = typeof isCompCardWidgetsEnabled === 'function' && isCompCardWidgetsEnabled();
+  if (cardsOn && !text.endsWith('\n')) text += '\n';
+  insertTextAtCursor(cmEditor, text);
+  if (cardsOn && typeof focusCompCardNameAtLine === 'function') {
     focusCompCardNameAtLine(startLine);
   }
 }
