@@ -18,7 +18,7 @@ comp [clcd] .name:
   bgColor: ^000000
   bgColorSym: ^ffff00
   nl
-  = {
+  symbols {
     symbolName:
       x: 10
       y: 20
@@ -54,7 +54,7 @@ comp [clcd] .panel::
 
 Component-level and per-symbol `color` / `bgColor` accept hex `^RRGGBB` or a wire name (snapshot at declaration). See [component-color-attributes.md](component-color-attributes.md).
 
-## Symbol fields (`= { … }`)
+## Symbol fields (`symbols { … }`)
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -166,7 +166,7 @@ Per symbol with `bitOut`, add a quoted **`hotkey`** string. While the **Devices*
 ```logts-play
 comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :
     power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
   }
@@ -182,7 +182,7 @@ show(out)
 ```logts-play
 comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "w" width: 22 height: 22 :
     power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
   }
@@ -245,7 +245,7 @@ For **touch screen** examples, use **Load & Run**, then **tap** symbols on the C
 
 ```logts-play
 comp [clcd] .status:
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     wifi: x:50 y:10 bit:1 :
     warning: x:90 y:10 bit:2 :
@@ -298,7 +298,7 @@ comp [clcd] .status:
   height: 60
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     wifi: x:50 y:10 bit:1 :
     warning: x:90 y:10 bit:2 color:^ffaa00 bgColor:^332200 :
@@ -317,7 +317,7 @@ comp [clcd] .status:
 comp [clcd] .battery:
   width: 120
   height: 50
-  = {
+  symbols {
     battery: x:10 y:10 bit:0 :
     charging: x:60 y:10 bit:1 :
   }
@@ -337,7 +337,7 @@ comp [clcd] .ui:
   height: 50
   color: ^00ff00
   bgColor: ^002200
-  = {
+  symbols {
     label:
       x: 8
       y: 6
@@ -372,7 +372,7 @@ comp [clcd] .ui:
 
 ```logts-play
 comp [clcd] .digit:
-  = {
+  symbols {
     digit7: x:10 y:10 bits:0-6 :
     dp: x:60 y:10 bit:7 :
   }
@@ -390,7 +390,7 @@ comp [clcd] .digit:
 comp [clcd] .display:
   width: 160
   height: 80
-  = {
+  symbols {
     digit7:
       x: 10
       y: 10
@@ -438,7 +438,7 @@ comp [clcd] .panel:
   height: 70
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     wifi: x: 10 y: 15 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
     bell: x: 60 y: 15 bit: 1 bitOut: 1 touchType: 2 width: 22 height: 22 :
     power: x: 110 y: 15 bit: 2 bitOut: 2 touchType: 3 width: 22 height: 22 :
@@ -464,7 +464,7 @@ comp [clcd] .panel:
   height: 80
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     wifi: x: 10 y: 20 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
     bell: x: 45 y: 20 bit: 1 bitOut: 1 touchType: 1 width: 22 height: 22 :
     warning: x: 80 y: 20 bit: 2 bitOut: 2 touchType: 1 width: 22 height: 22 :
@@ -494,7 +494,7 @@ comp [clcd] .panel:
   height: 60
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     power: x: 10 y: 15 bit: 0 bitOut: 0 touchType: 3 width: 22 height: 22 :
     wifi: x: 55 y: 15 bit: 1 bitOut: 1 touchType: 3 width: 22 height: 22 :
   }
@@ -528,7 +528,7 @@ comp [clcd] .panel:
   height: 60
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     wifi: x: 20 y: 15 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
     bell: x: 20 y: 15 bit: 1 bitOut: 1 touchType: 1 width: 22 height: 22 :
   }
@@ -552,7 +552,7 @@ comp [clcd] .panel:
   height: 80
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     power: x: 30 y: 25 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 padding: 4 :
   }
   :

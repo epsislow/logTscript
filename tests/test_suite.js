@@ -10364,7 +10364,7 @@ reg(1338, 'clcd', 'parse minimal comp [clcd] .status::', function(h, session) {
 
 reg(1339, 'clcd', 'parse symbol block single bit', function(h, session) {
   const stmts = session.parse(`comp [clcd] .status:
-  = {
+  symbols {
     power:
       x: 10
       y: 10
@@ -10372,16 +10372,15 @@ reg(1339, 'clcd', 'parse symbol block single bit', function(h, session) {
     :
   }
   :`);
-  const iv = stmts[0].comp.initialValue;
-  h.assert('kind clcdSymbols', iv.kind, 'clcdSymbols');
-  h.assert('one symbol', String(iv.symbols.length), '1');
-  h.assert('power name', iv.symbols[0].name, 'power');
-  h.assert('bit 0', String(iv.symbols[0].bit), '0');
+  const sym = stmts[0].comp.attributes.clcdSymbols;
+  h.assert('one symbol', String(sym.length), '1');
+  h.assert('power name', sym[0].name, 'power');
+  h.assert('bit 0', String(sym[0].bit), '0');
 });
 
 reg(1340, 'clcd', 'parse bits 0-6 multi-bit', function(h, session) {
   const stmts = session.parse(`comp [clcd] .digit:
-  = {
+  symbols {
     digit7:
       x: 10
       y: 10
@@ -10394,7 +10393,7 @@ reg(1340, 'clcd', 'parse bits 0-6 multi-bit', function(h, session) {
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols;
+  const sym = stmts[0].comp.attributes.clcdSymbols;
   h.assert('two symbols', String(sym.length), '2');
   h.assert('digit7 range', String(sym[0].bitsStart + '-' + sym[0].bitsEnd), '0-6');
   h.assert('dp bit 7', String(sym[1].bit), '7');
@@ -10403,7 +10402,7 @@ reg(1340, 'clcd', 'parse bits 0-6 multi-bit', function(h, session) {
 reg(1341, 'clcd', 'parse error — unknown symbol', function(h, session) {
   h.assertThrows('unknown symbol', function() {
     session.parse(`comp [clcd] .x:
-  = { notasymbol: x:1 y:1 bit:0 : }
+  symbols { notasymbol: x:1 y:1 bit:0 : }
   :`);
   }, 'Unknown CLCD symbol');
 });
@@ -10411,7 +10410,7 @@ reg(1341, 'clcd', 'parse error — unknown symbol', function(h, session) {
 reg(1342, 'clcd', 'parse error — bit gap', function(h, session) {
   h.assertThrows('gap bit 1', function() {
     session.parse(`comp [clcd] .bad:
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     warning: x:90 y:10 bit:2 :
   }
@@ -10427,7 +10426,7 @@ reg(1343, 'clcd', 'doc(comp.clcd) attrs and init block', function(h, session) {
   h.assert('icon section', String(out.some(l => l.trim() === 'icon:')), 'true');
   h.assert('canvas section', String(out.some(l => l.trim() === 'canvas:')), 'true');
   h.assert('label section', String(out.some(l => l.trim() === 'label:')), 'true');
-  h.assert('multiline init', String(out.some(l => l.includes('= {'))), 'true');
+  h.assert('symbols block', String(out.some(l => l.includes('symbols {'))), 'true');
   h.assert('no single-line schema', String(out.some(l => l.includes('symbol: x: integer y: integer'))), 'false');
 });
 
@@ -10438,7 +10437,7 @@ reg(1344, 'clcd', 'doc(comp) lists comp.clcd', function(h, session) {
 
 reg(1345, 'clcd', 'status panel wire drive + show', function(h, session) {
   const { interp } = session.run(`comp [clcd] .status:
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     wifi: x:50 y:10 bit:1 :
     warning: x:90 y:10 bit:2 :
@@ -10458,7 +10457,7 @@ reg(1345, 'clcd', 'status panel wire drive + show', function(h, session) {
 
 reg(1346, 'clcd', 'property block value + set', function(h, session) {
   const { interp } = session.run(`comp [clcd] .status:
-  = { power: x:10 y:10 bit:0 : }
+  symbols { power: x:10 y:10 bit:0 : }
   on: 1
   :
 
@@ -10474,7 +10473,7 @@ reg(1346, 'clcd', 'property block value + set', function(h, session) {
 
 reg(1347, 'clcd', 'peek(.status)', function(h, session) {
   const { interp } = session.run(`comp [clcd] .status:
-  = { power: x:10 y:10 bit:0 : wifi: x:50 y:10 bit:1 : }
+  symbols { power: x:10 y:10 bit:0 : wifi: x:50 y:10 bit:1 : }
   :
 
 2wire flags = 10
@@ -10487,7 +10486,7 @@ reg(1347, 'clcd', 'peek(.status)', function(h, session) {
 
 reg(1348, 'clcd', 'digit7 + dp eight bits', function(h, session) {
   const { interp } = session.run(`comp [clcd] .digit:
-  = {
+  symbols {
     digit7: x:10 y:10 bits:0-6 :
     dp: x:60 y:10 bit:7 :
   }
@@ -10503,7 +10502,7 @@ reg(1349, 'clcd', 'per-symbol color parse', function(h, session) {
   const stmts = session.parse(`comp [clcd] .status:
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     warning:
       x: 90
       y: 10
@@ -10515,14 +10514,14 @@ reg(1349, 'clcd', 'per-symbol color parse', function(h, session) {
     wifi: x:50 y:10 bit:1 :
   }
   :`);
-  const w = stmts[0].comp.initialValue.symbols.find(s => s.name === 'warning');
+  const w = stmts[0].comp.attributes.clcdSymbols.find(s => s.name === 'warning');
   h.assert('warning color', w.color, '#ffaa00');
   h.assert('warning bgColor', w.bgColor, '#332200');
 });
 
 reg(1350, 'clcd', 'wave propagation wire to clcd', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
-  = { power: x:10 y:10 bit:0 : }
+  symbols { power: x:10 y:10 bit:0 : }
   :
 
 1wire link = 0
@@ -10533,7 +10532,7 @@ reg(1350, 'clcd', 'wave propagation wire to clcd', function(h, session) {
 
 reg(1351, 'clcd', 'legacy propagation wire to clcd', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
-  = { power: x:10 y:10 bit:0 : }
+  symbols { power: x:10 y:10 bit:0 : }
   :
 
 1wire link = 0
@@ -10544,7 +10543,7 @@ reg(1351, 'clcd', 'legacy propagation wire to clcd', function(h, session) {
 
 reg(1352, 'clcd', 'duplicate symbol names — two digit7 at different bits', function(h, session) {
   const stmts = session.parse(`comp [clcd] .display:
-  = {
+  symbols {
     digit7:
       x: 10
       y: 10
@@ -10557,7 +10556,7 @@ reg(1352, 'clcd', 'duplicate symbol names — two digit7 at different bits', fun
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols;
+  const sym = stmts[0].comp.attributes.clcdSymbols;
   h.assert('two digit7 entries', String(sym.length), '2');
   h.assert('both named digit7', String(sym.every(s => s.name === 'digit7')), 'true');
   h.assert('first bits 0-6', String(sym[0].bitsStart + '-' + sym[0].bitsEnd), '0-6');
@@ -10566,7 +10565,7 @@ reg(1352, 'clcd', 'duplicate symbol names — two digit7 at different bits', fun
     clcdSymbols: sym,
   })), '14');
   const { interp } = session.run(`comp [clcd] .display:
-  = {
+  symbols {
     digit7: x:10 y:10 bits:0-6 :
     digit7: x:50 y:10 bits:7-13 :
   }
@@ -11069,7 +11068,7 @@ reg(1382, 'alu', 'zero flag on nonzero result', function(h, session) {
 
 reg(1383, 'clcd', 'parse style 2 on bell', function(h, session) {
   const stmts = session.parse(`comp [clcd] .status:
-  = {
+  symbols {
     bell:
       x: 10
       y: 10
@@ -11078,7 +11077,7 @@ reg(1383, 'clcd', 'parse style 2 on bell', function(h, session) {
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols[0];
+  const sym = stmts[0].comp.attributes.clcdSymbols[0];
   h.assert('style 2', String(sym.style), '2');
   h.assert('name bell', sym.name, 'bell');
 });
@@ -11086,7 +11085,7 @@ reg(1383, 'clcd', 'parse style 2 on bell', function(h, session) {
 reg(1384, 'clcd', 'parse error bluetooth style 1', function(h, session) {
   h.assertThrows('bluetooth style 1', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     bluetooth:
       x: 0
       y: 0
@@ -11101,7 +11100,7 @@ reg(1384, 'clcd', 'parse error bluetooth style 1', function(h, session) {
 reg(1385, 'clcd', 'parse error digit7 style 1', function(h, session) {
   h.assertThrows('digit7 style', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     digit7:
       x: 0
       y: 0
@@ -11116,7 +11115,7 @@ reg(1385, 'clcd', 'parse error digit7 style 1', function(h, session) {
 reg(1386, 'clcd', 'parse error style 4', function(h, session) {
   h.assertThrows('style 4', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     wifi:
       x: 0
       y: 0
@@ -11241,7 +11240,7 @@ reg(1393, 'error-display', 'editor align - leading blank line', function(h, sess
 
 reg(1394, 'error-display', 'multiline script - bit mismatch on wire line', function(h, session) {
   const source = `comp [clcd] .digit:
-  = {
+  symbols {
     digit7: x:10 y:10 bits:0-6 :
     dp: x:60 y:10 bit:7 :
   }
@@ -11311,7 +11310,7 @@ reg(1398, 'bool-analysis', 'outBlocks - simplify assignPair span', function(h, s
 
 reg(1399, 'clcd', 'parse label with text', function(h, session) {
   const stmts = session.parse(`comp [clcd] .ui:
-  = {
+  symbols {
     label:
       x: 10
       y: 8
@@ -11320,7 +11319,7 @@ reg(1399, 'clcd', 'parse label with text', function(h, session) {
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols[0];
+  const sym = stmts[0].comp.attributes.clcdSymbols[0];
   h.assert('name label', sym.name, 'label');
   h.assert('label text', sym.text, 'Load');
   h.assert('x', String(sym.x), '10');
@@ -11330,7 +11329,7 @@ reg(1399, 'clcd', 'parse label with text', function(h, session) {
 
 reg(1400, 'clcd', 'parse label font options', function(h, session) {
   const stmts = session.parse(`comp [clcd] .ui:
-  = {
+  symbols {
     label:
       x: 0
       y: 0
@@ -11342,7 +11341,7 @@ reg(1400, 'clcd', 'parse label font options', function(h, session) {
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols[0];
+  const sym = stmts[0].comp.attributes.clcdSymbols[0];
   h.assert('family sans', sym.family, 'sans');
   h.assert('size 18', String(sym.size), '18');
   h.assert('weight bold', sym.weight, 'bold');
@@ -11351,7 +11350,7 @@ reg(1400, 'clcd', 'parse label font options', function(h, session) {
 reg(1401, 'clcd', 'parse error label missing text', function(h, session) {
   h.assertThrows('label missing text', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     label:
       x: 0
       y: 0
@@ -11365,7 +11364,7 @@ reg(1401, 'clcd', 'parse error label missing text', function(h, session) {
 reg(1402, 'clcd', 'parse error text on fa symbol', function(h, session) {
   h.assertThrows('wifi text', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     wifi:
       x: 0
       y: 0
@@ -11380,7 +11379,7 @@ reg(1402, 'clcd', 'parse error text on fa symbol', function(h, session) {
 reg(1403, 'clcd', 'parse error label with bits range', function(h, session) {
   h.assertThrows('label bits', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     label:
       x: 0
       y: 0
@@ -11395,7 +11394,7 @@ reg(1403, 'clcd', 'parse error label with bits range', function(h, session) {
 reg(1404, 'clcd', 'parse error label with style', function(h, session) {
   h.assertThrows('label style', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     label:
       x: 0
       y: 0
@@ -11411,7 +11410,7 @@ reg(1404, 'clcd', 'parse error label with style', function(h, session) {
 reg(1405, 'clcd', 'parse error unknown family', function(h, session) {
   h.assertThrows('unknown family', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     label:
       x: 0
       y: 0
@@ -11437,7 +11436,7 @@ reg(1407, 'clcd', 'bgColorSym applies to all symbols', function(h, session) {
   const { interp } = session.run(`comp [clcd] .ui:
   bgColor: ^002200
   bgColorSym: ^ff0
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     wifi: x:50 y:10 bit:1 :
   }
@@ -11454,7 +11453,7 @@ reg(1408, 'clcd', 'bgColorSym per-symbol override', function(h, session) {
   const { interp } = session.run(`comp [clcd] .ui:
   bgColor: ^002200
   bgColorSym: ^ff0
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     warning: x:50 y:10 bit:1 bgColor: ^332200 :
   }
@@ -11487,7 +11486,7 @@ reg(1411, 'clcd', 'Parse touch:1, touchColor, symbol bitOut + touchType', functi
   const stmts = session.parse(`comp [clcd] .panel:
   touch: 1
   touchColor: ^ff00ff
-  = {
+  symbols {
     wifi:
       x: 10  y: 10
       bit: 0
@@ -11498,18 +11497,18 @@ reg(1411, 'clcd', 'Parse touch:1, touchColor, symbol bitOut + touchType', functi
   }
   :
 `);
-  const iv = stmts[0].comp.initialValue;
+  const sym = stmts[0].comp.attributes.clcdSymbols;
   h.assert('touch attr', String(stmts[0].comp.attributes.touch), '1');
   h.assert('touchColor', String(stmts[0].comp.attributes.touchColor).toLowerCase().replace(/^\^/, '#'), '#ff00ff');
-  h.assert('bitOut', String(iv.symbols[0].bitOut), '0');
-  h.assert('touchType', String(iv.symbols[0].touchType), '1');
+  h.assert('bitOut', String(sym[0].bitOut), '0');
+  h.assert('touchType', String(sym[0].touchType), '1');
 });
 
 reg(1412, 'clcd', 'Parse error — bitOut gap (0 and 2 without 1)', function(h, session) {
   h.assertThrows('bitOut gap', function() {
     session.parse(`comp [clcd] .bad:
   touch: 1
-  = {
+  symbols {
     power: x: 0 y: 0 bit: 0 bitOut: 0 :
     warning: x: 10 y: 10 bit: 1 bitOut: 2 :
   }
@@ -11568,7 +11567,7 @@ reg(1417, 'clcd', 'Symbol without bitOut excluded from out width', function(h, s
 reg(1418, 'clcd', 'touchType 1 — press/release via triggerClcdTouch', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
   }
   :
@@ -11583,7 +11582,7 @@ reg(1418, 'clcd', 'touchType 1 — press/release via triggerClcdTouch', function
 reg(1419, 'clcd', 'touchType 2 — pulse returns out to 0 after propagate', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 2 width: 22 height: 22 :
   }
   :
@@ -11595,7 +11594,7 @@ reg(1419, 'clcd', 'touchType 2 — pulse returns out to 0 after propagate', func
 reg(1420, 'clcd', 'touchType 3 — latch toggle on second press', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 width: 22 height: 22 :
   }
   :
@@ -11609,7 +11608,7 @@ reg(1420, 'clcd', 'touchType 3 — latch toggle on second press', function(h, se
 reg(1421, 'clcd', 'touchReset mask clears bitOut 2 and 3', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 3 width: 20 height: 20 :
     wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 3 width: 20 height: 20 :
     bell: x: 50 y: 0 bit: 2 bitOut: 2 touchType: 3 width: 20 height: 20 :
@@ -11629,7 +11628,7 @@ reg(1421, 'clcd', 'touchReset mask clears bitOut 2 and 3', function(h, session) 
 reg(1422, 'clcd', 'Wire t = .panel:out updates on press', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
   }
   :
@@ -11643,7 +11642,7 @@ reg(1423, 'clcd', 'Property block out> touchWire', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
   on: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 width: 22 height: 22 :
   }
   :
@@ -11659,7 +11658,7 @@ reg(1423, 'clcd', 'Property block out> touchWire', function(h, session) {
 reg(1424, 'clcd', 'touch:0 — triggerClcdTouch is no-op', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 0
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
   }
   :
@@ -11671,7 +11670,7 @@ reg(1424, 'clcd', 'touch:0 — triggerClcdTouch is no-op', function(h, session) 
 reg(1425, 'clcd', 'Parse error — touchType without bitOut', function(h, session) {
   h.assertThrows('touchType without bitOut', function() {
     session.parse(`comp [clcd] .bad:
-  = {
+  symbols {
     wifi: x: 0 y: 0 bit: 0 touchType: 1 :
   }
   :`);
@@ -11689,7 +11688,7 @@ reg(1426, 'clcd', 'doc(comp.clcd) lists touch, touchColor, out, touchReset', fun
 reg(1427, 'clcd', 'touchType 1 press/release (wave propagation)', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
   }
   :
@@ -11703,7 +11702,7 @@ reg(1427, 'clcd', 'touchType 1 press/release (wave propagation)', function(h, se
 reg(1428, 'clcd', 'touchReset + wire out (wave propagation)', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 3 width: 20 height: 20 :
     wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 3 width: 20 height: 20 :
   }
@@ -12594,7 +12593,7 @@ reg(1548, 'bool-filt', 'lift AND mid-wire slice B.1-2', function(h, session) {
 
 reg(1549, 'clcd', 'parse FA power with size 30', function(h, session) {
   const stmts = session.parse(`comp [clcd] .status:
-  = {
+  symbols {
     power:
       x: 120
       y: 12
@@ -12603,14 +12602,14 @@ reg(1549, 'clcd', 'parse FA power with size 30', function(h, session) {
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols[0];
+  const sym = stmts[0].comp.attributes.clcdSymbols[0];
   h.assert('size 30', String(sym.size), '30');
   h.assert('name power', sym.name, 'power');
 });
 
 reg(1550, 'clcd', 'parse canvas digit7 with size 60', function(h, session) {
   const stmts = session.parse(`comp [clcd] .digit:
-  = {
+  symbols {
     digit7:
       x: 10
       y: 10
@@ -12619,14 +12618,14 @@ reg(1550, 'clcd', 'parse canvas digit7 with size 60', function(h, session) {
     :
   }
   :`);
-  const sym = stmts[0].comp.initialValue.symbols[0];
+  const sym = stmts[0].comp.attributes.clcdSymbols[0];
   h.assert('size 60', String(sym.size), '60');
 });
 
 reg(1551, 'clcd', 'parse error FA size 7 and canvas size 4', function(h, session) {
   h.assertThrows('FA size 7', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     power:
       x: 0
       y: 0
@@ -12638,7 +12637,7 @@ reg(1551, 'clcd', 'parse error FA size 7 and canvas size 4', function(h, session
   });
   h.assertThrows('canvas size 4', function() {
     session.parse(`comp [clcd] .x:
-  = {
+  symbols {
     digit7:
       x: 0
       y: 0
@@ -12685,7 +12684,7 @@ reg(1555, 'clcd', 'computeTouchRect digit7 size 88', function(h, session) {
 reg(1556, 'clcd', 'parse error label size 5', function(h, session) {
   h.assertThrows('label size 5', function() {
     session.parse(`comp [clcd] .ui:
-  = {
+  symbols {
     label:
       x: 0
       y: 0
@@ -12706,7 +12705,7 @@ reg(1557, 'clcd', 'doc(.ui) instance multiline with defaults', function(h, sessi
   bgColor: ^220
   bgColorSym: ^440
   nl
-  = {
+  symbols {
     label:
       x: 8
       y: 6
@@ -28973,7 +28972,7 @@ comp [switch] .faultSw:
   :
 
 comp [clcd] .panel:
-  = { warning: x:10 y:10 bit:0 : }
+  symbols { warning: x:10 y:10 bit:0 : }
   on: 1
   :
 
@@ -33148,7 +33147,7 @@ comp [dip] .d:
 
   reg(2992, 'clcd', 'per-symbol color wire ref parse', function(h, session) {
     const stmts = session.parse(`comp [clcd] .status:
-  = {
+  symbols {
     warning:
       x: 90
       y: 10
@@ -33158,7 +33157,7 @@ comp [dip] .d:
     :
   }
   :`);
-    const w = stmts[0].comp.initialValue.symbols.find(s => s.name === 'warning');
+    const w = stmts[0].comp.attributes.clcdSymbols.find(s => s.name === 'warning');
     h.assert('color wireRef', JSON.stringify(w.color), JSON.stringify({ wireRef: 'symFg' }));
     h.assert('bg wireRef', JSON.stringify(w.bgColor), JSON.stringify({ wireRef: 'symBg' }));
   });
@@ -33168,7 +33167,7 @@ comp [dip] .d:
 24wire symBg = ^332200
 
 comp [clcd] .panel:
-  = {
+  symbols {
     warning:
       x: 10
       y: 10
@@ -33189,7 +33188,7 @@ comp [clcd] .panel:
 24wire symFg = ^ffaa00
 
 comp [clcd] .panel:
-  = {
+  symbols {
     warning: x: 10 y: 10 bit: 0 color: symFg :
   }
   :
@@ -33202,7 +33201,7 @@ symFg = ^112233`);
   reg(2995, 'color-wire', 'undefined symbol color wire throws at comp creation', function(h, session) {
     h.assertThrows('missing wire', function() {
       session.run(`comp [clcd] .x:
-  = { warning: x: 10 y: 10 bit: 0 color: noSuch : }
+  symbols { warning: x: 10 y: 10 bit: 0 color: noSuch : }
   :
 `);
     });
@@ -51163,7 +51162,7 @@ comp [logic] .gameLogic:
     const src = [
       'comp [clcd] .panel:',
       '  touch: 1',
-      '  = {',
+      '  symbols {',
       '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :',
       '  }',
       '  :',
@@ -51182,7 +51181,7 @@ comp [logic] .gameLogic:
     const src = [
       'comp [clcd] .panel:',
       '  touch: 1',
-      '  = {',
+      '  symbols {',
       '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 2 hotkey: "p" width: 22 height: 22 :',
       '  }',
       '  :',
@@ -51198,7 +51197,7 @@ comp [logic] .gameLogic:
     const src = [
       'comp [clcd] .panel:',
       '  touch: 1',
-      '  = {',
+      '  symbols {',
       '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "l" width: 22 height: 22 :',
       '  }',
       '  :',
@@ -51216,7 +51215,7 @@ comp [logic] .gameLogic:
     const src = [
       'comp [clcd] .panel:',
       '  touch: 1',
-      '  = {',
+      '  symbols {',
       '    power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 3 hotkey: "x" width: 20 height: 20 :',
       '    wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 3 hotkey: "x" width: 20 height: 20 :',
       '  }',
@@ -51233,7 +51232,7 @@ comp [logic] .gameLogic:
     const src = [
       'comp [clcd] .panel:',
       '  touch: 1',
-      '  = {',
+      '  symbols {',
       '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "g" width: 22 height: 22 :',
       '  }',
       '  :',
@@ -51247,13 +51246,12 @@ comp [logic] .gameLogic:
   reg(4650, 'clcd', 'parse symbol hotkey in CLCD block', function(h, session) {
     const stmts = session.parse(`comp [clcd] .p:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 hotkey: "w" width: 22 height: 22 :
   }
   :`);
-    const iv = stmts[0].comp.initialValue;
-    h.assert('kind', iv && iv.kind, 'clcdSymbols');
-    h.assert('hotkey', iv.symbols[0].hotkey, 'w');
+    const sym = stmts[0].comp.attributes.clcdSymbols;
+    h.assert('hotkey', sym[0].hotkey, 'w');
   });
 
   reg(4651, 'clcd', 'CLCD hotkey touchType 1 hold (legacy)', runClcdHotkeyMomentary);
@@ -51267,7 +51265,7 @@ comp [logic] .gameLogic:
     const src = [
       'comp [clcd] .panel:',
       '  touch: 1',
-      '  = {',
+      '  symbols {',
       '    power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 1 hotkey: "h" width: 20 height: 20 :',
       '    wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 1 hotkey: "h" width: 20 height: 20 :',
       '  }',
@@ -51281,7 +51279,7 @@ comp [logic] .gameLogic:
   reg(4658, 'clcd', 'parse error hotkey without touch:1', function(h, session) {
     const src = [
       'comp [clcd] .panel:',
-      '  = {',
+      '  symbols {',
       '    wifi: x: 10 y: 10 bit: 0 bitOut: 0 hotkey: "w" width: 22 height: 22 :',
       '  }',
       '  :',
@@ -51299,7 +51297,7 @@ comp [logic] .gameLogic:
   reg(4663, 'clcd', 'triggerClcdHotkey direct invoke', function(h, session) {
     const { interp } = session.run(`comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :
   }
   :
@@ -53257,7 +53255,7 @@ probe(outX)`;
   reg(4901, 'cm-comp-card', 'parse 5 types without nested loss', function(h, session) {
     const led = 'comp [led] .l:\n  :';
     const network = 'comp [network] .n:\n  width: 64\n  length: 5\n  :';
-    const clcd = 'comp [clcd] .c:\n  = {\n    p:\n      x: 1\n      y: 2\n      bit: 0\n    :\n  }\n  :';
+    const clcd = 'comp [clcd] .c:\n  symbols {\n    p:\n      x: 1\n      y: 2\n      bit: 0\n    :\n  }\n  :';
     const canvas = 'comp [canvas] .p:\n  width: 100\n  hitbox {\n    z: { rect(0,0,10,10) }\n  }\n  :';
     const plc = 'comp [plc] .ctrl:\n  inputs: { A = w1 }\n  outputs: { B = w2 }\n  :';
     const src = [led, network, clcd, canvas, plc].join('\n\n');
@@ -53265,7 +53263,7 @@ probe(outX)`;
     h.assert('five blocks', String(blocks.length), '5');
     h.assert('types', blocks.map(function (b) { return b.type; }).join(','), 'led,network,clcd,canvas,plc');
     const round = blocks.map(function (b) { return CCM.serializeCompBlock(b); }).join('\n\n');
-    h.assert('clcd equals kept', String(round.includes('= {')), 'true');
+    h.assert('clcd symbols kept', String(round.includes('symbols {')), 'true');
     h.assert('canvas hitbox kept', String(round.includes('hitbox {')), 'true');
     h.assert('plc inputs kept', String(round.includes('inputs: {')), 'true');
     const blocks2 = CCM.parseCompBlocks(round, cmReg(session));
@@ -53393,7 +53391,7 @@ probe(outX)`;
   });
 
   reg(4912, 'cm-comp-card', 'clcd symbols round-trip 2 icons', function(h, session) {
-    const src = 'comp [clcd] .status:\n  = {\n    power:\n      x: 10\n      y: 10\n      bit: 0\n      style: 1\n      size: 22\n    :\n    bell:\n      x: 50\n      y: 10\n      bit: 1\n      style: 1\n      size: 22\n    :\n  }\n  :';
+    const src = 'comp [clcd] .status:\n  symbols {\n    power:\n      x: 10\n      y: 10\n      bit: 0\n      style: 1\n      size: 22\n    :\n    bell:\n      x: 50\n      y: 10\n      bit: 1\n      style: 1\n      size: 22\n    :\n  }\n  :';
     const blocks = CCM.parseCompBlocks(src, cmReg(session));
     const clcd = blocks.find(function (b) { return b.name === '.status'; });
     h.assert('2 symbols', String(CCM.getClcdSymbols(clcd).length), '2');

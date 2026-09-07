@@ -746,7 +746,7 @@ comp [switch] .faultSw:
   :
 
 comp [clcd] .panel:
-  = { warning: x:10 y:10 bit:0 : }
+  symbols { warning: x:10 y:10 bit:0 : }
   on: 1
   :
 
@@ -2015,7 +2015,7 @@ comp [plc] .ctrl:
   ...
 
 comp [clcd] .panel:
-  = { warning: x:10 y:10 bit:0 : }
+  symbols { warning: x:10 y:10 bit:0 : }
   on: 1
   :
 

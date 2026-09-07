@@ -1067,7 +1067,7 @@ inline [asm] .th:
   :
 
 16wire init = .th { movs r0, 1 }
-32wire main = .th {
+48wire main = .th {
   use init
   movs r1, 2
   adds r2, r0, r1
@@ -1400,7 +1400,10 @@ inline [asm] .rv:
 
 comp [cpu] .u:
   isa: .rv
-  registers: 2
+  registers: 32
+  ram:
+    depth: 32
+    length: 16
   on: 1
   prog:
     depth: 32
@@ -1540,11 +1543,11 @@ inline [asm] .a32:
   set: arm-a32
   :
 
-64wire mem = .a32 {
+128wire mem = .a32 {
   mov r0, 0
   mov r1, 42
-  str r1, [r0, #0]
-  ldr r2, [r0, #0]
+  str r1, [r0, 0]
+  ldr r2, [r0, 0]
 }
 show(mem; asm)
 \`\`\`
@@ -1702,7 +1705,7 @@ inline [asm] .th:
   set: arm-thumb
   :
 
-32wire p = .th {
+64wire p = .th {
   movs r0, 10
   movs r1, 3
   adds r2, r0, r1
@@ -1720,7 +1723,7 @@ inline [asm] .th:
   set: arm-thumb
   :
 
-32wire p = .th {
+64wire p = .th {
   movs r0, 0
 again:
   adds r0, r0, r1
@@ -1800,7 +1803,7 @@ inline [asm] .th:
   set: arm-thumb
   :
 
-32wire p = .th {
+64wire p = .th {
   movs r1, 0
   movs r2, 42
   str r2, 0, r1
@@ -2067,7 +2070,7 @@ inline [asm] .rv:
   set: riscv32
   :
 
-64wire p = .rv {
+96wire p = .rv {
   addi x2, x0, 100
   sw x1, 0(x2)
   lw x3, 0(x2)
@@ -2241,7 +2244,7 @@ comp [cpu] .u:
     length: 4
   prog:
     depth: 32
-    length: 4
+    length: 5
     = .rv {
       addi x1, x0, 6
       addi x2, x0, 7
@@ -2843,7 +2846,7 @@ inline [asm] .x86:
   set: x86-32
   :
 
-80wire branch = .x86 {
+128wire branch = .x86 {
   cmp eax, ebx
   je equal
   jmp done
@@ -3181,6 +3184,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 40
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 128
@@ -3216,7 +3222,7 @@ inline [asm] .x86:
   set: x86-32
   :
 
-80wire p16 = .x86 {
+88wire p16 = .x86 {
   mov ax, 5
   mov bx, 10
   add ax, bx
@@ -3241,6 +3247,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 8
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 32
@@ -3290,6 +3299,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 8
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 80
@@ -3352,6 +3364,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 12
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 128
@@ -3388,6 +3403,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 10
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 96
@@ -3876,14 +3894,14 @@ show(q)
 
 Result: \`001\`
 
-\`\`\`logts-play
+\`\`\`logts
 3wire q = 1
 show(q)
 \`\`\`
 
 Error: \`Expected 3 bits, got 1 bit.\`
 
-\`\`\`logts-play
+\`\`\`logts
 4wire q = 11111
 show(q)
 \`\`\`
@@ -4965,7 +4983,7 @@ show(ovf)
 
 \`\`\`logts-play
 8wire x = 11110000
-8wire a, 1wire ovf = ABS(x; q4p4)
+8wire a, 4wire ovf = ABS(x; q4p4)
 show(a; q4p4)
 show(ovf)
 \`\`\`
@@ -5077,7 +5095,7 @@ IEEE half-precision add (\`1.0 + 2.0 = 3.0\`):
 \`\`\`logts-play
 16wire a = 0011110000000000
 16wire b = 0100000000000000
-16wire s, 1wire flag = ADD(a, b; fp16)
+16wire s, 4wire flag = ADD(a, b; fp16)
 show(s; fp16)
 show(flag)
 \`\`\`
@@ -6077,9 +6095,10 @@ Signed \`−1 / 2 = 0\`, remainder \`−1\` (\`1111\`).
 \`\`\`logts-play
 8wire a = 00100000
 8wire b = 00001000
-8wire q, 8wire m = DIVIDE(a, b; q4p4)
+8wire q, 8wire m, 4wire st = DIVIDE(a, b; q4p4)
 show(q; q4p4)
 show(m; q4p4)
+show(st)
 \`\`\`
 
 \`2.0/0.5=4.0\`, remainder \`0\`.
@@ -6220,9 +6239,10 @@ Signed \`(−1)×(−1) + 2×1 = 3\`.
 \`\`\`logts-play
 8wire[2] a = 00011000 + 00001000
 8wire[2] b = 00010000 + 00010000
-8wire dot, 16wire over = DOT(a, b; q4p4)
+8wire dot, 16wire over, 4wire st = DOT(a, b; q4p4)
 show(dot; q4p4)
 show(over)
+show(st)
 \`\`\`
 
 \`[1.5, 0.5]·[1, 1] = 2.0\`.
@@ -7157,11 +7177,11 @@ show(y)
 \`\`\`logts-play
 4wire val = 0001
 4wire cnt = 0010
-5wire r = LSHIFT(val, cnt)
+6wire r = LSHIFT(val, cnt)
 show(r)
 \`\`\`
 
-\`1 << 2\` → \`00100\`.
+\`1 << 2\` → \`000100\` (6 bits).
 
 ### \`LSHIFT(Xbit data, Nbit n, 1bit fill)\`
 
@@ -7177,7 +7197,7 @@ show(y1)
 
 \`\`\`logts-play
 4wire x2 = 0001
-8wire wide = LSHIFT(x2, 11, 1)
+7wire wide = LSHIFT(x2, 11, 1)
 show(wide)
 \`\`\`
 
@@ -7205,11 +7225,11 @@ show(r)
 
 \`\`\`logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-4wire[2,2] out = LSHIFT(m, 0001; matrix)
+5wire[2,2] out = LSHIFT(m, 0001; matrix)
 show(out)
 \`\`\`
 
-Per-cell left shift by 1 (within each **W**-bit cell; assign to \`4wire[N,M]\`).
+Per-cell left shift by 1 → **5**-bit elements (\`00010\`, \`00100\`, \`01000\`, \`10000\`).
 
 ## See also
 
@@ -7418,9 +7438,10 @@ Signed \`−8 + 2×1 = −6\` → \`r=1010\`.
 8wire acc = 00010000
 8wire a = 00011000
 8wire b = 00001000
-8wire r, 9wire o = MAC(acc, a, b; q4p4)
+8wire r, 9wire o, 4wire st = MAC(acc, a, b; q4p4)
 show(r; q4p4)
 show(o)
+show(st)
 \`\`\`
 
 \`1.0 + 1.5×0.5 = 1.75\`.
@@ -7878,9 +7899,10 @@ Signed \`(−1)×(−1)=1\` → \`rS=0001\`, \`oS=0000\`.
 \`\`\`logts-play
 8wire a = 00011000
 8wire b = 00100000
-8wire r, 8wire o = MULTIPLY(a, b; q4p4)
+8wire r, 8wire o, 4wire st = MULTIPLY(a, b; q4p4)
 show(r; q4p4)
 show(o)
+show(st)
 \`\`\`
 
 \`1.5×2.0=3.0\` → \`r=00110000\`.
@@ -7890,9 +7912,10 @@ show(o)
 \`\`\`logts-play
 16wire a = 0100000000000000
 16wire b = 0011111000000000
-16wire r, 16wire o = MULTIPLY(a, b; fp16)
+16wire r, 16wire o, 4wire st = MULTIPLY(a, b; fp16)
 show(r; fp16)
 show(o)
+show(st)
 \`\`\`
 
 \`2.0×1.5=3.0\`.
@@ -8704,7 +8727,7 @@ show(y1)
 \`fill=0\` → \`0101\`; \`fill=1\` → \`1101\`.
 
 \`\`\`logts-play
-4wire x2 = 10
+4wire x2 = 0010
 4wire y2 = RSHIFT(x2, 11, 1)
 show(y2)
 \`\`\`
@@ -8842,6 +8865,7 @@ probe(out)
 ### Runnable example (\`~\` clock)
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire data = 1
 1wire clr = 0
 1wire q = LATCH(data, ~, clr)
@@ -9089,7 +9113,7 @@ Signed \`−8 − 1\` on 4 bits → \`r=0111\`, overflow \`1\`.
 \`\`\`logts-play
 8wire a = 00100000
 8wire b = 00001000
-8wire s, 1wire ovf = SUBTRACT(a, b; q4p4)
+8wire s, 4wire ovf = SUBTRACT(a, b; q4p4)
 show(s; q4p4)
 show(ovf)
 \`\`\`
@@ -9231,9 +9255,10 @@ Sum of vector elements in Q4.4:
 
 \`\`\`logts-play
 8wire[2] v = 00011000 + 00001000
-8wire total, 8wire over = SUM(v; q4p4)
+8wire total, 8wire over, 4wire st = SUM(v; q4p4)
 show(total; q4p4)
 show(over)
+show(st)
 \`\`\`
 
 ### \`SUM(Wbit[n] a, … ; vector)\`
@@ -11258,7 +11283,7 @@ comp [clcd] .name:
   bgColor: ^000000
   bgColorSym: ^ffff00
   nl
-  = {
+  symbols {
     symbolName:
       x: 10
       y: 20
@@ -11294,7 +11319,7 @@ comp [clcd] .panel::
 
 Component-level and per-symbol \`color\` / \`bgColor\` accept hex \`^RRGGBB\` or a wire name (snapshot at declaration). See [component-color-attributes.md](component-color-attributes.md).
 
-## Symbol fields (\`= { … }\`)
+## Symbol fields (\`symbols { … }\`)
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -11406,7 +11431,7 @@ Per symbol with \`bitOut\`, add a quoted **\`hotkey\`** string. While the **Devi
 \`\`\`logts-play
 comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 hotkey: "w" width: 22 height: 22 :
     power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
   }
@@ -11422,7 +11447,7 @@ show(out)
 \`\`\`logts-play
 comp [clcd] .panel:
   touch: 1
-  = {
+  symbols {
     wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "w" width: 22 height: 22 :
     power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :
   }
@@ -11485,7 +11510,7 @@ For **touch screen** examples, use **Load & Run**, then **tap** symbols on the C
 
 \`\`\`logts-play
 comp [clcd] .status:
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     wifi: x:50 y:10 bit:1 :
     warning: x:90 y:10 bit:2 :
@@ -11538,7 +11563,7 @@ comp [clcd] .status:
   height: 60
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     power: x:10 y:10 bit:0 :
     wifi: x:50 y:10 bit:1 :
     warning: x:90 y:10 bit:2 color:^ffaa00 bgColor:^332200 :
@@ -11557,7 +11582,7 @@ comp [clcd] .status:
 comp [clcd] .battery:
   width: 120
   height: 50
-  = {
+  symbols {
     battery: x:10 y:10 bit:0 :
     charging: x:60 y:10 bit:1 :
   }
@@ -11577,7 +11602,7 @@ comp [clcd] .ui:
   height: 50
   color: ^00ff00
   bgColor: ^002200
-  = {
+  symbols {
     label:
       x: 8
       y: 6
@@ -11612,7 +11637,7 @@ comp [clcd] .ui:
 
 \`\`\`logts-play
 comp [clcd] .digit:
-  = {
+  symbols {
     digit7: x:10 y:10 bits:0-6 :
     dp: x:60 y:10 bit:7 :
   }
@@ -11630,7 +11655,7 @@ comp [clcd] .digit:
 comp [clcd] .display:
   width: 160
   height: 80
-  = {
+  symbols {
     digit7:
       x: 10
       y: 10
@@ -11649,7 +11674,7 @@ comp [clcd] .display:
   }
   :
 
-21wire val = 1111111000000111111100000
+21wire val = 111111100000011111111
 .display = val
 \`\`\`
 
@@ -11678,7 +11703,7 @@ comp [clcd] .panel:
   height: 70
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     wifi: x: 10 y: 15 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
     bell: x: 60 y: 15 bit: 1 bitOut: 1 touchType: 2 width: 22 height: 22 :
     power: x: 110 y: 15 bit: 2 bitOut: 2 touchType: 3 width: 22 height: 22 :
@@ -11704,7 +11729,7 @@ comp [clcd] .panel:
   height: 80
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     wifi: x: 10 y: 20 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
     bell: x: 45 y: 20 bit: 1 bitOut: 1 touchType: 1 width: 22 height: 22 :
     warning: x: 80 y: 20 bit: 2 bitOut: 2 touchType: 1 width: 22 height: 22 :
@@ -11734,7 +11759,7 @@ comp [clcd] .panel:
   height: 60
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     power: x: 10 y: 15 bit: 0 bitOut: 0 touchType: 3 width: 22 height: 22 :
     wifi: x: 55 y: 15 bit: 1 bitOut: 1 touchType: 3 width: 22 height: 22 :
   }
@@ -11768,7 +11793,7 @@ comp [clcd] .panel:
   height: 60
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     wifi: x: 20 y: 15 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
     bell: x: 20 y: 15 bit: 1 bitOut: 1 touchType: 1 width: 22 height: 22 :
   }
@@ -11792,7 +11817,7 @@ comp [clcd] .panel:
   height: 80
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     power: x: 30 y: 25 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 padding: 4 :
   }
   :
@@ -14326,7 +14351,7 @@ Rules:
 | \`motor\`, \`servo\` | \`color\`, \`frameColor\`, \`bgColor\` |
 | \`led\`, \`slider\`, \`rotary\`, \`sensor\`, \`terminal\` | \`color\` |
 | \`scanner\`, \`keyboard\` | \`color\`, \`bgColor\`, \`focusColor\`, \`focusBgColor\` (+ \`pulseColor\` on keyboard) |
-| \`clcd\` | \`color\`, \`bgColor\`, \`bgColorSym\`, \`touchColor\` (component level); per-symbol \`color\` / \`bgColor\` in \`= { … }\` |
+| \`clcd\` | \`color\`, \`bgColor\`, \`bgColorSym\`, \`touchColor\` (component level); per-symbol \`color\` / \`bgColor\` in \`symbols { … }\` |
 | \`bar\` / \`ledBar\` | \`color\`, \`bgColor\`, \`lgColor\` |
 | \`7seg\`, \`14seg\`, \`dots\` | \`color\`, \`bgColor\`, \`lgColor\` |
 | \`dip\` | \`color\`, \`colorFor.N\` |
@@ -14383,7 +14408,7 @@ Position \`2\` uses red when on; other positions use the default \`color\`.
 
 ## CLCD — symbol block colors
 
-Inside \`comp [clcd] … = { … }\`, each symbol entry may set \`color\` and \`bgColor\` with the same rules as component-level attributes: \`^hex\` or a wire name (snapshot at \`comp\` elaboration).
+Inside \`comp [clcd] … symbols { … }\`, each symbol entry may set \`color\` and \`bgColor\` with the same rules as component-level attributes: \`^hex\` or a wire name (snapshot at \`comp\` elaboration).
 
 \`\`\`logts-play
 24wire symFg = ^ffaa00
@@ -14392,11 +14417,11 @@ Inside \`comp [clcd] … = { … }\`, each symbol entry may set \`color\` and \`
 comp [clcd] .status:
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     warning:
       x: 90
       y: 10
-      bit: 2
+      bit: 1
       color: symFg
       bgColor: symBg
     :
@@ -14404,11 +14429,11 @@ comp [clcd] .status:
   }
   :
 
-3wire flags = 101
+3wire flags = 110
 .status = flags
 \`\`\`
 
-When bit \`2\` is on, the \`warning\` icon uses \`#ffaa00\` on \`#332200\`; other symbols use the component defaults. Changing \`symFg\` after the \`comp\` line does **not** update the symbol colors.
+When bit \`1\` is on, the \`warning\` icon uses \`#ffaa00\` on \`#332200\`; other symbols use the component defaults. Changing \`symFg\` after the \`comp\` line does **not** update the symbol colors.
 
 See [clcd.md](clcd.md) for the full symbol catalog and syntax.
 
@@ -15178,13 +15203,21 @@ comp [cpu] .mp:
     depth: 8
     length: 32
     core0:
-      = .x86 { jmp halt halt: jmp halt }
+      = .x86 {
+        jmp halt
+      halt:
+        jmp halt
+      }
     core1:
-      = .x86 { jmp halt halt: jmp halt }
+      = .x86 {
+        jmp halt
+      halt:
+        jmp halt
+      }
   :
 
 .mp:{ ramAdr = 0, set = 1 }
-8wire cell = .mp:ram:get
+32wire cell = .mp:ram:get
 \`\`\`
 
 After **Load & Run**, **\`cell\`** holds word 0 (\`5\`).
@@ -15556,6 +15589,7 @@ Equivalent: \`wait: hold\`. Per-pulse override in a wave: \`.u:{ wait = 1, set =
 \`hold = 1\` blocks \`set\`; after \`hold = 0\`, one step runs.
 
 \`\`\`logts-play
+MODE WIREWRITE
 inline [asm] .cpuisa:
   NOP   : 0000 + 4b
   ADDI  : 0011 + R2b + A2b
@@ -15625,13 +15659,13 @@ comp [cpu] .u:
 
 .u:{ run = 1 }
 8wire r0 = .u:r0
-8wire halted = .u:halted
+1wire halted = .u:halted
 show(r0)
 show(halted)
 
 .u:{ run = 1 }
 8wire r0b = .u:r0
-8wire haltedb = .u:halted
+1wire haltedb = .u:halted
 show(r0b)
 show(haltedb)
 \`\`\`
@@ -15685,7 +15719,7 @@ comp [cpu] .u:
     }
   :
 
-.dma:{ src = 1, dst = \\\\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
 .u:{ run = 1 }
 8wire r0 = .u:r0
 show(r0)
@@ -16704,6 +16738,7 @@ show(w; signed)            # w (4wire) = \\-1;s4
 show(code; ascii)          # code (8wire) = "A"
 8wire fp = 00011000
 show(fp; q4p4)             # fp (8wire) = \\1.5;q4p4
+8wire[4] v := \\2 \\-1 \\5 \\0;s8
 show(v; s8)                # 8wire[4] v = \\2 \\-1 \\5 \\0;s8  (fixed per element)
 show(w; q8p0)              # w (8wire) = \\5;q8p0
 40wire msg := "Hello"
@@ -17115,7 +17150,7 @@ After RUN: **no** \`#\` lines — quotient/remainder are computed on read, not s
 comp [divider] .div:
     depth:4
     :
-1wire mod = .div:mod
+4wire mod = .div:mod
 probe(mod)
 \`\`\`
 
@@ -17145,10 +17180,11 @@ Examples:
 All \`probe()\` calls are collected during **elaboration** (before sequential execution). A probe declared **after** the wire it watches still sees the first committed value:
 
 \`\`\`logts-play
+MODE WIREWRITE
+1wire b = 0
 1wire a := 0
 a = AND(b, 1)
 probe(a)
-1wire b = 0
 \`\`\`
 
 After RUN, \`probe(a)\` still reports \`initialised\` for \`a\` when its first value is committed.
@@ -17168,6 +17204,7 @@ After RUN, \`probe(a)\` still reports \`initialised\` for \`a\` when its first v
 Each target is independent:
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire a = 0
 1wire b = 1
 1wire c = AND(a, b)
@@ -17182,6 +17219,7 @@ a = 1
 \`probe\` reports \`changed\` when the value changes **after** elaboration (e.g. toggle switch, \`setWire\` in tests). The script below is the same as tests **800** / **801**:
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire b = 0
 1wire a := 0
 a = AND(b, 1)
@@ -17205,6 +17243,7 @@ Wave — same script (\`logts-play wave\`); identical behavior when changing \`b
 ### Example — storage reference
 
 \`\`\`logts-play
+MODE WIREWRITE
 4wire x := 0000
 probe(&1)
 x = 1010
@@ -17347,6 +17386,7 @@ Output: \`c (1wire) = 0\`, \`a = 0\`, \`b = 1\`.
 On **Legacy**, \`a = 1\` propagates immediately to \`b = NOT(a)\`; \`peek\` sees \`b = 0\`.
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire a := 0
 1wire b = NOT(a)
 show(a, b)
@@ -17431,6 +17471,7 @@ q (1wire) = 1 …
 ### 6. Two \`show(b)\` after \`a = 1\` — Legacy vs Wave (812 / 813)
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire a := 0
 1wire b = NOT(a)
 show(b)
@@ -17483,6 +17524,7 @@ b (1wire) = 1 …
 On **Wave**, propagation at end of RUN may change \`a\` after the probe’s first read — the second line must be **\`changed\`**, not \`initialised\`:
 
 \`\`\`logts-play wave
+MODE WIREWRITE
 1wire a := 0
 1wire b := 1
 a = AND(b, 1)
@@ -17499,6 +17541,7 @@ Output:
 On **Legacy**, the cascade runs before \`activateProbes\` — a single line:
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire a := 0
 1wire b := 1
 a = AND(b, 1)
@@ -17572,6 +17615,7 @@ Example: with \`4wire o = AND(.o:counter, .p + .p + .p + .p)\`, \`watch(.o:count
 ### Example — wires
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire clk = 0
 1wire en = 0
 
@@ -17935,7 +17979,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 comp [mem] .rom:
   depth: 8
   length: 16
-  readonly: 1
+  readonly
   on: 1
   = ^aa5500ff
   :
@@ -18113,7 +18157,7 @@ Copy **4 words** from slot 1 (\`.rom\`) to slot 2 (\`.ram\`). **Load & Run:** \`
 comp [mem] .rom:
   depth: 8
   length: 8
-  readonly: 1
+  readonly
   on: 1
   = ^01020304
   :
@@ -18206,7 +18250,7 @@ comp [dma] .dma:
 
 1wire done = .dma:done
 1wire busy = .dma:busy
-4wire rem = .dma:remaining
+3wire rem = .dma:remaining
 .ram:{ adr = 11, set = 1 }
 8wire w3 = .ram:get
 show(done)
@@ -18250,8 +18294,8 @@ comp [dma] .dma:
 .dma:{ set = 1 }
 
 1wire done = .dma:done
-.ram:{ adr = 100, set = 1 }
-8wire w4 = .ram:get
+.dst:{ adr = 100, set = 1 }
+8wire w4 = .dst:get
 show(done)
 show(w4)
 \`\`\`
@@ -18402,7 +18446,7 @@ show(.dma:remaining)
 .dma:{ set = 1 }
 show(.dma:done)
 
-.ram:{ adr = 4, set = 1 }
+.ram:{ adr = 100, set = 1 }
 8wire last = .ram:get
 show(last)
 \`\`\`
@@ -18623,7 +18667,7 @@ inline [asm] .cpuisa:
 comp [mem] .rom:
   depth: 8
   length: 4
-  readonly: 1
+  readonly
   on: 1
   = ^2a
   :
@@ -34219,7 +34263,7 @@ inline [lut] .traffic:
   }
   :
 
-2wire x = .traffic:decode(GREEN)
+4wire x = .traffic:decode(GREEN)
 show(x)
 \`\`\`
 
@@ -36994,6 +37038,12 @@ comp [led] .beat::
 Copy the \`chip +[alu4]\` and \`board +[cpu4]\` definitions from the oscillator example, then use the tail below (or replace the oscillator/switch/led block):
 
 \`\`\`logts-play
+board +[cpu4]:
+  1pin set
+  exec: set
+  on: 1
+  :
+
 board [cpu4] .cpu::
 
 comp [key] .step::
@@ -37010,6 +37060,12 @@ comp [key] .step::
 Same setup, after definitions + \`board [cpu4] .cpu::\`:
 
 \`\`\`logts-play
+board +[cpu4]:
+  1pin set
+  exec: set
+  on: 1
+  :
+
 board [cpu4] .cpu::
 
 .cpu:{ set = ~ }
@@ -40366,16 +40422,13 @@ comp [network] .wifi:
   on: 1
   :
 
-4wire lastId
-
 .wifi:{ send = ^41
   set = 1 }
 
-lastId = .wifi:sendId
-show(lastId)
+show(.wifi:sendId)
 \`\`\`
 
-After the send above, \`lastId\` is \`1\` and the traffic log row shows **Id** \`1\`. A second send from the same endpoint yields \`sendId\` \`10\` (binary for decimal 2) and log **Id** \`2\`.
+After the send above, \`:sendId\` is \`1\` and the traffic log row shows **Id** \`1\`. A second send from the same endpoint yields \`sendId\` \`10\` (binary for decimal 2) and log **Id** \`2\`.
 
 Packet ids are for tracing and UI only — they are **not** inserted into the RX FIFO and receivers cannot read them from \`:get\` / \`:front\`.
 
@@ -40447,7 +40500,7 @@ comp [network] .wifi:
   on: 1
   :
 
-.wifi:{ send = inst
+.wifi:{ send = inst;8
   set = 1 }
 \`\`\`
 
@@ -42853,7 +42906,7 @@ inline [plc] .demo:
   OUT = t.Q
   :
 
-; parse-only — use with comp [plc] for scans (see plc.md example 17)
+# parse-only — use with comp [plc] for scans (see plc.md example 17)
 doc(.demo)
 \`\`\`
 
@@ -43004,7 +43057,7 @@ comp [plc] .ctrl:
   on: 1
   :
 
-; 3 rising edges — WARN on (cv>=3), FULL off (cv<5)
+# 3 rising edges — WARN on (cv>=3), FULL off (cv<5)
 .sensor = 1
 .ctrl:{ set = 1 }
 .sensor = 0
@@ -43051,12 +43104,12 @@ comp [plc] .ctrl:
   on: 1
   :
 
-; load preset first
+# load preset first
 .reload = 1
 .ctrl:{ set = 1 }
 .reload = 0
 
-; 3 rising edges to count down
+# 3 rising edges to count down
 .tick = 1
 .ctrl:{ set = 1 }
 .tick = 0
@@ -43750,6 +43803,7 @@ inline [plc] .latch:
 1wire startIn
 1wire motorOut
 
+MODE WIREWRITE
 startIn = 1
 
 comp [plc] .ctrl:
@@ -43775,16 +43829,16 @@ inline [plc] .machine:
   IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
   :
 
+1wire startIn
+1wire stopIn
+1wire motorOut
+
 comp [plc] .ctrl:
   program: .machine
   inputs: { START = startIn, STOP = stopIn }
   outputs: { MOTOR = motorOut }
   on: 1
   :
-
-1wire startIn
-1wire stopIn
-1wire motorOut
 
 doc(.machine)
 doc(.ctrl)
@@ -43934,7 +43988,7 @@ comp [switch] .faultSw:
   :
 
 comp [clcd] .panel:
-  = { warning: x:10 y:10 bit:0 : }
+  symbols { warning: x:10 y:10 bit:0 : }
   on: 1
   :
 
@@ -44789,17 +44843,20 @@ comp [bar] .levelBar:
   length: 8
   :
 
+8wire levelOut
+
 comp [plc] .ctrl:
   program: .machine
   inputs: { TEMP = .tempSlider }
-  outputs: { LEVEL = .levelBar }
+  outputs: { LEVEL = levelOut }
   on: 1
   :
 
 .tempSlider:{ data = 01010000 set = 1 }
 .ctrl:{ set = 1 }
+.levelBar = levelOut
 
-show(.levelBar:get)
+show(levelOut)
 \`\`\`
 
 After Load & Run: \`TEMP = 80\`, \`LEVEL = (80 * 2) / 10 = **16**\` (\`00010000\` on \`:get\`).
@@ -45200,7 +45257,7 @@ comp [plc] .ctrl:
   ...
 
 comp [clcd] .panel:
-  = { warning: x:10 y:10 bit:0 : }
+  symbols { warning: x:10 y:10 bit:0 : }
   on: 1
   :
 
@@ -46286,10 +46343,9 @@ inline [protocol] .verifyCs:
   :
 
 24wire pkt = .pktCs { data = 10101010 }
-1wire ok = .verifyCs { data = pkt }
+1wire _ = .verifyCs { data = pkt }
 
 show(pkt)
-show(ok)
 \`\`\`
 
 Body \`10101010\` + CRC suffix → 24-bit packet. Verify succeeds silently (empty output channel).
@@ -46835,7 +46891,7 @@ inline [protocol] .restFoot:
     1111
   :
 
-32wire out = .restFoot { data = 0000 + 0100 + repeat(1,32) + 1111 }
+32wire out = .restFoot { data = 0000 + 0100 + 11111111111111111111111111111111 + 1111 }
 show(out)
 \`\`\`
 
@@ -46872,10 +46928,9 @@ inline [protocol] .verifyCs:
   :
 
 24wire pkt = .pktCs { data = 10101010 }
-1wire ok = .verifyCs { data = pkt }
+1wire _ = .verifyCs { data = pkt }
 
 show(pkt)
-show(ok)
 \`\`\`
 
 Body \`10101010\` + CRC suffix → 24-bit packet. Verify succeeds silently (empty output channel).
@@ -47625,6 +47680,7 @@ When \`clock\` is a regular wire, \`REG\` behaves as a **falling-edge register**
 This matches typical counter / state-machine usage with a DIP or key as clock: prepare \`data\` while \`clk = 1\`, then pulse \`clk\` low to capture.
 
 \`\`\`logts-play
+MODE WIREWRITE
 1wire data = 0
 1wire clk  = 0
 1wire clr  = 0
@@ -48361,7 +48417,7 @@ Mismatch between schema width and **element** width is a compile-time error:
     cycles:2
     reserved:5
 :
-16wire<opcode13> instr
+13wire<opcode13> instr
 \`\`\`
 
 Valid attach (16 bits):
@@ -50993,6 +51049,12 @@ Load & Run: \`p\` matches \`cmd\` (\`8\` steps).
 ## PLC mapping (optional)
 
 \`\`\`logts-play
+inline [plc] .servo:
+  inputs: { START }
+  outputs: { ARM: 8 }
+  IF START THEN ARM = 10000000 ELSE ARM = 00000000 END_IF
+  :
+
 comp [switch] .start:
   text: 'Go'
   on: 1
@@ -51008,6 +51070,7 @@ comp [servo] .arm:
   :
 
 comp [plc] .ctrl:
+  program: .servo
   scanTime: 0
   inputs: { START = .start }
   outputs: { ARM = .arm }
@@ -52493,14 +52556,14 @@ Append rejects **\`Z\`/\`X\`** in the source bitstring (even in \`MODE ZSTATE\`)
 | \`show(rx./8)\` | Peek for display |
 | \`4wire x << rx./4\` | **Consume** — assign wire and remove 4 bits from front |
 
-Slice canonical form: **\`rx./N\`** (front N bits). Dynamic length: **\`rx/(expr)\`** — length evaluated at runtime from a wire expression (e.g. \`4wire len : 0100\` then \`rx/(len)\`). Sugar **\`rx./(expr)\`** is equivalent. Consume is **only** through \`<<\` on a wire target.
+Slice canonical form: **\`rx./N\`** (front N bits). Dynamic length: **\`rx/(expr)\`** — length evaluated at runtime from a wire expression (e.g. \`4wire n : 0100\` then \`rx/(n)\`). Sugar **\`rx./(expr)\`** is equivalent. Consume is **only** through \`<<\` on a wire target.
 
 \`\`\`logts-play
 sock rx
 rx << ^FF
-4wire len : 0100
-4wire peek = rx/(len)
-4wire take << rx/(len)
+4wire n : 0100
+4wire front = rx/(n)
+4wire take << rx/(n)
 show(BITSIZE(rx))
 \`\`\`
 
@@ -52533,8 +52596,8 @@ sock rx
 show(bs)
 show(ww)
 rx << ^FF
-bs = BITSIZE(rx)
-show(bs)
+4wire bs2 = BITSIZE(rx)
+show(bs2)
 \`\`\`
 
 ### \`SOCKATTACHED(sock)\`
@@ -54751,12 +54814,12 @@ literal.bit           # single bit
 \`\`\`
 
 \`\`\`logts-play
-8wire a = \\255.0-3
+8wire a = \\255.0-3;8
 show(a)
 \`\`\`
 
 \`\`\`logts-play
-8wire b = ^FF.4/4
+8wire b = ^FF.4/4;8
 show(b)
 \`\`\`
 

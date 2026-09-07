@@ -86,7 +86,7 @@ Rules:
 | `motor`, `servo` | `color`, `frameColor`, `bgColor` |
 | `led`, `slider`, `rotary`, `sensor`, `terminal` | `color` |
 | `scanner`, `keyboard` | `color`, `bgColor`, `focusColor`, `focusBgColor` (+ `pulseColor` on keyboard) |
-| `clcd` | `color`, `bgColor`, `bgColorSym`, `touchColor` (component level); per-symbol `color` / `bgColor` in `= { … }` |
+| `clcd` | `color`, `bgColor`, `bgColorSym`, `touchColor` (component level); per-symbol `color` / `bgColor` in `symbols { … }` |
 | `bar` / `ledBar` | `color`, `bgColor`, `lgColor` |
 | `7seg`, `14seg`, `dots` | `color`, `bgColor`, `lgColor` |
 | `dip` | `color`, `colorFor.N` |
@@ -143,7 +143,7 @@ Position `2` uses red when on; other positions use the default `color`.
 
 ## CLCD — symbol block colors
 
-Inside `comp [clcd] … = { … }`, each symbol entry may set `color` and `bgColor` with the same rules as component-level attributes: `^hex` or a wire name (snapshot at `comp` elaboration).
+Inside `comp [clcd] … symbols { … }`, each symbol entry may set `color` and `bgColor` with the same rules as component-level attributes: `^hex` or a wire name (snapshot at `comp` elaboration).
 
 ```logts-play
 24wire symFg = ^ffaa00
@@ -152,7 +152,7 @@ Inside `comp [clcd] … = { … }`, each symbol entry may set `color` and `bgCol
 comp [clcd] .status:
   color: ^00ff00
   bgColor: ^001000
-  = {
+  symbols {
     warning:
       x: 90
       y: 10

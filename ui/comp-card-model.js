@@ -507,7 +507,7 @@
   }
 
   function serializeClcdSymbolsLines(symbols, indent) {
-    const lines = [indent + '= {'];
+    const lines = [indent + 'symbols {'];
     if (typeof ClcdComponent !== 'undefined' && ClcdComponent._pushInstanceSymbolLines) {
       const stubLines = [];
       (symbols || []).forEach(function (sym) {
@@ -532,12 +532,12 @@
 
   function enrichBodyItemsFromParsed(model, parsed) {
     if (!parsed) return;
-    if (model.type === 'clcd' && parsed.initialValue && parsed.initialValue.kind === 'clcdSymbols') {
+    if (model.type === 'clcd' && parsed && parsed.attributes && parsed.attributes.clcdSymbols) {
       for (let i = 0; i < model.bodyItems.length; i++) {
-        if (model.bodyItems[i].kind === 'equals') {
+        if (model.bodyItems[i].kind === 'clcdSymbols') {
           const item = {
             kind: 'clcdSymbols',
-            symbols: (parsed.initialValue.symbols || []).map(function (s) { return Object.assign({}, s); }),
+            symbols: (parsed.attributes.clcdSymbols || []).map(function (s) { return Object.assign({}, s); }),
             rawLines: model.bodyItems[i].rawLines.slice()
           };
           refreshNestedRawLines(item, detectBodyIndent(model));
@@ -770,6 +770,20 @@
         items.push({ kind: 'raw', rawLines: [line] });
         i++;
         continue;
+      }
+
+      if (compType === 'clcd') {
+        const symbolsHead = line.match(/^\s*symbols\s*\{/);
+        if (symbolsHead) {
+          const block = consumeBraceBlock(bodyLines, i);
+          i = block.endIdx;
+          items.push({
+            kind: 'clcdSymbols',
+            symbols: [],
+            rawLines: block.rawLines
+          });
+          continue;
+        }
       }
 
       if (/^\s*=/.test(line)) {
@@ -1559,24 +1573,7 @@
   }
 
   function defaultClcdSymbol(name) {
-    const kind = getClcdUiKind(name);
-    const sym = { name: name, x: 0, y: 0, bit: 0 };
-    if (kind === 'icon') {
-      sym.style = 1;
-      sym.size = 22;
-      if (typeof getClcdSymbolDef === 'function') {
-        const def = getClcdSymbolDef(name);
-        if (def && def.defaultStyle != null) sym.style = def.defaultStyle;
-      }
-    } else if (kind === 'canvas') {
-      sym.size = 44;
-    } else if (kind === 'label') {
-      sym.text = 'Text';
-      sym.family = 'mono';
-      sym.size = 14;
-      sym.weight = 'normal';
-    }
-    return sym;
+    return { name: name, x: 0, y: 0 };
   }
 
   function upsertClcdSymbol(model, oldName, symbol) {

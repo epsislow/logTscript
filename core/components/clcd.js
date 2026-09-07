@@ -194,6 +194,12 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     return { touchPadding };
   }
 
+  getSpecialParseAttributes() {
+    return {
+      symbolsBlockAttrs: ['symbols'],
+    };
+  }
+
   getWidthBits(attributes) {
     return ClcdComponent.bitWidthFromSymbols(attributes.clcdSymbols || []);
   }
@@ -257,7 +263,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
         lines.push(`  ${attr.name}: ${attr.value}`);
       }
     }
-    lines.push('  = {');
+    lines.push('  symbols {');
     ClcdComponent._pushTypeDocSymbolSection(lines, 'icon', '<name>', [
       'x: integer',
       'y: integer',
@@ -312,7 +318,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     return lines;
   }
 
-  static _pushInstanceSymbolLines(lines, sym, attributes) {
+  static _pushInstanceSymbolLines(lines, sym, attributes, docMode) {
     const symDef = (typeof getClcdSymbolDef === 'function')
       ? getClcdSymbolDef(sym.name)
       : null;
@@ -320,22 +326,23 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     const touchPadding = attributes && attributes.touchPadding !== undefined
       ? parseInt(attributes.touchPadding, 10)
       : 0;
+    const forDoc = !!docMode;
 
     lines.push(`    ${sym.name}:`);
     lines.push(`      x: ${sym.x}`);
     lines.push(`      y: ${sym.y}`);
     if (sym.bitsStart !== undefined) {
       lines.push(`      bits: ${sym.bitsStart}-${sym.bitsEnd}`);
-    } else {
+    } else if (sym.bit !== undefined) {
       lines.push(`      bit: ${sym.bit}`);
     }
 
-    if (kind === 'label') {
-      lines.push(`      text: ${ClcdComponent.formatDocString(sym.text)}`);
+    if (kind === 'label' && (sym.text !== undefined || forDoc)) {
+      if (sym.text !== undefined) {
+        lines.push(`      text: ${ClcdComponent.formatDocString(sym.text)}`);
+      }
       lines.push(`      family: ${sym.family !== undefined ? sym.family : 'mono'}`);
-      const labelSize = (sym.size !== undefined && sym.size !== null)
-        ? sym.size
-        : 14;
+      const labelSize = (sym.size !== undefined && sym.size !== null) ? sym.size : 14;
       lines.push(`      size: ${labelSize}`);
       lines.push(`      weight: ${sym.weight !== undefined ? sym.weight : 'normal'}`);
     }
@@ -353,16 +360,23 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
         lines.push(`      style: ${sym.style}`);
       } else if (symDef && symDef.defaultStyle !== undefined) {
         lines.push(`      style: ${symDef.defaultStyle}`);
+      } else if (forDoc) {
+        lines.push('      style: 1');
       }
-      const faSize = (typeof resolveClcdFaIconSize === 'function')
-        ? resolveClcdFaIconSize(sym)
-        : (sym.size !== undefined ? sym.size : 22);
-      lines.push(`      size: ${faSize}`);
+      if (sym.size !== undefined && sym.size !== null) {
+        lines.push(`      size: ${sym.size}`);
+      } else if (forDoc) {
+        const faSize = (typeof resolveClcdFaIconSize === 'function')
+          ? resolveClcdFaIconSize(sym)
+          : 22;
+        lines.push(`      size: ${faSize}`);
+      }
     } else if (kind === 'canvas') {
-      const canvasSize = (sym.size !== undefined && sym.size !== null)
-        ? sym.size
-        : ClcdComponent._docDefaultCanvasSize(sym);
-      lines.push(`      size: ${canvasSize}`);
+      if (sym.size !== undefined && sym.size !== null) {
+        lines.push(`      size: ${sym.size}`);
+      } else if (forDoc) {
+        lines.push(`      size: ${ClcdComponent._docDefaultCanvasSize(sym)}`);
+      }
     }
 
     if (sym.width !== undefined) lines.push(`      width: ${sym.width}`);
@@ -400,9 +414,9 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       lines.push('    nl');
     }
 
-    lines.push('  = {');
+    lines.push('  symbols {');
     for (const sym of symbols) {
-      ClcdComponent._pushInstanceSymbolLines(lines, sym, attributes);
+      ClcdComponent._pushInstanceSymbolLines(lines, sym, attributes, true);
     }
     lines.push('  }');
     lines.push('  :');
@@ -566,9 +580,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
   }
 
   finalizeCompInfo(compInfo, attributes, initialValue, bits) {
-    const rawSymbols = (initialValue && initialValue.kind === 'clcdSymbols')
-      ? initialValue.symbols
-      : (attributes.clcdSymbols || []);
+    const rawSymbols = attributes.clcdSymbols || [];
     const defaultColor = attributes.color;
     const defaultSymBgColor = ClcdComponent.defaultSymbolBgColor(attributes);
     const symbols = ClcdComponent.resolveSymbols(rawSymbols, defaultColor, defaultSymBgColor);
@@ -608,9 +620,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       ? ClcdComponent.normalizeColor(attributes.touchColor, null)
       : null;
     const touchDefaults = ClcdComponent.touchDefaultsFromAttributes(attributes);
-    const rawSymbols = (initialValue && initialValue.kind === 'clcdSymbols')
-      ? initialValue.symbols
-      : (attributes.clcdSymbols || []);
+    const rawSymbols = attributes.clcdSymbols || [];
     const symbols = ClcdComponent.resolveSymbols(rawSymbols, defaultColor, ClcdComponent.defaultSymbolBgColor(attributes));
     const initialBits = '0'.repeat(bits);
     const storageIdx = ctx.storeValue(initialBits);

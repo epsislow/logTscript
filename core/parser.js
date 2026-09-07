@@ -3717,6 +3717,7 @@ assignment() {
         let literalAttrs = [];
         let regionsBlockAttrs = [];
         let hitboxBlockAttrs = [];
+        let symbolsBlockAttrs = [];
         let plcMappingBlockAttrs = [];
         let plcGlobalsBlockAttrs = [];
         if (this.componentRegistry) {
@@ -3730,9 +3731,18 @@ assignment() {
             if (special && special.literalAttrs) literalAttrs = special.literalAttrs;
             if (special && special.regionsBlockAttrs) regionsBlockAttrs = special.regionsBlockAttrs;
             if (special && special.hitboxBlockAttrs) hitboxBlockAttrs = special.hitboxBlockAttrs;
+            if (special && special.symbolsBlockAttrs) symbolsBlockAttrs = special.symbolsBlockAttrs;
             if (special && special.plcMappingBlockAttrs) plcMappingBlockAttrs = special.plcMappingBlockAttrs;
             if (special && special.plcGlobalsBlockAttrs) plcGlobalsBlockAttrs = special.plcGlobalsBlockAttrs;
           }
+        }
+        if (symbolsBlockAttrs.includes(attrName) && this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const parsed = this.parseClcdSymbolsRaw(bracePos);
+          if (parsed && parsed.kind === 'clcdSymbols') {
+            attributes.clcdSymbols = parsed.symbols;
+          }
+          continue;
         }
         if (hitboxBlockAttrs.includes(attrName) && this.c.type === 'SYM' && this.c.value === '{') {
           const bracePos = this.t.i - 1;
@@ -4377,12 +4387,7 @@ assignment() {
             throw Error(`Expected '{' after '= ${isaRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           } else if (this.c.type === 'SYM' && this.c.value === '{') {
             if (compType === 'clcd') {
-              const bracePos = this.t.i - 1;
-              initialValue = this.parseClcdSymbolsRaw(bracePos);
-              if (initialValue && initialValue.kind === 'clcdSymbols') {
-                attributes.clcdSymbols = initialValue.symbols;
-              }
-              continue;
+              throw Error(`CLCD symbol definitions use 'symbols { ... }', not '= { ... }' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
             }
             throw Error(`Expected binary or decimal value after '=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           } else {
