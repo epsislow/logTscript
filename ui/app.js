@@ -663,9 +663,9 @@ function editorOnSpace(editor) {
       const cursor = cm.getCursor();
       const lineText = cm.getLine(cursor.line).substring(0, cursor.ch);
 
-      // Dacă utilizatorul a scris exact "comp" și acum a apăsat Space
-      if (lineText.trim() === "comp") {
-        const template = ` [network] .net:\n  width: 100\n  length: 5\n  channel: 'demo'\n  on: 0\n  :`;
+      // Dacă utilizatorul a scris exact "comp" și acum a apăsat Space (doar cu Cards activ)
+      if (lineText.trim() === "comp" && isCompCardWidgetsEnabled()) {
+        const template = ` [key] .name:\n  :`;
         cm.replaceRange(template, cursor);
         
         // Mutăm cursorul frumos după introducere
