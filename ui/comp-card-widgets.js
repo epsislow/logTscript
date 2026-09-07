@@ -227,6 +227,7 @@
   }
 
   function renderEqualsField(model) {
+    if (model.type === 'clcd' && CCM.getClcdSymbols(model).length) return '';
     const eq = CCM.getEqualsItem(model);
     if (!eq) return '';
     const rhs = CCM.getEqualsRhsText(eq);
@@ -288,6 +289,319 @@
       '<button type="button" class="cm-comp-card-plc-global-add">+ row</button>' +
       '</div>'
     );
+  }
+
+  function clcdKnownSymbolsDatalistId(model) {
+    return 'cm-comp-card-clcd-symbols-' + (model.id || '0').replace(/:/g, '-');
+  }
+
+  function renderClcdKnownSymbolsDatalist(model) {
+    const listId = clcdKnownSymbolsDatalistId(model);
+    let opts = '';
+    const known = (typeof CLCD_KNOWN_SYMBOLS !== 'undefined') ? CLCD_KNOWN_SYMBOLS : [];
+    known.forEach(function (name) {
+      opts += '<option value="' + escapeHtml(name) + '"></option>';
+    });
+    return '<datalist id="' + escapeHtml(listId) + '">' + opts + '</datalist>';
+  }
+
+  function renderClcdKindFields(sym) {
+    const kind = CCM.getClcdUiKind(sym.name);
+    if (kind === 'icon') {
+      const style = sym.style != null ? sym.style : 1;
+      const size = sym.size != null ? sym.size : 22;
+      return (
+        '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-style" placeholder="style" value="' + escapeHtml(String(style)) + '" min="1" max="3">' +
+        '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-size" placeholder="size" value="' + escapeHtml(String(size)) + '">'
+      );
+    }
+    if (kind === 'canvas') {
+      const size = sym.size != null ? sym.size : 44;
+      return '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-size" placeholder="size" value="' + escapeHtml(String(size)) + '">';
+    }
+    if (kind === 'label') {
+      const text = sym.text != null ? String(sym.text).replace(/^"|"$/g, '') : '';
+      const family = sym.family || 'mono';
+      const size = sym.size != null ? sym.size : 14;
+      const weight = sym.weight || 'normal';
+      return (
+        '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-text" placeholder="text" value="' + escapeHtml(text) + '">' +
+        '<select class="cm-comp-card-nested-input cm-comp-card-clcd-family">' +
+        '<option value="mono"' + (family === 'mono' ? ' selected' : '') + '>mono</option>' +
+        '<option value="sans"' + (family === 'sans' ? ' selected' : '') + '>sans</option>' +
+        '<option value="serif"' + (family === 'serif' ? ' selected' : '') + '>serif</option>' +
+        '</select>' +
+        '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-size" placeholder="size" value="' + escapeHtml(String(size)) + '">' +
+        '<select class="cm-comp-card-nested-input cm-comp-card-clcd-weight">' +
+        '<option value="normal"' + (weight === 'normal' ? ' selected' : '') + '>normal</option>' +
+        '<option value="bold"' + (weight === 'bold' ? ' selected' : '') + '>bold</option>' +
+        '<option value="italic"' + (weight === 'italic' ? ' selected' : '') + '>italic</option>' +
+        '<option value="boldItalic"' + (weight === 'boldItalic' ? ' selected' : '') + '>boldItalic</option>' +
+        '</select>'
+      );
+    }
+    return '';
+  }
+
+  function renderClcdSymbolCard(model, sym) {
+    const listId = clcdKnownSymbolsDatalistId(model);
+    const kind = CCM.getClcdUiKind(sym.name);
+    return (
+      '<div class="cm-comp-card-clcd-symbol" data-old-name="' + escapeHtml(sym.name) + '">' +
+      '<div class="cm-comp-card-clcd-symbol-head">' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-name" list="' + escapeHtml(listId) + '" value="' + escapeHtml(sym.name) + '">' +
+      '<span class="cm-comp-card-clcd-kind">' + escapeHtml(kind) + '</span>' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-remove" data-name="' + escapeHtml(sym.name) + '">✕</button>' +
+      '</div>' +
+      '<div class="cm-comp-card-clcd-symbol-fields">' +
+      '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-x" placeholder="x" value="' + escapeHtml(String(sym.x != null ? sym.x : 0)) + '">' +
+      '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-y" placeholder="y" value="' + escapeHtml(String(sym.y != null ? sym.y : 0)) + '">' +
+      '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-bit" placeholder="bit" value="' + escapeHtml(String(sym.bit != null ? sym.bit : 0)) + '">' +
+      renderClcdKindFields(sym) +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderClcdSymbolsSection(model) {
+    const symbols = CCM.getClcdSymbols(model);
+    if (!symbols.length && !model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; })) return '';
+    const cards = symbols.map(function (sym) { return renderClcdSymbolCard(model, sym); }).join('');
+    return (
+      renderClcdKnownSymbolsDatalist(model) +
+      '<div class="cm-comp-card-nested cm-comp-card-nested--clcd">' +
+      '<div class="cm-comp-card-nested-title">= { symbols }</div>' +
+      cards +
+      '<button type="button" class="cm-comp-card-clcd-add">+ symbol</button>' +
+      '</div>'
+    );
+  }
+
+  function renderHitboxLabeledRow(label, fieldHtml) {
+    return (
+      '<div class="cm-comp-card-hitbox-labeled-row">' +
+      '<span class="cm-comp-card-hitbox-label">' + escapeHtml(label) + '</span>' +
+      fieldHtml +
+      '</div>'
+    );
+  }
+
+  function renderHitboxPoutRow(zoneName, pout, pi) {
+    const field = pout.field || '';
+    const nameFmt = CCM.formatHitboxPoutNameFormat(pout);
+    let eventOpts = ['press', 'release', 'drag', 'move'].map(function (ev) {
+      const sel = ev === pout.event ? ' selected' : '';
+      return '<option value="' + ev + '"' + sel + '>' + ev + '</option>';
+    }).join('');
+    let fieldOpts = ['', 'eventX', 'eventY'].map(function (f) {
+      const sel = f === field ? ' selected' : '';
+      const label = f || '—';
+      return '<option value="' + escapeHtml(f) + '"' + sel + '>' + escapeHtml(label) + '</option>';
+    }).join('');
+    return (
+      '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--hitbox-pout" data-zone="' + escapeHtml(zoneName) + '" data-pout-idx="' + pi + '">' +
+      '<select class="cm-comp-card-nested-input cm-comp-card-hitbox-pout-event">' + eventOpts + '</select>' +
+      '<select class="cm-comp-card-nested-input cm-comp-card-hitbox-pout-field">' + fieldOpts + '</select>' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-pout-namefmt" placeholder="pinName/s16" value="' + escapeHtml(nameFmt) + '">' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-hitbox-pout-remove">✕</button>' +
+      '</div>'
+    );
+  }
+
+  function renderHitboxZoneCard(zoneName, zone) {
+    const shapeLine = CCM.hitboxZoneShapeLine(zone);
+    const stroke = zone.stroke || '';
+    const touchVal = zone.touchType != null ? zone.touchType : 1;
+    let touchOpts = [
+      { v: 1, label: '1 — press/release' },
+      { v: 2, label: '2 — pulse' },
+      { v: 3, label: '3 — latch' }
+    ].map(function (t) {
+      const sel = touchVal === t.v ? ' selected' : '';
+      return '<option value="' + t.v + '"' + sel + '>' + escapeHtml(t.label) + '</option>';
+    }).join('');
+    let poutRows = (zone.pouts || []).map(function (p, pi) {
+      return renderHitboxPoutRow(zoneName, p, pi);
+    }).join('');
+    return (
+      '<div class="cm-comp-card-hitbox-zone" data-old-zone="' + escapeHtml(zoneName) + '">' +
+      '<div class="cm-comp-card-hitbox-zone-head">' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-zone-name" value="' + escapeHtml(zoneName) + '">' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-hitbox-zone-remove">✕</button>' +
+      '</div>' +
+      renderHitboxLabeledRow('shape', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-shape" value="' + escapeHtml(shapeLine) + '">') +
+      renderHitboxLabeledRow('touchType:', '<select class="cm-comp-card-nested-input cm-comp-card-hitbox-touch">' + touchOpts + '</select>') +
+      renderHitboxLabeledRow('stroke:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-stroke" placeholder="ffff00" value="' + escapeHtml(stroke) + '">') +
+      '<div class="cm-comp-card-hitbox-pouts">' + poutRows + '</div>' +
+      '<button type="button" class="cm-comp-card-hitbox-pout-add" data-zone="' + escapeHtml(zoneName) + '">+ pout</button>' +
+      '</div>'
+    );
+  }
+
+  function renderHitboxSection(model) {
+    const hb = CCM.getHitboxBlock(model);
+    if (!hb && !model.bodyItems.some(function (i) { return i.kind === 'hitboxBlock'; })) return '';
+    const zones = hb ? hb.zones : {};
+    const zoneNames = Object.keys(zones);
+    const cards = zoneNames.map(function (zn) { return renderHitboxZoneCard(zn, zones[zn]); }).join('');
+    return (
+      '<div class="cm-comp-card-nested cm-comp-card-nested--hitbox">' +
+      '<div class="cm-comp-card-nested-title">hitbox { }</div>' +
+      cards +
+      '<button type="button" class="cm-comp-card-hitbox-zone-add">+ zone</button>' +
+      '</div>'
+    );
+  }
+
+  function readClcdSymbolFromCard(card) {
+    const oldName = card.getAttribute('data-old-name') || '';
+    const name = card.querySelector('.cm-comp-card-clcd-name').value.trim();
+    const sym = {
+      name: name,
+      x: parseInt(card.querySelector('.cm-comp-card-clcd-x').value, 10) || 0,
+      y: parseInt(card.querySelector('.cm-comp-card-clcd-y').value, 10) || 0,
+      bit: parseInt(card.querySelector('.cm-comp-card-clcd-bit').value, 10) || 0
+    };
+    const kind = CCM.getClcdUiKind(name);
+    const styleEl = card.querySelector('.cm-comp-card-clcd-style');
+    const sizeEl = card.querySelector('.cm-comp-card-clcd-size');
+    if (kind === 'icon') {
+      if (styleEl) sym.style = parseInt(styleEl.value, 10) || 1;
+      if (sizeEl) sym.size = parseInt(sizeEl.value, 10) || 22;
+    } else if (kind === 'canvas') {
+      if (sizeEl) sym.size = parseInt(sizeEl.value, 10) || 44;
+    } else if (kind === 'label') {
+      const textEl = card.querySelector('.cm-comp-card-clcd-text');
+      if (textEl) sym.text = textEl.value;
+      const familyEl = card.querySelector('.cm-comp-card-clcd-family');
+      if (familyEl) sym.family = familyEl.value;
+      if (sizeEl) sym.size = parseInt(sizeEl.value, 10) || 14;
+      const weightEl = card.querySelector('.cm-comp-card-clcd-weight');
+      if (weightEl) sym.weight = weightEl.value;
+    }
+    return { oldName: oldName, symbol: sym };
+  }
+
+  function readHitboxZoneFromCard(zoneCard) {
+    const oldName = zoneCard.getAttribute('data-old-zone') || '';
+    const name = zoneCard.querySelector('.cm-comp-card-hitbox-zone-name').value.trim();
+    const zone = {
+      name: name,
+      shapeLine: zoneCard.querySelector('.cm-comp-card-hitbox-shape').value.trim(),
+      touchType: parseInt(zoneCard.querySelector('.cm-comp-card-hitbox-touch').value, 10) || 1,
+      stroke: zoneCard.querySelector('.cm-comp-card-hitbox-stroke').value.trim() || null,
+      pouts: []
+    };
+    zoneCard.querySelectorAll('.cm-comp-card-nested-row--hitbox-pout').forEach(function (row) {
+      const event = row.querySelector('.cm-comp-card-hitbox-pout-event').value;
+      const field = row.querySelector('.cm-comp-card-hitbox-pout-field').value;
+      const nameFmt = row.querySelector('.cm-comp-card-hitbox-pout-namefmt').value.trim();
+      const parsed = CCM.parseHitboxPoutNameFormat(nameFmt);
+      if (!parsed) return;
+      const pout = { event: event, name: parsed.name, bindType: parsed.bindType || 'bool' };
+      if (field) pout.field = field;
+      if (parsed.numberFormat) pout.numberFormat = parsed.numberFormat;
+      zone.pouts.push(pout);
+    });
+    return { oldName: oldName, zone: zone };
+  }
+
+  function bindClcdSymbolCard(card, syncModel) {
+    function syncFromCard() {
+      if (card.dataset.pending === '1') {
+        const data = readClcdSymbolFromCard(card);
+        if (!data.symbol.name) return;
+        card.dataset.pending = '0';
+        card.setAttribute('data-old-name', data.symbol.name);
+      }
+      const data = readClcdSymbolFromCard(card);
+      if (!data.symbol.name) return;
+      syncModel(function (m) {
+        return CCM.upsertClcdSymbol(m, data.oldName, data.symbol);
+      });
+    }
+    card.querySelectorAll('input, select').forEach(function (el) {
+      el.addEventListener('change', syncFromCard);
+    });
+    card.querySelector('.cm-comp-card-clcd-remove').addEventListener('click', function () {
+      if (card.dataset.pending === '1') {
+        card.remove();
+        return;
+      }
+      const name = card.getAttribute('data-old-name');
+      syncModel(function (m) { return CCM.removeClcdSymbol(m, name); });
+    });
+    card.querySelectorAll('input').forEach(function (el) {
+      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      bindInputNativeCaret(el);
+    });
+  }
+
+  function bindHitboxZoneCard(zoneCard, syncModel) {
+    function syncFromCard() {
+      if (zoneCard.dataset.pending === '1') {
+        const data = readHitboxZoneFromCard(zoneCard);
+        if (!data.zone.name) return;
+        zoneCard.dataset.pending = '0';
+        zoneCard.setAttribute('data-old-zone', data.zone.name);
+      }
+      const data = readHitboxZoneFromCard(zoneCard);
+      if (!data.zone.name) return;
+      syncModel(function (m) {
+        return CCM.setHitboxZone(m, data.oldName, data.zone);
+      });
+    }
+    zoneCard.querySelectorAll('.cm-comp-card-hitbox-shape, .cm-comp-card-hitbox-touch, .cm-comp-card-hitbox-stroke, .cm-comp-card-hitbox-zone-name').forEach(function (el) {
+      el.addEventListener('change', syncFromCard);
+    });
+    zoneCard.querySelectorAll('.cm-comp-card-nested-row--hitbox-pout input, .cm-comp-card-nested-row--hitbox-pout select').forEach(function (el) {
+      el.addEventListener('change', syncFromCard);
+    });
+    zoneCard.querySelector('.cm-comp-card-hitbox-zone-remove').addEventListener('click', function () {
+      if (zoneCard.dataset.pending === '1') {
+        zoneCard.remove();
+        return;
+      }
+      const name = zoneCard.getAttribute('data-old-zone');
+      syncModel(function (m) { return CCM.removeHitboxZone(m, name); });
+    });
+    zoneCard.querySelectorAll('.cm-comp-card-hitbox-pout-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btn.closest('.cm-comp-card-nested-row--hitbox-pout').remove();
+        syncFromCard();
+      });
+    });
+    zoneCard.querySelectorAll('input').forEach(function (el) {
+      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      bindInputNativeCaret(el);
+    });
+  }
+
+  function appendHitboxPoutRow(zoneCard, zoneName) {
+    const pouts = zoneCard.querySelector('.cm-comp-card-hitbox-pouts');
+    const idx = pouts.querySelectorAll('.cm-comp-card-nested-row--hitbox-pout').length;
+    const row = document.createElement('div');
+    row.className = 'cm-comp-card-nested-row cm-comp-card-nested-row--hitbox-pout';
+    row.dataset.zone = zoneName;
+    row.dataset.poutIdx = String(idx);
+    row.dataset.pending = '1';
+    row.innerHTML =
+      '<select class="cm-comp-card-nested-input cm-comp-card-hitbox-pout-event">' +
+      '<option value="press" selected>press</option><option value="release">release</option>' +
+      '<option value="drag">drag</option><option value="move">move</option></select>' +
+      '<select class="cm-comp-card-nested-input cm-comp-card-hitbox-pout-field">' +
+      '<option value="" selected>—</option><option value="eventX">eventX</option><option value="eventY">eventY</option></select>' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-pout-namefmt" placeholder="pinName/s16" value="">' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-hitbox-pout-remove">✕</button>';
+    pouts.appendChild(row);
+    row.querySelector('.cm-comp-card-hitbox-pout-remove').addEventListener('click', function () {
+      row.remove();
+    });
+    row.querySelectorAll('input, select').forEach(function (el) {
+      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      if (el.tagName === 'INPUT') bindInputNativeCaret(el);
+    });
+    return row;
   }
 
   function renderProgramRefsField(model, editor) {
@@ -496,8 +810,14 @@
     if (model.type === 'logic' && CCM.getLogicProgram(model)) {
       html += renderLogicProgramSection(model, editor);
     }
+    if (model.type === 'canvas') {
+      html += renderHitboxSection(model);
+    }
     if (model.type === 'canvas' && CCM.getCanvasProgram(model)) {
       html += renderCanvasProgramSection(model, editor);
+    }
+    if (model.type === 'clcd') {
+      html += renderClcdSymbolsSection(model);
     }
     return html;
   }
@@ -811,6 +1131,85 @@
         bindLogicBindingRow(row, syncModel);
         const first = row.querySelector('.cm-comp-card-logic-var');
         if (first) first.focus();
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-clcd-symbol').forEach(function (card) {
+      bindClcdSymbolCard(card, syncModel);
+    });
+
+    div.querySelectorAll('.cm-comp-card-clcd-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const block = btn.closest('.cm-comp-card-nested--clcd');
+        const known = (typeof CLCD_KNOWN_SYMBOLS !== 'undefined' && CLCD_KNOWN_SYMBOLS.length)
+          ? CLCD_KNOWN_SYMBOLS[0] : 'bell';
+        const sym = CCM.defaultClcdSymbol(known);
+        const card = document.createElement('div');
+        card.className = 'cm-comp-card-clcd-symbol';
+        card.dataset.pending = '1';
+        card.dataset.oldName = '';
+        card.innerHTML =
+          '<div class="cm-comp-card-clcd-symbol-head">' +
+          '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-name" list="' + escapeHtml(clcdKnownSymbolsDatalistId(model)) + '" value="">' +
+          '<span class="cm-comp-card-clcd-kind">' + escapeHtml(CCM.getClcdUiKind(sym.name)) + '</span>' +
+          '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-remove">✕</button>' +
+          '</div>' +
+          '<div class="cm-comp-card-clcd-symbol-fields">' +
+          '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-x" placeholder="x" value="0">' +
+          '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-y" placeholder="y" value="0">' +
+          '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-bit" placeholder="bit" value="0">' +
+          renderClcdKindFields(sym) +
+          '</div>';
+        block.insertBefore(card, btn);
+        bindClcdSymbolCard(card, syncModel);
+        card.querySelector('.cm-comp-card-clcd-name').focus();
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-hitbox-zone').forEach(function (zoneCard) {
+      bindHitboxZoneCard(zoneCard, syncModel);
+    });
+
+    div.querySelectorAll('.cm-comp-card-hitbox-zone-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const block = btn.closest('.cm-comp-card-nested--hitbox');
+        const zoneCard = document.createElement('div');
+        zoneCard.className = 'cm-comp-card-hitbox-zone';
+        zoneCard.dataset.pending = '1';
+        zoneCard.dataset.oldZone = '';
+        zoneCard.innerHTML =
+          '<div class="cm-comp-card-hitbox-zone-head">' +
+          '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-zone-name" value="">' +
+          '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-hitbox-zone-remove">✕</button>' +
+          '</div>' +
+          renderHitboxLabeledRow('shape', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-shape" value="rect(0, 0, 30, 30)">') +
+          renderHitboxLabeledRow('touchType:', '<select class="cm-comp-card-nested-input cm-comp-card-hitbox-touch">' +
+          '<option value="1" selected>1 — press/release</option><option value="2">2 — pulse</option><option value="3">3 — latch</option></select>') +
+          renderHitboxLabeledRow('stroke:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-hitbox-stroke" placeholder="ffff00" value="">') +
+          '<div class="cm-comp-card-hitbox-pouts"></div>' +
+          '<button type="button" class="cm-comp-card-hitbox-pout-add" data-zone="">+ pout</button>';
+        block.insertBefore(zoneCard, btn);
+        bindHitboxZoneCard(zoneCard, syncModel);
+        zoneCard.querySelector('.cm-comp-card-hitbox-zone-name').focus();
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-hitbox-pout-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const zoneCard = btn.closest('.cm-comp-card-hitbox-zone');
+        const zoneName = zoneCard.querySelector('.cm-comp-card-hitbox-zone-name').value.trim() || btn.getAttribute('data-zone') || 'zone';
+        const row = appendHitboxPoutRow(zoneCard, zoneName);
+        row.querySelectorAll('input, select').forEach(function (el) {
+          el.addEventListener('change', function () {
+            const data = readHitboxZoneFromCard(zoneCard);
+            if (!data.zone.name) return;
+            syncModel(function (m) {
+              return CCM.setHitboxZone(m, data.oldName, data.zone);
+            });
+          });
+        });
+        const nameInput = row.querySelector('.cm-comp-card-hitbox-pout-namefmt');
+        if (nameInput) nameInput.focus();
       });
     });
 

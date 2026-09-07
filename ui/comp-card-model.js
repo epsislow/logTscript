@@ -385,19 +385,27 @@
     return program;
   }
 
+  function getHitboxBlockItem(model) {
+    return model.bodyItems.find(function (i) { return i.kind === 'hitboxBlock'; }) || null;
+  }
+
   function getHitboxBlockInner(model) {
+    const item = getHitboxBlockItem(model);
+    if (item) return innerTextFromBraceRawLines(item.rawLines);
     for (let i = 0; i < model.bodyItems.length; i++) {
-      const item = model.bodyItems[i];
-      if (item.kind !== 'raw' || !item.rawLines.length) continue;
-      const first = item.rawLines[0].trim();
-      if (/^hitbox\s*\{/.test(first) || /^hitbox\s*:\s*\{/.test(item.rawLines[0])) {
-        return innerTextFromBraceRawLines(item.rawLines);
+      const rawItem = model.bodyItems[i];
+      if (rawItem.kind !== 'raw' || !rawItem.rawLines.length) continue;
+      const first = rawItem.rawLines[0].trim();
+      if (/^hitbox\s*\{/.test(first) || /^hitbox\s*:\s*\{/.test(rawItem.rawLines[0])) {
+        return innerTextFromBraceRawLines(rawItem.rawLines);
       }
     }
     return null;
   }
 
   function getHitboxZoneNames(model) {
+    const item = getHitboxBlockItem(model);
+    if (item && item.zones) return Object.keys(item.zones).sort();
     const inner = getHitboxBlockInner(model);
     if (!inner || typeof parseCanvasHitboxBlock !== 'function') return [];
     try {
@@ -405,6 +413,162 @@
       return Object.keys(parsed.zones || {}).sort();
     } catch (e) {
       return [];
+    }
+  }
+
+  function hitboxZoneShapeLine(zone) {
+    if (zone.shapeLine) return zone.shapeLine;
+    if (zone.rect) {
+      const r = zone.rect;
+      return 'rect(' + r.x + ', ' + r.y + ', ' + r.w + ', ' + r.h + ')';
+    }
+    return 'rect(0, 0, 30, 30)';
+  }
+
+  function normalizeHitboxZone(zone) {
+    const copy = {
+      name: zone.name,
+      shapeLine: zone.shapeLine || hitboxZoneShapeLine(zone),
+      touchType: zone.touchType != null ? zone.touchType : 1,
+      stroke: zone.stroke || null,
+      pouts: (zone.pouts || []).map(function (p) { return Object.assign({}, p); })
+    };
+    const m = copy.shapeLine.match(/rect\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    if (m) {
+      copy.rect = { x: parseInt(m[1], 10), y: parseInt(m[2], 10), w: parseInt(m[3], 10), h: parseInt(m[4], 10) };
+    } else if (zone.rect) {
+      copy.rect = Object.assign({}, zone.rect);
+    }
+    return copy;
+  }
+
+  function formatHitboxPoutNameFormat(pout) {
+    if (!pout || !pout.name) return '';
+    if (pout.bindType && pout.bindType !== 'bool') {
+      return pout.name + '/' + (pout.numberFormat || pout.bindType);
+    }
+    return pout.name;
+  }
+
+  function parseHitboxPoutNameFormat(text) {
+    const t = String(text || '').trim();
+    if (!t) return null;
+    const slash = t.indexOf('/');
+    if (slash > 0) {
+      return {
+        name: t.slice(0, slash),
+        bindType: 'number',
+        numberFormat: t.slice(slash + 1)
+      };
+    }
+    return { name: t, bindType: 'bool' };
+  }
+
+  function serializeHitboxPoutLine(pout) {
+    let s = 'pout :' + pout.event;
+    if (pout.field) s += ':' + pout.field;
+    s += ' as ' + pout.name;
+    if (pout.bindType && pout.bindType !== 'bool') {
+      s += '/' + (pout.numberFormat || pout.bindType);
+    }
+    return s;
+  }
+
+  function serializeHitboxZoneLines(zoneName, zone, indent) {
+    const inner = indent + '  ';
+    const norm = normalizeHitboxZone(zone);
+    const lines = [indent + zoneName + ': {'];
+    if (norm.shapeLine) {
+      lines.push(inner + norm.shapeLine);
+    }
+    if (norm.touchType != null) {
+      lines.push(inner + 'touchType = ' + norm.touchType);
+    }
+    if (norm.stroke) {
+      lines.push(inner + 'stroke("' + norm.stroke + '")');
+    }
+    (norm.pouts || []).forEach(function (p) {
+      lines.push(inner + serializeHitboxPoutLine(p));
+    });
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function serializeHitboxBlockLines(zones, indent) {
+    const inner = indent + '  ';
+    const lines = [indent + 'hitbox {'];
+    Object.keys(zones || {}).forEach(function (zoneName) {
+      serializeHitboxZoneLines(zoneName, zones[zoneName], inner).forEach(function (l) {
+        lines.push(l);
+      });
+    });
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function serializeClcdSymbolsLines(symbols, indent) {
+    const lines = [indent + '= {'];
+    if (typeof ClcdComponent !== 'undefined' && ClcdComponent._pushInstanceSymbolLines) {
+      const stubLines = [];
+      (symbols || []).forEach(function (sym) {
+        ClcdComponent._pushInstanceSymbolLines(stubLines, sym, {});
+      });
+      stubLines.forEach(function (l) {
+        lines.push(l.replace(/^    /, indent + '  '));
+      });
+    }
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function getClcdUiKind(symbolName) {
+    if (typeof getClcdSymbolDef !== 'function') return 'icon';
+    const def = getClcdSymbolDef(symbolName);
+    if (!def) return 'icon';
+    if (def.kind === 'text') return 'label';
+    if (def.kind === 'canvas') return 'canvas';
+    return 'icon';
+  }
+
+  function enrichBodyItemsFromParsed(model, parsed) {
+    if (!parsed) return;
+    if (model.type === 'clcd' && parsed.initialValue && parsed.initialValue.kind === 'clcdSymbols') {
+      for (let i = 0; i < model.bodyItems.length; i++) {
+        if (model.bodyItems[i].kind === 'equals') {
+          const item = {
+            kind: 'clcdSymbols',
+            symbols: (parsed.initialValue.symbols || []).map(function (s) { return Object.assign({}, s); }),
+            rawLines: model.bodyItems[i].rawLines.slice()
+          };
+          refreshNestedRawLines(item, detectBodyIndent(model));
+          model.bodyItems[i] = item;
+          break;
+        }
+      }
+    }
+    if (model.type === 'canvas' && parsed.attributes && parsed.attributes.canvasHitboxRaw != null) {
+      for (let i = 0; i < model.bodyItems.length; i++) {
+        const rawItem = model.bodyItems[i];
+        if (rawItem.kind !== 'raw' || !rawItem.rawLines.length) continue;
+        if (!/^\s*hitbox\s*\{/.test(rawItem.rawLines[0])) continue;
+        let zones = {};
+        if (typeof parseCanvasHitboxBlock === 'function') {
+          try {
+            zones = parseCanvasHitboxBlock(parsed.attributes.canvasHitboxRaw, 'hitbox').zones || {};
+          } catch (e) { /* keep empty zones */ }
+        }
+        const hitboxItem = {
+          kind: 'hitboxBlock',
+          zones: JSON.parse(JSON.stringify(zones)),
+          rawLines: rawItem.rawLines.slice()
+        };
+        refreshNestedRawLines(hitboxItem, detectBodyIndent(model));
+        Object.keys(hitboxItem.zones).forEach(function (zn) {
+          hitboxItem.zones[zn] = normalizeHitboxZone(hitboxItem.zones[zn]);
+        });
+        model.bodyItems[i] = hitboxItem;
+        break;
+      }
     }
   }
 
@@ -446,6 +610,10 @@
       item.rawLines = serializeLogicProgramLines(item.ref, item.bindings || [], item.observeDefs || [], indent);
     } else if (item.kind === 'canvasProgram') {
       item.rawLines = serializeCanvasProgramLines(item.ref, item.program || { initDraw: null, whenRenderers: [] }, indent);
+    } else if (item.kind === 'clcdSymbols') {
+      item.rawLines = serializeClcdSymbolsLines(item.symbols || [], indent);
+    } else if (item.kind === 'hitboxBlock') {
+      item.rawLines = serializeHitboxBlockLines(item.zones || {}, indent);
     }
   }
 
@@ -478,6 +646,23 @@
           };
         })
       };
+    }
+    if (item.symbols) {
+      copy.symbols = item.symbols.map(function (s) { return Object.assign({}, s); });
+    }
+    if (item.zones) {
+      copy.zones = {};
+      Object.keys(item.zones).forEach(function (zn) {
+        const z = item.zones[zn];
+        copy.zones[zn] = normalizeHitboxZone({
+          name: z.name || zn,
+          shapeLine: z.shapeLine,
+          rect: z.rect ? Object.assign({}, z.rect) : null,
+          touchType: z.touchType,
+          stroke: z.stroke,
+          pouts: (z.pouts || []).map(function (p) { return Object.assign({}, p); })
+        });
+      });
     }
     return copy;
   }
@@ -706,6 +891,25 @@
       if (trimmed.includes('{') || /^\s*\./.test(line) || /^\s*\w+\s+\{/.test(line)) {
         const block = consumeBraceBlock(bodyLines, i);
         i = block.endIdx;
+        const hitboxHead = line.match(/^\s*(hitbox)\s*\{/);
+        if (hitboxHead && compType === 'canvas') {
+          let zones = {};
+          const inner = innerTextFromBraceRawLines(block.rawLines);
+          if (typeof parseCanvasHitboxBlock === 'function') {
+            try {
+              zones = parseCanvasHitboxBlock(inner, 'hitbox').zones || {};
+            } catch (e) { /* keep empty */ }
+          }
+          items.push({
+            kind: 'hitboxBlock',
+            zones: JSON.parse(JSON.stringify(zones)),
+            rawLines: block.rawLines
+          });
+          Object.keys(items[items.length - 1].zones).forEach(function (zn) {
+            items[items.length - 1].zones[zn] = normalizeHitboxZone(items[items.length - 1].zones[zn]);
+          });
+          continue;
+        }
         items.push({ kind: 'raw', rawLines: block.rawLines });
         continue;
       }
@@ -785,8 +989,7 @@
       const type = split ? split.type : (parsed ? parsed.type : '');
       const name = split ? split.name : (parsed ? parsed.name : '');
       const bodyItems = split ? parseBodyItems(split.bodyLines, type, registry) : [];
-
-      return {
+      const blockModel = {
         id: span.startLine + ':0',
         type: type,
         name: name,
@@ -800,6 +1003,8 @@
         parsed: parsed,
         initialValue: parsed ? parsed.initialValue : null
       };
+      enrichBodyItemsFromParsed(blockModel, parsed);
+      return blockModel;
     });
   }
 
@@ -1334,6 +1539,125 @@
     return newModel;
   }
 
+  function findBodyItemByKind(model, kind) {
+    return model.bodyItems.find(function (i) { return i.kind === kind; }) || null;
+  }
+
+  function getClcdSymbols(model) {
+    const item = findBodyItemByKind(model, 'clcdSymbols');
+    return item ? (item.symbols || []).slice() : [];
+  }
+
+  function ensureClcdSymbolsItem(newModel) {
+    let item = findBodyItemByKind(newModel, 'clcdSymbols');
+    if (!item) {
+      item = { kind: 'clcdSymbols', symbols: [], rawLines: [] };
+      newModel.bodyItems.push(item);
+    }
+    if (!item.symbols) item.symbols = [];
+    return item;
+  }
+
+  function defaultClcdSymbol(name) {
+    const kind = getClcdUiKind(name);
+    const sym = { name: name, x: 0, y: 0, bit: 0 };
+    if (kind === 'icon') {
+      sym.style = 1;
+      sym.size = 22;
+      if (typeof getClcdSymbolDef === 'function') {
+        const def = getClcdSymbolDef(name);
+        if (def && def.defaultStyle != null) sym.style = def.defaultStyle;
+      }
+    } else if (kind === 'canvas') {
+      sym.size = 44;
+    } else if (kind === 'label') {
+      sym.text = 'Text';
+      sym.family = 'mono';
+      sym.size = 14;
+      sym.weight = 'normal';
+    }
+    return sym;
+  }
+
+  function upsertClcdSymbol(model, oldName, symbol) {
+    const newModel = cloneModel(model);
+    const item = ensureClcdSymbolsItem(newModel);
+    const key = oldName != null && oldName !== '' ? oldName : symbol.name;
+    const idx = item.symbols.findIndex(function (s) { return s.name === key; });
+    const copy = Object.assign({}, symbol);
+    if (idx >= 0) item.symbols[idx] = copy;
+    else item.symbols.push(copy);
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeClcdSymbol(model, name) {
+    const newModel = cloneModel(model);
+    const item = findBodyItemByKind(newModel, 'clcdSymbols');
+    if (!item) return newModel;
+    item.symbols = (item.symbols || []).filter(function (s) { return s.name !== name; });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addClcdSymbol(model, name) {
+    return upsertClcdSymbol(model, null, defaultClcdSymbol(name));
+  }
+
+  function getHitboxBlock(model) {
+    const item = getHitboxBlockItem(model);
+    if (!item) return null;
+    return { zones: item.zones || {} };
+  }
+
+  function ensureHitboxBlockItem(newModel) {
+    let item = getHitboxBlockItem(newModel);
+    if (!item) {
+      item = { kind: 'hitboxBlock', zones: {}, rawLines: [] };
+      newModel.bodyItems.push(item);
+    }
+    if (!item.zones) item.zones = {};
+    return item;
+  }
+
+  function defaultHitboxZone(zoneName) {
+    return normalizeHitboxZone({
+      name: zoneName,
+      shapeLine: 'rect(0, 0, 30, 30)',
+      touchType: 1,
+      stroke: null,
+      pouts: []
+    });
+  }
+
+  function setHitboxZone(model, oldName, zone) {
+    const newModel = cloneModel(model);
+    const item = ensureHitboxBlockItem(newModel);
+    const key = oldName != null && oldName !== '' ? oldName : zone.name;
+    const copy = normalizeHitboxZone(zone);
+    if (key !== copy.name) delete item.zones[key];
+    item.zones[copy.name] = copy;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeHitboxZone(model, zoneName) {
+    const newModel = cloneModel(model);
+    const item = getHitboxBlockItem(newModel);
+    if (!item || !item.zones) return newModel;
+    delete item.zones[zoneName];
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addHitboxZone(model, zoneName) {
+    return setHitboxZone(model, null, defaultHitboxZone(zoneName));
+  }
+
   return {
     ON_ENUM: ON_ENUM,
     findCompBlockSpans: findCompBlockSpans,
@@ -1385,6 +1709,19 @@
     parseLogicBindingType: parseLogicBindingType,
     getLogicBindingFieldErrors: getLogicBindingFieldErrors,
     getHitboxZoneNames: getHitboxZoneNames,
+    hitboxZoneShapeLine: hitboxZoneShapeLine,
+    formatHitboxPoutNameFormat: formatHitboxPoutNameFormat,
+    parseHitboxPoutNameFormat: parseHitboxPoutNameFormat,
+    getHitboxBlock: getHitboxBlock,
+    getClcdSymbols: getClcdSymbols,
+    getClcdUiKind: getClcdUiKind,
+    upsertClcdSymbol: upsertClcdSymbol,
+    removeClcdSymbol: removeClcdSymbol,
+    addClcdSymbol: addClcdSymbol,
+    defaultClcdSymbol: defaultClcdSymbol,
+    setHitboxZone: setHitboxZone,
+    removeHitboxZone: removeHitboxZone,
+    addHitboxZone: addHitboxZone,
     modelContentKey: modelContentKey,
     setLogicProgramRef: setLogicProgramRef,
     setCanvasProgramRef: setCanvasProgramRef,

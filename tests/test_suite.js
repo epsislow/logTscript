@@ -53392,6 +53392,47 @@ probe(outX)`;
     h.assert('bindings after reparse', String(CCM.getLogicProgram(reparsed).bindings.length), '3');
   });
 
+  reg(4912, 'cm-comp-card', 'clcd symbols round-trip 2 icons', function(h, session) {
+    const src = 'comp [clcd] .status:\n  = {\n    power:\n      x: 10\n      y: 10\n      bit: 0\n      style: 1\n      size: 22\n    :\n    bell:\n      x: 50\n      y: 10\n      bit: 1\n      style: 1\n      size: 22\n    :\n  }\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const clcd = blocks.find(function (b) { return b.name === '.status'; });
+    h.assert('2 symbols', String(CCM.getClcdSymbols(clcd).length), '2');
+    h.assert('power name', CCM.getClcdSymbols(clcd)[0].name, 'power');
+    let next = CCM.upsertClcdSymbol(clcd, 'bell', { name: 'bell', x: 60, y: 10, bit: 1, style: 2, size: 24 });
+    const out = CCM.serializeCompBlock(next);
+    h.assert('bell x', String(out.includes('x: 60')), 'true');
+    h.assert('style 2', String(out.includes('style: 2')), 'true');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session)).find(function (b) { return b.name === '.status'; });
+    h.assert('2 after reparse', String(CCM.getClcdSymbols(reparsed).length), '2');
+    const bell = CCM.getClcdSymbols(reparsed).find(function (s) { return s.name === 'bell'; });
+    h.assert('bell x parsed', String(bell.x), '60');
+  });
+
+  reg(4913, 'cm-comp-card', 'canvas hitbox block round-trip', function(h, session) {
+    const src = 'comp [canvas] .panel:\n  on: 1\n  width: 100\n  height: 60\n  hitbox {\n    btn: {\n      rect(10, 10, 30, 30)\n      touchType = 1\n      stroke("ffff00")\n      pout :press as btnPress\n    }\n    slider: {\n      rect(50, 10, 40, 40)\n      touchType = 1\n      pout :drag:eventX as dragX/s16\n    }\n  }\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const canvas = blocks.find(function (b) { return b.name === '.panel'; });
+    const hb = CCM.getHitboxBlock(canvas);
+    h.assert('hitbox parsed', !!hb, true);
+    h.assert('btn zone', String(!!hb.zones.btn), 'true');
+    h.assert('rect w', String(hb.zones.btn.rect.w), '30');
+    h.assert('pout name', hb.zones.btn.pouts[0].name, 'btnPress');
+    h.assert('zone names', CCM.getHitboxZoneNames(canvas).join(' '), 'btn slider');
+    let next = CCM.setHitboxZone(canvas, 'btn', {
+      name: 'btn',
+      rect: { x: 12, y: 12, w: 30, h: 30 },
+      touchType: 1,
+      stroke: 'ffff00',
+      pouts: [{ event: 'press', name: 'btnPress', bindType: 'bool' }]
+    });
+    next = CCM.addHitboxZone(next, 'knob');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('btn x12', String(out.includes('rect(12, 12, 30, 30)')), 'true');
+    h.assert('knob zone', String(out.includes('knob:')), 'true');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session)).find(function (b) { return b.name === '.panel'; });
+    h.assert('3 zones', String(Object.keys(CCM.getHitboxBlock(reparsed).zones).length), '3');
+  });
+
   reg(4919, 'cm-comp-card', 'logic binding invalid draft preserved without text fallback', function(h, session) {
     const src = 'inline [logic] .character:\n  :\n\ncomp [logic] .characterLogic:\n  on: 1\n  .character {\n    Y is number myY\n  }\n  :';
     const blocks = CCM.parseCompBlocks(src, cmReg(session));
