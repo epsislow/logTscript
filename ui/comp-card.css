@@ -1,0 +1,183 @@
+/* CodeMirror comp card widgets */
+.cm-comp-card-main {
+  cursor: auto;
+  background: #002800;
+  border: 1px solid #444;
+  padding: 12px;
+  position: relative;
+  width: 400px;
+  font-family: monospace;
+  margin: 10px 0;
+  font-size: 15px;
+  color: #0f0;
+  box-sizing: border-box;
+  margin-left: 15px;
+}
+
+.cm-comp-card-delete {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.cm-comp-card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cm-comp-card-name-input {
+  border: 2px solid #16a34a;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+  font-size: 14px;
+  width: 120px;
+}
+
+.cm-comp-card-type-select {
+  color: #5583fb;
+  font-weight: bold;
+  background: #000;
+  border: 1px solid #444;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+.cm-comp-card-type-select option {
+  background: #000;
+  color: #fff;
+}
+
+.cm-comp-card-type-select optgroup {
+  background: #111;
+  color: #5583fb;
+  font-style: normal;
+}
+
+.cm-comp-card-view-toggle {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: #111;
+  color: #aaa;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cm-comp-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.cm-comp-card-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+  gap: 4px;
+}
+
+.cm-comp-card-item--equals {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.cm-comp-card-item--invalid span,
+.cm-comp-card-item--invalid input,
+.cm-comp-card-item--invalid select {
+  color: #f55;
+  border-color: #f55;
+}
+
+.cm-comp-card-attr-input,
+.cm-comp-card-equals-input {
+  border: 2px solid #ea580c;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-weight: bold;
+  background-color: #000;
+  color: #fff;
+  font-family: monospace;
+  font-size: 14px;
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+}
+
+.cm-comp-card-equals-textarea {
+  border: 2px solid #ea580c;
+  border-radius: 4px;
+  padding: 4px;
+  background: #000;
+  color: #fff;
+  font-family: monospace;
+  font-size: 13px;
+  width: 100%;
+  resize: vertical;
+  overflow: auto;
+  min-height: 4em;
+  max-height: 20em;
+  box-sizing: border-box;
+}
+
+.cm-comp-card-remove {
+  background: transparent;
+  border: none;
+  color: #f55;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.cm-comp-card-segment-toggle {
+  border: 2px solid #ea580c;
+  border-radius: 4px;
+  padding: 2px 8px;
+  background: #111;
+  color: #fff;
+  font-family: monospace;
+  cursor: pointer;
+}
+
+.cm-comp-card-segment-toggle.is-on {
+  background: #ea580c;
+  color: #000;
+}
+
+.cm-comp-card-add-row {
+  margin-top: 8px;
+}
+
+.cm-comp-card-add-select {
+  background: #111;
+  color: #0f0;
+  border: 1px dashed #444;
+  font-family: monospace;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.cm-comp-card-item--flag label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

@@ -53236,5 +53236,161 @@ probe(outX)`;
 
   regCanvasDual(4858, 4859, 'drag pout only while dragging hitbox', runCanvasDragPoutOnlyOnDrag);
 
+  // --- cm-comp-card widgets (4900+) ---
+  const CCM = typeof LogTScriptCompCardModel !== 'undefined' ? LogTScriptCompCardModel : null;
+
+  function cmReg(session) {
+    return session._ensureRegistry ? session._ensureRegistry() : session.registry;
+  }
+
+  reg(4900, 'cm-comp-card', 'parse single comp [led] → model type/name/span', function(h, session) {
+    h.assert('model loaded', !!CCM, true);
+    const src = 'comp [led] .x:\n  length: 4\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    h.assert('one block', String(blocks.length), '1');
+    h.assert('type', blocks[0].type, 'led');
+    h.assert('name', blocks[0].name, '.x');
+    h.assert('span start', String(blocks[0].span.startLine), '0');
+    h.assert('span end', String(blocks[0].span.endLine), '2');
+  });
+
+  reg(4901, 'cm-comp-card', 'parse 5 types without nested loss', function(h, session) {
+    const led = 'comp [led] .l:\n  :';
+    const network = 'comp [network] .n:\n  width: 64\n  length: 5\n  :';
+    const clcd = 'comp [clcd] .c:\n  = {\n    p:\n      x: 1\n      y: 2\n      bit: 0\n    :\n  }\n  :';
+    const canvas = 'comp [canvas] .p:\n  width: 100\n  hitbox {\n    z: { rect(0,0,10,10) }\n  }\n  :';
+    const plc = 'comp [plc] .ctrl:\n  inputs: { A = w1 }\n  outputs: { B = w2 }\n  :';
+    const src = [led, network, clcd, canvas, plc].join('\n\n');
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    h.assert('five blocks', String(blocks.length), '5');
+    h.assert('types', blocks.map(function (b) { return b.type; }).join(','), 'led,network,clcd,canvas,plc');
+    const round = blocks.map(function (b) { return CCM.serializeCompBlock(b); }).join('\n\n');
+    h.assert('clcd equals kept', String(round.includes('= {')), 'true');
+    h.assert('canvas hitbox kept', String(round.includes('hitbox {')), 'true');
+    h.assert('plc inputs kept', String(round.includes('inputs: {')), 'true');
+    const blocks2 = CCM.parseCompBlocks(round, cmReg(session));
+    h.assert('reparse count', String(blocks2.length), '5');
+    blocks2.forEach(function (b, i) {
+      h.assert('type ' + i, b.type, blocks[i].type);
+    });
+  });
+
+  reg(4902, 'cm-comp-card', 'round-trip led explicit attrs', function(h, session) {
+    const src = 'comp [led] .x:\n  length: 8\n  color: ^ff0000\n  nl\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const out = CCM.serializeCompBlock(blocks[0]);
+    h.assert('length preserved', String(out.includes('length: 8')), 'true');
+    h.assert('color preserved', String(out.includes('color: ^ff0000')), 'true');
+    h.assert('nl preserved', String(out.includes('\n  nl\n')), 'true');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session));
+    h.assert('reparsed type', reparsed[0].type, 'led');
+    const attrs = CCM.getExplicitAttrs(reparsed[0]);
+    h.assert('attr count', String(attrs.length), '3');
+  });
+
+  reg(4903, 'cm-comp-card', 'add attr channel on network minimal', function(h, session) {
+    const src = 'comp [network] .n:\n  width: 64\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const next = CCM.addAttr(blocks[0], 'channel', cmReg(session));
+    const out = CCM.serializeCompBlock(next);
+    h.assert('channel added', String(out.includes('channel:')), 'true');
+    h.assert('width kept', String(out.includes('width: 64')), 'true');
+  });
+
+  reg(4904, 'cm-comp-card', 'remove attr → line absent from serialize', function(h, session) {
+    const src = 'comp [network] .n:\n  width: 64\n  length: 5\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const next = CCM.removeAttr(blocks[0], 'length');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('length removed', String(out.includes('length:')), 'false');
+    h.assert('width kept', String(out.includes('width: 64')), 'true');
+  });
+
+  reg(4905, 'cm-comp-card', 'on enum round-trip raise/edge/1', function(h, session) {
+    ['raise', 'edge', '1'].forEach(function (mode) {
+      const src = 'comp [network] .n:\n  width: 8\n  on: ' + mode + '\n  :';
+      const blocks = CCM.parseCompBlocks(src, cmReg(session));
+      const out = CCM.serializeCompBlock(blocks[0]);
+      h.assert('on ' + mode, String(out.includes('on: ' + mode)), 'true');
+      const reparsed = CCM.parseCompBlocks(out, cmReg(session));
+      const onAttr = CCM.getExplicitAttrs(reparsed[0]).find(function (a) { return a.name === 'on'; });
+      h.assert('on value ' + mode, onAttr ? onAttr.value : '', mode);
+    });
+  });
+
+  reg(4906, 'cm-comp-card', 'color ^aabbcc round-trip', function(h, session) {
+    const src = 'comp [led] .x:\n  color: ^aabbcc\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const out = CCM.serializeCompBlock(blocks[0]);
+    h.assert('color kept', String(out.includes('color: ^aabbcc')), 'true');
+    const next = CCM.setAttrValue(blocks[0], 'color', '^112233');
+    h.assert('color patched', String(CCM.serializeCompBlock(next).includes('color: ^112233')), 'true');
+  });
+
+  reg(4907, 'cm-comp-card', 'flag nl add/remove', function(h, session) {
+    const src = 'comp [led] .x:\n  length: 4\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const withNl = CCM.addAttr(blocks[0], 'nl', cmReg(session));
+    h.assert('nl added', String(CCM.serializeCompBlock(withNl).includes('\n  nl\n')), 'true');
+    const without = CCM.removeAttr(withNl, 'nl');
+    h.assert('nl removed', String(CCM.serializeCompBlock(without).includes('\n  nl\n')), 'false');
+  });
+
+  reg(4908, 'cm-comp-card', 'type change led→network keeps invalid attrs (D12 D)', function(h, session) {
+    const src = 'comp [led] .x:\n  text: hi\n  color: ^ff0000\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const next = CCM.setCompType(blocks[0], 'network');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('type changed', String(out.startsWith('comp [network]')), 'true');
+    h.assert('text kept', String(out.includes('text: hi')), 'true');
+    h.assert('color kept', String(out.includes('color: ^ff0000')), 'true');
+    const invalid = CCM.getInvalidAttrs(next, cmReg(session));
+    h.assert('text invalid', String(invalid.includes('text')), 'true');
+    h.assert('color invalid', String(invalid.includes('color')), 'true');
+  });
+
+  reg(4916, 'cm-comp-card', 'type change key→switch single block no attr dup', function(h, session) {
+    const src = 'comp [key] .draw2ndTrack:\n    label:\'2\'\n    size: 35\n    on:1\n    :\n\n1wire sliderPressed := .panel:sliderPressed';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const next = CCM.setCompType(blocks[0], 'switch');
+    const out = CCM.serializeCompBlock(next);
+    const patched = out + '\n\n1wire sliderPressed := .panel:sliderPressed';
+    h.assert('one header', String((out.match(/comp \[/g) || []).length), '1');
+    h.assert('type switch', String(out.startsWith('comp [switch]')), 'true');
+    h.assert('no old key header', String(out.includes('comp [key]')), 'false');
+    h.assert('blank line preserved in patch pattern', String(patched.includes(':\n\n1wire')), 'true');
+    const attrs = CCM.getExplicitAttrs(next);
+    h.assert('three attrs', String(attrs.length), '3');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session));
+    h.assert('one block', String(reparsed.length), '1');
+    h.assert('attrs after reparse', String(CCM.getExplicitAttrs(reparsed[0]).length), '3');
+  });
+
+  reg(4917, 'cm-comp-card', 'key type attr enum 0/1/2 not on enum', function(h, session) {
+    const def = CCM.getAttrDef('key', 'type', cmReg(session));
+    h.assert('field enum', CCM.getWidgetFieldType('type', def), 'enum');
+    const opts = CCM.getAttrEnumOptions('type', def);
+    h.assert('opts length', String(opts.length), '3');
+    h.assert('opts values', opts.join(','), '0,1,2');
+    h.assert('on still raise', CCM.getAttrEnumOptions('on', { name: 'on', value: 'mode' }).join(','), 'raise,edge,1');
+  });
+
+  reg(4914, 'cm-comp-card', 're-parse after patch equals serialize (flat attrs F2)', function(h, session) {
+    const src = 'comp [network] .n:\n  width: 10\n  length: 3\n  channel: \'demo\'\n  on: raise\n  :';
+    let blocks = CCM.parseCompBlocks(src, cmReg(session));
+    let model = blocks[0];
+    model = CCM.setAttrValue(model, 'width', '20');
+    model = CCM.setAttrValue(model, 'on', 'edge');
+    model = CCM.addAttr(model, 'nl', cmReg(session));
+    const serialized = CCM.serializeCompBlock(model);
+    blocks = CCM.parseCompBlocks(serialized, cmReg(session));
+    const out = CCM.serializeCompBlock(blocks[0]);
+    h.assert('stable serialize', out, serialized);
+    const attrs = CCM.getExplicitAttrs(blocks[0]);
+    h.assert('width 20', attrs.find(function (a) { return a.name === 'width'; }).value, '20');
+    h.assert('on edge', attrs.find(function (a) { return a.name === 'on'; }).value, 'edge');
+    h.assert('has nl', String(attrs.some(function (a) { return a.name === 'nl'; })), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

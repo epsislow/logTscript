@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="res/css/codemirror.min.css">
 <link rel="stylesheet" href="res/css/cm.show-hint.min.css">
 <link rel="stylesheet" href="res/css/fontawesome/all.min.css">
+<link rel="stylesheet" href="ui/comp-card.css">
 <style>
 body { font-family: monospace; background:#111; color:#eee; padding:20px }
 textarea { width:100%; height:340px; background:#000; color:#0f0; font-size: 20px; }
@@ -372,113 +373,6 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
  button.cls:hover { background-color: #afa; }
  */
 
-/* Containerul principal al cardului */
-.cm-comp-card-main {
-  cursor: auto;
-  background: #002800;
-  border: 1px solid #444;
-  padding: 12px;
-  position: relative;
-  width: 400px;
-  font-family: monospace;
-  margin: 10px 0;
-  font-size: 15px;
-  color: #0f0;
-  box-sizing: border-box;
-  margin-left: 15px;
-}
-
-/* Butonul de ștergere X */
-.cm-comp-card-delete {
-  position: absolute;
-  right: -3px;
-  top: -3px;
-  /*border: 2px solid #f00;
-  background: #fff;*/
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-size: 10px;
-  line-height: 1;
-}
-
-/* Header-ul care conține Numele și Tipul */
-.cm-comp-card-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  align-items: center;
-}
-
-/* Inputul pentru Nume (.net) */
-.cm-comp-card-name-input {
-  border: 2px solid #16a34a;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-weight: bold;
-  background: #000;
-  color: #0f0;
-  font-family: monospace;
-  font-size: 14px;
-  width: 120px;
-}
-
-/* Selectorul Dropdown pentru Componente */
-.cm-comp-card-type-select {
-  color: #5583fb;
-  font-weight: bold;
-  margin-right: 11px;
-  background: #000;
-  border: 1px solid #444;
-  font-family: monospace;
-  font-size: 14px;
-  padding: 2px 4px;
-  cursor: pointer;
-  outline: none;
-}
-
-/* Option-urile din interiorul dropdown-ului */
-.cm-comp-card-type-select option {
-  background: #000;
-  color: #fff;
-}
-.cm-comp-card-type-select optgroup {
-  background: #111;
-  color: #5583fb;
-  font-style: normal;
-}
-
-/* Grid-ul pentru atribute (2 coloane egale) */
-.cm-comp-card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
-  align-items: center;
-}
-
-/* Fiecare rând/element din grid */
-.cm-comp-card-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  white-space: nowrap;
-}
-
-/* Stilul comun pentru inputurile de atribute */
-.cm-comp-card-attribute-input {
-  border: 2px solid #ea580c;
-  border-radius: 4px;
-  padding: 2px 4px;
-  font-weight: bold;
-  background-color: #000;
-  color: #fff;
-  font-family: monospace;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-
 .hidden { display: none;}
 
 .btn {
@@ -629,6 +523,33 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .prop-toggle--wave:hover {
   background: #3a2a14;
   border-color: #fa0;
+}
+
+.comp-cards-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  min-width: 52px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.comp-cards-toggle--off {
+  color: #888;
+  background: #1c1c1c;
+  border-color: #333;
+}
+.comp-cards-toggle--off:hover {
+  color: #aaa;
+  border-color: #555;
+}
+.comp-cards-toggle--on {
+  color: #0f0;
+  background: #1a2e1a;
+  border-color: #3a5a3a;
+}
+.comp-cards-toggle--on:hover {
+  background: #243a24;
+  border-color: #0f0;
 }
 
 #editorToolbar {
@@ -3341,6 +3262,7 @@ show(a,b,c)
     <button onclick="changeSECINT()" id="secint" class="btn btn--disabled" disabled>1</button>
   </div>
   <span class="toolbar-sep" aria-hidden="true"></span>
+  <button type="button" id="compCardsToggle" class="btn comp-cards-toggle comp-cards-toggle--off" onclick="toggleCompCardWidgets()" title="Comp card widgets (off)">Cards</button>
     <div class="panel-dropdown" id="panel-dropdown">
       <button class="btn dropdown-trigger" aria-expanded="false">
         Win ▾
@@ -3746,6 +3668,8 @@ show(a,b,c)
 <script src="ui/network-traffic-panel.js"></script>
 <script src="ui/wave-listen-format.js"></script>
 <script src="ui/wave-listen-panel.js"></script>
+<script src="ui/comp-card-model.js"></script>
+<script src="ui/comp-card-widgets.js"></script>
 <script src="ui/app.js"></script>
 
 </body>
