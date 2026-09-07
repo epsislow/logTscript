@@ -53383,8 +53383,28 @@ probe(outX)`;
     h.assert('Y added', String(out.includes('Y is number myY')), 'true');
     h.assert('observe kept', String(out.includes('observe spotX$ is number xPin')), 'true');
     h.assert('Name kept', String(out.includes('Name is text myName')), 'true');
+    const edited = CCM.upsertLogicBinding(next, 'Y', 'Y', 'number/q4p4 list', 'myY');
+    const out2 = CCM.serializeCompBlock(edited);
+    h.assert('Y type edited', String(out2.includes('Y is number/q4p4 list myY')), 'true');
+    const renamed = CCM.upsertLogicBinding(edited, 'Y', 'W', 'number', 'myW');
+    h.assert('Y renamed W', String(CCM.serializeCompBlock(renamed).includes('W is number myW')), 'true');
     const reparsed = CCM.parseCompBlocks(out, cmReg(session)).find(function (b) { return b.name === '.characterLogic'; });
     h.assert('bindings after reparse', String(CCM.getLogicProgram(reparsed).bindings.length), '3');
+  });
+
+  reg(4919, 'cm-comp-card', 'logic binding invalid draft preserved without text fallback', function(h, session) {
+    const src = 'inline [logic] .character:\n  :\n\ncomp [logic] .characterLogic:\n  on: 1\n  .character {\n    Y is number myY\n  }\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const logic = blocks.find(function (b) { return b.name === '.characterLogic'; });
+    const invalid = CCM.upsertLogicBinding(logic, 'Y', 'Y', 'numbr', 'myY');
+    const out = CCM.serializeCompBlock(invalid);
+    h.assert('invalid type literal', String(out.includes('Y is numbr myY')), 'true');
+    h.assert('no text fallback', String(!out.includes('Y is text myY')), 'true');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session)).find(function (b) { return b.name === '.characterLogic'; });
+    const b = CCM.getLogicProgram(reparsed).bindings[0];
+    h.assert('binding kept', String(!!b), 'true');
+    h.assert('typeText kept', CCM.formatLogicBindingType(b), 'numbr');
+    h.assert('type invalid', String(CCM.getLogicBindingFieldErrors(b.logicVar, CCM.formatLogicBindingType(b), b.pinName).has('type')), 'true');
   });
 
   reg(4911, 'cm-comp-card', 'canvas program block round-trip multiline initDraw when', function(h, session) {

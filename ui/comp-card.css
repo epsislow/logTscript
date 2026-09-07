@@ -156,7 +156,8 @@
   -webkit-user-select: text;
 }
 
-.cm-comp-card-remove {
+.cm-comp-card-remove,
+.cm-comp-card-entry-remove {
   flex: 0 0 auto;
   background: transparent;
   border: none;
@@ -164,6 +165,10 @@
   cursor: pointer;
   font-size: 12px;
   padding: 0 2px;
+}
+
+.cm-comp-card-nested-row--canvas-call .cm-comp-card-entry-remove {
+  margin-top: 0;
 }
 
 .cm-comp-card-segment-toggle {
@@ -257,27 +262,29 @@
   -webkit-user-select: text;
 }
 
-.cm-comp-card-canvas-ref {
+.cm-comp-card-canvas-ref,
+.cm-comp-card-inline-ref {
   margin-bottom: 0;
   color: #8cf;
   font-weight: bold;
 }
 
-.cm-comp-card-canvas-inline-row {
+.cm-comp-card-inline-row {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
 }
 
-.cm-comp-card-canvas-inline-label {
+.cm-comp-card-inline-label {
   color: #9cf;
   font-size: 15px;
   font-weight: bold;
   white-space: nowrap;
 }
 
-.cm-comp-card-canvas-inline-row .cm-comp-card-canvas-ref {
+.cm-comp-card-inline-row .cm-comp-card-inline-ref,
+.cm-comp-card-inline-row .cm-comp-card-canvas-ref {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -307,19 +314,8 @@
   min-width: 72px;
 }
 
-.cm-comp-card-canvas-block-head button.cm-comp-card-canvas-init-remove,
-.cm-comp-card-canvas-block-head button.cm-comp-card-canvas-when-section-remove,
-.cm-comp-card-canvas-block-head button.cm-comp-card-canvas-init-section-remove,
-.cm-comp-card-nested-row--canvas-call button.cm-comp-card-canvas-init-remove,
-.cm-comp-card-nested-row--canvas-call button.cm-comp-card-canvas-when-call-remove,
-.cm-comp-card-nested-row--canvas-call button.cm-comp-card-canvas-call-remove {
-  flex: 0 0 auto;
-  background: transparent;
-  border: none;
-  color: #777;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0 2px;
+.cm-comp-card-canvas-block-head button.cm-comp-card-entry-remove,
+.cm-comp-card-nested-row--canvas-call button.cm-comp-card-entry-remove {
   margin-top: 0;
 }
 
@@ -357,7 +353,24 @@
 }
 
 .cm-comp-card-nested-row--logic-bind {
-  grid-template-columns: 60px 20px 70px 1fr 24px;
+  grid-template-columns: minmax(44px, 52px) 18px minmax(108px, 1.45fr) minmax(48px, 0.85fr) 22px;
+}
+
+.cm-comp-card-logic-var {
+  color: #ff0;
+}
+
+.cm-comp-card-logic-type {
+  color: #0f0;
+}
+
+.cm-comp-card-logic-pin {
+  color: #fff;
+}
+
+.cm-comp-card-field--invalid {
+  color: #f55 !important;
+  outline: 1px solid #f55;
 }
 
 .cm-comp-card-nested-row--logic-obs {

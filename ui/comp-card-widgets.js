@@ -177,7 +177,7 @@
         '<div class="cm-comp-card-item cm-comp-card-item--flag' + invalidClass + '"' + title + '>' +
         '<label><input type="checkbox" class="cm-comp-card-flag-input" data-attr="' + escapeHtml(attr.name) + '" checked>' +
         escapeHtml(attr.name) + '</label>' +
-        '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
         '</div>'
       );
     }
@@ -194,7 +194,7 @@
         '<div class="cm-comp-card-attr-field">' +
         '<select class="cm-comp-card-attr-input" data-attr="' + escapeHtml(attr.name) + '">' + opts + '</select>' +
         '</div>' +
-        '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
         '</div>'
       );
     }
@@ -206,7 +206,7 @@
       '<div class="cm-comp-card-attr-field">' +
       '<input type="' + inputType + '" class="cm-comp-card-attr-input" data-attr="' + escapeHtml(attr.name) + '" value="' + escapeHtml(attr.value || '') + '">' +
       '</div>' +
-      '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
       '</div>'
     );
   }
@@ -221,7 +221,7 @@
       '<div class="cm-comp-card-attr-field">' +
       '<button type="button" class="cm-comp-card-segment-toggle' + (active ? ' is-on' : '') + '" data-seg="' + escapeHtml(seg.name) + '">' + escapeHtml(seg.value) + '</button>' +
       '</div>' +
-      '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(seg.name) + '">✕</button>' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-remove" data-attr="' + escapeHtml(seg.name) + '">✕</button>' +
       '</div>'
     );
   }
@@ -254,7 +254,7 @@
         '<div class="cm-comp-card-nested-row">' +
         '<input type="text" class="cm-comp-card-plc-sym" data-map="' + escapeHtml(mapName) + '" data-old-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(e.symbol) + '">' +
         '<input type="text" class="cm-comp-card-plc-target" data-map="' + escapeHtml(mapName) + '" data-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(e.target) + '">' +
-        '<button type="button" class="cm-comp-card-plc-remove" data-map="' + escapeHtml(mapName) + '" data-sym="' + escapeHtml(e.symbol) + '">✕</button>' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-plc-remove" data-map="' + escapeHtml(mapName) + '" data-sym="' + escapeHtml(e.symbol) + '">✕</button>' +
         '</div>'
       );
     }).join('');
@@ -276,7 +276,7 @@
         '<div class="cm-comp-card-nested-row">' +
         '<input type="text" class="cm-comp-card-plc-global-sym" data-old-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(e.symbol) + '">' +
         '<input type="number" class="cm-comp-card-plc-global-width" data-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(String(w)) + '" placeholder="1">' +
-        '<button type="button" class="cm-comp-card-plc-global-remove" data-sym="' + escapeHtml(e.symbol) + '">✕</button>' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-plc-global-remove" data-sym="' + escapeHtml(e.symbol) + '">✕</button>' +
         '</div>'
       );
     }).join('');
@@ -302,17 +302,41 @@
     );
   }
 
-  function renderLogicProgramSection(model) {
+  function renderLogicProgramSection(model, editor) {
     const prog = CCM.getLogicProgram(model);
     if (!prog) return '';
+    const inlineRefs = CCM.findInlineLogicRefs(editor.getValue());
+    const currentRef = prog.ref || '';
+    let refHtml = '<select class="cm-comp-card-inline-ref cm-comp-card-nested-input cm-comp-card-logic-ref">';
+    if (inlineRefs.indexOf(currentRef) === -1 && currentRef) {
+      refHtml += '<option value="' + escapeHtml(currentRef) + '" selected>' + escapeHtml(currentRef) + ' (missing inline)</option>';
+    }
+    inlineRefs.forEach(function (ref) {
+      const sel = ref === currentRef ? ' selected' : '';
+      refHtml += '<option value="' + escapeHtml(ref) + '"' + sel + '>' + escapeHtml(ref) + '</option>';
+    });
+    if (!inlineRefs.length && !currentRef) {
+      refHtml += '<option value="">— no inline [logic] —</option>';
+    }
+    refHtml += '</select>';
+    const refRowHtml =
+      '<div class="cm-comp-card-inline-row">' +
+      '<span class="cm-comp-card-inline-label">inline:</span>' +
+      refHtml +
+      '</div>';
     let bindRows = prog.bindings.map(function (b) {
+      const typeText = CCM.formatLogicBindingType(b);
+      const fieldErrs = CCM.getLogicBindingFieldErrors(b.logicVar, typeText, b.pinName);
+      const varInvalid = fieldErrs.has('var') ? ' cm-comp-card-field--invalid' : '';
+      const typeInvalid = fieldErrs.has('type') ? ' cm-comp-card-field--invalid' : '';
+      const pinInvalid = fieldErrs.has('pin') ? ' cm-comp-card-field--invalid' : '';
       return (
-        '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--logic-bind">' +
-        '<input type="text" class="cm-comp-card-logic-var" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.logicVar) + '" readonly>' +
+        '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--logic-bind" data-old-var="' + escapeHtml(b.logicVar) + '">' +
+        '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-var' + varInvalid + '" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.logicVar) + '">' +
         '<span class="cm-comp-card-logic-is">is</span>' +
-        '<input type="text" class="cm-comp-card-logic-type" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.bindType) + '">' +
-        '<input type="text" class="cm-comp-card-logic-pin" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.pinName) + '">' +
-        '<button type="button" class="cm-comp-card-logic-remove" data-var="' + escapeHtml(b.logicVar) + '">✕</button>' +
+        '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-type' + typeInvalid + '" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(typeText) + '">' +
+        '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-pin' + pinInvalid + '" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.pinName) + '">' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-logic-remove" data-var="' + escapeHtml(b.logicVar) + '">✕</button>' +
         '</div>'
       );
     }).join('');
@@ -320,13 +344,13 @@
       const line = o.rawLine || ('observe ' + o.logicVar);
       return (
         '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--logic-obs">' +
-        '<input type="text" class="cm-comp-card-logic-observe" data-obs-idx="' + idx + '" value="' + escapeHtml(line) + '" readonly>' +
+        '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-observe" data-obs-idx="' + idx + '" value="' + escapeHtml(line) + '" readonly>' +
         '</div>'
       );
     }).join('');
     return (
       '<div class="cm-comp-card-nested cm-comp-card-nested--logic">' +
-      '<div class="cm-comp-card-nested-title">' + escapeHtml(prog.ref) + '</div>' +
+      refRowHtml +
       bindRows +
       obsRows +
       '<button type="button" class="cm-comp-card-logic-add">+ binding</button>' +
@@ -363,7 +387,7 @@
     const zoneNames = CCM.getHitboxZoneNames(model);
     const inlineRefs = CCM.findInlineCanvasRefs(editor.getValue());
     const currentRef = cp.ref || '';
-    let refHtml = '<select class="cm-comp-card-canvas-ref cm-comp-card-nested-input">';
+    let refHtml = '<select class="cm-comp-card-inline-ref cm-comp-card-nested-input cm-comp-card-canvas-ref">';
     if (inlineRefs.indexOf(currentRef) === -1 && currentRef) {
       refHtml += '<option value="' + escapeHtml(currentRef) + '" selected>' + escapeHtml(currentRef) + ' (missing inline)</option>';
     }
@@ -376,8 +400,8 @@
     }
     refHtml += '</select>';
     const refRowHtml =
-      '<div class="cm-comp-card-canvas-inline-row">' +
-      '<span class="cm-comp-card-canvas-inline-label">inline:</span>' +
+      '<div class="cm-comp-card-inline-row">' +
+      '<span class="cm-comp-card-inline-label">inline:</span>' +
       refHtml +
       '</div>';
 
@@ -387,14 +411,14 @@
         '<div class="cm-comp-card-canvas-block">' +
         '<div class="cm-comp-card-canvas-block-head">' +
         '<span class="cm-comp-card-canvas-subtitle">initDraw</span>' +
-        '<button type="button" class="cm-comp-card-canvas-init-section-remove" title="Remove initDraw">✕</button>' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-canvas-init-section-remove" title="Remove initDraw">✕</button>' +
         '</div>'
       );
       (program.initDraw || []).forEach(function (call, idx) {
         initHtml += (
           '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--canvas-call">' +
           '<input type="text" class="cm-comp-card-nested-input cm-comp-card-canvas-init-call" data-idx="' + idx + '" value="' + escapeHtml(CCM.callTextFromCanvasCall(call)) + '">' +
-          '<button type="button" class="cm-comp-card-canvas-init-remove" data-idx="' + idx + '" title="Remove call">✕</button>' +
+          '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-canvas-init-remove" data-idx="' + idx + '" title="Remove call">✕</button>' +
           '</div>'
         );
       });
@@ -416,14 +440,14 @@
         renderWhenHitboxField(w, wi, zoneNames) +
         '<select class="cm-comp-card-nested-input cm-comp-card-canvas-when-event" data-when="' + wi + '">' + evOpts + '</select>' +
         '<span class="cm-comp-card-canvas-when-paren">)</span>' +
-        '<button type="button" class="cm-comp-card-canvas-when-section-remove" data-when="' + wi + '" title="Remove when block">✕</button>' +
+        '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-canvas-when-section-remove" data-when="' + wi + '" title="Remove when block">✕</button>' +
         '</div>'
       );
       (w.calls || []).forEach(function (call, ci) {
         whenHtml += (
           '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--canvas-call">' +
           '<input type="text" class="cm-comp-card-nested-input cm-comp-card-canvas-when-call" data-when="' + wi + '" data-call="' + ci + '" value="' + escapeHtml(CCM.callTextFromCanvasCall(call)) + '">' +
-          '<button type="button" class="cm-comp-card-canvas-when-call-remove" data-when="' + wi + '" data-call="' + ci + '" title="Remove call">✕</button>' +
+          '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-canvas-when-call-remove" data-when="' + wi + '" data-call="' + ci + '" title="Remove call">✕</button>' +
           '</div>'
         );
       });
@@ -455,7 +479,7 @@
       }
     }
     if (model.type === 'logic' && CCM.getLogicProgram(model)) {
-      html += renderLogicProgramSection(model);
+      html += renderLogicProgramSection(model, editor);
     }
     if (model.type === 'canvas' && CCM.getCanvasProgram(model)) {
       html += renderCanvasProgramSection(model, editor);
@@ -473,7 +497,7 @@
     });
     row.innerHTML =
       '<input type="text" class="cm-comp-card-nested-input ' + className + '"' + attrStr + ' value="">' +
-      '<button type="button" class="cm-comp-card-canvas-call-remove" title="Remove call">✕</button>';
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-canvas-call-remove" title="Remove call">✕</button>';
     const addBtn = container.querySelector('.cm-comp-card-canvas-init-add, .cm-comp-card-canvas-when-call-add');
     if (addBtn) container.insertBefore(row, addBtn);
     else container.appendChild(row);
@@ -493,6 +517,81 @@
     input.addEventListener('keydown', function (e) { e.stopPropagation(); });
     bindInputNativeCaret(input);
     requestAnimationFrame(function () { input.focus(); });
+  }
+
+  function appendLogicBindingRow(container, oldVar) {
+    const row = document.createElement('div');
+    row.className = 'cm-comp-card-nested-row cm-comp-card-nested-row--logic-bind';
+    row.dataset.oldVar = oldVar || '';
+    row.dataset.pending = '1';
+    row.innerHTML =
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-var" data-var="' + escapeHtml(oldVar || '') + '" value="">' +
+      '<span class="cm-comp-card-logic-is">is</span>' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-type" data-var="' + escapeHtml(oldVar || '') + '" value="">' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-logic-pin" data-var="' + escapeHtml(oldVar || '') + '" value="">' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-logic-remove" data-var="' + escapeHtml(oldVar || '') + '">✕</button>';
+    const addBtn = container.querySelector('.cm-comp-card-logic-add');
+    if (addBtn) container.insertBefore(row, addBtn);
+    else container.appendChild(row);
+    return row;
+  }
+
+  function readLogicBindingRow(row) {
+    const oldVar = row.getAttribute('data-old-var') || '';
+    return {
+      oldVar: oldVar,
+      logicVar: row.querySelector('.cm-comp-card-logic-var').value,
+      typeText: row.querySelector('.cm-comp-card-logic-type').value,
+      pinName: row.querySelector('.cm-comp-card-logic-pin').value
+    };
+  }
+
+  function updateLogicRowValidation(row) {
+    const data = readLogicBindingRow(row);
+    const fieldErrs = CCM.getLogicBindingFieldErrors(data.logicVar, data.typeText, data.pinName);
+    row.querySelector('.cm-comp-card-logic-var').classList.toggle('cm-comp-card-field--invalid', fieldErrs.has('var'));
+    row.querySelector('.cm-comp-card-logic-type').classList.toggle('cm-comp-card-field--invalid', fieldErrs.has('type'));
+    row.querySelector('.cm-comp-card-logic-pin').classList.toggle('cm-comp-card-field--invalid', fieldErrs.has('pin'));
+  }
+
+  function bindLogicBindingRow(row, syncModel) {
+    function syncFromRow() {
+      const data = readLogicBindingRow(row);
+      if (row.dataset.pending === '1') {
+        if (!data.logicVar.trim() || !data.typeText.trim() || !data.pinName.trim()) {
+          updateLogicRowValidation(row);
+          return;
+        }
+        row.dataset.pending = '0';
+        row.setAttribute('data-old-var', data.logicVar);
+        row.querySelectorAll('[data-var]').forEach(function (el) {
+          el.setAttribute('data-var', data.logicVar);
+        });
+        row.querySelector('.cm-comp-card-logic-remove').setAttribute('data-var', data.logicVar);
+      }
+      updateLogicRowValidation(row);
+      syncModel(function (m) {
+        return CCM.upsertLogicBinding(m, data.oldVar, data.logicVar, data.typeText, data.pinName);
+      });
+    }
+    row.querySelectorAll('.cm-comp-card-logic-var, .cm-comp-card-logic-type, .cm-comp-card-logic-pin').forEach(function (el) {
+      el.addEventListener('input', function () { updateLogicRowValidation(row); });
+      el.addEventListener('change', syncFromRow);
+    });
+    updateLogicRowValidation(row);
+    const removeBtn = row.querySelector('.cm-comp-card-logic-remove');
+    removeBtn.addEventListener('click', function () {
+      if (row.dataset.pending === '1') {
+        row.remove();
+        return;
+      }
+      const oldVar = row.getAttribute('data-old-var');
+      syncModel(function (m) { return CCM.removeLogicBinding(m, oldVar); });
+    });
+    row.querySelectorAll('input').forEach(function (el) {
+      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      bindInputNativeCaret(el);
+    });
   }
 
   function buildCardDom(model, registry, catalog, editor, refreshImmediate, internalEditFlag, clearBlockMarker) {
@@ -679,15 +778,17 @@
       });
     });
 
-    div.querySelectorAll('.cm-comp-card-logic-add').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        syncModel(function (m) { return CCM.addLogicBinding(m, 'Z', 'number', 'pinZ'); });
-      });
+    div.querySelectorAll('.cm-comp-card-nested-row--logic-bind').forEach(function (row) {
+      bindLogicBindingRow(row, syncModel);
     });
 
-    div.querySelectorAll('.cm-comp-card-logic-remove').forEach(function (btn) {
+    div.querySelectorAll('.cm-comp-card-logic-add').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        syncModel(function (m) { return CCM.removeLogicBinding(m, btn.getAttribute('data-var')); });
+        const block = btn.closest('.cm-comp-card-nested--logic');
+        const row = appendLogicBindingRow(block, '');
+        bindLogicBindingRow(row, syncModel);
+        const first = row.querySelector('.cm-comp-card-logic-var');
+        if (first) first.focus();
       });
     });
 
@@ -817,6 +918,15 @@
         });
       });
     });
+
+    const logicRefSel = div.querySelector('.cm-comp-card-logic-ref');
+    if (logicRefSel) {
+      logicRefSel.addEventListener('change', function (e) {
+        const ref = e.target.value;
+        if (!ref) return;
+        syncModel(function (m) { return CCM.setLogicProgramRef(m, ref); });
+      });
+    }
 
     const canvasRefSel = div.querySelector('.cm-comp-card-canvas-ref');
     if (canvasRefSel) {

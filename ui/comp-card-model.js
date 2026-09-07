@@ -111,11 +111,25 @@
     return lines;
   }
 
+  function composeLogicBindingRawLine(logicVar, typeText, pinName) {
+    const v = String(logicVar || '').trim();
+    const t = String(typeText || '').trim();
+    const p = String(pinName || '').trim();
+    if (!v && !t && !p) return '';
+    return v + ' is ' + t + (p ? ' ' + p : '');
+  }
+
   function serializeLogicBinding(b) {
+    const typeText = b.typeText != null ? b.typeText : formatLogicBindingType(b);
+    const pinName = b.pinName || '';
+    const errors = getLogicBindingFieldErrors(b.logicVar, typeText, pinName);
+    if (errors.size > 0) {
+      return b.rawLine || composeLogicBindingRawLine(b.logicVar, typeText, pinName);
+    }
     let s = b.logicVar + ' is ' + b.bindType;
     if (b.numberFormat) s += '/' + b.numberFormat;
     if (b.listFlag) s += ' list';
-    s += ' ' + b.pinName;
+    s += ' ' + pinName;
     return s;
   }
 
@@ -174,6 +188,124 @@
       if (refs.indexOf(m[1]) === -1) refs.push(m[1]);
     }
     return refs;
+  }
+
+  function findInlineLogicRefs(src) {
+    const refs = [];
+    const re = /^\s*inline\s+\[logic\]\s+(\.\S+)\s*:/gm;
+    let m;
+    while ((m = re.exec(String(src || ''))) !== null) {
+      if (refs.indexOf(m[1]) === -1) refs.push(m[1]);
+    }
+    return refs;
+  }
+
+  function formatLogicBindingType(binding) {
+    if (!binding) return '';
+    if (binding.typeText != null && binding.typeText !== '') return binding.typeText;
+    let s = binding.bindType || '';
+    if (binding.numberFormat) s += '/' + binding.numberFormat;
+    if (binding.listFlag) s += ' list';
+    return s.trim();
+  }
+
+  function parseLogicBindingType(typeText) {
+    const raw = String(typeText || '').trim();
+    if (!raw) return null;
+    const listFlag = /\blist\b/i.test(raw);
+    const rest = raw.replace(/\blist\b/gi, '').trim();
+    const m = rest.match(/^(number|bool|text|float)(?:\/([A-Za-z0-9]+))?$/i);
+    if (!m) return null;
+    return {
+      bindType: m[1].toLowerCase(),
+      numberFormat: m[2] || null,
+      listFlag: listFlag
+    };
+  }
+
+  function getLogicBindingFieldErrors(logicVar, typeText, pinName) {
+    const bad = new Set();
+    const v = String(logicVar || '').trim();
+    const p = String(pinName || '').trim();
+    if (!/^[A-Z_][A-Za-z0-9_]*$/.test(v)) bad.add('var');
+    if (!parseLogicBindingType(typeText)) bad.add('type');
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(p)) bad.add('pin');
+    return bad;
+  }
+
+  function bindingFromFields(logicVar, typeText, pinName) {
+    const v = String(logicVar || '').trim();
+    const t = String(typeText || '').trim();
+    const p = String(pinName || '').trim();
+    const parsed = parseLogicBindingType(t);
+    const binding = { logicVar: v, typeText: t, pinName: p };
+    const errors = getLogicBindingFieldErrors(v, t, p);
+    if (errors.size === 0 && parsed) {
+      binding.bindType = parsed.bindType;
+      binding.numberFormat = parsed.numberFormat;
+      binding.listFlag = parsed.listFlag;
+    } else {
+      binding.rawLine = composeLogicBindingRawLine(v, t, p);
+    }
+    return binding;
+  }
+
+  function extractLogicBindingLines(innerRaw) {
+    const lines = [];
+    String(innerRaw || '').split('\n').forEach(function (line) {
+      const t = line.trim();
+      if (!t || t.startsWith(';')) return;
+      if (t.startsWith('observe')) return;
+      lines.push(t);
+    });
+    return lines;
+  }
+
+  function draftBindingFromRawLine(rawLine) {
+    const binding = { rawLine: rawLine };
+    const m = rawLine.match(/^(\S+)\s+is\s+(.*)$/);
+    if (!m) {
+      binding.logicVar = '';
+      binding.typeText = '';
+      binding.pinName = '';
+      return binding;
+    }
+    binding.logicVar = m[1];
+    const validRe = /^([A-Z_][A-Za-z0-9_]*)\s+is\s+(number|bool|text|float)(?:\/([A-Za-z0-9]+))?(?:\s+list)?\s+([a-zA-Z_][A-Za-z0-9_]*)$/;
+    const vm = rawLine.match(validRe);
+    if (vm) {
+      const listFlag = /\blist\b/.test(rawLine);
+      binding.bindType = vm[2];
+      binding.numberFormat = vm[3] || null;
+      binding.listFlag = listFlag;
+      binding.pinName = vm[4];
+      binding.typeText = formatLogicBindingType(binding);
+      return binding;
+    }
+    const rest = m[2].trim();
+    const parts = rest.split(/\s+/);
+    if (parts.length >= 2) {
+      binding.pinName = parts[parts.length - 1];
+      binding.typeText = parts.slice(0, -1).join(' ');
+    } else {
+      binding.typeText = rest;
+      binding.pinName = '';
+    }
+    return binding;
+  }
+
+  function enrichLogicBindingsFromRaw(bindings, innerRaw) {
+    const rawLines = extractLogicBindingLines(innerRaw);
+    if (!rawLines.length && !bindings.length) return bindings;
+    if (bindings.length === rawLines.length) {
+      return bindings.map(function (b, i) {
+        const copy = Object.assign({}, b);
+        if (!copy.typeText) copy.typeText = formatLogicBindingType(copy);
+        copy.rawLine = rawLines[i];
+        return copy;
+      });
+    }
+    return rawLines.map(draftBindingFromRawLine);
   }
 
   function extractBraceSectionInner(src, sectionRe) {
@@ -528,8 +660,9 @@
               const parsed = parseLogicProgramBlock(inner, 'logic program');
               bindings = parsed.bindings || [];
               observeDefs = parsed.observeDefs || [];
-              attachLogicObserveRawLines(inner, observeDefs);
-            } catch (e) { /* keep empty structured */ }
+            } catch (e) { /* keep drafts from raw lines */ }
+            attachLogicObserveRawLines(inner, observeDefs);
+            bindings = enrichLogicBindingsFromRaw(bindings, inner);
           }
           items.push({
             kind: 'logicProgram',
@@ -1007,7 +1140,14 @@
     const item = findBodyItem(newModel, 'logicProgram');
     if (!item) return newModel;
     item.bindings = item.bindings || [];
-    item.bindings.push({ logicVar: logicVar, bindType: bindType, pinName: pinName, listFlag: false, numberFormat: null });
+    item.bindings.push({
+      logicVar: logicVar,
+      bindType: bindType,
+      typeText: bindType,
+      pinName: pinName,
+      listFlag: false,
+      numberFormat: null
+    });
     refreshNestedRawLines(item, detectBodyIndent(newModel));
     newModel.rawText = serializeCompBlock(newModel);
     return newModel;
@@ -1018,6 +1158,21 @@
     const item = findBodyItem(newModel, 'logicProgram');
     if (!item) return newModel;
     item.bindings = (item.bindings || []).filter(function (b) { return b.logicVar !== logicVar; });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function upsertLogicBinding(model, oldVar, logicVar, typeText, pinName) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'logicProgram');
+    if (!item) return newModel;
+    item.bindings = item.bindings || [];
+    const binding = bindingFromFields(logicVar, typeText, pinName);
+    const key = oldVar != null && oldVar !== '' ? oldVar : binding.logicVar;
+    const idx = item.bindings.findIndex(function (b) { return b.logicVar === key; });
+    if (idx >= 0) item.bindings[idx] = binding;
+    else item.bindings.push(binding);
     refreshNestedRawLines(item, detectBodyIndent(newModel));
     newModel.rawText = serializeCompBlock(newModel);
     return newModel;
@@ -1067,6 +1222,16 @@
       event: event || 'press',
       calls: calls || []
     });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setLogicProgramRef(model, newRef) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'logicProgram');
+    if (!item || !newRef) return newModel;
+    item.ref = newRef;
     refreshNestedRawLines(item, detectBodyIndent(newModel));
     newModel.rawText = serializeCompBlock(newModel);
     return newModel;
@@ -1197,14 +1362,20 @@
     setProgramRefs: setProgramRefs,
     addLogicBinding: addLogicBinding,
     removeLogicBinding: removeLogicBinding,
+    upsertLogicBinding: upsertLogicBinding,
     setCanvasInitDrawCall: setCanvasInitDrawCall,
     addCanvasInitDrawCall: addCanvasInitDrawCall,
     setCanvasWhenCall: setCanvasWhenCall,
     addCanvasWhenBlock: addCanvasWhenBlock,
     callTextFromCanvasCall: callTextFromCanvasCall,
     findInlineCanvasRefs: findInlineCanvasRefs,
+    findInlineLogicRefs: findInlineLogicRefs,
+    formatLogicBindingType: formatLogicBindingType,
+    parseLogicBindingType: parseLogicBindingType,
+    getLogicBindingFieldErrors: getLogicBindingFieldErrors,
     getHitboxZoneNames: getHitboxZoneNames,
     modelContentKey: modelContentKey,
+    setLogicProgramRef: setLogicProgramRef,
     setCanvasProgramRef: setCanvasProgramRef,
     addCanvasInitDrawSection: addCanvasInitDrawSection,
     removeCanvasInitDrawSection: removeCanvasInitDrawSection,
