@@ -45,6 +45,8 @@
   font-family: monospace;
   font-size: 14px;
   width: 120px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .cm-comp-card-type-select {
@@ -82,17 +84,26 @@
 
 .cm-comp-card-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px 16px;
   align-items: center;
 }
 
 .cm-comp-card-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  white-space: nowrap;
   gap: 4px;
+  min-width: 0;
+}
+
+.cm-comp-card-item > span:first-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cm-comp-card-attr-field {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .cm-comp-card-item--equals {
@@ -119,8 +130,11 @@
   font-family: monospace;
   font-size: 14px;
   box-sizing: border-box;
-  flex: 1;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .cm-comp-card-equals-textarea {
@@ -137,9 +151,12 @@
   min-height: 4em;
   max-height: 20em;
   box-sizing: border-box;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .cm-comp-card-remove {
+  flex: 0 0 auto;
   background: transparent;
   border: none;
   color: #f55;
@@ -149,6 +166,9 @@
 }
 
 .cm-comp-card-segment-toggle {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 2px solid #ea580c;
   border-radius: 4px;
   padding: 2px 8px;

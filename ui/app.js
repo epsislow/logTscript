@@ -625,9 +625,6 @@ function setCompCardWidgetsEnabled(on) {
       if (!cmEditor) return;
       compCardWidgetsHandle = attachCompCardWidgetsFromRegistry(cmEditor);
       compCardWidgetsEnabled = !!compCardWidgetsHandle;
-      if (compCardWidgetsEnabled && compCardWidgetsHandle.refresh) {
-        compCardWidgetsHandle.refresh();
-      }
     } else {
       if (compCardWidgetsHandle && typeof compCardWidgetsHandle.destroy === 'function') {
         compCardWidgetsHandle.destroy();

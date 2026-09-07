@@ -80,36 +80,78 @@
     return origin === '+input' || origin === '+delete' || origin === 'paste' || origin === 'cut';
   }
 
-  function isTextLikeInput(el) {
-    if (!el || el.tagName !== 'INPUT') return false;
+  function isCaretEditableInput(el) {
+    if (!el) return false;
+    if (el.tagName === 'TEXTAREA') return true;
+    if (el.tagName !== 'INPUT') return false;
     const t = (el.type || 'text').toLowerCase();
-    return t === 'text' || t === 'number' || t === 'search' || t === 'tel' || t === 'url' || t === 'email' || t === 'password';
+    return t === 'text' || t === 'search' || t === 'tel' || t === 'url' ||
+      t === 'email' || t === 'password' || t === 'number';
   }
 
-  function bindInputCursorToEnd(el) {
-    if (!isTextLikeInput(el)) return;
-    function moveEnd() {
-      const len = (el.value || '').length;
-      try {
-        if (el.type === 'number') {
-          const prevType = el.type;
-          el.type = 'text';
-          el.setSelectionRange(len, len);
-          el.type = prevType;
-        } else if (typeof el.setSelectionRange === 'function') {
-          el.setSelectionRange(len, len);
-        }
-      } catch (e) { /* ignore */ }
+  function caretIndexFromMouse(el, clientX) {
+    const text = el.value || '';
+    if (!text.length) return 0;
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    const padL = parseFloat(style.paddingLeft) || 0;
+    const borderL = parseFloat(style.borderLeftWidth) || 0;
+    let x = clientX - rect.left - padL - borderL;
+    if (x <= 0) return 0;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = style.font || (style.fontSize + ' ' + style.fontFamily);
+    const fullW = ctx.measureText(text).width;
+    if (x >= fullW) return text.length;
+
+    let lo = 0;
+    let hi = text.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (ctx.measureText(text.slice(0, mid)).width <= x) lo = mid;
+      else hi = mid - 1;
     }
-    el.addEventListener('focus', moveEnd);
-    el.addEventListener('mouseup', function () {
-      requestAnimationFrame(moveEnd);
-    });
+    if (lo < text.length) {
+      const wLo = ctx.measureText(text.slice(0, lo)).width;
+      const wHi = ctx.measureText(text.slice(0, lo + 1)).width;
+      if ((x - wLo) > (wHi - x)) lo += 1;
+    }
+    return lo;
   }
 
-  function bindCardTextInputsCursorToEnd(container) {
-    container.querySelectorAll('input').forEach(function (el) {
-      bindInputCursorToEnd(el);
+  function setInputCaretFromMouse(el, e) {
+    if (!isCaretEditableInput(el) || typeof el.setSelectionRange !== 'function') return;
+    try {
+      const pos = caretIndexFromMouse(el, e.clientX);
+      el.setSelectionRange(pos, pos);
+    } catch (err) { /* ignore */ }
+  }
+
+  function bindInputNativeCaret(el) {
+    if (!isCaretEditableInput(el)) return;
+    let pointerDown = null;
+
+    el.addEventListener('mousedown', function (e) {
+      pointerDown = { x: e.clientX, y: e.clientY, button: e.button };
+    });
+
+    el.addEventListener('mouseup', function (e) {
+      e.stopPropagation();
+      const down = pointerDown;
+      pointerDown = null;
+      if (e.button !== 0 || !down || down.button !== 0) return;
+      const dragged = Math.abs(e.clientX - down.x) > 4 || Math.abs(e.clientY - down.y) > 4;
+      let selStart = 0;
+      let selEnd = 0;
+      try {
+        selStart = el.selectionStart;
+        selEnd = el.selectionEnd;
+      } catch (err) { /* ignore */ }
+      if (dragged && selStart !== selEnd) return;
+      requestAnimationFrame(function () {
+        setInputCaretFromMouse(el, e);
+      });
     });
   }
 
@@ -139,7 +181,9 @@
       return (
         '<div class="cm-comp-card-item' + invalidClass + '"' + title + '>' +
         '<span>' + escapeHtml(attr.name) + '</span>' +
+        '<div class="cm-comp-card-attr-field">' +
         '<select class="cm-comp-card-attr-input" data-attr="' + escapeHtml(attr.name) + '">' + opts + '</select>' +
+        '</div>' +
         '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
         '</div>'
       );
@@ -149,7 +193,9 @@
     return (
       '<div class="cm-comp-card-item' + invalidClass + '"' + title + '>' +
       '<span>' + escapeHtml(attr.name) + '</span>' +
+      '<div class="cm-comp-card-attr-field">' +
       '<input type="' + inputType + '" class="cm-comp-card-attr-input" data-attr="' + escapeHtml(attr.name) + '" value="' + escapeHtml(attr.value || '') + '">' +
+      '</div>' +
       '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(attr.name) + '">✕</button>' +
       '</div>'
     );
@@ -162,7 +208,9 @@
     return (
       '<div class="cm-comp-card-item cm-comp-card-item--segment' + invalidClass + '">' +
       '<span>' + escapeHtml(seg.name) + '</span>' +
+      '<div class="cm-comp-card-attr-field">' +
       '<button type="button" class="cm-comp-card-segment-toggle' + (active ? ' is-on' : '') + '" data-seg="' + escapeHtml(seg.name) + '">' + escapeHtml(seg.value) + '</button>' +
+      '</div>' +
       '<button type="button" class="cm-comp-card-remove" data-attr="' + escapeHtml(seg.name) + '">✕</button>' +
       '</div>'
     );
@@ -262,9 +310,7 @@
       }
     });
 
-    bindCardTextInputsCursorToEnd(div);
-
-    div.querySelectorAll('input.cm-comp-card-attr-input').forEach(function (el) {
+    div.querySelectorAll('.cm-comp-card-attr-input').forEach(function (el) {
       el.addEventListener('change', function (e) {
         const name = e.target.getAttribute('data-attr');
         syncModel(function (m) { return CCM.setAttrValue(m, name, e.target.value); });
@@ -319,7 +365,10 @@
 
     div.querySelectorAll('input, select, textarea, button').forEach(function (el) {
       el.addEventListener('keydown', function (e) { e.stopPropagation(); });
-      el.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+      if (el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.type === 'checkbox') {
+        el.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+      }
+      bindInputNativeCaret(el);
     });
 
     return div;
@@ -331,6 +380,36 @@
     let debounceTimer = null;
     let updatingWidgets = false;
     const internalEditFlag = { value: false };
+    let widgetInteractUntil = 0;
+
+    function nodeInAnyWidget(node) {
+      if (!node) return false;
+      let inside = false;
+      active.forEach(function (w) {
+        if (w.root && w.root.contains(node)) inside = true;
+      });
+      return inside;
+    }
+
+    function markWidgetInteraction() {
+      widgetInteractUntil = Date.now() + 300;
+    }
+
+    function shouldSkipCursorActivity() {
+      if (focusInsideAnyWidget()) return true;
+      if (Date.now() < widgetInteractUntil) return true;
+      return false;
+    }
+
+    document.addEventListener('mousedown', function (e) {
+      if (!nodeInAnyWidget(e.target)) return;
+      markWidgetInteraction();
+    }, true);
+
+    document.addEventListener('mouseup', function (e) {
+      if (!nodeInAnyWidget(e.target)) return;
+      markWidgetInteraction();
+    }, true);
 
     function getCardModeSpans() {
       const spans = [];
@@ -338,6 +417,16 @@
         if (w.viewMode === 'card' && w.span) spans.push(w.span);
       });
       return spans;
+    }
+
+    function focusInsideAnyWidget() {
+      const ae = document.activeElement;
+      if (!ae) return false;
+      let inside = false;
+      active.forEach(function (w) {
+        if (w.root && w.root.contains(ae)) inside = true;
+      });
+      return inside;
     }
 
     function onBeforeChange(cm, change) {
@@ -354,12 +443,61 @@
 
     function onCursorActivity() {
       if (internalEditFlag.value || updatingWidgets) return;
+      if (shouldSkipCursorActivity()) return;
       const cur = editor.getCursor();
       const spans = getCardModeSpans();
       for (let i = 0; i < spans.length; i++) {
         if (!cursorInsideSpan(cur, spans[i])) continue;
         if (moveCursorOutsideSpan(editor, spans[i])) return;
       }
+    }
+
+    function blockSpanForModel(model) {
+      const endLine = model.span.endLine;
+      return {
+        startLine: model.span.startLine,
+        endLine: endLine,
+        startCh: 0,
+        endCh: editor.getLine(endLine).length
+      };
+    }
+
+    function markerIsLive(marker) {
+      if (!marker) return false;
+      try {
+        return marker.find() != null;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function createCollapseMarker(blockSpan) {
+      try {
+        return editor.markText(
+          { line: blockSpan.startLine, ch: blockSpan.startCh },
+          { line: blockSpan.endLine, ch: blockSpan.endCh },
+          { collapsed: true, atomic: true, readOnly: true }
+        );
+      } catch (e) {
+        console.warn('comp-card markText failed', e);
+        return null;
+      }
+    }
+
+    function ensureCollapseMarker(w, model, viewMode) {
+      if (viewMode !== 'card') {
+        if (w.marker) {
+          w.marker.clear();
+          w.marker = null;
+        }
+        return;
+      }
+      w.span = blockSpanForModel(model);
+      if (markerIsLive(w.marker)) return;
+      if (w.marker) {
+        try { w.marker.clear(); } catch (e) { /* ignore */ }
+      }
+      w.marker = createCollapseMarker(w.span);
     }
 
     function clearWidget(id) {
@@ -390,6 +528,7 @@
 
       const root = document.createElement('div');
       root.className = 'cm-comp-card-widget-root';
+      root.setAttribute('cm-ignore-events', 'true');
 
       const refreshImmediate = function () {
         if (debounceTimer) clearTimeout(debounceTimer);
@@ -411,24 +550,11 @@
       const endLine = model.span.endLine;
       if (endLine < 0 || endLine >= editor.lineCount()) return;
 
-      const blockSpan = {
-        startLine: model.span.startLine,
-        endLine: endLine,
-        startCh: 0,
-        endCh: editor.getLine(endLine).length
-      };
+      const blockSpan = blockSpanForModel(model);
 
       let marker = null;
       if (viewMode === 'card') {
-        try {
-          marker = editor.markText(
-            { line: blockSpan.startLine, ch: blockSpan.startCh },
-            { line: blockSpan.endLine, ch: blockSpan.endCh },
-            { collapsed: true, atomic: true, readOnly: true }
-          );
-        } catch (e) {
-          console.warn('comp-card markText failed', e);
-        }
+        marker = createCollapseMarker(blockSpan);
       }
 
       const lineWidget = editor.addLineWidget(model.span.startLine, root, {
@@ -473,13 +599,17 @@
         });
 
         const seen = new Set();
+        let didReattach = false;
         blocks.forEach(function (model) {
           seen.add(model.id);
           const prev = active.get(model.id);
           const key = CCM.spanKey(model.span);
           const desiredMode = viewModes.get(model.id) || 'card';
-          const markerOk = desiredMode !== 'card' || (prev && prev.marker);
-          if (prev && prev.spanKey === key && prev.viewMode === desiredMode && markerOk) return;
+          if (prev && prev.spanKey === key && prev.viewMode === desiredMode) {
+            ensureCollapseMarker(prev, model, desiredMode);
+            return;
+          }
+          didReattach = true;
           clearWidget(model.id);
           attachBlock(model, viewModes);
         });
@@ -488,13 +618,17 @@
           if (!seen.has(id)) clearWidget(id);
         });
 
-        if (typeof editor.refresh === 'function') editor.refresh();
+        if (didReattach && typeof editor.refresh === 'function') editor.refresh();
       } finally {
         updatingWidgets = false;
       }
     }
 
     function onEditorChange() {
+      if (!internalEditFlag.value &&
+          (focusInsideAnyWidget() || Date.now() < widgetInteractUntil)) {
+        return;
+      }
       scheduleUpdate();
     }
 

@@ -53375,6 +53375,17 @@ probe(outX)`;
     h.assert('on still raise', CCM.getAttrEnumOptions('on', { name: 'on', value: 'mode' }).join(','), 'raise,edge,1');
   });
 
+  reg(4918, 'cm-comp-card', 'setAttrValue enum visual 0/1 serializes', function(h, session) {
+    const src = 'comp [dip] .d:\n  on: edge\n  visual: 1\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const def = CCM.getAttrDef('dip', 'visual', cmReg(session));
+    h.assert('visual enum', CCM.getWidgetFieldType('visual', def), 'enum');
+    const next = CCM.setAttrValue(blocks[0], 'visual', '0');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('visual 0', String(out.includes('visual: 0')), 'true');
+    h.assert('no visual 1', String(out.includes('visual: 1')), 'false');
+  });
+
   reg(4914, 'cm-comp-card', 're-parse after patch equals serialize (flat attrs F2)', function(h, session) {
     const src = 'comp [network] .n:\n  width: 10\n  length: 3\n  channel: \'demo\'\n  on: raise\n  :';
     let blocks = CCM.parseCompBlocks(src, cmReg(session));
