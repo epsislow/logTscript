@@ -290,14 +290,29 @@
     );
   }
 
-  function renderProgramRefsField(model) {
+  function renderProgramRefsField(model, editor) {
     const refs = CCM.getProgramRefs(model);
+    const inlineRefs = CCM.findInlinePlcRefs(editor.getValue());
+    const multiRef = refs.length > 1 ? refs.join(' ') : '';
+    const currentRef = refs.length === 1 ? refs[0] : '';
+    let selectHtml = '<select class="cm-comp-card-inline-ref cm-comp-card-nested-input cm-comp-card-plc-program-ref">';
+    if (multiRef) {
+      selectHtml += '<option value="' + escapeHtml(multiRef) + '" selected>' + escapeHtml(multiRef) + ' (multiple)</option>';
+    } else if (currentRef && inlineRefs.indexOf(currentRef) === -1) {
+      selectHtml += '<option value="' + escapeHtml(currentRef) + '" selected>' + escapeHtml(currentRef) + ' (missing inline)</option>';
+    }
+    if (!refs.length) {
+      selectHtml += '<option value="">— select inline [plc] —</option>';
+    }
+    inlineRefs.forEach(function (ref) {
+      const sel = ref === currentRef ? ' selected' : '';
+      selectHtml += '<option value="' + escapeHtml(ref) + '"' + sel + '>' + escapeHtml(ref) + '</option>';
+    });
+    selectHtml += '</select>';
     return (
-      '<div class="cm-comp-card-item cm-comp-card-item--program-refs">' +
-      '<span>program</span>' +
-      '<div class="cm-comp-card-attr-field">' +
-      '<input type="text" class="cm-comp-card-program-refs" value="' + escapeHtml(refs.join(' ')) + '" placeholder=".ref1 .ref2">' +
-      '</div>' +
+      '<div class="cm-comp-card-program-row">' +
+      '<span class="cm-comp-card-program-label">program:</span>' +
+      selectHtml +
       '</div>'
     );
   }
@@ -603,11 +618,15 @@
     const explicit = CCM.getExplicitAttrs(model);
     const missing = CCM.getMissingAttrNames(model, registry);
 
+    let programHtml = '';
+    if (model.type === 'plc' && explicit.some(function (a) { return a.name === 'program'; })) {
+      programHtml = renderProgramRefsField(model, editor);
+    }
+
     let gridHtml = '<div class="cm-comp-card-grid">';
     gridHtml += renderEqualsField(model);
     explicit.forEach(function (attr) {
       if (model.type === 'plc' && attr.name === 'program') {
-        gridHtml += renderProgramRefsField(model);
         return;
       }
       if (attr.kind === 'segment') {
@@ -617,6 +636,7 @@
       }
     });
     gridHtml += '</div>';
+    gridHtml = programHtml + gridHtml;
     gridHtml += renderNestedSections(model, editor);
 
     let addHtml = '';
@@ -725,10 +745,12 @@
       });
     }
 
-    const progRefs = div.querySelector('.cm-comp-card-program-refs');
-    if (progRefs) {
-      progRefs.addEventListener('change', function (e) {
-        const refs = e.target.value.trim().split(/\s+/).filter(Boolean);
+    const plcProgSel = div.querySelector('.cm-comp-card-plc-program-ref');
+    if (plcProgSel) {
+      plcProgSel.addEventListener('change', function (e) {
+        const val = e.target.value.trim();
+        if (!val) return;
+        const refs = val.split(/\s+/).filter(Boolean);
         syncModel(function (m) { return CCM.setProgramRefs(m, refs); });
       });
     }

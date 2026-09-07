@@ -200,6 +200,16 @@
     return refs;
   }
 
+  function findInlinePlcRefs(src) {
+    const refs = [];
+    const re = /^\s*inline\s+\[plc\]\s+(\.\S+)\s*:/gm;
+    let m;
+    while ((m = re.exec(String(src || ''))) !== null) {
+      if (refs.indexOf(m[1]) === -1) refs.push(m[1]);
+    }
+    return refs;
+  }
+
   function formatLogicBindingType(binding) {
     if (!binding) return '';
     if (binding.typeText != null && binding.typeText !== '') return binding.typeText;
@@ -1370,6 +1380,7 @@
     callTextFromCanvasCall: callTextFromCanvasCall,
     findInlineCanvasRefs: findInlineCanvasRefs,
     findInlineLogicRefs: findInlineLogicRefs,
+    findInlinePlcRefs: findInlinePlcRefs,
     formatLogicBindingType: formatLogicBindingType,
     parseLogicBindingType: parseLogicBindingType,
     getLogicBindingFieldErrors: getLogicBindingFieldErrors,

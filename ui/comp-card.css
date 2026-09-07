@@ -283,6 +283,25 @@
   white-space: nowrap;
 }
 
+.cm-comp-card-program-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cm-comp-card-program-label {
+  color: #9cf;
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.cm-comp-card-program-row .cm-comp-card-plc-program-ref {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .cm-comp-card-inline-row .cm-comp-card-inline-ref,
 .cm-comp-card-inline-row .cm-comp-card-canvas-ref {
   flex: 1 1 0;
