@@ -14,7 +14,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 comp [mem] .rom:
   depth: 8
   length: 16
-  readonly: 1
+  readonly
   on: 1
   = ^aa5500ff
   :
@@ -192,7 +192,7 @@ Copy **4 words** from slot 1 (`.rom`) to slot 2 (`.ram`). **Load & Run:** `done=
 comp [mem] .rom:
   depth: 8
   length: 8
-  readonly: 1
+  readonly
   on: 1
   = ^01020304
   :
@@ -285,7 +285,7 @@ comp [dma] .dma:
 
 1wire done = .dma:done
 1wire busy = .dma:busy
-4wire rem = .dma:remaining
+3wire rem = .dma:remaining
 .ram:{ adr = 11, set = 1 }
 8wire w3 = .ram:get
 show(done)
@@ -329,8 +329,8 @@ comp [dma] .dma:
 .dma:{ set = 1 }
 
 1wire done = .dma:done
-.ram:{ adr = 100, set = 1 }
-8wire w4 = .ram:get
+.dst:{ adr = 100, set = 1 }
+8wire w4 = .dst:get
 show(done)
 show(w4)
 ```
@@ -481,7 +481,7 @@ show(.dma:remaining)
 .dma:{ set = 1 }
 show(.dma:done)
 
-.ram:{ adr = 4, set = 1 }
+.ram:{ adr = 100, set = 1 }
 8wire last = .ram:get
 show(last)
 ```
@@ -702,7 +702,7 @@ inline [asm] .cpuisa:
 comp [mem] .rom:
   depth: 8
   length: 4
-  readonly: 1
+  readonly
   on: 1
   = ^2a
   :

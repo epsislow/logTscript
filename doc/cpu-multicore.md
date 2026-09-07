@@ -161,13 +161,21 @@ comp [cpu] .mp:
     depth: 8
     length: 32
     core0:
-      = .x86 { jmp halt halt: jmp halt }
+      = .x86 {
+        jmp halt
+      halt:
+        jmp halt
+      }
     core1:
-      = .x86 { jmp halt halt: jmp halt }
+      = .x86 {
+        jmp halt
+      halt:
+        jmp halt
+      }
   :
 
 .mp:{ ramAdr = 0, set = 1 }
-8wire cell = .mp:ram:get
+32wire cell = .mp:ram:get
 ```
 
 After **Load & Run**, **`cell`** holds word 0 (`5`).

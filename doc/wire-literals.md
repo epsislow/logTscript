@@ -378,12 +378,12 @@ literal.bit           # single bit
 ```
 
 ```logts-play
-8wire a = \255.0-3
+8wire a = \255.0-3;8
 show(a)
 ```
 
 ```logts-play
-8wire b = ^FF.4/4
+8wire b = ^FF.4/4;8
 show(b)
 ```
 

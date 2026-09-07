@@ -82,7 +82,7 @@ Signed `−8 − 1` on 4 bits → `r=0111`, overflow `1`.
 ```logts-play
 8wire a = 00100000
 8wire b = 00001000
-8wire s, 1wire ovf = SUBTRACT(a, b; q4p4)
+8wire s, 4wire ovf = SUBTRACT(a, b; q4p4)
 show(s; q4p4)
 show(ovf)
 ```

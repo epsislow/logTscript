@@ -90,9 +90,10 @@ Signed `(−1)×(−1) + 2×1 = 3`.
 ```logts-play
 8wire[2] a = 00011000 + 00001000
 8wire[2] b = 00010000 + 00010000
-8wire dot, 16wire over = DOT(a, b; q4p4)
+8wire dot, 16wire over, 4wire st = DOT(a, b; q4p4)
 show(dot; q4p4)
 show(over)
+show(st)
 ```
 
 `[1.5, 0.5]·[1, 1] = 2.0`.

@@ -142,7 +142,7 @@ inline [asm] .x86:
   set: x86-32
   :
 
-80wire branch = .x86 {
+128wire branch = .x86 {
   cmp eax, ebx
   je equal
   jmp done
@@ -480,6 +480,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 40
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 128
@@ -515,7 +518,7 @@ inline [asm] .x86:
   set: x86-32
   :
 
-80wire p16 = .x86 {
+88wire p16 = .x86 {
   mov ax, 5
   mov bx, 10
   add ax, bx
@@ -540,6 +543,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 8
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 32
@@ -589,6 +595,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 8
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 80
@@ -651,6 +660,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 12
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 128
@@ -687,6 +699,9 @@ comp [cpu] .u:
   sp: 4
   on: 1
   maxSteps: 10
+  ram:
+    depth: 32
+    length: 16
   prog:
     depth: 8
     length: 96

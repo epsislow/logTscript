@@ -45,14 +45,14 @@ Append rejects **`Z`/`X`** in the source bitstring (even in `MODE ZSTATE`).
 | `show(rx./8)` | Peek for display |
 | `4wire x << rx./4` | **Consume** — assign wire and remove 4 bits from front |
 
-Slice canonical form: **`rx./N`** (front N bits). Dynamic length: **`rx/(expr)`** — length evaluated at runtime from a wire expression (e.g. `4wire len : 0100` then `rx/(len)`). Sugar **`rx./(expr)`** is equivalent. Consume is **only** through `<<` on a wire target.
+Slice canonical form: **`rx./N`** (front N bits). Dynamic length: **`rx/(expr)`** — length evaluated at runtime from a wire expression (e.g. `4wire n : 0100` then `rx/(n)`). Sugar **`rx./(expr)`** is equivalent. Consume is **only** through `<<` on a wire target.
 
 ```logts-play
 sock rx
 rx << ^FF
-4wire len : 0100
-4wire peek = rx/(len)
-4wire take << rx/(len)
+4wire n : 0100
+4wire front = rx/(n)
+4wire take << rx/(n)
 show(BITSIZE(rx))
 ```
 
@@ -85,8 +85,8 @@ sock rx
 show(bs)
 show(ww)
 rx << ^FF
-bs = BITSIZE(rx)
-show(bs)
+4wire bs2 = BITSIZE(rx)
+show(bs2)
 ```
 
 ### `SOCKATTACHED(sock)`

@@ -317,7 +317,7 @@ inline [protocol] .restFoot:
     1111
   :
 
-32wire out = .restFoot { data = 0000 + 0100 + repeat(1,32) + 1111 }
+32wire out = .restFoot { data = 0000 + 0100 + 11111111111111111111111111111111 + 1111 }
 show(out)
 ```
 
@@ -354,10 +354,9 @@ inline [protocol] .verifyCs:
   :
 
 24wire pkt = .pktCs { data = 10101010 }
-1wire ok = .verifyCs { data = pkt }
+1wire _ = .verifyCs { data = pkt }
 
 show(pkt)
-show(ok)
 ```
 
 Body `10101010` + CRC suffix → 24-bit packet. Verify succeeds silently (empty output channel).

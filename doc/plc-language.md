@@ -456,7 +456,7 @@ inline [plc] .demo:
   OUT = t.Q
   :
 
-; parse-only — use with comp [plc] for scans (see plc.md example 17)
+# parse-only — use with comp [plc] for scans (see plc.md example 17)
 doc(.demo)
 ```
 
@@ -607,7 +607,7 @@ comp [plc] .ctrl:
   on: 1
   :
 
-; 3 rising edges — WARN on (cv>=3), FULL off (cv<5)
+# 3 rising edges — WARN on (cv>=3), FULL off (cv<5)
 .sensor = 1
 .ctrl:{ set = 1 }
 .sensor = 0
@@ -654,12 +654,12 @@ comp [plc] .ctrl:
   on: 1
   :
 
-; load preset first
+# load preset first
 .reload = 1
 .ctrl:{ set = 1 }
 .reload = 0
 
-; 3 rising edges to count down
+# 3 rising edges to count down
 .tick = 1
 .ctrl:{ set = 1 }
 .tick = 0

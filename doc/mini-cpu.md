@@ -455,6 +455,12 @@ comp [led] .beat::
 Copy the `chip +[alu4]` and `board +[cpu4]` definitions from the oscillator example, then use the tail below (or replace the oscillator/switch/led block):
 
 ```logts-play
+board +[cpu4]:
+  1pin set
+  exec: set
+  on: 1
+  :
+
 board [cpu4] .cpu::
 
 comp [key] .step::
@@ -471,6 +477,12 @@ comp [key] .step::
 Same setup, after definitions + `board [cpu4] .cpu::`:
 
 ```logts-play
+board +[cpu4]:
+  1pin set
+  exec: set
+  on: 1
+  :
+
 board [cpu4] .cpu::
 
 .cpu:{ set = ~ }

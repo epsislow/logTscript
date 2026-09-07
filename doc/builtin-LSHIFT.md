@@ -49,11 +49,11 @@ show(y)
 ```logts-play
 4wire val = 0001
 4wire cnt = 0010
-5wire r = LSHIFT(val, cnt)
+6wire r = LSHIFT(val, cnt)
 show(r)
 ```
 
-`1 << 2` → `00100`.
+`1 << 2` → `000100` (6 bits).
 
 ### `LSHIFT(Xbit data, Nbit n, 1bit fill)`
 
@@ -69,7 +69,7 @@ show(y1)
 
 ```logts-play
 4wire x2 = 0001
-8wire wide = LSHIFT(x2, 11, 1)
+7wire wide = LSHIFT(x2, 11, 1)
 show(wide)
 ```
 
@@ -97,11 +97,11 @@ show(r)
 
 ```logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-4wire[2,2] out = LSHIFT(m, 0001; matrix)
+5wire[2,2] out = LSHIFT(m, 0001; matrix)
 show(out)
 ```
 
-Per-cell left shift by 1 (within each **W**-bit cell; assign to `4wire[N,M]`).
+Per-cell left shift by 1 → **5**-bit elements (`00010`, `00100`, `01000`, `10000`).
 
 ## See also
 

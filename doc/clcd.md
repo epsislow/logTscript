@@ -409,7 +409,7 @@ comp [clcd] .display:
   }
   :
 
-21wire val = 1111111000000111111100000
+21wire val = 111111100000011111111
 .display = val
 ```
 

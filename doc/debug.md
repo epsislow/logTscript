@@ -235,6 +235,7 @@ show(w; signed)            # w (4wire) = \-1;s4
 show(code; ascii)          # code (8wire) = "A"
 8wire fp = 00011000
 show(fp; q4p4)             # fp (8wire) = \1.5;q4p4
+8wire[4] v := \2 \-1 \5 \0;s8
 show(v; s8)                # 8wire[4] v = \2 \-1 \5 \0;s8  (fixed per element)
 show(w; q8p0)              # w (8wire) = \5;q8p0
 40wire msg := "Hello"
@@ -646,7 +647,7 @@ After RUN: **no** `#` lines — quotient/remainder are computed on read, not sto
 comp [divider] .div:
     depth:4
     :
-1wire mod = .div:mod
+4wire mod = .div:mod
 probe(mod)
 ```
 
@@ -676,10 +677,11 @@ Examples:
 All `probe()` calls are collected during **elaboration** (before sequential execution). A probe declared **after** the wire it watches still sees the first committed value:
 
 ```logts-play
+MODE WIREWRITE
+1wire b = 0
 1wire a := 0
 a = AND(b, 1)
 probe(a)
-1wire b = 0
 ```
 
 After RUN, `probe(a)` still reports `initialised` for `a` when its first value is committed.
@@ -699,6 +701,7 @@ After RUN, `probe(a)` still reports `initialised` for `a` when its first value i
 Each target is independent:
 
 ```logts-play
+MODE WIREWRITE
 1wire a = 0
 1wire b = 1
 1wire c = AND(a, b)
@@ -713,6 +716,7 @@ a = 1
 `probe` reports `changed` when the value changes **after** elaboration (e.g. toggle switch, `setWire` in tests). The script below is the same as tests **800** / **801**:
 
 ```logts-play
+MODE WIREWRITE
 1wire b = 0
 1wire a := 0
 a = AND(b, 1)
@@ -736,6 +740,7 @@ Wave — same script (`logts-play wave`); identical behavior when changing `b` a
 ### Example — storage reference
 
 ```logts-play
+MODE WIREWRITE
 4wire x := 0000
 probe(&1)
 x = 1010
@@ -878,6 +883,7 @@ Output: `c (1wire) = 0`, `a = 0`, `b = 1`.
 On **Legacy**, `a = 1` propagates immediately to `b = NOT(a)`; `peek` sees `b = 0`.
 
 ```logts-play
+MODE WIREWRITE
 1wire a := 0
 1wire b = NOT(a)
 show(a, b)
@@ -962,6 +968,7 @@ q (1wire) = 1 …
 ### 6. Two `show(b)` after `a = 1` — Legacy vs Wave (812 / 813)
 
 ```logts-play
+MODE WIREWRITE
 1wire a := 0
 1wire b = NOT(a)
 show(b)
@@ -1014,6 +1021,7 @@ b (1wire) = 1 …
 On **Wave**, propagation at end of RUN may change `a` after the probe’s first read — the second line must be **`changed`**, not `initialised`:
 
 ```logts-play wave
+MODE WIREWRITE
 1wire a := 0
 1wire b := 1
 a = AND(b, 1)
@@ -1030,6 +1038,7 @@ Output:
 On **Legacy**, the cascade runs before `activateProbes` — a single line:
 
 ```logts-play
+MODE WIREWRITE
 1wire a := 0
 1wire b := 1
 a = AND(b, 1)
@@ -1103,6 +1112,7 @@ Example: with `4wire o = AND(.o:counter, .p + .p + .p + .p)`, `watch(.o:counter)
 ### Example — wires
 
 ```logts-play
+MODE WIREWRITE
 1wire clk = 0
 1wire en = 0
 

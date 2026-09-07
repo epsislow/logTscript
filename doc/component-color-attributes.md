@@ -156,7 +156,7 @@ comp [clcd] .status:
     warning:
       x: 90
       y: 10
-      bit: 2
+      bit: 1
       color: symFg
       bgColor: symBg
     :
@@ -164,11 +164,11 @@ comp [clcd] .status:
   }
   :
 
-3wire flags = 101
+3wire flags = 110
 .status = flags
 ```
 
-When bit `2` is on, the `warning` icon uses `#ffaa00` on `#332200`; other symbols use the component defaults. Changing `symFg` after the `comp` line does **not** update the symbol colors.
+When bit `1` is on, the `warning` icon uses `#ffaa00` on `#332200`; other symbols use the component defaults. Changing `symFg` after the `comp` line does **not** update the symbol colors.
 
 See [clcd.md](clcd.md) for the full symbol catalog and syntax.
 

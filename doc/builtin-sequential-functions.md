@@ -39,6 +39,7 @@ probe(out)
 ### Runnable example (`~` clock)
 
 ```logts-play
+MODE WIREWRITE
 1wire data = 1
 1wire clr = 0
 1wire q = LATCH(data, ~, clr)

@@ -362,7 +362,7 @@ inline [lut] .traffic:
   }
   :
 
-2wire x = .traffic:decode(GREEN)
+4wire x = .traffic:decode(GREEN)
 show(x)
 ```
 

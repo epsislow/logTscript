@@ -38,14 +38,14 @@ show(q)
 
 Result: `001`
 
-```logts-play
+```logts
 3wire q = 1
 show(q)
 ```
 
 Error: `Expected 3 bits, got 1 bit.`
 
-```logts-play
+```logts
 4wire q = 11111
 show(q)
 ```
