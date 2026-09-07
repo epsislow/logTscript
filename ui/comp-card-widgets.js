@@ -305,241 +305,146 @@
     return '<datalist id="' + escapeHtml(listId) + '">' + opts + '</datalist>';
   }
 
-  function renderClcdLabeledRow(label, fieldHtml) {
+  function clcdSymbolKey(sym) {
+    return sym._id || sym.name || '';
+  }
+
+  function clcdPropDisplayValue(sym, prop) {
+    if (prop === 'bits') {
+      if (sym.bitsText != null && sym.bitsText !== '') return sym.bitsText;
+      if (sym.bitsStart !== undefined) return sym.bitsStart + '-' + sym.bitsEnd;
+      return '';
+    }
+    if (prop === 'color' || prop === 'bgColor') {
+      const v = sym[prop];
+      if (v === undefined || v === null || v === '') return '';
+      const s = String(v);
+      if (s.charAt(0) === '#') return '^' + s.slice(1);
+      return s;
+    }
+    if (prop === 'text' || prop === 'hotkey') {
+      if (sym[prop] == null) return '';
+      return String(sym[prop]).replace(/^"|"$/g, '');
+    }
+    if (sym[prop] == null) return '';
+    return String(sym[prop]);
+  }
+
+  function renderClcdPropField(sym, kind, prop, fieldErrs) {
+    const invalid = fieldErrs.has(prop) ? ' cm-comp-card-field--invalid' : '';
+    const val = clcdPropDisplayValue(sym, prop);
+    if (prop === 'style') {
+      const styleOpts = CCM.getClcdSymbolStyleOptions(sym.name);
+      let opts = '<option value="">—</option>';
+      styleOpts.forEach(function (v) {
+        opts += '<option value="' + v + '"' + (String(sym.style) === String(v) ? ' selected' : '') + '>' +
+          escapeHtml(CCM.clcdStyleOptionLabel(v, sym.name)) + '</option>';
+      });
+      return '<select class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '">' + opts + '</select>';
+    }
+    if (prop === 'family') {
+      let opts = '<option value="">—</option>' + ['mono', 'sans', 'serif'].map(function (f) {
+        return '<option value="' + f + '"' + (sym.family === f ? ' selected' : '') + '>' + f + '</option>';
+      }).join('');
+      return '<select class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '">' + opts + '</select>';
+    }
+    if (prop === 'weight') {
+      let opts = '<option value="">—</option>' + ['normal', 'bold', 'italic', 'boldItalic'].map(function (w) {
+        return '<option value="' + w + '"' + (sym.weight === w ? ' selected' : '') + '>' + w + '</option>';
+      }).join('');
+      return '<select class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '">' + opts + '</select>';
+    }
+    if (prop === 'touchType') {
+      let opts = '<option value="">—</option>' + [
+        { v: 1, l: '1 pr/rel' },
+        { v: 2, l: '2 pulse' },
+        { v: 3, l: '3 latch' }
+      ].map(function (t) {
+        return '<option value="' + t.v + '"' + (sym.touchType === t.v ? ' selected' : '') + '>' + t.l + '</option>';
+      }).join('');
+      return '<select class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '">' + opts + '</select>';
+    }
+    if (prop === 'bits') {
+      return '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '" placeholder="0-6" value="' + escapeHtml(val) + '">';
+    }
+    if (prop === 'text' || prop === 'hotkey') {
+      return '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '" value="' + escapeHtml(val) + '">';
+    }
+    if (prop === 'color' || prop === 'bgColor') {
+      return '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '" placeholder="^00ff00" value="' + escapeHtml(val) + '">';
+    }
+    const inputType = (prop === 'bit' || prop === 'bitOut' || prop === 'size' || prop === 'width' || prop === 'height' || prop === 'padding') ? 'number' : 'text';
+    return '<input type="' + inputType + '" class="cm-comp-card-nested-input cm-comp-card-clcd-prop-input' + invalid + '" data-prop="' + prop + '" value="' + escapeHtml(val) + '">';
+  }
+
+  function renderClcdPropItem(sym, kind, prop, fieldErrs) {
     return (
-      '<div class="cm-comp-card-clcd-labeled-row">' +
-      '<span class="cm-comp-card-clcd-label">' + escapeHtml(label) + '</span>' +
-      fieldHtml +
+      '<div class="cm-comp-card-item cm-comp-card-clcd-prop" data-prop="' + escapeHtml(prop) + '">' +
+      '<span>' + escapeHtml(prop) + '</span>' +
+      '<div class="cm-comp-card-attr-field">' + renderClcdPropField(sym, kind, prop, fieldErrs) + '</div>' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-prop-remove" data-prop="' + escapeHtml(prop) + '">✕</button>' +
       '</div>'
     );
-  }
-
-  function formatClcdColorForInput(val) {
-    if (val === undefined || val === null || val === '') return '';
-    const s = String(val);
-    if (s.charAt(0) === '#') return '^' + s.slice(1);
-    if (s.charAt(0) === '^') return s;
-    return s;
-  }
-
-  function parseClcdColorFromInput(text) {
-    const t = String(text || '').trim();
-    if (!t) return undefined;
-    if (t.charAt(0) === '^') return '#' + t.slice(1);
-    if (t.charAt(0) === '#') return t;
-    return t;
-  }
-
-  function clcdHasStyleGroup(sym, kind) {
-    if (kind === 'label') {
-      return sym.text !== undefined || sym.family !== undefined || sym.weight !== undefined ||
-        sym.size !== undefined || sym.color !== undefined || sym.bgColor !== undefined;
-    }
-    if (kind === 'icon') {
-      return sym.style !== undefined || sym.size !== undefined ||
-        sym.color !== undefined || sym.bgColor !== undefined;
-    }
-    return sym.size !== undefined || sym.color !== undefined || sym.bgColor !== undefined;
-  }
-
-  function clcdHasBindingGroup(sym) {
-    return sym.bit !== undefined || sym.bitsStart !== undefined || sym.bitOut !== undefined;
-  }
-
-  function clcdHasHitboxGroup(sym) {
-    return sym.touchType !== undefined || sym.width !== undefined ||
-      sym.height !== undefined || sym.padding !== undefined;
-  }
-
-  function clcdHasEventGroup(sym) {
-    return sym.hotkey !== undefined;
-  }
-
-  function clcdBindingMode(sym, kind) {
-    if (kind === 'label') return 'bit';
-    return sym.bitsStart !== undefined ? 'bits' : 'bit';
-  }
-
-  function clcdBitsRangeText(sym) {
-    if (sym.bitsStart === undefined) return '0-0';
-    return String(sym.bitsStart) + '-' + String(sym.bitsEnd != null ? sym.bitsEnd : sym.bitsStart);
-  }
-
-  function defaultClcdStyleFields(kind) {
-    if (kind === 'label') {
-      return { text: 'Text', family: 'mono', size: 14, weight: 'normal' };
-    }
-    if (kind === 'canvas') return { size: 44 };
-    return { style: 1, size: 22 };
-  }
-
-  function renderClcdStyleGroup(sym, kind) {
-    let rows = '';
-    if (kind === 'label') {
-      const text = sym.text != null ? String(sym.text).replace(/^"|"$/g, '') : 'Text';
-      const family = sym.family || 'mono';
-      const size = sym.size != null ? sym.size : 14;
-      const weight = sym.weight || 'normal';
-      rows += renderClcdLabeledRow('text:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-text" value="' + escapeHtml(text) + '">');
-      rows += renderClcdLabeledRow('family:', '<select class="cm-comp-card-nested-input cm-comp-card-clcd-family">' +
-        ['mono', 'sans', 'serif'].map(function (f) {
-          return '<option value="' + f + '"' + (family === f ? ' selected' : '') + '>' + f + '</option>';
-        }).join('') + '</select>');
-      rows += renderClcdLabeledRow('size:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-size" min="6" max="48" value="' + escapeHtml(String(size)) + '">');
-      rows += renderClcdLabeledRow('weight:', '<select class="cm-comp-card-nested-input cm-comp-card-clcd-weight">' +
-        ['normal', 'bold', 'italic', 'boldItalic'].map(function (w) {
-          return '<option value="' + w + '"' + (weight === w ? ' selected' : '') + '>' + w + '</option>';
-        }).join('') + '</select>');
-    } else if (kind === 'icon') {
-      const style = sym.style != null ? sym.style : 1;
-      const size = sym.size != null ? sym.size : 22;
-      rows += renderClcdLabeledRow('style:', '<select class="cm-comp-card-nested-input cm-comp-card-clcd-style">' +
-        [1, 2, 3].map(function (v) {
-          return '<option value="' + v + '"' + (style === v ? ' selected' : '') + '>' + v + '</option>';
-        }).join('') + '</select>');
-      rows += renderClcdLabeledRow('size:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-size" min="8" max="64" value="' + escapeHtml(String(size)) + '">');
-    } else {
-      const size = sym.size != null ? sym.size : 44;
-      rows += renderClcdLabeledRow('size:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-size" min="8" max="120" value="' + escapeHtml(String(size)) + '">');
-    }
-    const color = formatClcdColorForInput(sym.color);
-    const bgColor = formatClcdColorForInput(sym.bgColor);
-    rows += renderClcdLabeledRow('color:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-color" placeholder="^00ff00" value="' + escapeHtml(color) + '">');
-    rows += renderClcdLabeledRow('bgColor:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-bgcolor" placeholder="^000000" value="' + escapeHtml(bgColor) + '">');
-    return (
-      '<div class="cm-comp-card-clcd-group" data-group="style">' +
-      '<div class="cm-comp-card-clcd-group-head">' +
-      '<span class="cm-comp-card-clcd-group-title">style</span>' +
-      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-group-remove" data-group="style">✕</button>' +
-      '</div>' + rows + '</div>'
-    );
-  }
-
-  function renderClcdBindingGroup(sym, kind) {
-    const mode = clcdBindingMode(sym, kind);
-    const bitVal = sym.bit != null ? sym.bit : 0;
-    const bitsVal = clcdBitsRangeText(sym);
-    const bitOutVal = sym.bitOut != null ? String(sym.bitOut) : '';
-    let modeRow = '';
-    if (kind !== 'label') {
-      modeRow = renderClcdLabeledRow('mode:', '<select class="cm-comp-card-nested-input cm-comp-card-clcd-bind-mode">' +
-        '<option value="bit"' + (mode === 'bit' ? ' selected' : '') + '>bit</option>' +
-        '<option value="bits"' + (mode === 'bits' ? ' selected' : '') + '>bits</option>' +
-        '</select>');
-    }
-    const bitRow = renderClcdLabeledRow('bit:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-bit" min="0" value="' + escapeHtml(String(bitVal)) + '">');
-    const bitsRow = renderClcdLabeledRow('bits:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-bits" placeholder="0-6" value="' + escapeHtml(bitsVal) + '">');
-    const showBit = kind === 'label' || mode === 'bit';
-    const showBits = kind !== 'label' && mode === 'bits';
-    return (
-      '<div class="cm-comp-card-clcd-group" data-group="binding">' +
-      '<div class="cm-comp-card-clcd-group-head">' +
-      '<span class="cm-comp-card-clcd-group-title">binding</span>' +
-      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-group-remove" data-group="binding">✕</button>' +
-      '</div>' +
-      modeRow +
-      '<div class="cm-comp-card-clcd-bind-bit"' + (showBit ? '' : ' style="display:none"') + '>' + bitRow + '</div>' +
-      '<div class="cm-comp-card-clcd-bind-bits"' + (showBits ? '' : ' style="display:none"') + '>' + bitsRow + '</div>' +
-      renderClcdLabeledRow('bitOut:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-bitout" min="0" placeholder="—" value="' + escapeHtml(bitOutVal) + '">') +
-      '</div>'
-    );
-  }
-
-  function renderClcdHitboxGroup(sym) {
-    const touchVal = sym.touchType != null ? sym.touchType : 1;
-    const touchOpts = [
-      { v: 1, label: '1 — press/release' },
-      { v: 2, label: '2 — pulse' },
-      { v: 3, label: '3 — latch' }
-    ].map(function (t) {
-      return '<option value="' + t.v + '"' + (touchVal === t.v ? ' selected' : '') + '>' + escapeHtml(t.label) + '</option>';
-    }).join('');
-    const width = sym.width != null ? String(sym.width) : '';
-    const height = sym.height != null ? String(sym.height) : '';
-    const padding = sym.padding != null ? String(sym.padding) : '';
-    return (
-      '<div class="cm-comp-card-clcd-group" data-group="hitbox">' +
-      '<div class="cm-comp-card-clcd-group-head">' +
-      '<span class="cm-comp-card-clcd-group-title">hitbox</span>' +
-      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-group-remove" data-group="hitbox">✕</button>' +
-      '</div>' +
-      renderClcdLabeledRow('touchType:', '<select class="cm-comp-card-nested-input cm-comp-card-clcd-touch">' + touchOpts + '</select>') +
-      renderClcdLabeledRow('width:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-width" min="1" placeholder="—" value="' + escapeHtml(width) + '">') +
-      renderClcdLabeledRow('height:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-height" min="1" placeholder="—" value="' + escapeHtml(height) + '">') +
-      renderClcdLabeledRow('padding:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-padding" min="0" placeholder="—" value="' + escapeHtml(padding) + '">') +
-      '</div>'
-    );
-  }
-
-  function renderClcdEventGroup(sym) {
-    const hotkey = sym.hotkey != null ? String(sym.hotkey).replace(/^"|"$/g, '') : '';
-    return (
-      '<div class="cm-comp-card-clcd-group" data-group="event">' +
-      '<div class="cm-comp-card-clcd-group-head">' +
-      '<span class="cm-comp-card-clcd-group-title">event</span>' +
-      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-group-remove" data-group="event">✕</button>' +
-      '</div>' +
-      renderClcdLabeledRow('hotkey:', '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-hotkey" placeholder="Space" value="' + escapeHtml(hotkey) + '">') +
-      '</div>'
-    );
-  }
-
-  function renderClcdGroupAdds(sym, kind) {
-    const hasStyle = clcdHasStyleGroup(sym, kind);
-    const hasBinding = clcdHasBindingGroup(sym);
-    const hasBitOut = sym.bitOut !== undefined && sym.bitOut !== null && sym.bitOut !== '';
-    const hasHitbox = clcdHasHitboxGroup(sym);
-    const hasEvent = clcdHasEventGroup(sym);
-    let btns = '';
-    if (!hasStyle) btns += '<button type="button" class="cm-comp-card-clcd-group-add" data-group="style">+ style</button>';
-    if (!hasBinding) btns += '<button type="button" class="cm-comp-card-clcd-group-add" data-group="binding">+ binding</button>';
-    if (hasBinding && hasBitOut && !hasHitbox) btns += '<button type="button" class="cm-comp-card-clcd-group-add" data-group="hitbox">+ hitbox</button>';
-    if (hasBinding && hasBitOut && !hasEvent) btns += '<button type="button" class="cm-comp-card-clcd-group-add" data-group="event">+ event</button>';
-    if (!btns) return '';
-    return '<div class="cm-comp-card-clcd-group-adds">' + btns + '</div>';
   }
 
   function renderClcdSymbolCard(model, sym) {
     const listId = clcdKnownSymbolsDatalistId(model);
     const kind = CCM.getClcdUiKind(sym.name);
+    const symKey = clcdSymbolKey(sym);
+    const fieldErrs = CCM.getClcdSymbolFieldErrors(sym, kind);
+    const nameInvalid = fieldErrs.has('name') ? ' cm-comp-card-field--invalid' : '';
+    const fields = CCM.sortClcdSymbolFields(CCM.inferClcdSymbolFields(sym, kind), kind);
+    const available = CCM.getClcdSymbolAvailableProps(sym, kind);
     const x = sym.x != null ? sym.x : 0;
     const y = sym.y != null ? sym.y : 0;
-    let groups = (
-      '<div class="cm-comp-card-clcd-group" data-group="position">' +
-      '<div class="cm-comp-card-clcd-group-head">' +
-      '<span class="cm-comp-card-clcd-group-title">pozitionare</span>' +
-      '</div>' +
-      renderClcdLabeledRow('x:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-x" value="' + escapeHtml(String(x)) + '">') +
-      renderClcdLabeledRow('y:', '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-y" value="' + escapeHtml(String(y)) + '">') +
-      '</div>'
-    );
-    if (clcdHasStyleGroup(sym, kind)) groups += renderClcdStyleGroup(sym, kind);
-    if (clcdHasBindingGroup(sym)) groups += renderClcdBindingGroup(sym, kind);
-    if (clcdHasHitboxGroup(sym)) groups += renderClcdHitboxGroup(sym);
-    if (clcdHasEventGroup(sym)) groups += renderClcdEventGroup(sym);
-    groups += renderClcdGroupAdds(sym, kind);
+    let propsHtml = fields.map(function (prop) {
+      return renderClcdPropItem(sym, kind, prop, fieldErrs);
+    }).join('');
+    let addHtml = '';
+    if (available.length) {
+      addHtml = '<div class="cm-comp-card-add-row cm-comp-card-clcd-prop-add-row">' +
+        '<select class="cm-comp-card-clcd-prop-add" data-symbol-key="' + escapeHtml(symKey) + '">' +
+        '<option value="">+property</option>';
+      available.forEach(function (p) {
+        addHtml += '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>';
+      });
+      addHtml += '</select></div>';
+    }
     return (
-      '<div class="cm-comp-card-clcd-symbol" data-old-name="' + escapeHtml(sym.name) + '">' +
+      '<div class="cm-comp-card-clcd-symbol" data-symbol-key="' + escapeHtml(symKey) + '" data-old-name="' + escapeHtml(sym.name) + '">' +
       '<div class="cm-comp-card-clcd-symbol-head">' +
-      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-name" list="' + escapeHtml(listId) + '" value="' + escapeHtml(sym.name) + '">' +
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-clcd-name' + nameInvalid + '" list="' + escapeHtml(listId) + '" value="' + escapeHtml(sym.name) + '">' +
       '<span class="cm-comp-card-clcd-kind">' + escapeHtml(kind) + '</span>' +
-      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-remove" data-name="' + escapeHtml(sym.name) + '">✕</button>' +
+      '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-remove">✕</button>' +
       '</div>' +
-      '<div class="cm-comp-card-clcd-symbol-body">' + groups + '</div>' +
+      '<div class="cm-comp-card-clcd-xy-row">' +
+      '<span class="cm-comp-card-clcd-xy-label">x:</span>' +
+      '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-x" value="' + escapeHtml(String(x)) + '">' +
+      '<span class="cm-comp-card-clcd-xy-label">y:</span>' +
+      '<input type="number" class="cm-comp-card-nested-input cm-comp-card-clcd-y" value="' + escapeHtml(String(y)) + '">' +
+      '</div>' +
+      '<div class="cm-comp-card-clcd-props">' + propsHtml + '</div>' +
+      addHtml +
       '</div>'
     );
   }
 
   function renderClcdSymbolsSection(model) {
+    const hasBlock = model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; });
     const symbols = CCM.getClcdSymbols(model);
-    if (!symbols.length && !model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; })) return '';
     const cards = symbols.map(function (sym) { return renderClcdSymbolCard(model, sym); }).join('');
+    const removeBtn = hasBlock
+      ? '<button type="button" class="cm-comp-card-entry-remove cm-comp-card-clcd-block-remove" title="Remove symbols block">✕</button>'
+      : '';
     return (
       renderClcdKnownSymbolsDatalist(model) +
       '<div class="cm-comp-card-nested cm-comp-card-nested--clcd">' +
+      '<div class="cm-comp-card-clcd-block-head">' +
       '<div class="cm-comp-card-nested-title">symbols { }</div>' +
+      removeBtn +
+      '</div>' +
       cards +
-      '<button type="button" class="cm-comp-card-clcd-add">+ symbol</button>' +
+      '<button type="button" class="cm-comp-card-clcd-add">+symbol</button>' +
       '</div>'
     );
   }
@@ -620,103 +525,162 @@
     );
   }
 
-  function parseClcdBitsRange(text) {
+  function parseClcdColorFromInput(text) {
     const t = String(text || '').trim();
-    const m = t.match(/^(\d+)\s*-\s*(\d+)$/);
-    if (!m) return null;
-    const start = parseInt(m[1], 10);
-    const end = parseInt(m[2], 10);
-    if (isNaN(start) || isNaN(end) || end < start) return null;
-    return { bitsStart: start, bitsEnd: end };
-  }
-
-  function clcdSymbolIsValidForSync(sym, kind) {
-    if (!sym.name) return false;
-    const hasBit = sym.bit !== undefined;
-    const hasBits = sym.bitsStart !== undefined;
-    if (!hasBit && !hasBits) return false;
-    if (kind === 'label' && sym.text === undefined) return false;
-    return true;
+    if (!t) return undefined;
+    if (t.charAt(0) === '^') return '#' + t.slice(1);
+    if (t.charAt(0) === '#') return t;
+    return t;
   }
 
   function readClcdSymbolFromCard(card) {
+    const symKey = card.getAttribute('data-symbol-key') || card.getAttribute('data-old-name') || '';
     const oldName = card.getAttribute('data-old-name') || '';
     const name = card.querySelector('.cm-comp-card-clcd-name').value.trim();
     const kind = CCM.getClcdUiKind(name);
     const sym = {
+      _id: symKey.indexOf('sym_') === 0 ? symKey : undefined,
       name: name,
       x: parseInt(card.querySelector('.cm-comp-card-clcd-x').value, 10) || 0,
-      y: parseInt(card.querySelector('.cm-comp-card-clcd-y').value, 10) || 0
+      y: parseInt(card.querySelector('.cm-comp-card-clcd-y').value, 10) || 0,
+      _fields: []
     };
+    if (symKey.indexOf('sym_') === 0) sym._id = symKey;
 
-    const styleGroup = card.querySelector('[data-group="style"]');
-    if (styleGroup) {
-      if (kind === 'label') {
-        const textEl = styleGroup.querySelector('.cm-comp-card-clcd-text');
-        if (textEl) sym.text = textEl.value;
-        const familyEl = styleGroup.querySelector('.cm-comp-card-clcd-family');
-        if (familyEl && familyEl.value) sym.family = familyEl.value;
-        const sizeEl = styleGroup.querySelector('.cm-comp-card-clcd-size');
-        if (sizeEl && sizeEl.value !== '') sym.size = parseInt(sizeEl.value, 10);
-        const weightEl = styleGroup.querySelector('.cm-comp-card-clcd-weight');
-        if (weightEl && weightEl.value) sym.weight = weightEl.value;
-      } else if (kind === 'icon') {
-        const styleEl = styleGroup.querySelector('.cm-comp-card-clcd-style');
-        if (styleEl) sym.style = parseInt(styleEl.value, 10) || 1;
-        const sizeEl = styleGroup.querySelector('.cm-comp-card-clcd-size');
-        if (sizeEl && sizeEl.value !== '') sym.size = parseInt(sizeEl.value, 10);
-      } else {
-        const sizeEl = styleGroup.querySelector('.cm-comp-card-clcd-size');
-        if (sizeEl && sizeEl.value !== '') sym.size = parseInt(sizeEl.value, 10);
-      }
-      const colorEl = styleGroup.querySelector('.cm-comp-card-clcd-color');
-      const bgEl = styleGroup.querySelector('.cm-comp-card-clcd-bgcolor');
-      const color = colorEl ? parseClcdColorFromInput(colorEl.value) : undefined;
-      const bgColor = bgEl ? parseClcdColorFromInput(bgEl.value) : undefined;
-      if (color !== undefined) sym.color = color;
-      if (bgColor !== undefined) sym.bgColor = bgColor;
-    }
+    card.querySelectorAll('.cm-comp-card-clcd-prop').forEach(function (row) {
+      const prop = row.getAttribute('data-prop');
+      if (!prop) return;
+      sym._fields.push(prop);
+      const el = row.querySelector('.cm-comp-card-clcd-prop-input');
+      if (!el) return;
+      const raw = el.tagName === 'SELECT' ? el.value : el.value.trim();
 
-    const bindingGroup = card.querySelector('[data-group="binding"]');
-    if (bindingGroup) {
-      const modeEl = bindingGroup.querySelector('.cm-comp-card-clcd-bind-mode');
-      const mode = kind === 'label' ? 'bit' : (modeEl ? modeEl.value : 'bit');
-      if (mode === 'bits') {
-        const bitsEl = bindingGroup.querySelector('.cm-comp-card-clcd-bits');
-        const parsed = bitsEl ? parseClcdBitsRange(bitsEl.value) : null;
+      if (prop === 'bits') {
+        if (raw === '') return;
+        sym.bitsText = raw;
+        const parsed = CCM.parseClcdBitsRangeText(raw);
         if (parsed) {
           sym.bitsStart = parsed.bitsStart;
           sym.bitsEnd = parsed.bitsEnd;
+        } else {
+          delete sym.bitsStart;
+          delete sym.bitsEnd;
         }
-      } else {
-        const bitEl = bindingGroup.querySelector('.cm-comp-card-clcd-bit');
-        if (bitEl && bitEl.value !== '') sym.bit = parseInt(bitEl.value, 10) || 0;
+        return;
       }
-      const bitOutEl = bindingGroup.querySelector('.cm-comp-card-clcd-bitout');
-      if (bitOutEl && bitOutEl.value !== '') {
-        sym.bitOut = parseInt(bitOutEl.value, 10);
+      if (raw === '' || raw === '—') return;
+
+      if (prop === 'bit' || prop === 'bitOut' || prop === 'size' || prop === 'width' || prop === 'height' || prop === 'padding' || prop === 'style' || prop === 'touchType') {
+        sym[prop] = parseInt(raw, 10);
+        if (isNaN(sym[prop])) delete sym[prop];
+        return;
       }
+      if (prop === 'color' || prop === 'bgColor') {
+        const c = parseClcdColorFromInput(raw);
+        if (c !== undefined) sym[prop] = c;
+        return;
+      }
+      sym[prop] = raw;
+    });
+
+    return { oldKey: symKey || oldName, oldName: oldName, symbol: sym, kind: kind };
+  }
+
+  function refreshClcdSymbolFieldErrors(card, sym, kind) {
+    const fieldErrs = CCM.getClcdSymbolFieldErrors(sym, kind);
+    const nameEl = card.querySelector('.cm-comp-card-clcd-name');
+    if (nameEl) nameEl.classList.toggle('cm-comp-card-field--invalid', fieldErrs.has('name'));
+    card.querySelectorAll('.cm-comp-card-clcd-prop').forEach(function (row) {
+      const prop = row.getAttribute('data-prop');
+      const el = row.querySelector('.cm-comp-card-clcd-prop-input');
+      if (el) el.classList.toggle('cm-comp-card-field--invalid', fieldErrs.has(prop));
+    });
+  }
+
+  function isClcdKnownSymbolName(name) {
+    const n = String(name || '').trim();
+    if (!n) return false;
+    if (typeof getClcdSymbolDef === 'function') return !!getClcdSymbolDef(n);
+    return false;
+  }
+
+  function bindClcdSymbolCard(card, syncModel) {
+    function syncFromCard() {
+      const data = readClcdSymbolFromCard(card);
+      const kindEl = card.querySelector('.cm-comp-card-clcd-kind');
+      if (kindEl) kindEl.textContent = CCM.getClcdUiKind(data.symbol.name);
+      refreshClcdSymbolFieldErrors(card, data.symbol, data.kind);
+      syncModel(function (m) {
+        return CCM.upsertClcdSymbol(m, data.oldKey, data.symbol, data.oldName);
+      });
     }
 
-    const hitboxGroup = card.querySelector('[data-group="hitbox"]');
-    if (hitboxGroup) {
-      const touchEl = hitboxGroup.querySelector('.cm-comp-card-clcd-touch');
-      if (touchEl) sym.touchType = parseInt(touchEl.value, 10) || 1;
-      const widthEl = hitboxGroup.querySelector('.cm-comp-card-clcd-width');
-      if (widthEl && widthEl.value !== '') sym.width = parseInt(widthEl.value, 10);
-      const heightEl = hitboxGroup.querySelector('.cm-comp-card-clcd-height');
-      if (heightEl && heightEl.value !== '') sym.height = parseInt(heightEl.value, 10);
-      const padEl = hitboxGroup.querySelector('.cm-comp-card-clcd-padding');
-      if (padEl && padEl.value !== '') sym.padding = parseInt(padEl.value, 10);
+    function previewClcdName(name) {
+      const kindEl = card.querySelector('.cm-comp-card-clcd-kind');
+      if (kindEl) kindEl.textContent = CCM.getClcdUiKind(name);
     }
 
-    const eventGroup = card.querySelector('[data-group="event"]');
-    if (eventGroup) {
-      const hotkeyEl = eventGroup.querySelector('.cm-comp-card-clcd-hotkey');
-      if (hotkeyEl && hotkeyEl.value.trim() !== '') sym.hotkey = hotkeyEl.value.trim();
+    const nameInput = card.querySelector('.cm-comp-card-clcd-name');
+    if (nameInput) {
+      nameInput.addEventListener('focus', function () {
+        nameInput.classList.remove('cm-comp-card-field--invalid');
+      });
+      nameInput.addEventListener('input', function () {
+        const val = nameInput.value;
+        previewClcdName(val);
+        if (isClcdKnownSymbolName(val)) {
+          syncFromCard();
+        }
+      });
+      nameInput.addEventListener('change', syncFromCard);
     }
 
-    return { oldName: oldName, symbol: sym, kind: kind };
+    card.querySelectorAll('input:not(.cm-comp-card-clcd-name), select').forEach(function (el) {
+      el.addEventListener('change', syncFromCard);
+    });
+
+    card.querySelectorAll('.cm-comp-card-clcd-prop-remove').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const prop = btn.getAttribute('data-prop');
+        const symKey = card.getAttribute('data-symbol-key') || card.getAttribute('data-old-name') || '';
+        const oldName = card.getAttribute('data-old-name') || '';
+        syncModel(function (m) {
+          return CCM.removeClcdSymbolProp(m, symKey, prop, oldName);
+        });
+      });
+    });
+
+    card.querySelectorAll('.cm-comp-card-clcd-prop-add').forEach(function (sel) {
+      sel.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const prop = e.target.value;
+        if (!prop) return;
+        e.target.value = '';
+        const data = readClcdSymbolFromCard(card);
+        syncModel(function (m) {
+          m = CCM.upsertClcdSymbol(m, data.oldKey, data.symbol, data.oldName);
+          return CCM.addClcdSymbolProp(m, data.oldKey, prop, data.oldName);
+        });
+      });
+    });
+
+    const removeBtn = card.querySelector('.cm-comp-card-clcd-remove');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const symKey = card.getAttribute('data-symbol-key') || '';
+        const oldName = card.getAttribute('data-old-name') || '';
+        syncModel(function (m) { return CCM.removeClcdSymbol(m, symKey || oldName, oldName); });
+      });
+    }
+
+    card.querySelectorAll('input').forEach(function (el) {
+      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      bindInputNativeCaret(el);
+    });
   }
 
   function readHitboxZoneFromCard(zoneCard) {
@@ -741,112 +705,6 @@
       zone.pouts.push(pout);
     });
     return { oldName: oldName, zone: zone };
-  }
-
-  function bindClcdSymbolCard(card, syncModel) {
-    function syncFromCard() {
-      const data = readClcdSymbolFromCard(card);
-      const kindEl = card.querySelector('.cm-comp-card-clcd-kind');
-      if (kindEl) kindEl.textContent = CCM.getClcdUiKind(data.symbol.name);
-
-      if (!clcdSymbolIsValidForSync(data.symbol, data.kind)) {
-        if (card.dataset.pending === '1' && data.symbol.name) return;
-        if (card.dataset.pending === '1') return;
-      }
-
-      if (card.dataset.pending === '1') {
-        if (!data.symbol.name || !clcdSymbolIsValidForSync(data.symbol, data.kind)) return;
-        card.dataset.pending = '0';
-        card.setAttribute('data-old-name', data.symbol.name);
-      }
-
-      if (!data.symbol.name || !clcdSymbolIsValidForSync(data.symbol, data.kind)) return;
-
-      syncModel(function (m) {
-        return CCM.upsertClcdSymbol(m, data.oldName, data.symbol);
-      });
-    }
-
-    function toggleBindMode() {
-      const modeEl = card.querySelector('.cm-comp-card-clcd-bind-mode');
-      if (!modeEl) return;
-      const bitWrap = card.querySelector('.cm-comp-card-clcd-bind-bit');
-      const bitsWrap = card.querySelector('.cm-comp-card-clcd-bind-bits');
-      const isBits = modeEl.value === 'bits';
-      if (bitWrap) bitWrap.style.display = isBits ? 'none' : '';
-      if (bitsWrap) bitsWrap.style.display = isBits ? '' : 'none';
-    }
-
-    card.querySelectorAll('input, select').forEach(function (el) {
-      el.addEventListener('change', syncFromCard);
-    });
-    const modeEl = card.querySelector('.cm-comp-card-clcd-bind-mode');
-    if (modeEl) {
-      modeEl.addEventListener('change', function () {
-        toggleBindMode();
-        syncFromCard();
-      });
-    }
-
-    card.querySelectorAll('.cm-comp-card-clcd-group-remove').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const group = btn.getAttribute('data-group');
-        const data = readClcdSymbolFromCard(card);
-        const sym = data.symbol;
-        if (group === 'style') {
-          delete sym.style; delete sym.size; delete sym.color; delete sym.bgColor;
-          delete sym.text; delete sym.family; delete sym.weight;
-        } else if (group === 'binding') {
-          delete sym.bit; delete sym.bitsStart; delete sym.bitsEnd; delete sym.bitOut;
-          delete sym.touchType; delete sym.width; delete sym.height; delete sym.padding;
-          delete sym.hotkey;
-        } else if (group === 'hitbox') {
-          delete sym.touchType; delete sym.width; delete sym.height; delete sym.padding;
-        } else if (group === 'event') {
-          delete sym.hotkey;
-        }
-        if (!sym.name) {
-          const grp = card.querySelector('[data-group="' + group + '"]');
-          if (grp) grp.remove();
-          return;
-        }
-        syncModel(function (m) {
-          return CCM.upsertClcdSymbol(m, data.oldName, sym);
-        });
-      });
-    });
-
-    card.querySelectorAll('.cm-comp-card-clcd-group-add').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const group = btn.getAttribute('data-group');
-        const data = readClcdSymbolFromCard(card);
-        const sym = Object.assign({}, data.symbol);
-        const kind = CCM.getClcdUiKind(sym.name);
-        if (group === 'style') Object.assign(sym, defaultClcdStyleFields(kind));
-        else if (group === 'binding') {
-          if (kind === 'label') sym.bit = 0;
-          else sym.bit = 0;
-        } else if (group === 'hitbox') sym.touchType = 1;
-        else if (group === 'event') sym.hotkey = '';
-        if (!sym.name) return;
-        syncModel(function (m) {
-          return CCM.upsertClcdSymbol(m, data.oldName, sym);
-        });
-      });
-    });
-
-    card.querySelector('.cm-comp-card-clcd-remove').addEventListener('click', function () {
-      if (card.dataset.pending === '1') {
-        card.remove();
-        return;
-      }
-      const name = card.getAttribute('data-old-name');
-      syncModel(function (m) { return CCM.removeClcdSymbol(m, name); });
-    });
-    card.querySelectorAll('input').forEach(function (el) {
-      el.addEventListener('keydown', function (e) { e.stopPropagation(); });
-      bindInputNativeCaret(el);
-    });
   }
 
   function bindHitboxZoneCard(zoneCard, syncModel) {
@@ -1274,7 +1132,7 @@
     let addHtml = '';
     if (missing.length) {
       addHtml = '<div class="cm-comp-card-add-row">' +
-        '<select class="cm-comp-card-add-select"><option value="">+ Attribute</option>';
+        '<select class="cm-comp-card-attr-add-select"><option value="">+attribute</option>';
       missing.forEach(function (n) {
         addHtml += '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>';
       });
@@ -1292,9 +1150,14 @@
       '</div>' +
       (model.viewMode === 'source' ? '' : gridHtml + addHtml);
 
+    function currentModel() {
+      return CCM.resolveCompBlockById(editor.getValue(), model.id, registry) || model;
+    }
+
     function syncModel(mutator) {
-      let next = mutator(CCM.cloneModel(model));
-      applyPatch(editor, model, CCM.serializeCompBlock(next), refreshImmediate, internalEditFlag, clearBlockMarker);
+      const cur = currentModel();
+      const next = mutator(CCM.cloneModel(cur));
+      applyPatch(editor, cur, CCM.serializeCompBlock(next), refreshImmediate, internalEditFlag, clearBlockMarker);
     }
 
     div.querySelector('.cm-comp-card-name-input').addEventListener('change', function (e) {
@@ -1367,7 +1230,7 @@
       });
     }
 
-    const addSel = div.querySelector('.cm-comp-card-add-select');
+    const addSel = div.querySelector('.cm-comp-card-attr-add-select');
     if (addSel) {
       addSel.addEventListener('change', function (e) {
         const name = e.target.value;
@@ -1450,20 +1313,15 @@
       bindClcdSymbolCard(card, syncModel);
     });
 
+    div.querySelectorAll('.cm-comp-card-clcd-block-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.removeClcdSymbolsBlock(m); });
+      });
+    });
+
     div.querySelectorAll('.cm-comp-card-clcd-add').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        const block = btn.closest('.cm-comp-card-nested--clcd');
-        const known = (typeof CLCD_KNOWN_SYMBOLS !== 'undefined' && CLCD_KNOWN_SYMBOLS.length)
-          ? CLCD_KNOWN_SYMBOLS[0] : 'bell';
-        const sym = CCM.defaultClcdSymbol(known);
-        const wrap = document.createElement('div');
-        wrap.innerHTML = renderClcdSymbolCard(model, sym);
-        const card = wrap.firstElementChild;
-        card.dataset.pending = '1';
-        card.setAttribute('data-old-name', '');
-        block.insertBefore(card, btn);
-        bindClcdSymbolCard(card, syncModel);
-        card.querySelector('.cm-comp-card-clcd-name').focus();
+        syncModel(function (m) { return CCM.addClcdSymbol(m, ''); });
       });
     });
 

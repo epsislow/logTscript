@@ -190,16 +190,27 @@
 }
 
 .cm-comp-card-add-row {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
-.cm-comp-card-add-select {
+.cm-comp-card-clcd-add,
+.cm-comp-card-attr-add-select,
+.cm-comp-card-clcd-prop-add,
+.cm-comp-card-hitbox-zone-add,
+.cm-comp-card-hitbox-pout-add {
+  font-size: 11px;
+  padding: 2px 3px;
+  margin-top: 4px;
   background: #111;
-  color: #0f0;
-  border: 1px dashed #444;
-  font-family: monospace;
-  padding: 2px 6px;
+  color: #aaa;
+  border: 1px solid #444;
   cursor: pointer;
+  font-family: monospace;
+}
+
+.cm-comp-card-attr-add-select,
+.cm-comp-card-clcd-prop-add {
+  appearance: auto;
 }
 
 .cm-comp-card-item--flag label {
@@ -461,65 +472,63 @@
   gap: 6px;
 }
 
-.cm-comp-card-clcd-group {
-  border-top: 1px dashed #2a442a;
-  padding-top: 4px;
-}
-
-.cm-comp-card-clcd-group-head {
+.cm-comp-card-clcd-xy-row {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
 }
 
-.cm-comp-card-clcd-group-title {
-  color: #9cf;
-  font-size: 11px;
-  font-weight: bold;
-  flex: 1 1 0;
-}
-
-.cm-comp-card-clcd-label {
+.cm-comp-card-clcd-xy-label {
   color: #9cf;
   font-size: 13px;
   font-weight: bold;
   white-space: nowrap;
-  flex: 0 0 auto;
-  min-width: 64px;
 }
 
-.cm-comp-card-clcd-labeled-row {
-  display: flex;
+.cm-comp-card-clcd-x,
+.cm-comp-card-clcd-y {
+  width: 64px;
+  min-width: 0;
+  flex: 0 1 72px;
+}
+
+.cm-comp-card-clcd-props {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
 }
 
-.cm-comp-card-clcd-labeled-row input,
-.cm-comp-card-clcd-labeled-row select {
-  flex: 1 1 0;
+.cm-comp-card-clcd-prop {
   min-width: 0;
 }
 
-.cm-comp-card-clcd-group-adds {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.cm-comp-card-clcd-prop > span:first-child {
+  min-width: 52px;
+  font-size: 13px;
+}
+
+.cm-comp-card-clcd-prop .cm-comp-card-nested-input,
+.cm-comp-card-clcd-prop .cm-comp-card-clcd-prop-input {
+  font-size: 13px;
+  padding: 1px 4px;
+}
+
+.cm-comp-card-clcd-prop-add-row {
   margin-top: 2px;
 }
 
-.cm-comp-card-clcd-group-add,
-.cm-comp-card-clcd-add,
-.cm-comp-card-hitbox-zone-add,
-.cm-comp-card-hitbox-pout-add {
-  font-size: 11px;
-  padding: 2px 3px;
-  margin-top: 4px;
-  background: #111;
-  color: #aaa;
-  border: 1px solid #444;
-  cursor: pointer;
+.cm-comp-card-clcd-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cm-comp-card-clcd-block-head .cm-comp-card-nested-title {
+  margin-bottom: 0;
 }
 
 .cm-comp-card-hitbox-label {

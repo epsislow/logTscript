@@ -506,17 +506,383 @@
     return lines;
   }
 
-  function serializeClcdSymbolsLines(symbols, indent) {
-    const lines = [indent + 'symbols {'];
-    if (typeof ClcdComponent !== 'undefined' && ClcdComponent._pushInstanceSymbolLines) {
-      const stubLines = [];
-      (symbols || []).forEach(function (sym) {
-        ClcdComponent._pushInstanceSymbolLines(stubLines, sym, {});
+  function clcdPropNamesForKind(kind) {
+    const common = ['bit', 'bits', 'bitOut', 'size', 'color', 'bgColor', 'touchType', 'width', 'height', 'padding', 'hotkey'];
+    if (kind === 'label') return ['bit', 'bitOut', 'text', 'family', 'size', 'weight', 'color', 'bgColor', 'touchType', 'width', 'height', 'padding', 'hotkey'];
+    if (kind === 'canvas') return common;
+    return ['bit', 'bits', 'bitOut', 'style', 'size', 'color', 'bgColor', 'touchType', 'width', 'height', 'padding', 'hotkey'];
+  }
+
+  function inferClcdSymbolFields(sym, kind) {
+    if (sym._fields && sym._fields.length) return sym._fields.slice();
+    const fields = [];
+    const names = clcdPropNamesForKind(kind);
+    names.forEach(function (n) {
+      if (n === 'bits') {
+        if (sym.bitsStart !== undefined || (sym.bitsText != null && sym.bitsText !== '')) fields.push('bits');
+        return;
+      }
+      if (sym[n] !== undefined && sym[n] !== null && sym[n] !== '') fields.push(n);
+    });
+    return fields;
+  }
+
+  function getClcdSymbolAvailableProps(sym, kind) {
+    const active = new Set(inferClcdSymbolFields(sym, kind));
+    return clcdPropNamesForKind(kind).filter(function (n) { return !active.has(n); });
+  }
+
+  function sortClcdSymbolFields(fields, kind) {
+    const order = clcdPropNamesForKind(kind);
+    return (fields || []).slice().sort(function (a, b) {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      if (ia < 0 && ib < 0) return String(a).localeCompare(String(b));
+      if (ia < 0) return 1;
+      if (ib < 0) return -1;
+      return ia - ib;
+    });
+  }
+
+  function getClcdSymbolStyleOptions(symbolName) {
+    if (typeof getClcdSymbolDef !== 'function') return [1, 2, 3];
+    const def = getClcdSymbolDef(symbolName);
+    if (!def || !def.glyphs) return [1, 2, 3];
+    return Object.keys(def.glyphs).map(function (k) { return parseInt(k, 10); })
+      .filter(function (n) { return !isNaN(n); })
+      .sort(function (a, b) { return a - b; });
+  }
+
+  function getClcdDefaultStyle(symbolName) {
+    if (typeof getClcdSymbolDef !== 'function') return 1;
+    const def = getClcdSymbolDef(symbolName);
+    const opts = getClcdSymbolStyleOptions(symbolName);
+    if (def && def.defaultStyle != null && opts.indexOf(def.defaultStyle) >= 0) {
+      return def.defaultStyle;
+    }
+    return opts.length ? opts[0] : 1;
+  }
+
+  function clcdStyleOptionLabel(styleNum, symbolName) {
+    const n = parseInt(styleNum, 10);
+    if (isNaN(n)) return String(styleNum);
+    const def = (typeof getClcdSymbolDef === 'function') ? getClcdSymbolDef(symbolName) : null;
+    if (def && def.kind === 'fa' && n === 3) return '3 — brands';
+    if (n === 1) return '1 — solid';
+    if (n === 2) return '2 — regular';
+    return String(n);
+  }
+
+  function defaultValueForClcdProp(propName, sym) {
+    const kind = getClcdUiKind(sym.name);
+    switch (propName) {
+      case 'bit':
+      case 'bitOut':
+        return 0;
+      case 'touchType':
+        return 1;
+      case 'style':
+        return getClcdDefaultStyle(sym.name);
+      case 'size':
+        return kind === 'label' ? 14 : 22;
+      case 'padding':
+        return 0;
+      case 'width':
+      case 'height':
+        return kind === 'icon' ? 22 : (kind === 'label' ? 14 : 22);
+      case 'family':
+        return 'mono';
+      case 'weight':
+        return 'normal';
+      case 'text':
+        return 'Text';
+      case 'hotkey':
+        return 'a';
+      case 'color':
+      case 'bgColor':
+        return '#ffffff';
+      default:
+        return undefined;
+    }
+  }
+
+  function applyDefaultClcdPropValue(sym, propName) {
+    if (propName === 'bits') {
+      if (sym.bitsText == null || sym.bitsText === '') {
+        sym.bitsText = '0-0';
+        sym.bitsStart = 0;
+        sym.bitsEnd = 0;
+      }
+      return;
+    }
+    if (sym[propName] !== undefined && sym[propName] !== null && sym[propName] !== '') return;
+    const def = defaultValueForClcdProp(propName, sym);
+    if (def !== undefined) sym[propName] = def;
+  }
+
+  function mergeClcdSymbolFields(parsedSym, existingSym) {
+    const kind = getClcdUiKind(parsedSym.name);
+    const merged = [];
+    const seen = new Set();
+    function push(name) {
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      merged.push(name);
+    }
+    if (existingSym && existingSym._fields) {
+      existingSym._fields.forEach(push);
+    }
+    inferClcdSymbolFields(parsedSym, kind).forEach(push);
+    if (parsedSym._fields) {
+      parsedSym._fields.forEach(push);
+    }
+    parsedSym._fields = sortClcdSymbolFields(merged, kind);
+    return parsedSym;
+  }
+
+  function applyClcdSymbolNameDefaults(sym) {
+    const kind = getClcdUiKind(sym.name);
+    if (!sym._fields) sym._fields = inferClcdSymbolFields(sym, kind);
+    if (kind === 'icon') {
+      if (sym._fields.indexOf('style') < 0) sym._fields.push('style');
+      const opts = getClcdSymbolStyleOptions(sym.name);
+      const cur = sym.style !== undefined && sym.style !== null && sym.style !== ''
+        ? parseInt(sym.style, 10) : NaN;
+      if (isNaN(cur) || (opts.length && opts.indexOf(cur) < 0)) {
+        sym.style = getClcdDefaultStyle(sym.name);
+      }
+    }
+    sym._fields = sortClcdSymbolFields(sym._fields, kind);
+    return sym;
+  }
+
+  function parseClcdBitsRangeText(text) {
+    const t = String(text || '').trim();
+    const m = t.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (!m) return null;
+    const start = parseInt(m[1], 10);
+    const end = parseInt(m[2], 10);
+    if (isNaN(start) || isNaN(end) || end < start) return null;
+    return { bitsStart: start, bitsEnd: end };
+  }
+
+  function getClcdSymbolFieldErrors(sym, kind) {
+    const bad = new Set();
+    const name = sym.name != null ? String(sym.name).trim() : '';
+    if (name && typeof getClcdSymbolDef === 'function' && !getClcdSymbolDef(name)) {
+      bad.add('name');
+    }
+    if (sym.bit !== undefined && sym.bitsStart !== undefined) {
+      bad.add('bit');
+      bad.add('bits');
+    }
+    if (sym.bitsText != null && sym.bitsText !== '' && !parseClcdBitsRangeText(sym.bitsText)) {
+      bad.add('bits');
+    }
+    if (kind !== 'icon') {
+      if (sym.style !== undefined || (sym._fields || []).indexOf('style') >= 0) bad.add('style');
+    } else if (sym.style !== undefined) {
+      const cur = parseInt(sym.style, 10);
+      const opts = getClcdSymbolStyleOptions(sym.name);
+      if (isNaN(cur) || (cur !== 1 && cur !== 2 && cur !== 3)) bad.add('style');
+      else if (opts.length && opts.indexOf(cur) < 0) bad.add('style');
+    }
+    if (sym.text !== undefined && kind !== 'label') bad.add('text');
+    if (sym.family !== undefined && ['mono', 'sans', 'serif'].indexOf(sym.family) < 0) bad.add('family');
+    if (sym.weight !== undefined && ['normal', 'bold', 'italic', 'boldItalic'].indexOf(sym.weight) < 0) bad.add('weight');
+    if (sym.touchType !== undefined && sym.touchType !== 1 && sym.touchType !== 2 && sym.touchType !== 3) bad.add('touchType');
+    return bad;
+  }
+
+  function formatClcdColorForSerialize(val) {
+    if (val === undefined || val === null || val === '') return null;
+    if (typeof ClcdComponent !== 'undefined' && ClcdComponent.formatDocColor) {
+      return ClcdComponent.formatDocColor(val);
+    }
+    let s = String(val);
+    if (s.charAt(0) === '#') return '^' + s.slice(1);
+    if (s.charAt(0) !== '^') return '^' + s;
+    return s;
+  }
+
+  function listClcdIconNamesAlphabetically() {
+    const known = (typeof CLCD_KNOWN_SYMBOLS !== 'undefined') ? CLCD_KNOWN_SYMBOLS : [];
+    return known.slice().sort(function (a, b) { return a.localeCompare(b); }).filter(function (name) {
+      if (typeof getClcdSymbolDef !== 'function') return true;
+      const def = getClcdSymbolDef(name);
+      return def && def.kind === 'fa';
+    });
+  }
+
+  function nextClcdSymbolName(symbols, explicit) {
+    if (explicit != null && String(explicit).trim() !== '' && String(explicit).trim() !== '?') {
+      return String(explicit).trim();
+    }
+    const used = new Set((symbols || []).map(function (s) { return s.name; }));
+    const icons = listClcdIconNamesAlphabetically();
+    for (let i = 0; i < icons.length; i++) {
+      if (!used.has(icons[i])) return icons[i];
+    }
+    let base = 'newSymbol';
+    if (!used.has(base)) return base;
+    let n = 2;
+    while (used.has(base + n)) n++;
+    return base + n;
+  }
+
+  function clcdSymbolSerializeName(sym, symbols, symIndex) {
+    const n = sym.name != null ? String(sym.name).trim() : '';
+    if (n && n !== '?' && n !== '_') return n;
+    const others = (symbols || []).filter(function (_, i) { return i !== symIndex; });
+    return nextClcdSymbolName(others, '');
+  }
+
+  function serializeClcdSymbolInstanceLines(sym, innerIndent, allSymbols, symIndex) {
+    const pad = innerIndent + '  ';
+    const symName = clcdSymbolSerializeName(sym, allSymbols, symIndex);
+    const lines = [innerIndent + symName + ':'];
+    lines.push(pad + 'x: ' + (sym.x != null ? sym.x : 0));
+    lines.push(pad + 'y: ' + (sym.y != null ? sym.y : 0));
+    if (sym.bitsText != null && sym.bitsText !== '') {
+      lines.push(pad + 'bits: ' + sym.bitsText);
+    } else if (sym.bitsStart !== undefined) {
+      lines.push(pad + 'bits: ' + sym.bitsStart + '-' + sym.bitsEnd);
+    }
+    if (sym.bit !== undefined) lines.push(pad + 'bit: ' + sym.bit);
+    if (sym.bitOut !== undefined) lines.push(pad + 'bitOut: ' + sym.bitOut);
+    if (sym.text !== undefined) {
+      const q = String(sym.text);
+      if (typeof ClcdComponent !== 'undefined' && ClcdComponent.formatDocString) {
+        lines.push(pad + 'text: ' + ClcdComponent.formatDocString(q));
+      } else {
+        lines.push(pad + 'text: "' + q.replace(/"/g, '\\"') + '"');
+      }
+    }
+    if (sym.family !== undefined) lines.push(pad + 'family: ' + sym.family);
+    if (sym.weight !== undefined) lines.push(pad + 'weight: ' + sym.weight);
+    if (sym.style !== undefined) lines.push(pad + 'style: ' + sym.style);
+    if (sym.size !== undefined && sym.size !== null && sym.size !== '') lines.push(pad + 'size: ' + sym.size);
+    if (sym.touchType !== undefined) lines.push(pad + 'touchType: ' + sym.touchType);
+    if (sym.hotkey !== undefined) {
+      const hk = String(sym.hotkey);
+      if (typeof ClcdComponent !== 'undefined' && ClcdComponent.formatDocString) {
+        lines.push(pad + 'hotkey: ' + ClcdComponent.formatDocString(hk));
+      } else {
+        lines.push(pad + 'hotkey: "' + hk.replace(/"/g, '\\"') + '"');
+      }
+    }
+    if (sym.width !== undefined) lines.push(pad + 'width: ' + sym.width);
+    if (sym.height !== undefined) lines.push(pad + 'height: ' + sym.height);
+    if (sym.padding !== undefined) lines.push(pad + 'padding: ' + sym.padding);
+    const colorDoc = formatClcdColorForSerialize(sym.color);
+    if (colorDoc) lines.push(pad + 'color: ' + colorDoc);
+    const bgDoc = formatClcdColorForSerialize(sym.bgColor);
+    if (bgDoc) lines.push(pad + 'bgColor: ' + bgDoc);
+    lines.push(innerIndent + ':');
+    return lines;
+  }
+
+  function draftClcdSymbolsFromRaw(innerRaw) {
+    const syms = [];
+    const src = String(innerRaw || '');
+    const re = /(^|\n)\s*([A-Za-z_]\w*)\s*:\s*\n([\s\S]*?)\n\s*:\s*(?=\n|$)/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      const sym = { name: m[2], x: 0, y: 0, _fields: [] };
+      const body = m[3];
+      body.split('\n').forEach(function (line) {
+        const t = line.trim();
+        if (!t || t.startsWith('#')) return;
+        const kv = t.match(/^([A-Za-z_]\w*)\s*:\s*(.*)$/);
+        if (!kv) return;
+        const key = kv[1];
+        let val = kv[2].trim();
+        if (key === 'x') sym.x = parseInt(val, 10) || 0;
+        else if (key === 'y') sym.y = parseInt(val, 10) || 0;
+        else if (key === 'bit') { sym.bit = parseInt(val, 10); sym._fields.push('bit'); }
+        else if (key === 'bits') {
+          sym.bitsText = val;
+          sym._fields.push('bits');
+          const parsed = parseClcdBitsRangeText(val);
+          if (parsed) {
+            sym.bitsStart = parsed.bitsStart;
+            sym.bitsEnd = parsed.bitsEnd;
+          }
+        } else if (key === 'bitOut') { sym.bitOut = parseInt(val, 10); sym._fields.push('bitOut'); }
+        else if (key === 'style') { sym.style = parseInt(val, 10); sym._fields.push('style'); }
+        else if (key === 'size') { sym.size = parseInt(val, 10); sym._fields.push('size'); }
+        else if (key === 'text') {
+          sym.text = val.replace(/^"|"$/g, '').replace(/\\"/g, '"');
+          sym._fields.push('text');
+        } else if (key === 'family') { sym.family = val; sym._fields.push('family'); }
+        else if (key === 'weight') { sym.weight = val; sym._fields.push('weight'); }
+        else if (key === 'touchType') { sym.touchType = parseInt(val, 10); sym._fields.push('touchType'); }
+        else if (key === 'hotkey') {
+          sym.hotkey = val.replace(/^"|"$/g, '').replace(/\\"/g, '"');
+          sym._fields.push('hotkey');
+        } else if (key === 'width') { sym.width = parseInt(val, 10); sym._fields.push('width'); }
+        else if (key === 'height') { sym.height = parseInt(val, 10); sym._fields.push('height'); }
+        else if (key === 'padding') { sym.padding = parseInt(val, 10); sym._fields.push('padding'); }
+        else if (key === 'color' || key === 'bgColor') {
+          if (val.charAt(0) === '^') sym[key] = '#' + val.slice(1);
+          else sym[key] = val;
+          sym._fields.push(key);
+        }
       });
-      stubLines.forEach(function (l) {
-        lines.push(l.replace(/^    /, indent + '  '));
+      syms.push(sym);
+    }
+    return syms;
+  }
+
+  function tryParseClcdSymbolsFromRawLines(rawLines, registry) {
+    if (typeof Parser === 'undefined' || typeof Tokenizer === 'undefined') {
+      return draftClcdSymbolsFromRaw(innerTextFromBraceRawLines(rawLines));
+    }
+    try {
+      const inner = innerTextFromBraceRawLines(rawLines);
+      const wrap = 'comp [clcd] .__card__:\n  symbols {\n' +
+        inner.split('\n').map(function (l) { return '    ' + l; }).join('\n') + '\n  }\n  :';
+      const p = new Parser(new Tokenizer(wrap), registry);
+      const stmts = p.parse();
+      const comp = stmts[0] && stmts[0].comp;
+      const symbols = (comp && comp.attributes && comp.attributes.clcdSymbols) || [];
+      return symbols.map(function (s) {
+        const copy = Object.assign({}, s);
+        copy._fields = inferClcdSymbolFields(copy, getClcdUiKind(copy.name));
+        if (!copy._id) copy._id = 'sym_' + Math.random().toString(36).slice(2, 10);
+        return copy;
+      });
+    } catch (e) {
+      return draftClcdSymbolsFromRaw(innerTextFromBraceRawLines(rawLines)).map(function (s) {
+        if (!s._id) s._id = 'sym_' + Math.random().toString(36).slice(2, 10);
+        return s;
       });
     }
+  }
+
+  function findClcdSymbolIndex(symbols, key) {
+    if (key == null || key === '') return -1;
+    return (symbols || []).findIndex(function (s) {
+      return s._id === key || s.name === key;
+    });
+  }
+
+  function resolveClcdSymbolIndex(symbols, key, fallbackName) {
+    let idx = findClcdSymbolIndex(symbols, key);
+    if (idx >= 0) return idx;
+    if (fallbackName && fallbackName !== key) {
+      return findClcdSymbolIndex(symbols, fallbackName);
+    }
+    return -1;
+  }
+
+  function serializeClcdSymbolsLines(symbols, indent) {
+    const lines = [indent + 'symbols {'];
+    (symbols || []).forEach(function (sym, si) {
+      serializeClcdSymbolInstanceLines(sym, indent + '  ', symbols, si).forEach(function (l) {
+        lines.push(l);
+      });
+    });
     lines.push(indent + '}');
     return lines;
   }
@@ -535,9 +901,30 @@
     if (model.type === 'clcd' && parsed && parsed.attributes && parsed.attributes.clcdSymbols) {
       for (let i = 0; i < model.bodyItems.length; i++) {
         if (model.bodyItems[i].kind === 'clcdSymbols') {
+          const parsedSyms = (parsed.attributes.clcdSymbols || []).map(function (s) {
+            const copy = Object.assign({}, s);
+            copy._fields = inferClcdSymbolFields(copy, getClcdUiKind(copy.name));
+            return copy;
+          });
+          const existing = model.bodyItems[i].symbols || [];
+          if (parsedSyms.length === 0 && existing.length > 0) {
+            refreshNestedRawLines(model.bodyItems[i], detectBodyIndent(model));
+            break;
+          }
+          const existingByKey = {};
+          existing.forEach(function (s) {
+            if (s.name) existingByKey[s.name] = s;
+            if (s._id) existingByKey[s._id] = s;
+          });
+          parsedSyms.forEach(function (s, si) {
+            const ex = existingByKey[s.name] || (existing[si] || null);
+            if (ex && ex._id) s._id = ex._id;
+            else if (!s._id) s._id = 'sym_' + Math.random().toString(36).slice(2, 10);
+            mergeClcdSymbolFields(s, ex);
+          });
           const item = {
             kind: 'clcdSymbols',
-            symbols: (parsed.attributes.clcdSymbols || []).map(function (s) { return Object.assign({}, s); }),
+            symbols: parsedSyms,
             rawLines: model.bodyItems[i].rawLines.slice()
           };
           refreshNestedRawLines(item, detectBodyIndent(model));
@@ -667,6 +1054,22 @@
     return copy;
   }
 
+  function detectCompBodyIndent(lines, headerLine) {
+    for (let k = headerLine + 1; k < lines.length; k++) {
+      const trimmed = lines[k].trim();
+      if (!trimmed) continue;
+      const m = lines[k].match(/^(\s*)/);
+      return m ? m[1] : '';
+    }
+    return '  ';
+  }
+
+  function isCompClosingLine(line, bodyIndent) {
+    if (!/^\s*:\s*$/.test(line)) return false;
+    const indent = (line.match(/^(\s*)/) || ['', ''])[1];
+    return indent === bodyIndent;
+  }
+
   function findCompBlockSpans(src) {
     const lines = src.split('\n');
     const spans = [];
@@ -682,12 +1085,13 @@
         i++;
         continue;
       }
+      const bodyIndent = detectCompBodyIndent(lines, startLine);
       let braceDepth = 0;
       let j = i + 1;
       let found = false;
       for (; j < lines.length; j++) {
         braceDepth += countBraces(lines[j]);
-        if (braceDepth === 0 && /^\s*:\s*$/.test(lines[j])) {
+        if (braceDepth === 0 && isCompClosingLine(lines[j], bodyIndent)) {
           spans.push({ startLine, endLine: j, startCh: 0, endCh: lines[j].length });
           i = j + 1;
           found = true;
@@ -777,9 +1181,10 @@
         if (symbolsHead) {
           const block = consumeBraceBlock(bodyLines, i);
           i = block.endIdx;
+          const symbols = tryParseClcdSymbolsFromRawLines(block.rawLines, registry);
           items.push({
             kind: 'clcdSymbols',
-            symbols: [],
+            symbols: symbols,
             rawLines: block.rawLines
           });
           continue;
@@ -982,6 +1387,16 @@
 
   function spanKey(span) {
     return span.startLine + ':' + span.endLine + ':' + span.endCh;
+  }
+
+  function resolveCompBlockById(src, blockId, registry) {
+    const startLine = parseInt(String(blockId).split(':')[0], 10);
+    const blocks = parseCompBlocks(src, registry);
+    if (!isNaN(startLine)) {
+      const byLine = blocks.find(function (b) { return b.span.startLine === startLine; });
+      if (byLine) return byLine;
+    }
+    return blocks.find(function (b) { return b.id === blockId; }) || null;
   }
 
   function parseCompBlocks(src, registry) {
@@ -1572,16 +1987,26 @@
     return item;
   }
 
-  function defaultClcdSymbol(name) {
-    return { name: name, x: 0, y: 0 };
+  function defaultClcdSymbol(name, symbols) {
+    return {
+      name: nextClcdSymbolName(symbols, name),
+      x: 0,
+      y: 0,
+      _fields: [],
+      _id: 'sym_' + Math.random().toString(36).slice(2, 10)
+    };
   }
 
-  function upsertClcdSymbol(model, oldName, symbol) {
+  function upsertClcdSymbol(model, oldKey, symbol, fallbackName) {
     const newModel = cloneModel(model);
     const item = ensureClcdSymbolsItem(newModel);
-    const key = oldName != null && oldName !== '' ? oldName : symbol.name;
-    const idx = item.symbols.findIndex(function (s) { return s.name === key; });
     const copy = Object.assign({}, symbol);
+    if (!copy._id) copy._id = 'sym_' + Math.random().toString(36).slice(2, 10);
+    applyClcdSymbolNameDefaults(copy);
+    if (!copy._fields) copy._fields = inferClcdSymbolFields(copy, getClcdUiKind(copy.name));
+    const lookup = oldKey != null && oldKey !== '' ? oldKey : (copy._id || copy.name);
+    let idx = resolveClcdSymbolIndex(item.symbols, lookup, fallbackName);
+    if (idx >= 0 && item.symbols[idx]._id) copy._id = item.symbols[idx]._id;
     if (idx >= 0) item.symbols[idx] = copy;
     else item.symbols.push(copy);
     refreshNestedRawLines(item, detectBodyIndent(newModel));
@@ -1589,18 +2014,79 @@
     return newModel;
   }
 
-  function removeClcdSymbol(model, name) {
+  function removeClcdSymbol(model, key, fallbackName) {
     const newModel = cloneModel(model);
     const item = findBodyItemByKind(newModel, 'clcdSymbols');
     if (!item) return newModel;
-    item.symbols = (item.symbols || []).filter(function (s) { return s.name !== name; });
+    const idx = resolveClcdSymbolIndex(item.symbols, key, fallbackName);
+    if (idx >= 0) item.symbols.splice(idx, 1);
+    else {
+      item.symbols = (item.symbols || []).filter(function (s) {
+        return s.name !== key && s.name !== fallbackName && s._id !== key;
+      });
+    }
     refreshNestedRawLines(item, detectBodyIndent(newModel));
     newModel.rawText = serializeCompBlock(newModel);
     return newModel;
   }
 
   function addClcdSymbol(model, name) {
-    return upsertClcdSymbol(model, null, defaultClcdSymbol(name));
+    const newModel = cloneModel(model);
+    const item = ensureClcdSymbolsItem(newModel);
+    return upsertClcdSymbol(newModel, null, defaultClcdSymbol(name, item.symbols));
+  }
+
+  function addClcdSymbolsBlock(model) {
+    const newModel = cloneModel(model);
+    const item = ensureClcdSymbolsItem(newModel);
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeClcdSymbolsBlock(model) {
+    const newModel = cloneModel(model);
+    if (!findBodyItemByKind(newModel, 'clcdSymbols')) return newModel;
+    newModel.bodyItems = newModel.bodyItems.filter(function (i) { return i.kind !== 'clcdSymbols'; });
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addClcdSymbolProp(model, symbolKey, propName, fallbackName) {
+    const newModel = cloneModel(model);
+    const item = findBodyItemByKind(newModel, 'clcdSymbols');
+    if (!item) return newModel;
+    const idx = resolveClcdSymbolIndex(item.symbols, symbolKey, fallbackName);
+    if (idx < 0) return newModel;
+    const sym = Object.assign({}, item.symbols[idx]);
+    if (!sym._fields) sym._fields = inferClcdSymbolFields(sym, getClcdUiKind(sym.name));
+    if (sym._fields.indexOf(propName) < 0) sym._fields.push(propName);
+    applyDefaultClcdPropValue(sym, propName);
+    sym._fields = sortClcdSymbolFields(sym._fields, getClcdUiKind(sym.name));
+    item.symbols[idx] = sym;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeClcdSymbolProp(model, symbolKey, propName, fallbackName) {
+    const newModel = cloneModel(model);
+    const item = findBodyItemByKind(newModel, 'clcdSymbols');
+    if (!item) return newModel;
+    const idx = resolveClcdSymbolIndex(item.symbols, symbolKey, fallbackName);
+    if (idx < 0) return newModel;
+    const sym = Object.assign({}, item.symbols[idx]);
+    sym._fields = (sym._fields || []).filter(function (f) { return f !== propName; });
+    delete sym[propName];
+    if (propName === 'bits') {
+      delete sym.bitsStart;
+      delete sym.bitsEnd;
+      delete sym.bitsText;
+    }
+    item.symbols[idx] = sym;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
   }
 
   function getHitboxBlock(model) {
@@ -1712,9 +2198,27 @@
     getHitboxBlock: getHitboxBlock,
     getClcdSymbols: getClcdSymbols,
     getClcdUiKind: getClcdUiKind,
+    inferClcdSymbolFields: inferClcdSymbolFields,
+    sortClcdSymbolFields: sortClcdSymbolFields,
+    clcdPropNamesForKind: clcdPropNamesForKind,
+    resolveCompBlockById: resolveCompBlockById,
+    getClcdSymbolAvailableProps: getClcdSymbolAvailableProps,
+    getClcdSymbolStyleOptions: getClcdSymbolStyleOptions,
+    getClcdDefaultStyle: getClcdDefaultStyle,
+    clcdStyleOptionLabel: clcdStyleOptionLabel,
+    applyClcdSymbolNameDefaults: applyClcdSymbolNameDefaults,
+    getClcdSymbolFieldErrors: getClcdSymbolFieldErrors,
+    parseClcdBitsRangeText: parseClcdBitsRangeText,
     upsertClcdSymbol: upsertClcdSymbol,
     removeClcdSymbol: removeClcdSymbol,
     addClcdSymbol: addClcdSymbol,
+    addClcdSymbolsBlock: addClcdSymbolsBlock,
+    removeClcdSymbolsBlock: removeClcdSymbolsBlock,
+    nextClcdSymbolName: nextClcdSymbolName,
+    listClcdIconNamesAlphabetically: listClcdIconNamesAlphabetically,
+    resolveClcdSymbolIndex: resolveClcdSymbolIndex,
+    addClcdSymbolProp: addClcdSymbolProp,
+    removeClcdSymbolProp: removeClcdSymbolProp,
     defaultClcdSymbol: defaultClcdSymbol,
     setHitboxZone: setHitboxZone,
     removeHitboxZone: removeHitboxZone,

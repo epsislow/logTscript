@@ -53522,5 +53522,163 @@ probe(outX)`;
     h.assert('has nl', String(attrs.some(function (a) { return a.name === 'nl'; })), 'true');
   });
 
+  reg(4920, 'cm-comp-card', 'clcd compact symbols add prop/symbol no orphan tail', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [clcd] .panel:\n  touch: 1\n  symbols {\n    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 hotkey: "w" width: 22 height: 22 :\n    power: x: 50 y: 10 bit: 1 bitOut: 1 touchType: 3 hotkey: "p" width: 22 height: 22 :\n  }\n  :\n\n2wire touchOut = .panel:out\n.panel = touchOut';
+    function patchLikeEditor(text, span, newBlock) {
+      const lines = text.split('\n');
+      const before = lines.slice(0, span.startLine);
+      const after = lines.slice(span.endLine + 1);
+      return before.concat(newBlock.split('\n')).concat(after).join('\n');
+    }
+    let blocks = CCM.parseCompBlocks(src, reg);
+    let model = blocks.find(function (b) { return b.name === '.panel'; });
+    const startSpan = model.span;
+    h.assert('compact span short', String(startSpan.endLine - startSpan.startLine), '6');
+    const wifiKey = CCM.getClcdSymbols(model)[0]._id || 'wifi';
+    let next = CCM.addClcdSymbolProp(model, wifiKey, 'style');
+    let text = patchLikeEditor(src, startSpan, CCM.serializeCompBlock(next));
+    blocks = CCM.parseCompBlocks(text, reg);
+    model = blocks.find(function (b) { return b.name === '.panel'; });
+    h.assert('span grows after expand', String(model.span.endLine > startSpan.endLine), 'true');
+    h.assert('no orphan bitOut attr', String(!model.bodyItems.some(function (i) { return i.kind === 'attr' && i.name === 'bitOut'; })), 'true');
+    const symKey = CCM.getClcdSymbols(model)[0]._id || CCM.getClcdSymbols(model)[0].name;
+    next = CCM.addClcdSymbol(model, 'bell');
+    text = patchLikeEditor(text, model.span, CCM.serializeCompBlock(next));
+    h.assert('no duplicate power tail', String((text.match(/power:/g) || []).length), '1');
+    h.assert('bell added', String(text.includes('bell:')), 'true');
+    h.assert('wire stmt kept', String(text.includes('2wire touchOut = .panel:out')), 'true');
+    blocks = CCM.parseCompBlocks(text, reg);
+    model = blocks.find(function (b) { return b.name === '.panel'; });
+    h.assert('3 symbols parsed', String(CCM.getClcdSymbols(model).length), '3');
+    h.assert('fields sorted style before size', String(CCM.sortClcdSymbolFields(['size', 'style', 'bit'], 'icon').join(',')), 'bit,style,size');
+  });
+
+  reg(4921, 'cm-comp-card', 'clcd empty comp + symbol creates block and first symbol', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [clcd] .panel:\n  :';
+    let blocks = CCM.parseCompBlocks(src, reg);
+    let model = blocks[0];
+    h.assert('no symbols block yet', String(model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; })), 'false');
+    model = CCM.addClcdSymbol(model, '');
+    const out = CCM.serializeCompBlock(model);
+    h.assert('symbols block added', String(out.includes('symbols {')), 'true');
+    h.assert('first symbol added', String(out.includes('align_center:')), 'true');
+    blocks = CCM.parseCompBlocks(out, reg);
+    model = blocks[0];
+    h.assert('symbols item parsed', String(model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; })), 'true');
+    h.assert('one symbol', String(CCM.getClcdSymbols(model).length), '1');
+  });
+
+  reg(4923, 'cm-comp-card', 'clcd remove symbols block clears nested item', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [clcd] .panel:\n  symbols {\n    wifi:\n      x: 10\n      y: 10\n    :\n  }\n  :';
+    let blocks = CCM.parseCompBlocks(src, reg);
+    let model = blocks[0];
+    h.assert('has symbols block', String(model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; })), 'true');
+    model = CCM.removeClcdSymbolsBlock(model);
+    const out = CCM.serializeCompBlock(model);
+    h.assert('symbols block gone', String(!out.includes('symbols {')), 'true');
+    h.assert('wifi gone', String(!out.includes('wifi:')), 'true');
+    blocks = CCM.parseCompBlocks(out, reg);
+    model = blocks[0];
+    h.assert('no symbols item', String(!model.bodyItems.some(function (i) { return i.kind === 'clcdSymbols'; })), 'true');
+  });
+
+  reg(4922, 'cm-comp-card', 'clcd add symbol uses first free fa icon name', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [clcd] .panel:\n  symbols {\n  }\n  :';
+    let blocks = CCM.parseCompBlocks(src, reg);
+    let model = blocks[0];
+    model = CCM.addClcdSymbol(model, '');
+    const out = CCM.serializeCompBlock(model);
+    h.assert('no question mark name', String(!out.includes('?:')), 'true');
+    const firstIcon = CCM.listClcdIconNamesAlphabetically()[0];
+    h.assert('first icon in source', String(out.includes(firstIcon + ':')), 'true');
+    blocks = CCM.parseCompBlocks(out, reg);
+    model = blocks[0];
+    const syms = CCM.getClcdSymbols(model);
+    h.assert('one symbol parsed', String(syms.length), '1');
+    h.assert('symbol name', syms[0].name, firstIcon);
+    h.assert('symbol has id', String(!!syms[0]._id), 'true');
+  });
+
+  reg(4924, 'cm-comp-card', 'clcd rename symbol updates in place via fallback name', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [clcd] .panel:\n  symbols {\n    align_center:\n      x: 0\n      y: 0\n    :\n  }\n  :';
+    let blocks = CCM.parseCompBlocks(src, reg);
+    let model = blocks[0];
+    const sym = CCM.getClcdSymbols(model)[0];
+    const renamed = Object.assign({}, sym, { name: 'wifi' });
+    model = CCM.upsertClcdSymbol(model, 'sym_missing_id', renamed, 'align_center');
+    const out = CCM.serializeCompBlock(model);
+    h.assert('wifi once', String((out.match(/wifi:/g) || []).length), '1');
+    h.assert('align_center gone', String(!out.includes('align_center:')), 'true');
+    blocks = CCM.parseCompBlocks(out, reg);
+    h.assert('one symbol', String(CCM.getClcdSymbols(blocks[0]).length), '1');
+    h.assert('renamed', CCM.getClcdSymbols(blocks[0])[0].name, 'wifi');
+  });
+
+  reg(4925, 'cm-comp-card', 'clcd remove symbol via fallback name', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [clcd] .panel:\n  symbols {\n    align_center:\n      x: 0\n      y: 0\n    :\n  }\n  :';
+    let blocks = CCM.parseCompBlocks(src, reg);
+    let model = blocks[0];
+    model = CCM.removeClcdSymbol(model, 'sym_missing_id', 'align_center');
+    const out = CCM.serializeCompBlock(model);
+    h.assert('symbol removed', String(!out.includes('align_center:')), 'true');
+    h.assert('empty symbols block', String(out.includes('symbols {\n  }')), 'true');
+  });
+
+  reg(4926, 'cm-comp-card', 'clcd icon auto style with per-icon options', function(h, session) {
+    const reg = cmReg(session);
+    let blocks = CCM.parseCompBlocks('comp [clcd] .panel:\n  symbols {\n  }\n  :', reg);
+    let model = blocks[0];
+    model = CCM.addClcdSymbol(model, '');
+    const sym = CCM.getClcdSymbols(model)[0];
+    h.assert('style field', String((sym._fields || []).indexOf('style') >= 0), 'true');
+    h.assert('default style', String(sym.style), String(CCM.getClcdDefaultStyle(sym.name)));
+    h.assert('style in source', String(CCM.serializeCompBlock(model).includes('style: ' + sym.style)), 'true');
+    const amazonOpts = CCM.getClcdSymbolStyleOptions('amazon');
+    h.assert('amazon brands only', amazonOpts.join(','), '3');
+    const renamed = Object.assign({}, sym, { name: 'amazon' });
+    model = CCM.upsertClcdSymbol(model, sym._id || sym.name, renamed, sym.name);
+    h.assert('amazon style 3', String(CCM.getClcdSymbols(model)[0].style), '3');
+  });
+
+  reg(4927, 'cm-comp-card', 'clcd label with style field is invalid', function(h, session) {
+    const reg = cmReg(session);
+    const blocks = CCM.parseCompBlocks('comp [clcd] .panel:\n  symbols {\n  }\n  :', reg);
+    let model = blocks[0];
+    model = CCM.upsertClcdSymbol(model, null, {
+      name: 'label',
+      x: 0,
+      y: 0,
+      bit: 0,
+      text: 'Hi',
+      style: 1,
+      _fields: ['bit', 'text', 'style']
+    });
+    const sym = CCM.getClcdSymbols(model)[0];
+    const errs = CCM.getClcdSymbolFieldErrors(sym, 'label');
+    h.assert('style invalid on label', String(errs.has('style')), 'true');
+    h.assert('style still in fields', String((sym._fields || []).indexOf('style') >= 0), 'true');
+  });
+
+  reg(4928, 'cm-comp-card', 'clcd add symbol prop bit serializes and keeps field', function(h, session) {
+    const reg = cmReg(session);
+    let blocks = CCM.parseCompBlocks('comp [clcd] .panel:\n  symbols {\n  }\n  :', reg);
+    let model = blocks[0];
+    model = CCM.addClcdSymbol(model, '');
+    const sym = CCM.getClcdSymbols(model)[0];
+    model = CCM.addClcdSymbolProp(model, sym._id || sym.name, 'bit', sym.name);
+    const out = CCM.serializeCompBlock(model);
+    h.assert('bit in source', String(out.includes('bit: 0')), 'true');
+    blocks = CCM.parseCompBlocks(out, reg);
+    const next = CCM.getClcdSymbols(blocks[0])[0];
+    h.assert('bit parsed', String(next.bit), '0');
+    h.assert('bit in fields', String((next._fields || []).indexOf('bit') >= 0), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
