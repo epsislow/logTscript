@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Bit Language Interpreter for LogTScript v0.3.2</title>
 <link rel="stylesheet" href="res/css/codemirror.min.css">
-<link rel="stylesheet" href="res/css/cm.show-hint.min.css">
 <link rel="stylesheet" href="res/css/fontawesome/all.min.css">
 <link rel="stylesheet" href="ui/comp-card.css">
 <style>
@@ -2814,7 +2813,6 @@ body.doc-mode #docView {
 
 <script type="text/javascript" src="res/js/lz-string-min.js"></script>
 <script src="res/js/codemirror.min.js"></script>
-<script src="res/js/cm.show-hint.min.js"></script>
 
 <script>
 // ─── LogTScript CodeMirror mode ───────────────────────────────────────────────
@@ -3186,21 +3184,6 @@ consoleLog('or else');
         consoleLog(t, " -> ", stream.current());
         return t;
     }
-  };
-});
-
-CodeMirror.registerHelper("hint", "logts", function(cm) {
-  const cursor = cm.getCursor();
-  const token  = cm.getTokenAt(cursor);
-  const start  = token.start;
-  const end    = cursor.ch;
-  const word   = token.string.slice(0, end - start);
-  const all    = _logtsKeywords.concat(_logtsGates);
-  const list   = all.filter(k => k.toLowerCase().startsWith(word.toLowerCase()));
-  return {
-    list,
-    from: CodeMirror.Pos(cursor.line, start),
-    to:   CodeMirror.Pos(cursor.line, end)
   };
 });
 </script>

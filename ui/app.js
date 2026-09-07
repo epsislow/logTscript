@@ -722,8 +722,7 @@ async function init() {
     theme: "default",
     indentUnit: 2,
     tabSize: 2,
-    lineWrapping: false,
-    extraKeys: { "Ctrl-Space": "autocomplete" }
+    lineWrapping: false
   });
 
   updateCompCardWidgetsToggleUI();
