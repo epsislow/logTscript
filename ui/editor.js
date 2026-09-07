@@ -827,7 +827,11 @@ function insertComp(name) {
   if(!(name in snippets)) {
     return;
   }
+  const startLine = cmEditor.getCursor('from').line;
   insertTextAtCursor(cmEditor, snippets[name]);
+  if (typeof focusCompCardNameAtLine === 'function') {
+    focusCompCardNameAtLine(startLine);
+  }
 }
 
 function closeCompDropdown() {

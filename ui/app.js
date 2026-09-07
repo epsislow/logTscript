@@ -598,6 +598,21 @@ function updateStepControlsUI() {
   });
 }
 
+function focusCompCardNameAtLine(line) {
+  if (!isCompCardWidgetsEnabled() || !compCardWidgetsHandle) return false;
+  const tryFocus = function () {
+    if (compCardWidgetsHandle && typeof compCardWidgetsHandle.focusNameInputAtLine === 'function') {
+      return compCardWidgetsHandle.focusNameInputAtLine(line);
+    }
+    return false;
+  };
+  if (tryFocus()) return true;
+  setTimeout(function () {
+    if (!tryFocus()) setTimeout(tryFocus, 50);
+  }, 90);
+  return true;
+}
+
 function attachCompCardWidgetsFromRegistry(editor) {
   const registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
   if (typeof attachCompCardWidgets === 'function' && registry) {

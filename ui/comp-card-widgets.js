@@ -1743,6 +1743,32 @@
       debounceTimer = setTimeout(updateWidgets, 80);
     }
 
+    function focusNameInputAtLine(line) {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+        updateWidgets();
+      }
+      let widget = active.get(line + ':0');
+      if (!widget) {
+        active.forEach(function (entry) {
+          if (entry.span && entry.span.startLine === line) widget = entry;
+        });
+      }
+      if (!widget || !widget.root) return false;
+      const input = widget.root.querySelector('.cm-comp-card-name-input');
+      if (!input) return false;
+      try {
+        input.focus({ preventScroll: true });
+      } catch (e) {
+        input.focus();
+      }
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+      markWidgetInteraction();
+      return true;
+    }
+
     function updateWidgets() {
       updatingWidgets = true;
       try {
@@ -1808,7 +1834,8 @@
         editor.off('cursorActivity', onCursorActivity);
         clearAll();
       },
-      refresh: updateWidgets
+      refresh: updateWidgets,
+      focusNameInputAtLine: focusNameInputAtLine
     };
   }
 
