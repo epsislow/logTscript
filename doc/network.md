@@ -76,16 +76,13 @@ comp [network] .wifi:
   on: 1
   :
 
-4wire lastId
-
 .wifi:{ send = ^41
   set = 1 }
 
-lastId = .wifi:sendId
-show(lastId)
+show(.wifi:sendId)
 ```
 
-After the send above, `lastId` is `1` and the traffic log row shows **Id** `1`. A second send from the same endpoint yields `sendId` `10` (binary for decimal 2) and log **Id** `2`.
+After the send above, `:sendId` is `1` and the traffic log row shows **Id** `1`. A second send from the same endpoint yields `sendId` `10` (binary for decimal 2) and log **Id** `2`.
 
 Packet ids are for tracing and UI only — they are **not** inserted into the RX FIFO and receivers cannot read them from `:get` / `:front`.
 
@@ -157,7 +154,7 @@ comp [network] .wifi:
   on: 1
   :
 
-.wifi:{ send = inst
+.wifi:{ send = inst;8
   set = 1 }
 ```
 

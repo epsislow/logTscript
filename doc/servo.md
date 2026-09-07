@@ -1134,6 +1134,12 @@ Load & Run: `p` matches `cmd` (`8` steps).
 ## PLC mapping (optional)
 
 ```logts-play
+inline [plc] .servo:
+  inputs: { START }
+  outputs: { ARM: 8 }
+  IF START THEN ARM = 10000000 ELSE ARM = 00000000 END_IF
+  :
+
 comp [switch] .start:
   text: 'Go'
   on: 1
@@ -1149,6 +1155,7 @@ comp [servo] .arm:
   :
 
 comp [plc] .ctrl:
+  program: .servo
   scanTime: 0
   inputs: { START = .start }
   outputs: { ARM = .arm }

@@ -78,9 +78,10 @@ Signed `(−1)×(−1)=1` → `rS=0001`, `oS=0000`.
 ```logts-play
 8wire a = 00011000
 8wire b = 00100000
-8wire r, 8wire o = MULTIPLY(a, b; q4p4)
+8wire r, 8wire o, 4wire st = MULTIPLY(a, b; q4p4)
 show(r; q4p4)
 show(o)
+show(st)
 ```
 
 `1.5×2.0=3.0` → `r=00110000`.
@@ -90,9 +91,10 @@ show(o)
 ```logts-play
 16wire a = 0100000000000000
 16wire b = 0011111000000000
-16wire r, 16wire o = MULTIPLY(a, b; fp16)
+16wire r, 16wire o, 4wire st = MULTIPLY(a, b; fp16)
 show(r; fp16)
 show(o)
+show(st)
 ```
 
 `2.0×1.5=3.0`.

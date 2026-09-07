@@ -59,7 +59,7 @@ show(ovf)
 
 ```logts-play
 8wire x = 11110000
-8wire a, 1wire ovf = ABS(x; q4p4)
+8wire a, 4wire ovf = ABS(x; q4p4)
 show(a; q4p4)
 show(ovf)
 ```

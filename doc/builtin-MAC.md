@@ -88,9 +88,10 @@ Signed `−8 + 2×1 = −6` → `r=1010`.
 8wire acc = 00010000
 8wire a = 00011000
 8wire b = 00001000
-8wire r, 9wire o = MAC(acc, a, b; q4p4)
+8wire r, 9wire o, 4wire st = MAC(acc, a, b; q4p4)
 show(r; q4p4)
 show(o)
+show(st)
 ```
 
 `1.0 + 1.5×0.5 = 1.75`.

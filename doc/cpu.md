@@ -341,6 +341,7 @@ Equivalent: `wait: hold`. Per-pulse override in a wave: `.u:{ wait = 1, set = 1 
 `hold = 1` blocks `set`; after `hold = 0`, one step runs.
 
 ```logts-play
+MODE WIREWRITE
 inline [asm] .cpuisa:
   NOP   : 0000 + 4b
   ADDI  : 0011 + R2b + A2b
@@ -410,13 +411,13 @@ comp [cpu] .u:
 
 .u:{ run = 1 }
 8wire r0 = .u:r0
-8wire halted = .u:halted
+1wire halted = .u:halted
 show(r0)
 show(halted)
 
 .u:{ run = 1 }
 8wire r0b = .u:r0
-8wire haltedb = .u:halted
+1wire haltedb = .u:halted
 show(r0b)
 show(haltedb)
 ```
@@ -470,7 +471,7 @@ comp [cpu] .u:
     }
   :
 
-.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.dma:{ src = 1, dst = \2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
 .u:{ run = 1 }
 8wire r0 = .u:r0
 show(r0)

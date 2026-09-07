@@ -73,7 +73,7 @@ show(y1)
 `fill=0` → `0101`; `fill=1` → `1101`.
 
 ```logts-play
-4wire x2 = 10
+4wire x2 = 0010
 4wire y2 = RSHIFT(x2, 11, 1)
 show(y2)
 ```

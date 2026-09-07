@@ -698,10 +698,9 @@ inline [protocol] .verifyCs:
   :
 
 24wire pkt = .pktCs { data = 10101010 }
-1wire ok = .verifyCs { data = pkt }
+1wire _ = .verifyCs { data = pkt }
 
 show(pkt)
-show(ok)
 ```
 
 Body `10101010` + CRC suffix → 24-bit packet. Verify succeeds silently (empty output channel).

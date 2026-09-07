@@ -202,7 +202,7 @@ Mismatch between schema width and **element** width is a compile-time error:
     cycles:2
     reserved:5
 :
-16wire<opcode13> instr
+13wire<opcode13> instr
 ```
 
 Valid attach (16 bits):

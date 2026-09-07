@@ -90,9 +90,10 @@ Sum of vector elements in Q4.4:
 
 ```logts-play
 8wire[2] v = 00011000 + 00001000
-8wire total, 8wire over = SUM(v; q4p4)
+8wire total, 8wire over, 4wire st = SUM(v; q4p4)
 show(total; q4p4)
 show(over)
+show(st)
 ```
 
 ### `SUM(Wbit[n] a, … ; vector)`

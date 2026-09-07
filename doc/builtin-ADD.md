@@ -99,7 +99,7 @@ IEEE half-precision add (`1.0 + 2.0 = 3.0`):
 ```logts-play
 16wire a = 0011110000000000
 16wire b = 0100000000000000
-16wire s, 1wire flag = ADD(a, b; fp16)
+16wire s, 4wire flag = ADD(a, b; fp16)
 show(s; fp16)
 show(flag)
 ```

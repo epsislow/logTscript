@@ -561,6 +561,7 @@ inline [plc] .latch:
 1wire startIn
 1wire motorOut
 
+MODE WIREWRITE
 startIn = 1
 
 comp [plc] .ctrl:
@@ -586,16 +587,16 @@ inline [plc] .machine:
   IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
   :
 
+1wire startIn
+1wire stopIn
+1wire motorOut
+
 comp [plc] .ctrl:
   program: .machine
   inputs: { START = startIn, STOP = stopIn }
   outputs: { MOTOR = motorOut }
   on: 1
   :
-
-1wire startIn
-1wire stopIn
-1wire motorOut
 
 doc(.machine)
 doc(.ctrl)
@@ -1600,17 +1601,20 @@ comp [bar] .levelBar:
   length: 8
   :
 
+8wire levelOut
+
 comp [plc] .ctrl:
   program: .machine
   inputs: { TEMP = .tempSlider }
-  outputs: { LEVEL = .levelBar }
+  outputs: { LEVEL = levelOut }
   on: 1
   :
 
 .tempSlider:{ data = 01010000 set = 1 }
 .ctrl:{ set = 1 }
+.levelBar = levelOut
 
-show(.levelBar:get)
+show(levelOut)
 ```
 
 After Load & Run: `TEMP = 80`, `LEVEL = (80 * 2) / 10 = **16**` (`00010000` on `:get`).

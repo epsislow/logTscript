@@ -89,9 +89,10 @@ Signed `−1 / 2 = 0`, remainder `−1` (`1111`).
 ```logts-play
 8wire a = 00100000
 8wire b = 00001000
-8wire q, 8wire m = DIVIDE(a, b; q4p4)
+8wire q, 8wire m, 4wire st = DIVIDE(a, b; q4p4)
 show(q; q4p4)
 show(m; q4p4)
+show(st)
 ```
 
 `2.0/0.5=4.0`, remainder `0`.
