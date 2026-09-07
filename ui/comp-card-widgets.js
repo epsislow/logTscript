@@ -13,12 +13,13 @@
       .replace(/"/g, '&quot;');
   }
 
-  function buildTypeSelectHtml(catalog, currentType) {
+  function buildTypeSelectHtml(catalog, currentType, registry) {
+    const currentCanonical = CCM.resolveCanonicalCompType(currentType, registry);
     let html = '<select class="cm-comp-card-type-select">';
     for (const [category, items] of Object.entries(catalog)) {
       html += '<optgroup label="' + escapeHtml(category) + '">';
       items.forEach(function (item) {
-        const sel = item === currentType ? ' selected' : '';
+        const sel = item === currentCanonical ? ' selected' : '';
         html += '<option value="' + escapeHtml(item) + '"' + sel + '>[' + escapeHtml(item) + ']</option>';
       });
       html += '</optgroup>';
@@ -1145,7 +1146,7 @@
       '<button type="button" class="cm-comp-card-delete" title="Delete comp">✕</button>' +
       '<div class="cm-comp-card-header">' +
       '<input type="text" class="cm-comp-card-name-input" value="' + escapeHtml(model.name) + '">' +
-      buildTypeSelectHtml(catalog, model.type) +
+      buildTypeSelectHtml(catalog, model.type, registry) +
       '<button type="button" class="cm-comp-card-view-toggle">' + viewBtnLabel + '</button>' +
       '</div>' +
       (model.viewMode === 'source' ? '' : gridHtml + addHtml);

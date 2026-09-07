@@ -53680,5 +53680,26 @@ probe(outX)`;
     h.assert('bit in fields', String((next._fields || []).indexOf('bit') >= 0), 'true');
   });
 
+  reg(4929, 'cm-comp-card', 'shortname resolves to canonical type for select', function(h, session) {
+    const reg = cmReg(session);
+    h.assert('resolve +', CCM.resolveCanonicalCompType('+', reg), 'adder');
+    h.assert('resolve fifo', CCM.resolveCanonicalCompType('fifo', reg), 'queue');
+    h.assert('resolve led', CCM.resolveCanonicalCompType('led', reg), 'led');
+    const blocks = CCM.parseCompBlocks('comp [+] .a:\n  :', reg);
+    h.assert('parsed type stays short', blocks[0].type, '+');
+    h.assert('canonical from model', CCM.resolveCanonicalCompType(blocks[0].type, reg), 'adder');
+  });
+
+  reg(4930, 'cm-comp-card', 'shortname [~] osc attrs not invalid', function(h, session) {
+    const reg = cmReg(session);
+    const src = 'comp [~] .aaaa:\n  duration1: 4\n  duration0: 4\n  length: 4\n  freq: 1\n  freqIsSec: 0\n  eachCycle: 1\n  :';
+    const blocks = CCM.parseCompBlocks(src, reg);
+    h.assert('type short', blocks[0].type, '~');
+    const invalid = CCM.getInvalidAttrs(blocks[0], reg);
+    h.assert('no invalid attrs', String(invalid.length), '0');
+    const missing = CCM.getMissingAttrNames(blocks[0], reg);
+    h.assert('on in missing', String(missing.indexOf('on') >= 0), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

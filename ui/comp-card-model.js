@@ -23,9 +23,19 @@
     return open - close;
   }
 
+  function resolveCanonicalCompType(type, registry) {
+    if (!type) return type;
+    if (registry && typeof registry.has === 'function' && registry.has(type)) return type;
+    if (registry && typeof registry.getShortnames === 'function') {
+      const mapped = registry.getShortnames()[type];
+      if (mapped) return mapped;
+    }
+    return type;
+  }
+
   function getCompSpecial(compType, registry) {
     if (!registry || !compType) return null;
-    const handler = registry.get(compType);
+    const handler = registry.get(resolveCanonicalCompType(compType, registry));
     if (!handler || !handler.getSpecialParseAttributes) return null;
     return handler.getSpecialParseAttributes();
   }
@@ -1146,7 +1156,7 @@
   function getSegAttrsSet(compType, registry) {
     const set = new Set();
     if (!registry || !compType) return set;
-    const handler = registry.get(compType);
+    const handler = registry.get(resolveCanonicalCompType(compType, registry));
     const special = handler && handler.getSpecialParseAttributes
       ? handler.getSpecialParseAttributes()
       : null;
@@ -1158,6 +1168,7 @@
 
   function parseBodyItems(bodyLines, compType, registry) {
     const items = [];
+    const canonicalType = resolveCanonicalCompType(compType, registry);
     const segAttrs = getSegAttrsSet(compType, registry);
     const special = getCompSpecial(compType, registry);
     const plcMapAttrs = special && special.plcMappingBlockAttrs ? special.plcMappingBlockAttrs : [];
@@ -1176,7 +1187,7 @@
         continue;
       }
 
-      if (compType === 'clcd') {
+      if (canonicalType === 'clcd') {
         const symbolsHead = line.match(/^\s*symbols\s*\{/);
         if (symbolsHead) {
           const block = consumeBraceBlock(bodyLines, i);
@@ -1225,7 +1236,7 @@
           const block = consumeBraceBlock(bodyLines, i);
           i = block.endIdx;
           const inner = innerTextFromBraceRawLines(block.rawLines);
-          if (compType === 'plc' && plcMapAttrs.indexOf(attrName) >= 0) {
+          if (canonicalType === 'plc' && plcMapAttrs.indexOf(attrName) >= 0) {
             items.push({
               kind: 'plcMap',
               name: attrName,
@@ -1234,7 +1245,7 @@
             });
             continue;
           }
-          if (compType === 'plc' && plcGlobalsAttrs.indexOf(attrName) >= 0) {
+          if (canonicalType === 'plc' && plcGlobalsAttrs.indexOf(attrName) >= 0) {
             items.push({
               kind: 'plcGlobals',
               name: attrName,
@@ -1266,7 +1277,7 @@
         i = block.endIdx;
         const ref = dotBlockMatch[1];
         const inner = innerTextFromBraceRawLines(block.rawLines);
-        if (compType === 'logic' && logicProgramBlocks) {
+        if (canonicalType === 'logic' && logicProgramBlocks) {
           let bindings = [];
           let observeDefs = [];
           if (typeof parseLogicProgramBlock === 'function') {
@@ -1287,7 +1298,7 @@
           });
           continue;
         }
-        if (compType === 'canvas' && canvasProgramBlocks) {
+        if (canonicalType === 'canvas' && canvasProgramBlocks) {
           let program = { initDraw: null, whenRenderers: [] };
           if (typeof parseCanvasProgramBlock === 'function') {
             try {
@@ -1311,7 +1322,7 @@
         const block = consumeBraceBlock(bodyLines, i);
         i = block.endIdx;
         const hitboxHead = line.match(/^\s*(hitbox)\s*\{/);
-        if (hitboxHead && compType === 'canvas') {
+        if (hitboxHead && canonicalType === 'canvas') {
           let zones = {};
           const inner = innerTextFromBraceRawLines(block.rawLines);
           if (typeof parseCanvasHitboxBlock === 'function') {
@@ -1440,7 +1451,7 @@
   function getAttrDef(compType, attrName, registry) {
     if (attrName === 'on') return { name: 'on', value: 'mode' };
     if (!registry) return null;
-    const handler = registry.get(compType);
+    const handler = registry.get(resolveCanonicalCompType(compType, registry));
     if (!handler || !handler.getDef) return null;
     const def = handler.getDef();
     if (!def || !def.attrs) return null;
@@ -1450,7 +1461,7 @@
   function getKnownAttrNames(compType, registry) {
     const names = new Set(['on', 'nl']);
     if (!registry || !compType) return names;
-    const handler = registry.get(compType);
+    const handler = registry.get(resolveCanonicalCompType(compType, registry));
     if (handler && handler.getDef) {
       const def = handler.getDef();
       if (def && def.attrs) {
@@ -1503,7 +1514,7 @@
     });
     const missing = [];
     if (!registry) return missing;
-    const handler = registry.get(model.type);
+    const handler = registry.get(resolveCanonicalCompType(model.type, registry));
     if (handler && handler.getDef) {
       const def = handler.getDef();
       if (def && def.attrs) {
@@ -2166,6 +2177,7 @@
     getAttrEnumOptions: getAttrEnumOptions,
     getSegAttrsSet: getSegAttrsSet,
     buildTypeCatalog: buildTypeCatalog,
+    resolveCanonicalCompType: resolveCanonicalCompType,
     getPlcMapEntries: getPlcMapEntries,
     getPlcGlobalsEntries: getPlcGlobalsEntries,
     getLogicProgram: getLogicProgram,
