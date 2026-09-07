@@ -23,6 +23,323 @@
     return open - close;
   }
 
+  function getCompSpecial(compType, registry) {
+    if (!registry || !compType) return null;
+    const handler = registry.get(compType);
+    if (!handler || !handler.getSpecialParseAttributes) return null;
+    return handler.getSpecialParseAttributes();
+  }
+
+  function consumeBraceBlock(bodyLines, startIdx) {
+    const rawLines = [bodyLines[startIdx]];
+    let braceDepth = countBraces(bodyLines[startIdx]);
+    let i = startIdx + 1;
+    while (i < bodyLines.length && braceDepth > 0) {
+      rawLines.push(bodyLines[i]);
+      braceDepth += countBraces(bodyLines[i]);
+      i++;
+    }
+    return { rawLines: rawLines, endIdx: i };
+  }
+
+  function innerTextFromBraceRawLines(rawLines) {
+    const joined = rawLines.join('\n');
+    const open = joined.indexOf('{');
+    const close = joined.lastIndexOf('}');
+    if (open < 0 || close < 0 || close <= open) return joined.trim();
+    return joined.slice(open + 1, close).trim();
+  }
+
+  function parsePlcMapEntries(text) {
+    const entries = [];
+    const cleaned = String(text || '').trim();
+    if (!cleaned) return entries;
+    const lines = cleaned.split('\n');
+    for (let li = 0; li < lines.length; li++) {
+      let line = lines[li].trim().replace(/,\s*$/, '');
+      if (!line || line === '{' || line === '}') continue;
+      const m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+      if (m) entries.push({ symbol: m[1], target: m[2].trim() });
+    }
+    if (!entries.length && cleaned.includes('=')) {
+      cleaned.replace(/^\{?\s*/, '').replace(/\s*\}?$/, '').split(',').forEach(function (part) {
+        part = part.trim();
+        const m = part.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+        if (m) entries.push({ symbol: m[1], target: m[2].trim() });
+      });
+    }
+    return entries;
+  }
+
+  function serializePlcMapLines(name, entries, indent) {
+    const inner = indent + '  ';
+    const lines = [indent + name + ': {'];
+    entries.forEach(function (e) {
+      lines.push(inner + e.symbol + ' = ' + e.target);
+    });
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function parsePlcGlobalsEntries(text) {
+    const entries = [];
+    String(text || '').split('\n').forEach(function (rawLine) {
+      let line = rawLine.trim().replace(/,\s*$/, '');
+      if (!line || line === '{' || line === '}') return;
+      const withWidth = line.match(/^([A-Za-z_]\w*)\s*:\s*(\d+)\s*$/);
+      if (withWidth) {
+        entries.push({ symbol: withWidth[1], width: parseInt(withWidth[2], 10) });
+        return;
+      }
+      const symOnly = line.match(/^([A-Za-z_]\w*)\s*$/);
+      if (symOnly) entries.push({ symbol: symOnly[1], width: 1 });
+    });
+    return entries;
+  }
+
+  function serializePlcGlobalsLines(name, entries, indent) {
+    const inner = indent + '  ';
+    const lines = [indent + name + ': {'];
+    entries.forEach(function (e) {
+      if (e.width != null && e.width !== 1) {
+        lines.push(inner + e.symbol + ': ' + e.width);
+      } else {
+        lines.push(inner + e.symbol);
+      }
+    });
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function serializeLogicBinding(b) {
+    let s = b.logicVar + ' is ' + b.bindType;
+    if (b.numberFormat) s += '/' + b.numberFormat;
+    if (b.listFlag) s += ' list';
+    s += ' ' + b.pinName;
+    return s;
+  }
+
+  function attachLogicObserveRawLines(bodyRaw, observeDefs) {
+    const rawLines = [];
+    String(bodyRaw || '').split('\n').forEach(function (line) {
+      const t = line.trim();
+      if (t.startsWith('observe')) rawLines.push(t);
+    });
+    observeDefs.forEach(function (od, i) {
+      if (rawLines[i]) od.rawLine = rawLines[i];
+    });
+  }
+
+  function serializeLogicProgramLines(ref, bindings, observeDefs, indent) {
+    const inner = indent + '  ';
+    const lines = [indent + ref + ' {'];
+    bindings.forEach(function (b) {
+      lines.push(inner + serializeLogicBinding(b));
+    });
+    observeDefs.forEach(function (o) {
+      lines.push(inner + (o.rawLine || ('observe ' + serializeLogicBinding(o))));
+    });
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function serializeCanvasArg(arg) {
+    if (!arg || typeof arg !== 'object') return String(arg);
+    if (arg.kind === 'number' || arg.kind === 'float') return String(arg.value);
+    if (arg.kind === 'string') return '"' + arg.value + '"';
+    if (arg.kind === 'wireRef') {
+      if (arg.numberFormat) return arg.pinName + '/' + arg.numberFormat;
+      return arg.pinName;
+    }
+    if (arg.value != null) return String(arg.value);
+    return '';
+  }
+
+  function serializeCanvasCall(call) {
+    if (typeof call === 'string') return call;
+    const name = call.name || call.kind;
+    const args = (call.args || []).map(serializeCanvasArg);
+    return name + '(' + args.join(', ') + ')';
+  }
+
+  function callTextFromCanvasCall(call) {
+    return serializeCanvasCall(call);
+  }
+
+  function findInlineCanvasRefs(src) {
+    const refs = [];
+    const re = /^\s*inline\s+\[canvas\]\s+(\.\S+)\s*:/gm;
+    let m;
+    while ((m = re.exec(String(src || ''))) !== null) {
+      if (refs.indexOf(m[1]) === -1) refs.push(m[1]);
+    }
+    return refs;
+  }
+
+  function extractBraceSectionInner(src, sectionRe) {
+    const m = sectionRe.exec(String(src || ''));
+    if (!m) return null;
+    let pos = m.index + m[0].length;
+    let depth = 1;
+    let buf = '';
+    while (pos < src.length && depth > 0) {
+      const ch = src[pos];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) break;
+      }
+      if (depth >= 1) buf += ch;
+      pos++;
+    }
+    return buf;
+  }
+
+  function splitCallLines(sectionInner) {
+    let lines = String(sectionInner).split('\n').map(function (line) { return line.trim(); });
+    while (lines.length && lines[0] === '') lines.shift();
+    while (lines.length && lines[lines.length - 1] === '') lines.pop();
+    return lines;
+  }
+
+  function enrichCanvasProgramCallsFromRaw(program, innerRaw) {
+    const src = String(innerRaw || '');
+    const initInner = extractBraceSectionInner(src, /\binitDraw\s*\{/);
+    if (initInner !== null) {
+      program.initDraw = splitCallLines(initInner);
+    }
+    const whenRe = /renderer\s+when\s*\(\s*([^)]+)\s*\)\s*\{/g;
+    let wm;
+    const whenBlocks = [];
+    while ((wm = whenRe.exec(src)) !== null) {
+      const whenRef = wm[1].trim();
+      let hitbox = whenRef;
+      let event = 'press';
+      const colon = whenRef.indexOf(':');
+      if (colon >= 0) {
+        hitbox = whenRef.slice(0, colon).trim();
+        event = whenRef.slice(colon + 1).trim() || 'press';
+      }
+      let pos = wm.index + wm[0].length;
+      let depth = 1;
+      let buf = '';
+      while (pos < src.length && depth > 0) {
+        const ch = src[pos];
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) break;
+        }
+        if (depth >= 1) buf += ch;
+        pos++;
+      }
+      whenBlocks.push({
+        hitbox: hitbox,
+        event: event,
+        calls: splitCallLines(buf)
+      });
+    }
+    if (whenBlocks.length) program.whenRenderers = whenBlocks;
+    return program;
+  }
+
+  function getHitboxBlockInner(model) {
+    for (let i = 0; i < model.bodyItems.length; i++) {
+      const item = model.bodyItems[i];
+      if (item.kind !== 'raw' || !item.rawLines.length) continue;
+      const first = item.rawLines[0].trim();
+      if (/^hitbox\s*\{/.test(first) || /^hitbox\s*:\s*\{/.test(item.rawLines[0])) {
+        return innerTextFromBraceRawLines(item.rawLines);
+      }
+    }
+    return null;
+  }
+
+  function getHitboxZoneNames(model) {
+    const inner = getHitboxBlockInner(model);
+    if (!inner || typeof parseCanvasHitboxBlock !== 'function') return [];
+    try {
+      const parsed = parseCanvasHitboxBlock(inner, 'hitbox');
+      return Object.keys(parsed.zones || {}).sort();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function modelContentKey(model) {
+    return serializeCompBlock(model);
+  }
+
+  function serializeCanvasProgramLines(ref, program, indent) {
+    const inner = indent + '  ';
+    const bodyInner = indent + '    ';
+    const lines = [indent + ref + ' {'];
+    if (program.initDraw != null) {
+      lines.push(inner + 'initDraw {');
+      program.initDraw.forEach(function (call) {
+        const text = typeof call === 'string' ? call : serializeCanvasCall(call);
+        lines.push(bodyInner + text);
+      });
+      lines.push(inner + '}');
+    }
+    (program.whenRenderers || []).forEach(function (w) {
+      const ev = w.event && w.event !== 'press' ? (w.hitbox + ':' + w.event) : w.hitbox;
+      lines.push(inner + 'renderer when(' + ev + ') {');
+      (w.calls || []).forEach(function (call) {
+        const text = typeof call === 'string' ? call : serializeCanvasCall(call);
+        lines.push(bodyInner + text);
+      });
+      lines.push(inner + '}');
+    });
+    lines.push(indent + '}');
+    return lines;
+  }
+
+  function refreshNestedRawLines(item, indent) {
+    if (item.kind === 'plcMap') {
+      item.rawLines = serializePlcMapLines(item.name, item.entries || [], indent);
+    } else if (item.kind === 'plcGlobals') {
+      item.rawLines = serializePlcGlobalsLines(item.name, item.entries || [], indent);
+    } else if (item.kind === 'logicProgram') {
+      item.rawLines = serializeLogicProgramLines(item.ref, item.bindings || [], item.observeDefs || [], indent);
+    } else if (item.kind === 'canvasProgram') {
+      item.rawLines = serializeCanvasProgramLines(item.ref, item.program || { initDraw: null, whenRenderers: [] }, indent);
+    }
+  }
+
+  function cloneBodyItem(item) {
+    const copy = {
+      kind: item.kind,
+      name: item.name,
+      value: item.value,
+      rawLines: item.rawLines.slice()
+    };
+    if (item.ref) copy.ref = item.ref;
+    if (item.entries) copy.entries = item.entries.map(function (e) { return Object.assign({}, e); });
+    if (item.bindings) copy.bindings = item.bindings.map(function (b) { return Object.assign({}, b); });
+    if (item.observeDefs) {
+      copy.observeDefs = item.observeDefs.map(function (o) { return Object.assign({}, o); });
+    }
+    if (item.program) {
+      copy.program = {
+        initDraw: item.program.initDraw ? item.program.initDraw.map(function (c) {
+          return typeof c === 'string' ? c : Object.assign({}, c);
+        }) : null,
+        whenRenderers: (item.program.whenRenderers || []).map(function (w) {
+          return {
+            hitbox: w.hitbox,
+            event: w.event,
+            line: w.line,
+            calls: (w.calls || []).map(function (c) {
+              return typeof c === 'string' ? c : Object.assign({}, c);
+            })
+          };
+        })
+      };
+    }
+    return copy;
+  }
+
   function findCompBlockSpans(src) {
     const lines = src.split('\n');
     const spans = [];
@@ -111,6 +428,11 @@
   function parseBodyItems(bodyLines, compType, registry) {
     const items = [];
     const segAttrs = getSegAttrsSet(compType, registry);
+    const special = getCompSpecial(compType, registry);
+    const plcMapAttrs = special && special.plcMappingBlockAttrs ? special.plcMappingBlockAttrs : [];
+    const plcGlobalsAttrs = special && special.plcGlobalsBlockAttrs ? special.plcGlobalsBlockAttrs : [];
+    const logicProgramBlocks = !!(special && special.logicProgramBlockAttrs);
+    const canvasProgramBlocks = !!(special && special.canvasProgramBlockAttrs);
     let i = 0;
 
     while (i < bodyLines.length) {
@@ -150,22 +472,36 @@
 
       const attrMatch = line.match(/^\s*([a-zA-Z]\w*)\s*:\s*(.*)$/);
       if (attrMatch) {
+        const attrName = attrMatch[1];
         const val = attrMatch[2].trim();
         const hasOpenBrace = val === '{' || (val.includes('{') && !val.includes('}'));
         if (hasOpenBrace) {
-          const rawLines = [line];
-          let braceDepth = val === '{' ? 1 : countBraces(val);
-          i++;
-          while (i < bodyLines.length && braceDepth > 0) {
-            rawLines.push(bodyLines[i]);
-            braceDepth += countBraces(bodyLines[i]);
-            i++;
+          const block = consumeBraceBlock(bodyLines, i);
+          i = block.endIdx;
+          const inner = innerTextFromBraceRawLines(block.rawLines);
+          if (compType === 'plc' && plcMapAttrs.indexOf(attrName) >= 0) {
+            items.push({
+              kind: 'plcMap',
+              name: attrName,
+              entries: parsePlcMapEntries(inner),
+              rawLines: block.rawLines
+            });
+            continue;
           }
-          items.push({ kind: 'raw', rawLines: rawLines });
+          if (compType === 'plc' && plcGlobalsAttrs.indexOf(attrName) >= 0) {
+            items.push({
+              kind: 'plcGlobals',
+              name: attrName,
+              entries: parsePlcGlobalsEntries(inner),
+              rawLines: block.rawLines
+            });
+            continue;
+          }
+          items.push({ kind: 'raw', rawLines: block.rawLines });
           continue;
         }
         if (val !== '') {
-          items.push({ kind: 'attr', name: attrMatch[1], rawLines: [line] });
+          items.push({ kind: 'attr', name: attrName, rawLines: [line] });
           i++;
           continue;
         }
@@ -178,16 +514,56 @@
         continue;
       }
 
-      if (trimmed.includes('{') || /^\s*\./.test(line) || /^\s*\w+\s+\{/.test(line)) {
-        const rawLines = [line];
-        let braceDepth = countBraces(line);
-        i++;
-        while (i < bodyLines.length && braceDepth > 0) {
-          rawLines.push(bodyLines[i]);
-          braceDepth += countBraces(bodyLines[i]);
-          i++;
+      const dotBlockMatch = line.match(/^\s*(\.\S+)\s*\{/);
+      if (dotBlockMatch && (logicProgramBlocks || canvasProgramBlocks)) {
+        const block = consumeBraceBlock(bodyLines, i);
+        i = block.endIdx;
+        const ref = dotBlockMatch[1];
+        const inner = innerTextFromBraceRawLines(block.rawLines);
+        if (compType === 'logic' && logicProgramBlocks) {
+          let bindings = [];
+          let observeDefs = [];
+          if (typeof parseLogicProgramBlock === 'function') {
+            try {
+              const parsed = parseLogicProgramBlock(inner, 'logic program');
+              bindings = parsed.bindings || [];
+              observeDefs = parsed.observeDefs || [];
+              attachLogicObserveRawLines(inner, observeDefs);
+            } catch (e) { /* keep empty structured */ }
+          }
+          items.push({
+            kind: 'logicProgram',
+            ref: ref,
+            bindings: bindings,
+            observeDefs: observeDefs,
+            rawLines: block.rawLines
+          });
+          continue;
         }
-        items.push({ kind: 'raw', rawLines: rawLines });
+        if (compType === 'canvas' && canvasProgramBlocks) {
+          let program = { initDraw: null, whenRenderers: [] };
+          if (typeof parseCanvasProgramBlock === 'function') {
+            try {
+              program = parseCanvasProgramBlock(inner, 'canvas program');
+            } catch (e) { /* keep empty */ }
+          }
+          program = enrichCanvasProgramCallsFromRaw(program, inner);
+          items.push({
+            kind: 'canvasProgram',
+            ref: ref,
+            program: program,
+            rawLines: block.rawLines
+          });
+          continue;
+        }
+        items.push({ kind: 'raw', rawLines: block.rawLines });
+        continue;
+      }
+
+      if (trimmed.includes('{') || /^\s*\./.test(line) || /^\s*\w+\s+\{/.test(line)) {
+        const block = consumeBraceBlock(bodyLines, i);
+        i = block.endIdx;
+        items.push({ kind: 'raw', rawLines: block.rawLines });
         continue;
       }
 
@@ -233,14 +609,7 @@
       name: model.name,
       span: model.span ? { startLine: model.span.startLine, endLine: model.span.endLine, startCh: model.span.startCh, endCh: model.span.endCh } : null,
       rawText: model.rawText,
-      bodyItems: model.bodyItems.map(function (item) {
-        return {
-          kind: item.kind,
-          name: item.name,
-          value: item.value,
-          rawLines: item.rawLines.slice()
-        };
-      }),
+      bodyItems: model.bodyItems.map(cloneBodyItem),
       emptyBody: model.emptyBody,
       closingLine: model.closingLine,
       indent: model.indent,
@@ -352,6 +721,9 @@
 
   function getMissingAttrNames(model, registry) {
     const present = new Set(getExplicitAttrs(model).map(function (a) { return a.name; }));
+    model.bodyItems.forEach(function (item) {
+      if (item.kind === 'plcMap' || item.kind === 'plcGlobals') present.add(item.name);
+    });
     const missing = [];
     if (!registry) return missing;
     const handler = registry.get(model.type);
@@ -525,6 +897,268 @@
     return result;
   }
 
+  function findBodyItem(model, kind, name) {
+    return model.bodyItems.find(function (item) {
+      if (item.kind !== kind) return false;
+      if (name == null) return true;
+      return item.name === name || item.ref === name;
+    }) || null;
+  }
+
+  function getPlcMapEntries(model, mapName) {
+    const item = findBodyItem(model, 'plcMap', mapName);
+    return item ? (item.entries || []).slice() : [];
+  }
+
+  function getPlcGlobalsEntries(model) {
+    const item = findBodyItem(model, 'plcGlobals', 'globals');
+    return item ? (item.entries || []).slice() : [];
+  }
+
+  function getLogicProgram(model) {
+    const item = findBodyItem(model, 'logicProgram');
+    if (!item) return null;
+    return {
+      ref: item.ref,
+      bindings: (item.bindings || []).slice(),
+      observeDefs: (item.observeDefs || []).slice()
+    };
+  }
+
+  function getCanvasProgram(model) {
+    const item = findBodyItem(model, 'canvasProgram');
+    if (!item) return null;
+    return {
+      ref: item.ref,
+      program: item.program ? cloneBodyItem({ kind: 'canvasProgram', rawLines: [], program: item.program }).program : { initDraw: null, whenRenderers: [] }
+    };
+  }
+
+  function getProgramRefs(model) {
+    const attr = getExplicitAttrs(model).find(function (a) { return a.name === 'program'; });
+    if (!attr || !attr.value) return [];
+    return attr.value.trim().split(/\s+/).filter(Boolean);
+  }
+
+  function setPlcMapEntry(model, mapName, symbol, target) {
+    const newModel = cloneModel(model);
+    const indent = detectBodyIndent(newModel);
+    let item = findBodyItem(newModel, 'plcMap', mapName);
+    if (!item) {
+      item = { kind: 'plcMap', name: mapName, entries: [], rawLines: [] };
+      newModel.bodyItems.push(item);
+    }
+    const idx = item.entries.findIndex(function (e) { return e.symbol === symbol; });
+    if (idx >= 0) item.entries[idx].target = target;
+    else item.entries.push({ symbol: symbol, target: target });
+    refreshNestedRawLines(item, indent);
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addPlcMapEntry(model, mapName, symbol, target) {
+    return setPlcMapEntry(model, mapName, symbol, target);
+  }
+
+  function removePlcMapEntry(model, mapName, symbol) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'plcMap', mapName);
+    if (!item) return newModel;
+    item.entries = item.entries.filter(function (e) { return e.symbol !== symbol; });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setPlcGlobalEntry(model, symbol, width) {
+    const newModel = cloneModel(model);
+    const indent = detectBodyIndent(newModel);
+    let item = findBodyItem(newModel, 'plcGlobals', 'globals');
+    if (!item) {
+      item = { kind: 'plcGlobals', name: 'globals', entries: [], rawLines: [] };
+      newModel.bodyItems.push(item);
+    }
+    const idx = item.entries.findIndex(function (e) { return e.symbol === symbol; });
+    const w = width == null ? 1 : width;
+    if (idx >= 0) item.entries[idx].width = w;
+    else item.entries.push({ symbol: symbol, width: w });
+    refreshNestedRawLines(item, indent);
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removePlcGlobalEntry(model, symbol) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'plcGlobals', 'globals');
+    if (!item) return newModel;
+    item.entries = item.entries.filter(function (e) { return e.symbol !== symbol; });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setProgramRefs(model, refs) {
+    const value = (refs || []).join(' ');
+    return setAttrValue(model, 'program', value);
+  }
+
+  function addLogicBinding(model, logicVar, bindType, pinName) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'logicProgram');
+    if (!item) return newModel;
+    item.bindings = item.bindings || [];
+    item.bindings.push({ logicVar: logicVar, bindType: bindType, pinName: pinName, listFlag: false, numberFormat: null });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeLogicBinding(model, logicVar) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'logicProgram');
+    if (!item) return newModel;
+    item.bindings = (item.bindings || []).filter(function (b) { return b.logicVar !== logicVar; });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setCanvasInitDrawCall(model, index, callText) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item) return newModel;
+    if (!item.program) item.program = { initDraw: [], whenRenderers: [] };
+    if (!item.program.initDraw) item.program.initDraw = [];
+    item.program.initDraw[index] = callText;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addCanvasInitDrawCall(model, callText) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item) return newModel;
+    if (!item.program) item.program = { initDraw: [], whenRenderers: [] };
+    if (!item.program.initDraw) item.program.initDraw = [];
+    item.program.initDraw.push(callText);
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setCanvasWhenCall(model, whenIndex, callIndex, callText) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item || !item.program || !item.program.whenRenderers[whenIndex]) return newModel;
+    item.program.whenRenderers[whenIndex].calls[callIndex] = callText;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addCanvasWhenBlock(model, hitbox, event, calls) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item) return newModel;
+    if (!item.program) item.program = { initDraw: null, whenRenderers: [] };
+    item.program.whenRenderers.push({
+      hitbox: hitbox,
+      event: event || 'press',
+      calls: calls || []
+    });
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setCanvasProgramRef(model, newRef) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item || !newRef) return newModel;
+    item.ref = newRef;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addCanvasInitDrawSection(model) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item) return newModel;
+    if (!item.program) item.program = { initDraw: [], whenRenderers: [] };
+    if (item.program.initDraw == null) item.program.initDraw = [];
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeCanvasInitDrawSection(model) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item || !item.program) return newModel;
+    item.program.initDraw = null;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeCanvasInitDrawCall(model, index) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item || !item.program || !item.program.initDraw) return newModel;
+    item.program.initDraw.splice(index, 1);
+    if (!item.program.initDraw.length) item.program.initDraw = null;
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function addCanvasWhenCall(model, whenIndex, callText) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    const w = item && item.program && item.program.whenRenderers[whenIndex];
+    if (!w) return newModel;
+    if (!w.calls) w.calls = [];
+    w.calls.push(callText == null ? '' : callText);
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeCanvasWhenCall(model, whenIndex, callIndex) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    const w = item && item.program && item.program.whenRenderers[whenIndex];
+    if (!w || !w.calls) return newModel;
+    w.calls.splice(callIndex, 1);
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function removeCanvasWhenBlock(model, whenIndex) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    if (!item || !item.program) return newModel;
+    item.program.whenRenderers.splice(whenIndex, 1);
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
+  function setCanvasWhenMeta(model, whenIndex, hitbox, event) {
+    const newModel = cloneModel(model);
+    const item = findBodyItem(newModel, 'canvasProgram');
+    const w = item && item.program && item.program.whenRenderers[whenIndex];
+    if (!w) return newModel;
+    if (hitbox != null) w.hitbox = hitbox;
+    if (event != null) w.event = event || 'press';
+    refreshNestedRawLines(item, detectBodyIndent(newModel));
+    newModel.rawText = serializeCompBlock(newModel);
+    return newModel;
+  }
+
   return {
     ON_ENUM: ON_ENUM,
     findCompBlockSpans: findCompBlockSpans,
@@ -549,6 +1183,35 @@
     getWidgetFieldType: getWidgetFieldType,
     getAttrEnumOptions: getAttrEnumOptions,
     getSegAttrsSet: getSegAttrsSet,
-    buildTypeCatalog: buildTypeCatalog
+    buildTypeCatalog: buildTypeCatalog,
+    getPlcMapEntries: getPlcMapEntries,
+    getPlcGlobalsEntries: getPlcGlobalsEntries,
+    getLogicProgram: getLogicProgram,
+    getCanvasProgram: getCanvasProgram,
+    getProgramRefs: getProgramRefs,
+    setPlcMapEntry: setPlcMapEntry,
+    addPlcMapEntry: addPlcMapEntry,
+    removePlcMapEntry: removePlcMapEntry,
+    setPlcGlobalEntry: setPlcGlobalEntry,
+    removePlcGlobalEntry: removePlcGlobalEntry,
+    setProgramRefs: setProgramRefs,
+    addLogicBinding: addLogicBinding,
+    removeLogicBinding: removeLogicBinding,
+    setCanvasInitDrawCall: setCanvasInitDrawCall,
+    addCanvasInitDrawCall: addCanvasInitDrawCall,
+    setCanvasWhenCall: setCanvasWhenCall,
+    addCanvasWhenBlock: addCanvasWhenBlock,
+    callTextFromCanvasCall: callTextFromCanvasCall,
+    findInlineCanvasRefs: findInlineCanvasRefs,
+    getHitboxZoneNames: getHitboxZoneNames,
+    modelContentKey: modelContentKey,
+    setCanvasProgramRef: setCanvasProgramRef,
+    addCanvasInitDrawSection: addCanvasInitDrawSection,
+    removeCanvasInitDrawSection: removeCanvasInitDrawSection,
+    removeCanvasInitDrawCall: removeCanvasInitDrawCall,
+    addCanvasWhenCall: addCanvasWhenCall,
+    removeCanvasWhenCall: removeCanvasWhenCall,
+    removeCanvasWhenBlock: removeCanvasWhenBlock,
+    setCanvasWhenMeta: setCanvasWhenMeta
   };
 });

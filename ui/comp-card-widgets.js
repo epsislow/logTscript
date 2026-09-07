@@ -33,6 +33,8 @@
 
   function applyPatch(editor, model, newText, onPatched, internalEditFlag, clearBlockMarker) {
     const span = model.span;
+    const scroll = editor.getScrollInfo();
+    const focusEl = document.activeElement;
     if (clearBlockMarker) clearBlockMarker(model.id);
     if (internalEditFlag) internalEditFlag.value = true;
     try {
@@ -47,6 +49,14 @@
       if (internalEditFlag) internalEditFlag.value = false;
     }
     if (typeof onPatched === 'function') onPatched();
+    requestAnimationFrame(function () {
+      editor.scrollTo(scroll.left, scroll.top);
+      if (focusEl && typeof focusEl.focus === 'function' && focusEl.isConnected) {
+        try { focusEl.focus({ preventScroll: true }); } catch (e) {
+          try { focusEl.focus(); } catch (e2) { /* ignore */ }
+        }
+      }
+    });
   }
 
   function changeTouchesSpan(change, span) {
@@ -237,6 +247,254 @@
     );
   }
 
+  function renderPlcMapSection(model, mapName) {
+    const entries = CCM.getPlcMapEntries(model, mapName);
+    let rows = entries.map(function (e) {
+      return (
+        '<div class="cm-comp-card-nested-row">' +
+        '<input type="text" class="cm-comp-card-plc-sym" data-map="' + escapeHtml(mapName) + '" data-old-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(e.symbol) + '">' +
+        '<input type="text" class="cm-comp-card-plc-target" data-map="' + escapeHtml(mapName) + '" data-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(e.target) + '">' +
+        '<button type="button" class="cm-comp-card-plc-remove" data-map="' + escapeHtml(mapName) + '" data-sym="' + escapeHtml(e.symbol) + '">✕</button>' +
+        '</div>'
+      );
+    }).join('');
+    return (
+      '<div class="cm-comp-card-nested cm-comp-card-nested--plc-map">' +
+      '<div class="cm-comp-card-nested-title">' + escapeHtml(mapName) + '</div>' +
+      '<div class="cm-comp-card-nested-head"><span>symbol</span><span>target</span><span></span></div>' +
+      rows +
+      '<button type="button" class="cm-comp-card-plc-add" data-map="' + escapeHtml(mapName) + '">+ row</button>' +
+      '</div>'
+    );
+  }
+
+  function renderPlcGlobalsSection(model) {
+    const entries = CCM.getPlcGlobalsEntries(model);
+    let rows = entries.map(function (e) {
+      const w = e.width != null && e.width !== 1 ? e.width : '';
+      return (
+        '<div class="cm-comp-card-nested-row">' +
+        '<input type="text" class="cm-comp-card-plc-global-sym" data-old-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(e.symbol) + '">' +
+        '<input type="number" class="cm-comp-card-plc-global-width" data-sym="' + escapeHtml(e.symbol) + '" value="' + escapeHtml(String(w)) + '" placeholder="1">' +
+        '<button type="button" class="cm-comp-card-plc-global-remove" data-sym="' + escapeHtml(e.symbol) + '">✕</button>' +
+        '</div>'
+      );
+    }).join('');
+    return (
+      '<div class="cm-comp-card-nested cm-comp-card-nested--plc-globals">' +
+      '<div class="cm-comp-card-nested-title">globals</div>' +
+      '<div class="cm-comp-card-nested-head"><span>symbol</span><span>width</span><span></span></div>' +
+      rows +
+      '<button type="button" class="cm-comp-card-plc-global-add">+ row</button>' +
+      '</div>'
+    );
+  }
+
+  function renderProgramRefsField(model) {
+    const refs = CCM.getProgramRefs(model);
+    return (
+      '<div class="cm-comp-card-item cm-comp-card-item--program-refs">' +
+      '<span>program</span>' +
+      '<div class="cm-comp-card-attr-field">' +
+      '<input type="text" class="cm-comp-card-program-refs" value="' + escapeHtml(refs.join(' ')) + '" placeholder=".ref1 .ref2">' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderLogicProgramSection(model) {
+    const prog = CCM.getLogicProgram(model);
+    if (!prog) return '';
+    let bindRows = prog.bindings.map(function (b) {
+      return (
+        '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--logic-bind">' +
+        '<input type="text" class="cm-comp-card-logic-var" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.logicVar) + '" readonly>' +
+        '<span class="cm-comp-card-logic-is">is</span>' +
+        '<input type="text" class="cm-comp-card-logic-type" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.bindType) + '">' +
+        '<input type="text" class="cm-comp-card-logic-pin" data-var="' + escapeHtml(b.logicVar) + '" value="' + escapeHtml(b.pinName) + '">' +
+        '<button type="button" class="cm-comp-card-logic-remove" data-var="' + escapeHtml(b.logicVar) + '">✕</button>' +
+        '</div>'
+      );
+    }).join('');
+    let obsRows = prog.observeDefs.map(function (o, idx) {
+      const line = o.rawLine || ('observe ' + o.logicVar);
+      return (
+        '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--logic-obs">' +
+        '<input type="text" class="cm-comp-card-logic-observe" data-obs-idx="' + idx + '" value="' + escapeHtml(line) + '" readonly>' +
+        '</div>'
+      );
+    }).join('');
+    return (
+      '<div class="cm-comp-card-nested cm-comp-card-nested--logic">' +
+      '<div class="cm-comp-card-nested-title">' + escapeHtml(prog.ref) + '</div>' +
+      bindRows +
+      obsRows +
+      '<button type="button" class="cm-comp-card-logic-add">+ binding</button>' +
+      '</div>'
+    );
+  }
+
+  const CANVAS_WHEN_EVENTS = ['press', 'release', 'drag', 'move'];
+
+  function renderWhenHitboxField(w, wi, zoneNames) {
+    const hb = w.hitbox || '';
+    if (zoneNames.length) {
+      let opts = zoneNames.map(function (z) {
+        const sel = z === hb ? ' selected' : '';
+        return '<option value="' + escapeHtml(z) + '"' + sel + '>' + escapeHtml(z) + '</option>';
+      }).join('');
+      if (hb && zoneNames.indexOf(hb) === -1) {
+        opts = '<option value="' + escapeHtml(hb) + '" selected>' + escapeHtml(hb) + ' (not in hitbox)</option>' + opts;
+      }
+      return (
+        '<select class="cm-comp-card-nested-input cm-comp-card-canvas-when-hitbox" data-when="' + wi + '">' +
+        opts + '</select>'
+      );
+    }
+    return (
+      '<input type="text" class="cm-comp-card-nested-input cm-comp-card-canvas-when-hitbox" data-when="' + wi + '" value="' + escapeHtml(hb) + '">'
+    );
+  }
+
+  function renderCanvasProgramSection(model, editor) {
+    const cp = CCM.getCanvasProgram(model);
+    if (!cp) return '';
+    const program = cp.program || {};
+    const zoneNames = CCM.getHitboxZoneNames(model);
+    const inlineRefs = CCM.findInlineCanvasRefs(editor.getValue());
+    const currentRef = cp.ref || '';
+    let refHtml = '<select class="cm-comp-card-canvas-ref cm-comp-card-nested-input">';
+    if (inlineRefs.indexOf(currentRef) === -1 && currentRef) {
+      refHtml += '<option value="' + escapeHtml(currentRef) + '" selected>' + escapeHtml(currentRef) + ' (missing inline)</option>';
+    }
+    inlineRefs.forEach(function (ref) {
+      const sel = ref === currentRef ? ' selected' : '';
+      refHtml += '<option value="' + escapeHtml(ref) + '"' + sel + '>' + escapeHtml(ref) + '</option>';
+    });
+    if (!inlineRefs.length && !currentRef) {
+      refHtml += '<option value="">— no inline [canvas] —</option>';
+    }
+    refHtml += '</select>';
+    const refRowHtml =
+      '<div class="cm-comp-card-canvas-inline-row">' +
+      '<span class="cm-comp-card-canvas-inline-label">inline:</span>' +
+      refHtml +
+      '</div>';
+
+    let initHtml = '';
+    if (program.initDraw != null) {
+      initHtml = (
+        '<div class="cm-comp-card-canvas-block">' +
+        '<div class="cm-comp-card-canvas-block-head">' +
+        '<span class="cm-comp-card-canvas-subtitle">initDraw</span>' +
+        '<button type="button" class="cm-comp-card-canvas-init-section-remove" title="Remove initDraw">✕</button>' +
+        '</div>'
+      );
+      (program.initDraw || []).forEach(function (call, idx) {
+        initHtml += (
+          '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--canvas-call">' +
+          '<input type="text" class="cm-comp-card-nested-input cm-comp-card-canvas-init-call" data-idx="' + idx + '" value="' + escapeHtml(CCM.callTextFromCanvasCall(call)) + '">' +
+          '<button type="button" class="cm-comp-card-canvas-init-remove" data-idx="' + idx + '" title="Remove call">✕</button>' +
+          '</div>'
+        );
+      });
+      initHtml += '<button type="button" class="cm-comp-card-canvas-init-add">+ call</button></div>';
+    } else {
+      initHtml = '<button type="button" class="cm-comp-card-canvas-init-section-add">+ initDraw</button>';
+    }
+
+    let whenHtml = '';
+    (program.whenRenderers || []).forEach(function (w, wi) {
+      let evOpts = CANVAS_WHEN_EVENTS.map(function (ev) {
+        const sel = (w.event || 'press') === ev ? ' selected' : '';
+        return '<option value="' + ev + '"' + sel + '>' + ev + '</option>';
+      }).join('');
+      whenHtml += (
+        '<div class="cm-comp-card-canvas-block" data-when-block="' + wi + '">' +
+        '<div class="cm-comp-card-canvas-block-head cm-comp-card-canvas-when-head">' +
+        '<span class="cm-comp-card-canvas-when-paren">when(</span>' +
+        renderWhenHitboxField(w, wi, zoneNames) +
+        '<select class="cm-comp-card-nested-input cm-comp-card-canvas-when-event" data-when="' + wi + '">' + evOpts + '</select>' +
+        '<span class="cm-comp-card-canvas-when-paren">)</span>' +
+        '<button type="button" class="cm-comp-card-canvas-when-section-remove" data-when="' + wi + '" title="Remove when block">✕</button>' +
+        '</div>'
+      );
+      (w.calls || []).forEach(function (call, ci) {
+        whenHtml += (
+          '<div class="cm-comp-card-nested-row cm-comp-card-nested-row--canvas-call">' +
+          '<input type="text" class="cm-comp-card-nested-input cm-comp-card-canvas-when-call" data-when="' + wi + '" data-call="' + ci + '" value="' + escapeHtml(CCM.callTextFromCanvasCall(call)) + '">' +
+          '<button type="button" class="cm-comp-card-canvas-when-call-remove" data-when="' + wi + '" data-call="' + ci + '" title="Remove call">✕</button>' +
+          '</div>'
+        );
+      });
+      whenHtml += '<button type="button" class="cm-comp-card-canvas-when-call-add" data-when="' + wi + '">+ call</button></div>';
+    });
+    if (zoneNames.length) {
+      whenHtml += '<button type="button" class="cm-comp-card-canvas-when-add">+ when block</button>';
+    }
+
+    return (
+      '<div class="cm-comp-card-nested cm-comp-card-nested--canvas">' +
+      refRowHtml +
+      initHtml + whenHtml +
+      '</div>'
+    );
+  }
+
+  function renderNestedSections(model, editor) {
+    let html = '';
+    if (model.type === 'plc') {
+      if (CCM.getPlcMapEntries(model, 'inputs').length || model.bodyItems.some(function (i) { return i.kind === 'plcMap' && i.name === 'inputs'; })) {
+        html += renderPlcMapSection(model, 'inputs');
+      }
+      if (CCM.getPlcMapEntries(model, 'outputs').length || model.bodyItems.some(function (i) { return i.kind === 'plcMap' && i.name === 'outputs'; })) {
+        html += renderPlcMapSection(model, 'outputs');
+      }
+      if (CCM.getPlcGlobalsEntries(model).length || model.bodyItems.some(function (i) { return i.kind === 'plcGlobals'; })) {
+        html += renderPlcGlobalsSection(model);
+      }
+    }
+    if (model.type === 'logic' && CCM.getLogicProgram(model)) {
+      html += renderLogicProgramSection(model);
+    }
+    if (model.type === 'canvas' && CCM.getCanvasProgram(model)) {
+      html += renderCanvasProgramSection(model, editor);
+    }
+    return html;
+  }
+
+  function appendCanvasCallRow(container, className, attrs, syncOnChange) {
+    const row = document.createElement('div');
+    row.className = 'cm-comp-card-nested-row cm-comp-card-nested-row--canvas-call';
+    row.dataset.pending = '1';
+    let attrStr = '';
+    Object.keys(attrs).forEach(function (k) {
+      attrStr += ' data-' + k + '="' + escapeHtml(String(attrs[k])) + '"';
+    });
+    row.innerHTML =
+      '<input type="text" class="cm-comp-card-nested-input ' + className + '"' + attrStr + ' value="">' +
+      '<button type="button" class="cm-comp-card-canvas-call-remove" title="Remove call">✕</button>';
+    const addBtn = container.querySelector('.cm-comp-card-canvas-init-add, .cm-comp-card-canvas-when-call-add');
+    if (addBtn) container.insertBefore(row, addBtn);
+    else container.appendChild(row);
+    const input = row.querySelector('input');
+    const removeBtn = row.querySelector('.cm-comp-card-canvas-call-remove');
+    input.addEventListener('change', function (e) {
+      row.dataset.pending = '0';
+      syncOnChange(e.target.value, row);
+    });
+    removeBtn.addEventListener('click', function () {
+      if (row.dataset.pending === '1') {
+        row.remove();
+        return;
+      }
+      syncOnChange(null, row);
+    });
+    input.addEventListener('keydown', function (e) { e.stopPropagation(); });
+    bindInputNativeCaret(input);
+    requestAnimationFrame(function () { input.focus(); });
+  }
+
   function buildCardDom(model, registry, catalog, editor, refreshImmediate, internalEditFlag, clearBlockMarker) {
     const div = document.createElement('div');
     div.className = 'cm-comp-card-main';
@@ -249,6 +507,10 @@
     let gridHtml = '<div class="cm-comp-card-grid">';
     gridHtml += renderEqualsField(model);
     explicit.forEach(function (attr) {
+      if (model.type === 'plc' && attr.name === 'program') {
+        gridHtml += renderProgramRefsField(model);
+        return;
+      }
       if (attr.kind === 'segment') {
         gridHtml += renderSegmentField(attr, invalidSet);
       } else {
@@ -256,6 +518,7 @@
       }
     });
     gridHtml += '</div>';
+    gridHtml += renderNestedSections(model, editor);
 
     let addHtml = '';
     if (missing.length) {
@@ -270,7 +533,7 @@
     const viewBtnLabel = model.viewMode === 'source' ? 'Show card' : 'Show source';
 
     div.innerHTML =
-      '<button type="button" class="cm-comp-card-delete" title="Delete comp">❌</button>' +
+      '<button type="button" class="cm-comp-card-delete" title="Delete comp">✕</button>' +
       '<div class="cm-comp-card-header">' +
       '<input type="text" class="cm-comp-card-name-input" value="' + escapeHtml(model.name) + '">' +
       buildTypeSelectHtml(catalog, model.type) +
@@ -363,12 +626,214 @@
       });
     }
 
+    const progRefs = div.querySelector('.cm-comp-card-program-refs');
+    if (progRefs) {
+      progRefs.addEventListener('change', function (e) {
+        const refs = e.target.value.trim().split(/\s+/).filter(Boolean);
+        syncModel(function (m) { return CCM.setProgramRefs(m, refs); });
+      });
+    }
+
+    div.querySelectorAll('.cm-comp-card-plc-target').forEach(function (el) {
+      el.addEventListener('change', function (e) {
+        const mapName = e.target.getAttribute('data-map');
+        const sym = e.target.getAttribute('data-sym');
+        syncModel(function (m) { return CCM.setPlcMapEntry(m, mapName, sym, e.target.value.trim()); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-plc-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const mapName = btn.getAttribute('data-map');
+        syncModel(function (m) { return CCM.addPlcMapEntry(m, mapName, 'NEW', 'wire'); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-plc-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const mapName = btn.getAttribute('data-map');
+        const sym = btn.getAttribute('data-sym');
+        syncModel(function (m) { return CCM.removePlcMapEntry(m, mapName, sym); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-plc-global-width').forEach(function (el) {
+      el.addEventListener('change', function (e) {
+        const sym = e.target.getAttribute('data-sym');
+        const w = e.target.value.trim();
+        syncModel(function (m) {
+          return CCM.setPlcGlobalEntry(m, sym, w === '' ? 1 : parseInt(w, 10));
+        });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-plc-global-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.setPlcGlobalEntry(m, 'NEW', 1); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-plc-global-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.removePlcGlobalEntry(m, btn.getAttribute('data-sym')); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-logic-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.addLogicBinding(m, 'Z', 'number', 'pinZ'); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-logic-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.removeLogicBinding(m, btn.getAttribute('data-var')); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-init-call').forEach(function (el) {
+      el.addEventListener('change', function (e) {
+        const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+        syncModel(function (m) { return CCM.setCanvasInitDrawCall(m, idx, e.target.value); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-init-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const block = btn.closest('.cm-comp-card-canvas-block');
+        const idx = block.querySelectorAll('.cm-comp-card-canvas-init-call').length;
+        appendCanvasCallRow(block, 'cm-comp-card-canvas-init-call', { idx: idx }, function (value, row) {
+          if (value == null) {
+            syncModel(function (m) { return CCM.removeCanvasInitDrawCall(m, idx); });
+            return;
+          }
+          syncModel(function (m) {
+            let nm = m;
+            const cp = CCM.getCanvasProgram(m);
+            const len = cp && cp.program && cp.program.initDraw ? cp.program.initDraw.length : 0;
+            for (let i = len; i < idx; i++) nm = CCM.addCanvasInitDrawCall(nm, '');
+            if (len <= idx) nm = CCM.addCanvasInitDrawCall(nm, value);
+            else nm = CCM.setCanvasInitDrawCall(nm, idx, value);
+            return nm;
+          });
+        });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-init-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = parseInt(btn.getAttribute('data-idx'), 10);
+        syncModel(function (m) { return CCM.removeCanvasInitDrawCall(m, idx); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-init-section-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.addCanvasInitDrawSection(m); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-init-section-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) { return CCM.removeCanvasInitDrawSection(m); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-call').forEach(function (el) {
+      el.addEventListener('change', function (e) {
+        const wi = parseInt(e.target.getAttribute('data-when'), 10);
+        const ci = parseInt(e.target.getAttribute('data-call'), 10);
+        syncModel(function (m) { return CCM.setCanvasWhenCall(m, wi, ci, e.target.value); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-call-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const wi = parseInt(btn.getAttribute('data-when'), 10);
+        const block = btn.closest('.cm-comp-card-canvas-block');
+        const ci = block.querySelectorAll('.cm-comp-card-canvas-when-call').length;
+        appendCanvasCallRow(block, 'cm-comp-card-canvas-when-call', { when: wi, call: ci }, function (value, row) {
+          if (value == null) {
+            syncModel(function (m) { return CCM.removeCanvasWhenCall(m, wi, ci); });
+            return;
+          }
+          syncModel(function (m) {
+            let nm = m;
+            const cp = CCM.getCanvasProgram(m);
+            const w = cp && cp.program && cp.program.whenRenderers[wi];
+            const len = w && w.calls ? w.calls.length : 0;
+            for (let i = len; i < ci; i++) nm = CCM.addCanvasWhenCall(nm, wi, '');
+            if (len <= ci) nm = CCM.addCanvasWhenCall(nm, wi, value);
+            else nm = CCM.setCanvasWhenCall(nm, wi, ci, value);
+            return nm;
+          });
+        });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-call-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const wi = parseInt(btn.getAttribute('data-when'), 10);
+        const ci = parseInt(btn.getAttribute('data-call'), 10);
+        syncModel(function (m) { return CCM.removeCanvasWhenCall(m, wi, ci); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        syncModel(function (m) {
+          const zones = CCM.getHitboxZoneNames(m);
+          const hb = zones.length ? zones[0] : 'zone';
+          return CCM.addCanvasWhenBlock(m, hb, 'press', ['']);
+        });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-section-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const wi = parseInt(btn.getAttribute('data-when'), 10);
+        syncModel(function (m) { return CCM.removeCanvasWhenBlock(m, wi); });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-hitbox').forEach(function (el) {
+      el.addEventListener('change', function (e) {
+        const wi = parseInt(e.target.getAttribute('data-when'), 10);
+        syncModel(function (m) {
+          const cp = CCM.getCanvasProgram(m);
+          const ev = cp && cp.program.whenRenderers[wi] ? cp.program.whenRenderers[wi].event : 'press';
+          return CCM.setCanvasWhenMeta(m, wi, e.target.value.trim(), ev);
+        });
+      });
+    });
+
+    div.querySelectorAll('.cm-comp-card-canvas-when-event').forEach(function (el) {
+      el.addEventListener('change', function (e) {
+        const wi = parseInt(e.target.getAttribute('data-when'), 10);
+        syncModel(function (m) {
+          const cp = CCM.getCanvasProgram(m);
+          const hb = cp && cp.program.whenRenderers[wi] ? cp.program.whenRenderers[wi].hitbox : 'zone';
+          return CCM.setCanvasWhenMeta(m, wi, hb, e.target.value);
+        });
+      });
+    });
+
+    const canvasRefSel = div.querySelector('.cm-comp-card-canvas-ref');
+    if (canvasRefSel) {
+      canvasRefSel.addEventListener('change', function (e) {
+        const ref = e.target.value;
+        if (!ref) return;
+        syncModel(function (m) { return CCM.setCanvasProgramRef(m, ref); });
+      });
+    }
+
     div.querySelectorAll('input, select, textarea, button').forEach(function (el) {
       el.addEventListener('keydown', function (e) { e.stopPropagation(); });
       if (el.tagName === 'SELECT' || el.tagName === 'BUTTON' || el.type === 'checkbox') {
         el.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+      } else if (isCaretEditableInput(el)) {
+        bindInputNativeCaret(el);
       }
-      bindInputNativeCaret(el);
     });
 
     return div;
@@ -407,6 +872,11 @@
     }, true);
 
     document.addEventListener('mouseup', function (e) {
+      if (!nodeInAnyWidget(e.target)) return;
+      markWidgetInteraction();
+    }, true);
+
+    document.addEventListener('focusin', function (e) {
       if (!nodeInAnyWidget(e.target)) return;
       markWidgetInteraction();
     }, true);
@@ -570,6 +1040,7 @@
         lineWidget: lineWidget,
         root: root,
         spanKey: CCM.spanKey(model.span),
+        contentKey: CCM.modelContentKey(model),
         span: blockSpan,
         viewMode: viewMode,
         viewModes: viewModesMap
@@ -604,8 +1075,9 @@
           seen.add(model.id);
           const prev = active.get(model.id);
           const key = CCM.spanKey(model.span);
+          const contentKey = CCM.modelContentKey(model);
           const desiredMode = viewModes.get(model.id) || 'card';
-          if (prev && prev.spanKey === key && prev.viewMode === desiredMode) {
+          if (prev && prev.spanKey === key && prev.viewMode === desiredMode && prev.contentKey === contentKey) {
             ensureCollapseMarker(prev, model, desiredMode);
             return;
           }

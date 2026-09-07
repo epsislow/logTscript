@@ -16,14 +16,15 @@
 
 .cm-comp-card-delete {
   position: absolute;
-  right: -3px;
-  top: -3px;
+  right: -1px;
+  top: -2px;
   background: transparent;
   border: none;
   padding: 0;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
+  color:#777;
 }
 
 .cm-comp-card-header {
@@ -121,7 +122,7 @@
 
 .cm-comp-card-attr-input,
 .cm-comp-card-equals-input {
-  border: 2px solid #ea580c;
+  border: none;
   border-radius: 4px;
   padding: 2px 4px;
   font-weight: bold;
@@ -159,7 +160,7 @@
   flex: 0 0 auto;
   background: transparent;
   border: none;
-  color: #f55;
+  color: #777;
   cursor: pointer;
   font-size: 12px;
   padding: 0 2px;
@@ -200,4 +201,176 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.cm-comp-card-nested {
+  border: 1px solid #335533;
+  margin: 8px 0;
+  padding: 8px;
+  background: #001a00;
+}
+
+.cm-comp-card-nested-title {
+  font-weight: bold;
+  color: #8cf;
+  margin-bottom: 6px;
+}
+
+.cm-comp-card-nested-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr 24px;
+  gap: 4px;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.cm-comp-card-nested-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 24px;
+  gap: 4px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+
+.cm-comp-card-nested-row--canvas-call {
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.cm-comp-card-nested-input,
+.cm-comp-card-nested-row input,
+.cm-comp-card-nested-row select,
+.cm-comp-card-canvas-ref {
+  border: none;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-weight: bold;
+  background-color: #000;
+  color: #0f0;
+  font-family: monospace;
+  font-size: 13px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.cm-comp-card-canvas-ref {
+  margin-bottom: 0;
+  color: #8cf;
+  font-weight: bold;
+}
+
+.cm-comp-card-canvas-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cm-comp-card-canvas-inline-label {
+  color: #9cf;
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.cm-comp-card-canvas-inline-row .cm-comp-card-canvas-ref {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.cm-comp-card-canvas-block {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #335533;
+}
+
+.cm-comp-card-canvas-block-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.cm-comp-card-canvas-when-head input {
+  flex: 1 1 80px;
+  max-width: 120px;
+}
+
+.cm-comp-card-canvas-when-head select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 72px;
+}
+
+.cm-comp-card-canvas-block-head button.cm-comp-card-canvas-init-remove,
+.cm-comp-card-canvas-block-head button.cm-comp-card-canvas-when-section-remove,
+.cm-comp-card-canvas-block-head button.cm-comp-card-canvas-init-section-remove,
+.cm-comp-card-nested-row--canvas-call button.cm-comp-card-canvas-init-remove,
+.cm-comp-card-nested-row--canvas-call button.cm-comp-card-canvas-when-call-remove,
+.cm-comp-card-nested-row--canvas-call button.cm-comp-card-canvas-call-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: #777;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  margin-top: 0;
+}
+
+.cm-comp-card-plc-add,
+.cm-comp-card-plc-global-add,
+.cm-comp-card-logic-add,
+.cm-comp-card-canvas-init-add,
+.cm-comp-card-canvas-when-call-add,
+.cm-comp-card-canvas-when-add,
+.cm-comp-card-canvas-init-section-add {
+  font-size: 11px;
+  padding: 2px 3px;
+  margin-top: 4px;
+  background: #111;
+  color: #aaa;
+  border: 1px solid #444;
+  cursor: pointer;
+}
+
+.cm-comp-card-canvas-subtitle {
+  font-size: 15px;
+  color: #9cf;
+  margin: 0;
+}
+
+.cm-comp-card-canvas-when-paren {
+  color: #9cf;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.cm-comp-card-canvas-when-hitbox {
+  color: #ff0;
+  font-weight: bold;
+}
+
+.cm-comp-card-nested-row--logic-bind {
+  grid-template-columns: 60px 20px 70px 1fr 24px;
+}
+
+.cm-comp-card-nested-row--logic-obs {
+  grid-template-columns: 1fr;
+}
+
+.cm-comp-card-nested-row:not(.cm-comp-card-nested-row--canvas-call):not(.cm-comp-card-nested-row--logic-bind):not(.cm-comp-card-nested-row--logic-obs) input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cm-comp-card-logic-is {
+  text-align: center;
+  color: #888;
 }

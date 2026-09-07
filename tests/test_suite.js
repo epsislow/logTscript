@@ -53349,6 +53349,66 @@ probe(outX)`;
     h.assert('color invalid', String(invalid.includes('color')), 'true');
   });
 
+  reg(4909, 'cm-comp-card', 'plc inputs/outputs map round-trip', function(h, session) {
+    const src = 'inline [plc] .m:\n  :\n\ncomp [plc] .ctrl:\n  program: .m\n  inputs: {\n    START = startIn\n    STOP = .stop\n  }\n  outputs: {\n    MOTOR = motorOut\n  }\n  globals: {\n    READY\n    STEP: 8\n  }\n  :';
+    let blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const plc = blocks.find(function (b) { return b.name === '.ctrl'; });
+    h.assert('plc found', !!plc, true);
+    h.assert('inputs parsed', String(CCM.getPlcMapEntries(plc, 'inputs').length), '2');
+    h.assert('outputs parsed', String(CCM.getPlcMapEntries(plc, 'outputs').length), '1');
+    h.assert('globals parsed', String(CCM.getPlcGlobalsEntries(plc).length), '2');
+    let next = CCM.setPlcMapEntry(plc, 'inputs', 'START', 'startBtn');
+    next = CCM.setPlcMapEntry(next, 'outputs', 'MOTOR', '.motorWire');
+    next = CCM.addPlcMapEntry(next, 'inputs', 'EMERG', 'eStop');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('START remapped', String(out.includes('START = startBtn')), 'true');
+    h.assert('EMERG added', String(out.includes('EMERG = eStop')), 'true');
+    h.assert('globals STEP', String(out.includes('STEP: 8')), 'true');
+    blocks = CCM.parseCompBlocks(out, cmReg(session));
+    const reparsed = blocks.find(function (b) { return b.name === '.ctrl'; });
+    h.assert('inputs after reparse', String(CCM.getPlcMapEntries(reparsed, 'inputs').length), '3');
+    h.assert('program refs', CCM.getProgramRefs(reparsed).join(' '), '.m');
+  });
+
+  reg(4910, 'cm-comp-card', 'logic program block body preserved', function(h, session) {
+    const src = 'inline [logic] .character:\n  query modifier: modifier2(X,Y)\n:\n\ncomp [logic] .characterLogic:\n  on: 1\n  .character {\n    X is number myX\n    Name is text myName\n    observe spotX$ is number xPin\n  }\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const logic = blocks.find(function (b) { return b.name === '.characterLogic'; });
+    const prog = CCM.getLogicProgram(logic);
+    h.assert('logic program', !!prog, true);
+    h.assert('bindings count', String(prog.bindings.length), '2');
+    h.assert('observe count', String(prog.observeDefs.length), '1');
+    const next = CCM.addLogicBinding(logic, 'Y', 'number', 'myY');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('Y added', String(out.includes('Y is number myY')), 'true');
+    h.assert('observe kept', String(out.includes('observe spotX$ is number xPin')), 'true');
+    h.assert('Name kept', String(out.includes('Name is text myName')), 'true');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session)).find(function (b) { return b.name === '.characterLogic'; });
+    h.assert('bindings after reparse', String(CCM.getLogicProgram(reparsed).bindings.length), '3');
+  });
+
+  reg(4911, 'cm-comp-card', 'canvas program block round-trip multiline initDraw when', function(h, session) {
+    const src = 'inline [canvas] .ui:\n  :\n\ncomp [canvas] .panel:\n  width: 320\n  height: 240\n  .ui {\n    initDraw {\n      drawTrack(0, 0, 320, 40)\n      drawBtn(10, 10, 30, 30, "333333")\n    }\n    renderer when(btn:press) {\n      drawBtn(10, 10, 30, 30, "ff0000")\n    }\n    renderer when(slider:drag) {\n      drawKnob(eventX, eventY)\n      drawValue(eventX, 200)\n    }\n  }\n  :';
+    const blocks = CCM.parseCompBlocks(src, cmReg(session));
+    const canvas = blocks.find(function (b) { return b.name === '.panel'; });
+    const cp = CCM.getCanvasProgram(canvas);
+    h.assert('canvas program', !!cp, true);
+    h.assert('initDraw calls', String(cp.program.initDraw.length), '2');
+    h.assert('when blocks', String(cp.program.whenRenderers.length), '2');
+    h.assert('slider drag', String(cp.program.whenRenderers[1].event), 'drag');
+    const whenCallText = cp.program.whenRenderers[1].calls[0];
+    h.assert('eventX in when call', String(String(whenCallText).includes('eventX')), 'true');
+    h.assert('eventY in when call', String(String(whenCallText).includes('eventY')), 'true');
+    let next = CCM.setCanvasInitDrawCall(canvas, 0, 'drawTrack(0, 0, 320, 50)');
+    next = CCM.addCanvasInitDrawCall(next, 'drawLabel(50, 20, "Go")');
+    const out = CCM.serializeCompBlock(next);
+    h.assert('initDraw patched', String(out.includes('drawTrack(0, 0, 320, 50)')), 'true');
+    h.assert('label added', String(out.includes('drawLabel(50, 20, "Go")')), 'true');
+    h.assert('when kept', String(out.includes('renderer when(slider:drag)')), 'true');
+    const reparsed = CCM.parseCompBlocks(out, cmReg(session)).find(function (b) { return b.name === '.panel'; });
+    h.assert('initDraw after reparse', String(CCM.getCanvasProgram(reparsed).program.initDraw.length), '3');
+  });
+
   reg(4916, 'cm-comp-card', 'type change key→switch single block no attr dup', function(h, session) {
     const src = 'comp [key] .draw2ndTrack:\n    label:\'2\'\n    size: 35\n    on:1\n    :\n\n1wire sliderPressed := .panel:sliderPressed';
     const blocks = CCM.parseCompBlocks(src, cmReg(session));
