@@ -2053,6 +2053,22 @@ class Interpreter {
       return this.evalAsmDecode(inlineInst, args[0]);
     }
 
+    if (inlineInst && inlineInst.kind === 'parser' && method === 'parseText') {
+      const parseFn = typeof parseGrammar === 'function' ? parseGrammar : null;
+      if (!parseFn) throw new Error('Parser engine is not loaded');
+      const srcArg = args[0];
+      const srcText = srcArg != null ? String(srcArg) : '';
+      const grammar = { tokens: inlineInst.tokens || [], rules: inlineInst.rules || [] };
+      const startRule = args[1] != null ? String(args[1]) : undefined;
+      const result = parseFn(grammar, srcText, startRule ? { startRule } : undefined);
+      if (!result.ok) {
+        const err = result.error || {};
+        return 'parse error (' + (err.kind || 'syntax') + ' at ' + err.line + ':' + err.col + '): ' + (err.message || '');
+      }
+      const fmt = typeof formatParseTree === 'function' ? formatParseTree : null;
+      return fmt ? fmt(result.tree) : JSON.stringify(result.tree);
+    }
+
     throw new Error(`Unknown method '${method}' for ${instName}`);
   }
 

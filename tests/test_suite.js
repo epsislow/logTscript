@@ -54032,6 +54032,148 @@ rule statement = assignStmt | exprStmt;
     h.assert('CallVariable', factor.alternatives[2].call, 'CallVariable');
   });
 
+  const INLINE_PARSER_STMTS = `
+token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+rule expression = ID;
+rule assignStmt = ID "=" expression ";";
+rule exprStmt = expression ";";
+rule statement = assignStmt | exprStmt;
+`;
+
+  const INLINE_PARSER_VALUES = `
+token INT = [0-9]+;
+token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+rule value
+    = ID "(" expression ")" -> CallFunction
+    | ID -> CallVariable;
+rule expression = value | INT -> CallNumber;
+`;
+
+  function parserCalcGrammar() {
+    return parseParserBody(INLINE_PARSER_BODY.trim());
+  }
+
+  function parserTreeCall(tree, name) {
+    if (!tree) return null;
+    if (tree.kind === 'call' && tree.call === name) return tree;
+    if (tree.kind === 'repeat') {
+      for (let i = 0; i < tree.items.length; i++) {
+        const f = parserTreeCall(tree.items[i], name);
+        if (f) return f;
+      }
+    }
+    if (tree.kind === 'optional' && tree.present) return parserTreeCall(tree.value, name);
+    if (tree.kind === 'call') {
+      if (tree.children) {
+        const keys = Object.keys(tree.children);
+        for (let i = 0; i < keys.length; i++) {
+          const f = parserTreeCall(tree.children[keys[i]], name);
+          if (f) return f;
+        }
+      }
+      if (tree.captures) {
+        const keys = Object.keys(tree.captures);
+        for (let i = 0; i < keys.length; i++) {
+          const f = parserTreeCall(tree.captures[keys[i]], name);
+          if (f) return f;
+        }
+      }
+    }
+    return null;
+  }
+
+  reg(4991, 'parser', 'engine precedence 1+2*3 tree', function(h) {
+    const g = parserCalcGrammar();
+    const r = parseGrammar(g, '1+2*3', { startRule: 'expression' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('root CallAdd', r.tree.call, 'CallAdd');
+    h.assert('right CallMul', r.tree.children.right.call, 'CallMul');
+    h.assert('left num', r.tree.children.left.children.value, '1');
+  });
+
+  reg(4992, 'parser', 'engine backtrack assign vs expr stmt', function(h) {
+    const g = parseParserBody(INLINE_PARSER_STMTS);
+    const a = parseGrammar(g, 'x=x;', { startRule: 'statement' });
+    const e = parseGrammar(g, 'x;', { startRule: 'statement' });
+    h.assert('assign ok', String(a.ok), '1');
+    h.assert('expr ok', String(e.ok), '1');
+    h.assert('assign token', a.tree.text, 'x');
+    h.assert('expr token', e.tree.text, 'x');
+  });
+
+  reg(4993, 'parser', 'engine specific before general value', function(h) {
+    const g = parseParserBody(INLINE_PARSER_VALUES);
+    const fn = parseGrammar(g, 'foo(1)', { startRule: 'expression' });
+    const id = parseGrammar(g, 'foo', { startRule: 'expression' });
+    h.assert('fn ok', String(fn.ok), '1');
+    h.assert('var ok', String(id.ok), '1');
+    h.assert('CallFunction', fn.tree.call, 'CallFunction');
+    h.assert('CallVariable', id.tree.call, 'CallVariable');
+  });
+
+  reg(4994, 'parser', 'engine lex fail at', function(h) {
+    const g = parseParserBody('token INT = [0-9]+; rule n = INT;');
+    const r = parseGrammar(g, '@', { startRule: 'n' });
+    h.assert('ok', String(r.ok), '0');
+    h.assert('kind lex', r.error.kind, 'lex');
+  });
+
+  reg(4995, 'parser', 'engine syntax fail incomplete', function(h) {
+    const g = parserCalcGrammar();
+    const r = parseGrammar(g, 'x=', { startRule: 'statement' });
+    h.assert('ok', String(r.ok), '0');
+    h.assert('kind syntax', r.error.kind, 'syntax');
+  });
+
+  reg(4996, 'parser', 'engine quantifiers on statement list', function(h) {
+    const g = parserCalcGrammar();
+    const r = parseGrammar(g, 'x=1;', { startRule: 'program' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('repeat plus', r.tree.kind, 'repeat');
+    h.assert('quant plus', r.tree.quant, '+');
+    h.assert('one stmt', r.tree.items.length, 1);
+  });
+
+  reg(4997, 'parser', 'engine program multi statement', function(h) {
+    const g = parserCalcGrammar();
+    const r = parseGrammar(g, 'x=1;y=2;', { startRule: 'program' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('two stmts', r.tree.items.length, 2);
+    h.assert('first assign', r.tree.items[0].call, 'CallAssign');
+    h.assert('second assign', r.tree.items[1].call, 'CallAssign');
+  });
+
+  reg(4998, 'parser', 'engine captures on CallAssign', function(h) {
+    const g = parserCalcGrammar();
+    const r = parseGrammar(g, 'a=42;', { startRule: 'statement' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('call', r.tree.call, 'CallAssign');
+    h.assert('name capture', r.tree.captures.name.text, 'a');
+    h.assert('value num', parserTreeCall(r.tree.captures.value, 'CallNumber').children.value, '42');
+  });
+
+  reg(4999, 'parser', 'engine strict trailing garbage', function(h) {
+    const g = parserCalcGrammar();
+    const r = parseGrammar(g, '1+2 xxx', { startRule: 'expression' });
+    h.assert('ok', String(r.ok), '0');
+    h.assert('kind syntax', r.error.kind, 'syntax');
+  });
+
+  reg(5000, 'parser', 'engine calcLang smoke assign expression', function(h, session) {
+    session.run(INLINE_PARSER_CALC);
+    const inst = session.interp.inlineInstances.get('.calcLang');
+    const g = { tokens: inst.tokens, rules: inst.rules };
+    const r = parseGrammar(g, 'n=1+2*3;', { startRule: 'program' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('repeat', r.tree.kind, 'repeat');
+    const assign = r.tree.items[0];
+    h.assert('CallAssign', assign.call, 'CallAssign');
+    h.assert('name n', assign.captures.name.text, 'n');
+    const add = parserTreeCall(assign.captures.value, 'CallAdd');
+    h.assert('inner CallAdd', add != null, true);
+    h.assert('mul inside', add.children.right.call, 'CallMul');
+  });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

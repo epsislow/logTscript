@@ -16,6 +16,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Comments** | `#` to end of line |
 | **Captures** | `$name:Symbol` — binds a matched subtree (token or rule) |
 | **Calls** | `-> CallName` at end of a rule alternative (for interpreter dispatch) |
+| **Runtime parse** | `.lang:parseText(source)` — parse source text with the stored grammar (see [Parse engine](#parse-engine)) |
 | **Doc** | `doc(inline.parser)`, `doc(.myLang)` |
 
 ---
@@ -317,6 +318,227 @@ An empty body is valid — zero tokens and zero rules.
 | Wildcard `.` in token regex | Assembler error — use `[.]` |
 | Empty rule alternative | Assembler error |
 | Unknown symbol in rule | Assembler error |
+
+---
+
+## Parse engine
+
+After a grammar is loaded, the **parse engine** reads source text with the declared **tokens** and **rules**, and builds an internal **parse tree** (a structured match result). This tree is an implementation detail used when assembling typed AST wires elsewhere; it is exposed for inspection via **`:parseText`**.
+
+### Pipeline
+
+```text
+source text
+    │
+    ▼
+lexer (token regexes, skip whitespace, longest match)
+    │
+    ▼
+recursive-descent parser (ordered choice + backtrack)
+    │
+    ▼
+parse tree (internal)
+```
+
+| Stage | Behaviour |
+|-------|-----------|
+| **Lexer** | Skips spaces, tabs, and newlines between tokens. On conflict, **longest match** wins; equal length uses token declaration order. |
+| **Rules** | Alternatives `\|` are tried top-to-bottom; first full match wins; partial failures **backtrack**. |
+| **Left recursion** | Patterns like `expression = expression "+" term \| term` run as an internal loop (left-associative folds), not as infinite recursion. |
+| **Strict parse** | Success requires the **entire** input to be consumed. Trailing text → syntax error. |
+| **`-> CallName`** | Creates a `call` node. Name is kept **as written** (e.g. `CallAdd`, not shortened). |
+| **No `->`** | **Passthrough** — the matched child subtree is returned without a wrapper (e.g. `\| term`, parentheses). |
+| **`$field:Symbol`** | Stored under `captures` on the enclosing `call` node. |
+| **`rule+` / `*`** | `{ kind: "repeat", quant: "+", items: [...] }` (or `"*"` — may be empty). |
+| **`rule?`** | `{ kind: "optional", present: true/false, value: ... }`. |
+
+### Inspecting with `:parseText`
+
+**Load** loads the grammar. **Load & Run** parses sample strings and prints the tree via `show()`.
+
+Start rule defaults to the **first `rule`** in the grammar. Pass a second argument to override:
+
+```logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+show(.calcLang:parseText("n=1+2*3;"))
+```
+
+Expected tree (abbreviated):
+
+```text
+repeat(+):
+  call CallAssign:
+    $name:
+      token ID "n"
+    $value:
+      call CallAdd:
+        left:
+          call CallNumber: value "1"
+        right:
+          call CallMul:
+            left: call CallNumber: value "2"
+            right: call CallNumber: value "3"
+```
+
+### Precedence — expression only
+
+Use a **start rule** argument to parse a fragment:
+
+```logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+show(.calcLang:parseText("1+2*3", "expression"))
+```
+
+Root call is **`CallAdd`**; the right child is **`CallMul`** (`1 + (2 * 3)`).
+
+### Passthrough — no wrapper without `->`
+
+Alternatives without `->` return the inner subtree directly. Parentheses do not create a node:
+
+```logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber;
+
+:
+
+show(.calcLang:parseText("(1+2)", "expression"))
+```
+
+The tree is a **`CallAdd`** — no `Parens` or `expression` wrapper.
+
+### Ordered choice and backtrack
+
+```logts-play
+inline [parser] .stmts:
+
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule expression = ID;
+
+    rule assignStmt = ID "=" expression ";";
+    rule exprStmt   = expression ";";
+
+    rule statement = assignStmt | exprStmt;
+
+:
+
+show(.stmts:parseText("x=x;", "statement"))
+show(.stmts:parseText("x;", "statement"))
+```
+
+Both succeed. The first matches **`assignStmt`**; the second tries **`assignStmt`**, fails at `"="`, backtracks to **`exprStmt`**.
+
+### Quantifiers — `program = statement+`
+
+```logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor = INT -> CallNumber;
+
+:
+
+show(.calcLang:parseText("a=1;b=2;"))
+```
+
+Root is **`repeat(+)`** with **two** `CallAssign` items.
+
+### Parse errors
+
+| Situation | Result |
+|-----------|--------|
+| Unrecognized character (e.g. `@`) | `parse error (lex at …)` |
+| Incomplete input (e.g. `x=`) | `parse error (syntax at …)` |
+| Trailing garbage (e.g. `1+2 xxx`) | `parse error (syntax at …)` — strict consume |
+
+```logts-play
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule main = INT -> CallNumber;
+:
+
+show(.mini:parseText("@"))
+show(.mini:parseText("1+2 xxx"))
+```
 
 ---
 

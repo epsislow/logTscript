@@ -24550,6 +24550,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Comments** | \`#\` to end of line |
 | **Captures** | \`$name:Symbol\` — binds a matched subtree (token or rule) |
 | **Calls** | \`-> CallName\` at end of a rule alternative (for interpreter dispatch) |
+| **Runtime parse** | \`.lang:parseText(source)\` — parse source text with the stored grammar (see [Parse engine](#parse-engine)) |
 | **Doc** | \`doc(inline.parser)\`, \`doc(.myLang)\` |
 
 ---
@@ -24851,6 +24852,227 @@ An empty body is valid — zero tokens and zero rules.
 | Wildcard \`.\` in token regex | Assembler error — use \`[.]\` |
 | Empty rule alternative | Assembler error |
 | Unknown symbol in rule | Assembler error |
+
+---
+
+## Parse engine
+
+After a grammar is loaded, the **parse engine** reads source text with the declared **tokens** and **rules**, and builds an internal **parse tree** (a structured match result). This tree is an implementation detail used when assembling typed AST wires elsewhere; it is exposed for inspection via **\`:parseText\`**.
+
+### Pipeline
+
+\`\`\`text
+source text
+    │
+    ▼
+lexer (token regexes, skip whitespace, longest match)
+    │
+    ▼
+recursive-descent parser (ordered choice + backtrack)
+    │
+    ▼
+parse tree (internal)
+\`\`\`
+
+| Stage | Behaviour |
+|-------|-----------|
+| **Lexer** | Skips spaces, tabs, and newlines between tokens. On conflict, **longest match** wins; equal length uses token declaration order. |
+| **Rules** | Alternatives \`\\|\` are tried top-to-bottom; first full match wins; partial failures **backtrack**. |
+| **Left recursion** | Patterns like \`expression = expression "+" term \\| term\` run as an internal loop (left-associative folds), not as infinite recursion. |
+| **Strict parse** | Success requires the **entire** input to be consumed. Trailing text → syntax error. |
+| **\`-> CallName\`** | Creates a \`call\` node. Name is kept **as written** (e.g. \`CallAdd\`, not shortened). |
+| **No \`->\`** | **Passthrough** — the matched child subtree is returned without a wrapper (e.g. \`\\| term\`, parentheses). |
+| **\`$field:Symbol\`** | Stored under \`captures\` on the enclosing \`call\` node. |
+| **\`rule+\` / \`*\`** | \`{ kind: "repeat", quant: "+", items: [...] }\` (or \`"*"\` — may be empty). |
+| **\`rule?\`** | \`{ kind: "optional", present: true/false, value: ... }\`. |
+
+### Inspecting with \`:parseText\`
+
+**Load** loads the grammar. **Load & Run** parses sample strings and prints the tree via \`show()\`.
+
+Start rule defaults to the **first \`rule\`** in the grammar. Pass a second argument to override:
+
+\`\`\`logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+show(.calcLang:parseText("n=1+2*3;"))
+\`\`\`
+
+Expected tree (abbreviated):
+
+\`\`\`text
+repeat(+):
+  call CallAssign:
+    $name:
+      token ID "n"
+    $value:
+      call CallAdd:
+        left:
+          call CallNumber: value "1"
+        right:
+          call CallMul:
+            left: call CallNumber: value "2"
+            right: call CallNumber: value "3"
+\`\`\`
+
+### Precedence — expression only
+
+Use a **start rule** argument to parse a fragment:
+
+\`\`\`logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+show(.calcLang:parseText("1+2*3", "expression"))
+\`\`\`
+
+Root call is **\`CallAdd\`**; the right child is **\`CallMul\`** (\`1 + (2 * 3)\`).
+
+### Passthrough — no wrapper without \`->\`
+
+Alternatives without \`->\` return the inner subtree directly. Parentheses do not create a node:
+
+\`\`\`logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber;
+
+:
+
+show(.calcLang:parseText("(1+2)", "expression"))
+\`\`\`
+
+The tree is a **\`CallAdd\`** — no \`Parens\` or \`expression\` wrapper.
+
+### Ordered choice and backtrack
+
+\`\`\`logts-play
+inline [parser] .stmts:
+
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule expression = ID;
+
+    rule assignStmt = ID "=" expression ";";
+    rule exprStmt   = expression ";";
+
+    rule statement = assignStmt | exprStmt;
+
+:
+
+show(.stmts:parseText("x=x;", "statement"))
+show(.stmts:parseText("x;", "statement"))
+\`\`\`
+
+Both succeed. The first matches **\`assignStmt\`**; the second tries **\`assignStmt\`**, fails at \`"="\`, backtracks to **\`exprStmt\`**.
+
+### Quantifiers — \`program = statement+\`
+
+\`\`\`logts-play
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor = INT -> CallNumber;
+
+:
+
+show(.calcLang:parseText("a=1;b=2;"))
+\`\`\`
+
+Root is **\`repeat(+)\`** with **two** \`CallAssign\` items.
+
+### Parse errors
+
+| Situation | Result |
+|-----------|--------|
+| Unrecognized character (e.g. \`@\`) | \`parse error (lex at …)\` |
+| Incomplete input (e.g. \`x=\`) | \`parse error (syntax at …)\` |
+| Trailing garbage (e.g. \`1+2 xxx\`) | \`parse error (syntax at …)\` — strict consume |
+
+\`\`\`logts-play
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule main = INT -> CallNumber;
+:
+
+show(.mini:parseText("@"))
+show(.mini:parseText("1+2 xxx"))
+\`\`\`
 
 ---
 
@@ -49790,17 +50012,22 @@ Within one script, referenced schemas must be defined in the same unit (or loade
 
 ---
 
-## Recursive schemas (\`bound\` and union \`?\`)
+## Recursive schemas (\`bound\`, \`presence_mask\`, optional \`?\`)
 
-For **tree-shaped** data (expression ASTs, tagged unions, recursive structures), schemas combine three features:
+For **tree-shaped** data (expression ASTs, optional branches, recursive structures), schemas combine:
 
 | Syntax | Meaning |
 |--------|---------|
-| \`field: bound <schema>\` | **Bit-bounded substream** — each instance is a **16-bit unsigned length** prefix followed by the payload bits for one \`<schema>\` instance |
-| \`branch?: <schema>\` | **Union variant** — optional field name with \`?\`; exactly **one** branch may be present at that level in a literal or on the wire |
-| \`branch?: <schema>: … :\` | **Inline sugar** — same as a separate \`<schema>:\` block plus the union field (only when the field is optional with \`?\`) |
+| \`<name>+:\` | Schema instances start with a **\`presence_mask\`** — one bit per optional (\`?\`) field, in declaration order (first \`?\` = bit 0) |
+| \`field?: <schema>\` | **Optional field** on a \`<name>+:\` schema — bit \`0\` = absent (0 payload bits); bit \`1\` = present (payload follows) |
+| \`field?: bound <schema>\` | Optional field whose payload is **variable-width** — \`bound\` is required when the referenced schema is not fixed-width |
+| \`field: bound <schema>\` | **Bit-bounded substream** — 16-bit unsigned length prefix + one \`<schema>\` instance |
+| \`field: bound <schema>[min-max]\` | **Variable-length list** of bounded elements — each element has its own 16-bit length prefix |
+| \`branch?: <schema>: … :\` | **Inline sugar** — same as a separate \`<schema>:\` block plus the optional field |
 
-**Nested fixed-width** composition (\`field:<schema>\` without \`bound\`) is unchanged — same fixed bit layout and access paths as before.
+**Nested fixed-width** composition (\`field:<schema>\` without \`bound\`) is unchanged.
+
+Optional fields on a plain \`<name>:\` schema (without \`+\`) are rejected at parse time — use \`<name>+:\` when you need \`?\`.
 
 ### Minimal expression tree
 
@@ -49814,17 +50041,17 @@ For **tree-shaped** data (expression ASTs, tagged unions, recursive structures),
     right: bound <expr>
 :
 
-<expr>:
+<expr>+:
     number?: <number>
-    add?: <add>
+    add?: bound <add>
 :
 \`\`\`
 
-- **\`bound <expr>\`** on \`left\` / \`right\` allows recursive children; self-reference requires \`bound\` (fixed nested refs cannot flatten a recursive type).
-- **Union \`?\`** on \`number?\` / \`add?\` — wire layout is **4-bit variant tag** + payload. A literal must fill **one** branch only.
-- Nested grouped literals use the **schema tag** on each group: \`{ value=\\2 }<number>\`, \`{ … }<add>\`, \`{ … }<expr>\`.
+- **\`bound <expr>\`** on \`left\` / \`right\` allows recursive children; self-reference requires \`bound\`.
+- **\`presence_mask\`** on \`<expr>+\` — two bits for \`number?\` and \`add?\`. Example: mask \`10\` = number only; \`01\` = add only; \`11\` = both.
+- Variable-width optional branches use **\`bound\`** (e.g. \`add?: bound <add>\`).
 
-**Load & Run** — number leaf, then a small \`add\` tree; read a deep field:
+**Load & Run** — number leaf, add tree, deep field read:
 
 \`\`\`logts-play
 <number>:
@@ -49836,13 +50063,13 @@ For **tree-shaped** data (expression ASTs, tagged unions, recursive structures),
     right: bound <expr>
 :
 
-<expr>:
+<expr>+:
     number?: <number>
-    add?: <add>
+    add?: bound <add>
 :
 
-12wire<expr> num = { number={ value=\\2 }<number> }<expr>
-60wire<expr> tree = {
+10wire<expr> num = { number={ value=\\2 }<number> }<expr>
+70wire<expr> tree = {
     add={
         left={ number={ value=\\2 }<number> }<expr>
         right={ number={ value=\\3 }<number> }<expr>
@@ -49852,81 +50079,153 @@ For **tree-shaped** data (expression ASTs, tagged unions, recursive structures),
 show(tree)
 \`\`\`
 
-After **Load & Run**: \`num\` is 12 bits (tag + 8-bit payload); \`tree\` is 60 bits; \`leftVal\` reads \`00000010\` (decimal 2). **Output** shows the nested \`add\` / \`number\` / \`value\` tree from \`show(tree)\`.
+After **Load & Run**: \`num\` is 10 bits (mask \`10\` + 8-bit value); \`tree\` is 70 bits; \`leftVal\` is \`00000010\`. **Output** shows the nested tree.
 
-Same script under **wave** propagation (\`logts-play wave\` badge) produces the same field values.
+**Load & Run** (wave) — same field values under wave propagation:
 
-### Inline sugar (equivalent blocks)
+\`\`\`logts-play wave
+<number>:
+    value: 8
+:
 
-These two forms are equivalent:
-
-\`\`\`logts
 <add>:
     left: bound <expr>
     right: bound <expr>
 :
 
-<expr>:
+<expr>+:
     number?: <number>
-    add?: <add>
+    add?: bound <add>
 :
+
+10wire<expr> num = { number={ value=\\2 }<number> }<expr>
+70wire<expr> tree = {
+    add={
+        left={ number={ value=\\2 }<number> }<expr>
+        right={ number={ value=\\3 }<number> }<expr>
+    }<add>
+}<expr>
+8wire leftVal = tree:add:left:number:value
+show(leftVal; dec)
 \`\`\`
 
-\`\`\`logts
-<expr>:
-    number?: <number>: value: 8 :
-    add?: <add>: left: bound <expr>  right: bound <expr> :
-:
-\`\`\`
+### Multiple optional fields populated
 
-**Load & Run** — inline sugar packs the same bits as separate blocks:
+Independent optional fields may both be present — the mask reflects which payloads follow:
 
 \`\`\`logts-play
 <number>:
     value: 8
 :
 
-<expr>:
-    number?: <number>: value: 8 :
-    add?: <add>: left: bound <expr>  right: bound <expr> :
+<twoNumbers>+:
+    add?: <number>
+    sub?: <number>
 :
 
-12wire<expr> ast = { number={ value=\\5 }<number> }<expr>
+18wire<twoNumbers> both = {
+    add={ value=\\7 }<number>
+    sub={ value=\\3 }<number>
+}<twoNumbers>
+show(both)
 \`\`\`
 
-### Union rules and errors
+Mask \`11\` + two 8-bit payloads = 18 bits total.
 
-| Rule | Detail |
-|------|--------|
-| One branch per level | \`{ number=… add=… }<expr>\` with both branches set → error |
-| Tag on wire | 4-bit variant index (declaration order of \`?\` fields) |
-| \`bound\` prefix | 16-bit unsigned bit length before each bounded payload |
-| Field access | Full path through union and bound layers, e.g. \`tree:add:left:number:value\` |
-| \`show(wire)\` | Indented tree with active union branch and nested bounded children |
+### Empty wire and \`show\`
 
-**Load & Run** — union rejects two branches at once (expect an error in **Output**):
+A zero-filled wire decodes as mask \`00…\` (no optional fields present):
 
-\`\`\`logts
+\`\`\`logts-play
 <number>:
     value: 8
 :
 
+<twoNumbers>+:
+    add?: <number>
+    sub?: <number>
+:
+
+2wire<twoNumbers> empty = 00
+show(empty; <twoNumbers>)
+\`\`\`
+
+### Inline sugar (equivalent blocks)
+
+\`\`\`logts
 <add>:
     left: bound <expr>
     right: bound <expr>
 :
 
-<expr>:
+<expr>+:
     number?: <number>
-    add?: <add>
+    add?: bound <add>
 :
-
-60wire<expr> bad = { number={ value=\\1 }<number> add={ left={ number={ value=\\2 }<number> }<expr> }<add> }<expr>
 \`\`\`
 
-Message: \`Union schema 'expr' allows at most one branch; multiple provided\`.
+\`\`\`logts
+<expr>+:
+    number?: <number>: value: 8 :
+    add?: bound <add>: left: bound <expr>  right: bound <expr> :
+:
+\`\`\`
 
-Wave and legacy propagation produce the same literal packing, field reads, and error messages for these schemas.
+**Load & Run** — inline sugar packs the same bits:
+
+\`\`\`logts-play
+<number>:
+    value: 8
+:
+
+<expr>+:
+    number?: <number>: value: 8 :
+    add?: bound <add>: left: bound <expr>  right: bound <expr> :
+:
+
+10wire<expr> ast = { number={ value=\\5 }<number> }<expr>
+\`\`\`
+
+### Bound variable arrays on \`+\` schemas
+
+\`\`\`logts
+<country>:
+    code: 16
+:
+
+<votedBy>+:
+    countries: bound <country>[1-]
+:
+\`\`\`
+
+Use grouped literals \`{ { code=\\16 }{ code=\\32 }<country> }\` for list elements. Each element is length-prefixed on the wire.
+
+### Optional bound lists
+
+\`\`\`logts
+<singleList>:
+    values: 8[1-]
+:
+
+<doubleList>+:
+    left?: bound <singleList>
+    right?: bound <singleList>
+:
+\`\`\`
+
+### Rules summary
+
+| Rule | Detail |
+|------|--------|
+| Mask bits | One bit per \`?\` field, declaration order; MSB-left (first \`?\` = bit 0) |
+| Absent field | Mask bit \`0\` → 0 payload bits for that field |
+| Present field | Mask bit \`1\` → fixed payload or \`bound\` prefix + payload |
+| Multiple \`?\` | Allowed — mask may have several bits set (e.g. \`11\`) |
+| \`bound\` prefix | 16-bit unsigned bit length before each bounded payload |
+| Field access | Full path, e.g. \`tree:add:left:number:value\` |
+| \`show(wire; <schema>)\` | Indented tree; only present optional branches are shown |
+
+Wave and legacy propagation produce the same packing, field reads, and \`show\` output for these schemas.
 
 ---
 
@@ -49946,11 +50245,10 @@ Wave and legacy propagation produce the same literal packing, field reads, and e
 | Unknown schema | \`Unknown schema 'opcode'\` |
 | Reserved schema name | \`Reserved schema name 'none' — choose another name for a user-defined schema\` |
 | Ambiguous variable layout | \`Ambiguous variable array layout for schema '…'\` — see [Variable arrays (1D)](schema-variable-arrays.md) |
-| Union — no branch | \`Union schema 'expr' requires exactly one branch; none provided\` |
-| Union — two branches | \`Union schema 'expr' allows at most one branch; multiple provided\` |
-| Union — wrong path | \`Union schema 'expr' active variant is 'number', not 'add'\` |
+| Optional without \`+\` | \`Optional field 'a?' requires schema '<x>+' declaration\` |
+| Optional needs bound | \`Optional field 'f?' in schema 's' requires bound <ref> for variable-width payload\` |
+| Optional not present | \`Optional field 'f' is not present in schema 's' (presence mask '…')\` |
 | Missing bound field | \`Missing bound field 'left' in schema 'add'\` |
-| Unknown union tag | \`Unknown union variant index N in schema 'expr'\` |
 
 ---
 

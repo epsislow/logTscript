@@ -445,6 +445,8 @@ function formatParserTypeDoc() {
     '',
     'See doc/inline-parser.md',
     'doc(inline.parser)  doc(.myLang)',
+    '',
+    'Runtime:  .lang:parseText(source)  .lang:parseText(source, startRule)',
   ];
 }
 
