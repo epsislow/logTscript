@@ -5636,8 +5636,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic' && kind !== 'canvas') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic, canvas)`);
+    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic' && kind !== 'canvas' && kind !== 'parser') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic, canvas, parser)`);
     }
     if (this.usagePolicy) {
       const chk = this.usagePolicy.isModuleAllowed('inline', kind);
@@ -5647,29 +5647,35 @@ isBuiltinFunction(name) {
     }
     this._syncTokenizerAt(pos + 1);
     const instanceName = this.parseDotComponentRef();
-    this.eat('SYM', ':');
+    let bodyRaw;
+    if (this.c.type === 'SYM' && this.c.value === '{') {
+      const bracePos = this.t.i - 1;
+      bodyRaw = this.parseRawBraceBlock(bracePos).trim();
+    } else {
+      this.eat('SYM', ':');
 
-    const bodyStart = this.t.i;
-    let foundEnd = false;
-    let colonPos = -1;
-    pos = bodyStart;
-    while (pos < src.length) {
-      const lineStart = pos;
-      while (pos < src.length && src[pos] !== '\n') pos++;
-      const line = src.substring(lineStart, pos).trim();
-      if (line === ':') {
-        colonPos = src.indexOf(':', lineStart);
-        if (colonPos < 0) colonPos = lineStart;
-        foundEnd = true;
-        break;
+      const bodyStart = this.t.i;
+      let foundEnd = false;
+      let colonPos = -1;
+      pos = bodyStart;
+      while (pos < src.length) {
+        const lineStart = pos;
+        while (pos < src.length && src[pos] !== '\n') pos++;
+        const line = src.substring(lineStart, pos).trim();
+        if (line === ':') {
+          colonPos = src.indexOf(':', lineStart);
+          if (colonPos < 0) colonPos = lineStart;
+          foundEnd = true;
+          break;
+        }
+        if (pos < src.length) pos++;
       }
-      if (pos < src.length) pos++;
+      if (!foundEnd) {
+        throw Error(`Unclosed inline block — expected closing ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      bodyRaw = src.substring(bodyStart, colonPos).trim();
+      this._syncTokenizerAt(colonPos + 1);
     }
-    if (!foundEnd) {
-      throw Error(`Unclosed inline block — expected closing ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-    }
-    const bodyRaw = src.substring(bodyStart, colonPos).trim();
-    this._syncTokenizerAt(colonPos + 1);
     const stmt = { inline: { kind, name: instanceName, bodyRaw } };
     this.inlines.set(instanceName, stmt.inline);
     return stmt;

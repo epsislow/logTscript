@@ -526,7 +526,7 @@ comp.osc, comp.~
 doc(inline)
 ```
 
-Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` / `inline [plc]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`, `inline.protocol`, `inline.plc`.
+Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` / `inline [plc]` / `inline [logic]` / `inline [canvas]` / `inline [parser]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`, `inline.protocol`, `inline.plc`, `inline.logic`, `inline.canvas`, `inline.parser`.
 
 ### doc(inline.kind) — declaration template
 
@@ -536,6 +536,9 @@ Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` / `inline [plc
 | `doc(inline.lut)` | lut | [lut.md](lut.md) |
 | `doc(inline.protocol)` | protocol | [protocol.md](protocol.md) |
 | `doc(inline.plc)` | plc | [plc-language.md](plc-language.md) |
+| `doc(inline.logic)` | logic | [inline-logic.md](inline-logic.md) |
+| `doc(inline.canvas)` | canvas | [inline-canvas.md](inline-canvas.md) |
+| `doc(inline.parser)` | parser | [inline-parser.md](inline-parser.md) |
 
 ### doc(.name) — specific inline instance
 

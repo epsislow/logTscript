@@ -2255,7 +2255,20 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas)`);
+    if (inline.kind === 'parser') {
+      const parseParserFn = typeof parseParserBody === 'function' ? parseParserBody : null;
+      if (!parseParserFn) throw Error('Parser assembler is not loaded');
+      const prog = parseParserFn(inline.bodyRaw, `inline ${inline.name}`);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        tokens: prog.tokens || [],
+        rules: prog.rules || [],
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas, parser)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -18710,6 +18723,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         if (kindName === 'logic' && typeof formatLogicInstanceDoc === 'function') {
           return formatLogicInstanceDoc(alias, inst);
         }
+        if (kindName === 'parser' && typeof formatParserInstanceDoc === 'function') {
+          return formatParserInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
@@ -18729,6 +18745,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
           }
           if (kindName === 'logic' && typeof formatLogicInstanceDoc === 'function') {
             return formatLogicInstanceDoc(instName, inst);
+          }
+          if (kindName === 'parser' && typeof formatParserInstanceDoc === 'function') {
+            return formatParserInstanceDoc(instName, inst);
           }
         }
       }
@@ -18751,6 +18770,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     if (kindName === 'logic' && typeof formatLogicTypeDoc === 'function') {
       return formatLogicTypeDoc();
     }
+    if (kindName === 'parser' && typeof formatParserTypeDoc === 'function') {
+      return formatParserTypeDoc();
+    }
     return [`${name}: (no inline doc available)`];
   }
 
@@ -18772,6 +18794,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
       if (inst.kind === 'logic' && typeof formatLogicInstanceDoc === 'function') {
         return formatLogicInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'parser' && typeof formatParserInstanceDoc === 'function') {
+        return formatParserInstanceDoc(name, inst);
       }
     }
   }

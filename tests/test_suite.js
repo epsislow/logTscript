@@ -53701,5 +53701,336 @@ probe(outX)`;
     h.assert('on in missing', String(missing.indexOf('on') >= 0), 'true');
   });
 
+  const INLINE_PARSER_CALC = `
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:`;
+
+  const INLINE_PARSER_BODY = `
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+`;
+
+  const INLINE_PARSER_BRACE = `
+inline [parser] .mini {
+    token NUM = [0-9]+;
+    rule main = NUM -> CallNum;
+}`;
+
+  reg(4931, 'parser', 'parse inline [parser] colon form', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_PARSER_CALC)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('one stmt', stmts.length, 1);
+    h.assert('kind parser', stmts[0].inline.kind, 'parser');
+    h.assert('name', stmts[0].inline.name, '.calcLang');
+  });
+
+  reg(4932, 'parser', 'parse inline [parser] brace form', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_PARSER_BRACE)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('kind parser', stmts[0].inline.kind, 'parser');
+    h.assert('name', stmts[0].inline.name, '.mini');
+  });
+
+  reg(4933, 'parser', 'unknown inline kind rejects parser typo', function(h, session) {
+    h.assertThrows('bad kind', function() {
+      new Parser(new Tokenizer(preprocessLoop('inline [parse] .x:\n:\n')), session._ensureRegistry()).parse();
+    });
+  });
+
+  reg(4934, 'parser', 'execInline stores parser grammar', function(h, session) {
+    session.run(INLINE_PARSER_CALC);
+    const inst = session.interp.inlineInstances.get('.calcLang');
+    h.assert('kind', inst.kind, 'parser');
+    h.assert('tokens', inst.tokens.length, 2);
+    h.assert('rules', inst.rules.length, 5);
+    h.assert('first rule', inst.rules[0].name, 'program');
+  });
+
+  reg(4935, 'parser', 'NotAllow policy blocks inline [parser]', function(h, session) {
+    const pol = session._ensureRegistry().usagePolicy;
+    if (!pol) { h.assert('skip no policy', '1', '1'); return; }
+    h.assertThrows('not allowed', function() {
+      session.run('Allow inline.type{asm}\nNotAllow inline.type{parser}\n' + INLINE_PARSER_CALC);
+    });
+  });
+
+  reg(4936, 'parser', 'doc(inline.parser) template', function(h, session) {
+    const out = session.runDoc('doc(inline.parser)');
+    h.assert('has token', String(out.some((l) => l.indexOf('token INT') >= 0)), 'true');
+    h.assert('has rule', String(out.some((l) => l.indexOf('rule program') >= 0)), 'true');
+  });
+
+  reg(4937, 'parser', 'doc(.calcLang) after load', function(h, session) {
+    const out = session.runDoc(INLINE_PARSER_CALC + '\ndoc(.calcLang)');
+    h.assert('header', String(out.some((l) => l.indexOf('inline [parser]') >= 0)), 'true');
+    h.assert('lists INT', String(out.some((l) => l.indexOf('INT') >= 0)), 'true');
+  });
+
+  reg(4938, 'parser', 'brace form execInline', function(h, session) {
+    session.run(INLINE_PARSER_BRACE);
+    const inst = session.interp.inlineInstances.get('.mini');
+    h.assert('token NUM', inst.tokens[0].name, 'NUM');
+    h.assert('rule main', inst.rules[0].name, 'main');
+  });
+
+  reg(4939, 'parser', 'comment lines in grammar body', function(h, session) {
+    const src = `
+inline [parser] .c:
+    # leading comment
+    token T = [a-z]+;  # end-of-line
+    rule r = T;
+:`;
+    session.run(src);
+    const inst = session.interp.inlineInstances.get('.c');
+    h.assert('token', inst.tokens[0].pattern, '[a-z]+');
+  });
+
+  reg(4940, 'parser', 'empty body allowed', function(h, session) {
+    session.run('inline [parser] .empty:\n:');
+    const inst = session.interp.inlineInstances.get('.empty');
+    h.assert('no tokens', inst.tokens.length, 0);
+    h.assert('no rules', inst.rules.length, 0);
+  });
+
+  reg(4941, 'parser', 'token regex digits', function(h) {
+    const prog = parseParserBody('token INT = [0-9]+;');
+    h.assert('pattern', prog.tokens[0].pattern, '[0-9]+');
+  });
+
+  reg(4942, 'parser', 'token regex escape star plus', function(h) {
+    const prog = parseParserBody('token STAR = \\\\*; token PLUS = \\+;');
+    h.assert('star', prog.tokens[0].pattern, '\\\\*');
+    h.assert('plus', prog.tokens[1].pattern, '\\+');
+  });
+
+  reg(4943, 'parser', 'token regex literal dot via class', function(h) {
+    const prog = parseParserBody('token DOT = [.] ;');
+    h.assert('dot class', prog.tokens[0].pattern, '[.]');
+  });
+
+  reg(4944, 'parser', 'token regex negated class', function(h) {
+    const prog = parseParserBody('token LINE = [^\\n]*;');
+    h.assert('negated', prog.tokens[0].pattern, '[^\\n]*');
+  });
+
+  reg(4945, 'parser', 'reject wildcard dot in token regex', function(h) {
+    h.assertThrows('no dot', function() {
+      parseParserBody('token BAD = .+;');
+    });
+  });
+
+  reg(4946, 'parser', 'reject regex lookahead', function(h) {
+    h.assertThrows('no lookahead', function() {
+      parseParserBody('token BAD = (?=a);');
+    });
+  });
+
+  reg(4947, 'parser', 'reject regex backreference', function(h) {
+    h.assertThrows('no backref', function() {
+      parseParserBody('token BAD = (a)\\1;');
+    });
+  });
+
+  reg(4948, 'parser', 'reject empty token pattern', function(h) {
+    h.assertThrows('empty', function() {
+      parseParserBody('token BAD = ;');
+    });
+  });
+
+  reg(4949, 'parser', 'duplicate token name error', function(h) {
+    h.assertThrows('dup token', function() {
+      parseParserBody('token A = [a]; token A = [b];');
+    });
+  });
+
+  reg(4950, 'parser', 'compiled token regex matches input', function(h) {
+    const prog = parseParserBody('token INT = [0-9]+;');
+    const re = compileParserTokenRegex(prog.tokens[0].pattern, 1);
+    h.assert('match', re.test('123'), true);
+    h.assert('no letters', re.test('abc'), false);
+  });
+
+  reg(4951, 'parser', 'rule alternatives with pipe', function(h) {
+    const prog = parseParserBody('token A = [a]; rule r = A | A -> Call;');
+    h.assert('alts', prog.rules[0].alternatives.length, 2);
+  });
+
+  reg(4952, 'parser', 'rule postfix plus quantifier', function(h) {
+    const prog = parseParserBody('token A = [a]; rule r = A+;');
+    h.assert('quant', prog.rules[0].alternatives[0].items[0].quant, '+');
+  });
+
+  reg(4953, 'parser', 'rule star and question quantifiers', function(h) {
+    const prog = parseParserBody('token A = [a]; rule r = A* | A?;');
+    h.assert('star', prog.rules[0].alternatives[0].items[0].quant, '*');
+    h.assert('quest', prog.rules[0].alternatives[1].items[0].quant, '?');
+  });
+
+  reg(4954, 'parser', 'rule string literals in pattern', function(h) {
+    const prog = parseParserBody('token ID = [a-z]+; rule stmt = ID "=" ID;');
+    h.assert('lit', prog.rules[0].alternatives[0].items[1].kind, 'literal');
+    h.assert('eq', prog.rules[0].alternatives[0].items[1].value, '=');
+  });
+
+  reg(4955, 'parser', 'rule grouped subpattern', function(h) {
+    const prog = parseParserBody('token A = [a]; token B = [b]; rule r = ( A B );');
+    h.assert('group', prog.rules[0].alternatives[0].items[0].kind, 'group');
+    h.assert('inner', prog.rules[0].alternatives[0].items[0].items.length, 2);
+  });
+
+  reg(4956, 'parser', 'stratified expression grammar parses', function(h) {
+    const prog = parseParserBody(INLINE_PARSER_BODY);
+    const expr = prog.rules.find((r) => r.name === 'expression');
+    h.assert('two alts', expr.alternatives.length, 2);
+    h.assert('call add', expr.alternatives[0].call, 'CallAdd');
+    const term = prog.rules.find((r) => r.name === 'term');
+    h.assert('call mul', term.alternatives[0].call, 'CallMul');
+  });
+
+  reg(4957, 'parser', 'arrow call name on alternative', function(h) {
+    const prog = parseParserBody('token N = [0-9]; rule n = N -> CallNumber;');
+    h.assert('call', prog.rules[0].alternatives[0].call, 'CallNumber');
+  });
+
+  reg(4958, 'parser', 'unknown symbol in rule error', function(h) {
+    h.assertThrows('unknown', function() {
+      parseParserBody('rule r = MISSING;');
+    });
+  });
+
+  reg(4959, 'parser', 'duplicate rule name error', function(h) {
+    h.assertThrows('dup rule', function() {
+      parseParserBody('token A = [a]; rule r = A; rule r = A;');
+    });
+  });
+
+  reg(4960, 'parser', 'reject unsupported error keyword', function(h) {
+    h.assertThrows('error kw', function() {
+      parseParserBody('error "msg";');
+    });
+  });
+
+  reg(4961, 'parser', 'capture binds token ref', function(h) {
+    const prog = parseParserBody('token ID = [a-z]+; rule r = $x:ID;');
+    const cap = prog.rules[0].alternatives[0].items[0];
+    h.assert('kind', cap.kind, 'capture');
+    h.assert('name', cap.name, 'x');
+    h.assert('ref', cap.refName, 'ID');
+  });
+
+  reg(4962, 'parser', 'capture binds rule ref', function(h) {
+    const prog = parseParserBody('token ID = [a-z]+; rule expr = ID; rule stmt = $v:expr;');
+    const cap = prog.rules.find((r) => r.name === 'stmt').alternatives[0].items[0];
+    h.assert('rule ref', cap.refName, 'expr');
+  });
+
+  reg(4963, 'parser', 'token and rule same name rejected', function(h) {
+    h.assertThrows('name clash', function() {
+      parseParserBody('token X = [a]; rule X = X;');
+    });
+  });
+
+  reg(4964, 'parser', 'rule referencing token and rule', function(h) {
+    const prog = parseParserBody('token PLUS = \\+; rule term = factor; rule expr = term PLUS term; rule factor = ID; token ID = [a];');
+    h.assert('refs ok', prog.rules.length, 3);
+  });
+
+  reg(4965, 'parser', 'assign statement pattern structure', function(h) {
+    const prog = parseParserBody(INLINE_PARSER_BODY);
+    const stmt = prog.rules.find((r) => r.name === 'statement');
+    h.assert('call', stmt.alternatives[0].call, 'CallAssign');
+    h.assert('items', stmt.alternatives[0].items.length, 4);
+  });
+
+  reg(4966, 'parser', 'function vs variable rule order', function(h) {
+    const src = `
+token ID = [a-z]+;
+rule value
+    = ID "(" expression ")" -> CallFunction
+    | ID -> CallVariable;
+rule expression = value;
+`;
+    const prog = parseParserBody(src);
+    const val = prog.rules.find((r) => r.name === 'value');
+    h.assert('two alts', val.alternatives.length, 2);
+    h.assert('fn first', val.alternatives[0].call, 'CallFunction');
+    h.assert('var second', val.alternatives[1].call, 'CallVariable');
+  });
+
+  reg(4967, 'parser', 'assign vs expr statement rules coexist', function(h) {
+    const src = `
+token ID = [a-z]+;
+rule expression = ID;
+rule assignStmt = ID "=" expression ";";
+rule exprStmt = expression ";";
+rule statement = assignStmt | exprStmt;
+`;
+    const prog = parseParserBody(src);
+    h.assert('statement alts', prog.rules.find((r) => r.name === 'statement').alternatives.length, 2);
+  });
+
+  reg(4968, 'parser', 'forward rule reference in capture', function(h) {
+    const src = 'token ID = [a]; rule stmt = $v:expression; rule expression = ID;';
+    const prog = parseParserBody(src);
+    h.assert('ok', prog.rules.length, 2);
+  });
+
+  reg(4969, 'parser', 'empty alternative rejected', function(h) {
+    h.assertThrows('empty alt', function() {
+      parseParserBody('token A = [a]; rule r = -> Call;');
+    });
+  });
+
+  reg(4970, 'parser', 'full calc grammar round-trip fields', function(h, session) {
+    session.run(INLINE_PARSER_CALC);
+    const inst = session.interp.inlineInstances.get('.calcLang');
+    const factor = inst.rules.find((r) => r.name === 'factor');
+    h.assert('factor alts', factor.alternatives.length, 3);
+    h.assert('CallNumber', factor.alternatives[1].call, 'CallNumber');
+    h.assert('CallVariable', factor.alternatives[2].call, 'CallVariable');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
