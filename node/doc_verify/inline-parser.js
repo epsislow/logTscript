@@ -46,6 +46,62 @@ function parseCalc(interp, src, startRule) {
   return pe.parseGrammar(g, src, startRule ? { startRule } : undefined);
 }
 
+const ab = require('../../core/ast-builder.js');
+
+const F2C_SCHEMAS = `
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+`;
+
+const CALC_FULL = F2C_SCHEMAS + CALC_LANG;
+
+function packCalc(interp, src, startRule, schemaName) {
+  const g = calcFromInterp(interp);
+  if (!g) return null;
+  if (typeof globalThis.compileParserTokenRegex !== 'function') {
+    globalThis.compileParserTokenRegex = pa.compileParserTokenRegex;
+  }
+  return ab.buildAstFromParse(g, src, schemaName, interp.schemaRegistry, { startRule, validateMapping: false });
+}
+
 /** Extra checks for doc/inline-parser.md */
 module.exports = {
   cases: [
@@ -95,7 +151,7 @@ module.exports = {
     {
       name: 'doc inline.parser template',
       src: 'doc(inline.parser)',
-      expect: ['token INT = [0-9]+', 'parseText'],
+      expect: ['token INT = [0-9]+', 'parseText', 'packAst'],
     },
     {
       name: 'parseText program tree via engine',
@@ -142,6 +198,38 @@ inline [parser] .mini:
       check: (interp) => {
         const r = parseCalc(interp, 'a=1;b=2;');
         return r && r.ok === 1 && r.tree.kind === 'repeat' && r.tree.items.length === 2;
+      },
+    },
+    {
+      name: 'packAst expression precedence mask',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = packCalc(interp, '1+2*3', 'expression', 'expr');
+        return r && r.ok === 1 && r.bitWidth === 135 && r.bits.charAt(1) === '1';
+      },
+    },
+    {
+      name: 'packAst CallNumber literal',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = packCalc(interp, '42', 'expression', 'expr');
+        return r && r.ok === 1 && r.bits.substring(0, 3) === '100' && r.bitWidth === 11;
+      },
+    },
+    {
+      name: 'packAst program assign',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = packCalc(interp, 'a=1;', 'program', 'program');
+        return r && r.ok === 1 && r.bitWidth > 48;
+      },
+    },
+    {
+      name: 'packAst numeric overflow',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = packCalc(interp, '999', 'expression', 'expr');
+        return r && r.ok === 0 && r.error && r.error.kind === 'pack';
       },
     },
   ],

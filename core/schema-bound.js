@@ -134,4 +134,7 @@
   };
 
   global.LogTScriptSchemaBound = api;
-})(typeof globalThis !== 'undefined' ? globalThis : window);
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : global);

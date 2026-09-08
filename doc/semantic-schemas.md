@@ -677,6 +677,30 @@ Wave and legacy propagation produce the same packing, field reads, and `show` ou
 
 ---
 
+### Variable-length symbol text (`<symbol>+`)
+
+Parser captures such as `$name:ID` can map to a **symbol** schema — one byte (8 bits) per ASCII character, length prefixed via **`bound <byte>[1-]`**:
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallAssign>:
+    name: bound <symbol>
+:
+```
+
+Non-ASCII text or values that do not fit the declared field width produce a **pack error** (no silent truncation).
+
+When using **`:packAst`**, see [inline-parser.md — AST wire packing](inline-parser.md#ast-wire-packing-packast) for a full calculator schema set.
+
+---
+
 ## Error reference
 
 | Situation | Message (example) |

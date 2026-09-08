@@ -1911,6 +1911,20 @@ class Interpreter {
     return { kind: 'scalar', ew };
   }
 
+  _exprWireStringArg(expr) {
+    if (!expr || !Array.isArray(expr) || !expr.length) return '';
+    const a = expr[0];
+    if (a && a.wireString != null) return String(a.wireString);
+    const parts = this.evalExpr(expr, false);
+    let out = '';
+    for (const part of parts) {
+      if (part.isText && part.value != null) out += String(part.value);
+      else if (part.displayText != null) out += String(part.displayText);
+      else if (part.value != null && part.value !== '-') out += String(part.value);
+    }
+    return out;
+  }
+
   evalInlineMethod(invoke, computeRefs) {
     const instName = invoke.var;
     const method = invoke.method;
@@ -2056,10 +2070,9 @@ class Interpreter {
     if (inlineInst && inlineInst.kind === 'parser' && method === 'parseText') {
       const parseFn = typeof parseGrammar === 'function' ? parseGrammar : null;
       if (!parseFn) throw new Error('Parser engine is not loaded');
-      const srcArg = args[0];
-      const srcText = srcArg != null ? String(srcArg) : '';
+      const srcText = this._exprWireStringArg(args[0]);
       const grammar = { tokens: inlineInst.tokens || [], rules: inlineInst.rules || [] };
-      const startRule = args[1] != null ? String(args[1]) : undefined;
+      const startRule = args[1] != null ? this._exprWireStringArg(args[1]) : undefined;
       const result = parseFn(grammar, srcText, startRule ? { startRule } : undefined);
       if (!result.ok) {
         const err = result.error || {};
@@ -2067,6 +2080,29 @@ class Interpreter {
       }
       const fmt = typeof formatParseTree === 'function' ? formatParseTree : null;
       return fmt ? fmt(result.tree) : JSON.stringify(result.tree);
+    }
+
+    if (inlineInst && inlineInst.kind === 'parser' && method === 'packAst') {
+      const buildFn = typeof buildAstFromParse === 'function' ? buildAstFromParse : null;
+      if (!buildFn) throw new Error('ast-builder.js is not loaded');
+      const srcText = this._exprWireStringArg(args[0]);
+      const startRule = args[1] != null ? this._exprWireStringArg(args[1]) : undefined;
+      const schemaName = args[2] != null ? this._exprWireStringArg(args[2]) : 'expr';
+      if (!schemaName) throw new Error('packAst requires schema name as third argument');
+      const grammar = { tokens: inlineInst.tokens || [], rules: inlineInst.rules || [] };
+      const result = buildFn(grammar, srcText, schemaName, this.schemaRegistry, {
+        startRule: startRule || undefined,
+        validateMapping: false,
+      });
+      if (!result.ok) {
+        const err = result.error || {};
+        throw new Error('packAst error (' + (err.kind || 'pack') + '): ' + (err.message || ''));
+      }
+      if (computeRefs) {
+        const idx = this.storeValue(result.bits);
+        return { value: result.bits, ref: `&${idx}`, varName: null, bitWidth: result.bitWidth };
+      }
+      return { value: result.bits, ref: null, varName: null, bitWidth: result.bitWidth };
     }
 
     throw new Error(`Unknown method '${method}' for ${instName}`);

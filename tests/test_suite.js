@@ -54174,6 +54174,228 @@ rule expression = value | INT -> CallNumber;
     h.assert('mul inside', add.children.right.call, 'CallMul');
   });
 
+  const F2C_BYTE = [
+    '<byte>:',
+    '    value: 8',
+    ':',
+  ].join('\n');
+
+  const F2C_SYMBOL = [
+    '<symbol>+:',
+    '    bytes: bound <byte>[1-]',
+    ':',
+  ].join('\n');
+
+  const F2C_CALL_NUMBER = [
+    '<CallNumber>:',
+    '    value: 8',
+    ':',
+  ].join('\n');
+
+  const F2C_CALL_ADD = [
+    '<CallAdd>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2C_CALL_MUL = [
+    '<CallMul>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2C_EXPR = [
+    '<expr>+:',
+    '    CallNumber?: <CallNumber>',
+    '    CallAdd?:    bound <CallAdd>',
+    '    CallMul?:    bound <CallMul>',
+    ':',
+  ].join('\n');
+
+  const F2C_CALL_ASSIGN = [
+    '<CallAssign>:',
+    '    name:  bound <symbol>',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2C_CALL_STATEMENT = [
+    '<CallStatement>+:',
+    '    CallAssign?: bound <CallAssign>',
+    ':',
+  ].join('\n');
+
+  const F2C_PROGRAM = [
+    '<program>+:',
+    '    statements: bound <CallStatement>[1-]',
+    ':',
+  ].join('\n');
+
+  const F2C_SCHEMAS = [
+    F2C_BYTE,
+    F2C_SYMBOL,
+    F2C_CALL_NUMBER,
+    F2C_CALL_ADD,
+    F2C_CALL_MUL,
+    F2C_EXPR,
+    F2C_CALL_ASSIGN,
+    F2C_CALL_STATEMENT,
+    F2C_PROGRAM,
+  ].join('\n');
+
+  const F2C_CORE = F2C_SCHEMAS + '\n' + INLINE_PARSER_CALC;
+
+  function f2cGrammar(session) {
+    const inst = session.interp.inlineInstances.get('.calcLang');
+    return { tokens: inst.tokens, rules: inst.rules };
+  }
+
+  function f2cPackExprScript(src, width) {
+    return F2C_CORE + '\n' + width + 'wire<expr> ast = .calcLang:packAst("' + src + '", "expression", "expr")';
+  }
+
+  function f2cPackProgramScript(src, width) {
+    return F2C_CORE + '\n' + width + 'wire<program> prog = .calcLang:packAst("' + src + '", "program", "program")';
+  }
+
+  function f2cPackExprWire(h, session, src) {
+    session.run(F2C_CORE);
+    const r = parseGrammar(f2cGrammar(session), src, { startRule: 'expression' });
+    h.assert('parse ok', String(r.ok), '1');
+    const built = buildAstWire(r.tree, 'expr', session.interp.schemaRegistry);
+    session.run(F2C_CORE + '\n' + built.bitWidth + 'wire<expr> ast = .calcLang:packAst("' + src + '", "expression", "expr")');
+    h.assert('wire bits match', session.getWire(session.interp, 'ast'), built.bits);
+    return built;
+  }
+
+  function f2cPackProgramWire(h, session, src, wireName, extraLines) {
+    session.run(F2C_CORE);
+    const r = parseGrammar(f2cGrammar(session), src, { startRule: 'program' });
+    h.assert('parse ok', String(r.ok), '1');
+    const built = buildAstWire(r.tree, 'program', session.interp.schemaRegistry);
+    const wn = wireName || 'prog';
+    const tail = [
+      built.bitWidth + 'wire<program> ' + wn + ' = .calcLang:packAst("' + src + '", "program", "program")',
+    ].concat(extraLines || []);
+    session.run(F2C_CORE + '\n' + tail.join('\n'));
+    h.assert('wire bits match', session.getWire(session.interp, wn), built.bits);
+    return built;
+  }
+
+  function runF2cPrecedence(h, session) {
+    session.run(F2C_CORE);
+    const r = parseGrammar(f2cGrammar(session), '1+2*3', { startRule: 'expression' });
+    h.assert('parse ok', String(r.ok), '1');
+    const built = buildAstWire(r.tree, 'expr', session.interp.schemaRegistry);
+    session.run(F2C_CORE + '\n' + built.bitWidth + 'wire<expr> ast = .calcLang:packAst("1+2*3", "expression", "expr")\nshow(ast; <expr>)');
+    h.assert('mask CallAdd', built.bits.substring(0, 3), '010');
+    const out = session.interp.out.join('\n');
+    h.assert('show CallAdd', out.indexOf('CallAdd') >= 0, true);
+    h.assert('show CallMul nested', out.indexOf('CallMul') >= 0, true);
+  }
+
+  reg(5001, 'parser', 'ast pack precedence 1+2*3 expr legacy', runF2cPrecedence);
+  reg(5002, 'parser', 'ast pack precedence 1+2*3 expr wave', runF2cPrecedence, { propagation: 'wave' });
+
+  function runF2cNumber42(h, session) {
+    const built = f2cPackExprWire(h, session, '42');
+    h.assert('mask CallNumber', built.bits.substring(0, 3), '100');
+    h.assert('value 42', built.bits.substring(built.bits.length - 8), '00101010');
+    h.assert('total width', built.bitWidth, 11);
+  }
+
+  reg(5003, 'parser', 'ast pack CallNumber 42 legacy', runF2cNumber42);
+  reg(5004, 'parser', 'ast pack CallNumber 42 wave', runF2cNumber42, { propagation: 'wave' });
+
+  function runF2cProgramAssign(h, session) {
+    const built = f2cPackProgramWire(h, session, 'a=1;', 'p');
+    h.assert('program packed', built.bitWidth > 48, true);
+    h.assert('wire on session', session.getWire(session.interp, 'p').length, built.bitWidth);
+  }
+
+  reg(5005, 'parser', 'ast pack program assign a=1 legacy', runF2cProgramAssign);
+  reg(5006, 'parser', 'ast pack program assign a=1 wave', runF2cProgramAssign, { propagation: 'wave' });
+
+  reg(5007, 'parser', 'ast pack max one branch error legacy', function(h, session) {
+    session.run(F2C_CORE);
+    h.assertThrows('max one', function() {
+      validateAstFieldValues('expr', {
+        CallNumber: '00000001',
+        CallAdd: '00000010',
+      }, session.interp.schemaRegistry);
+    });
+  });
+
+  reg(5008, 'parser', 'ast schema optional without plus rejected legacy', function(h, session) {
+    h.assertThrows('no plus', function() {
+      session.run(F2C_CALL_NUMBER + '\n<expr>:\n    CallNumber?: <CallNumber>\n:');
+    });
+  });
+
+  reg(5009, 'parser', 'ast pack unknown call schema mismatch legacy', function(h, session) {
+    session.run(F2C_CORE);
+    const tree = { kind: 'call', call: 'CallVariable', children: { value: 'x' } };
+    h.assertThrows('no field', function() {
+      buildAstWire(tree, 'expr', session.interp.schemaRegistry);
+    });
+  });
+
+  reg(5010, 'parser', 'ast pack bound length prefix legacy', function(h, session) {
+    const built = f2cPackExprWire(h, session, '1+2');
+    const SB = LogTScriptSchemaBound;
+    const sub = SB.readBoundSubstream(built.bits, 3);
+    h.assert('bound len positive', sub.len > 0, true);
+  });
+
+  function runF2cShowRoundTrip(h, session) {
+    session.run(F2C_CORE);
+    const built = buildAstWire(
+      parseGrammar(f2cGrammar(session), '1+2*3', { startRule: 'expression' }).tree,
+      'expr',
+      session.interp.schemaRegistry
+    );
+    session.run(F2C_CORE + '\n' + [
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("1+2*3", "expression", "expr")',
+      built.bitWidth + 'wire<expr> slice = ast',
+      'show(slice; <expr>)',
+    ].join('\n'));
+    const out = session.interp.out.join('\n');
+    h.assert('show CallAdd', out.indexOf('CallAdd') >= 0, true);
+    h.assert('show value fields', out.indexOf('value') >= 0, true);
+  }
+
+  reg(5011, 'parser', 'ast pack show round trip legacy', runF2cShowRoundTrip);
+  reg(5012, 'parser', 'ast pack show round trip wave', runF2cShowRoundTrip, { propagation: 'wave' });
+
+  function runF2cProgramTwoStmt(h, session) {
+    const built = f2cPackProgramWire(h, session, 'a=1;b=2;', 'p');
+    h.assert('program wider two stmt', built.bitWidth > 80, true);
+  }
+
+  reg(5013, 'parser', 'ast pack program two stmt legacy', runF2cProgramTwoStmt);
+  reg(5014, 'parser', 'ast pack program two stmt wave', runF2cProgramTwoStmt, { propagation: 'wave' });
+
+  reg(5015, 'parser', 'ast pack numeric overflow legacy', function(h, session) {
+    session.run(F2C_CORE);
+    const g = f2cGrammar(session);
+    const r = parseGrammar(g, '999', { startRule: 'expression' });
+    h.assert('parse ok', String(r.ok), '1');
+    h.assertThrows('overflow', function() {
+      buildAstWire(r.tree, 'expr', session.interp.schemaRegistry);
+    });
+  });
+
+  reg(5016, 'parser', 'ast pack symbol on program legacy', function(h, session) {
+    session.run(F2C_CORE);
+    const g = f2cGrammar(session);
+    const r = parseGrammar(g, 'ab=1;', { startRule: 'program' });
+    h.assert('parse ok', String(r.ok), '1');
+    const built = buildAstWire(r.tree, 'program', session.interp.schemaRegistry);
+    h.assert('symbol packed', built.bitWidth > 48, true);
+  });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

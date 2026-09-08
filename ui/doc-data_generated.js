@@ -25076,6 +25076,301 @@ show(.mini:parseText("1+2 xxx"))
 
 ---
 
+## AST wire packing (\`:packAst\`)
+
+After parsing, **\`:packAst\`** builds a **typed semantic wire** from source text using AST schemas (\`<name>+:\`). Grammar \`-> CallName\` targets map **1:1** to schema fields (\`CallAdd?:\`, \`CallAssign?:\`, …). Captures such as \`$name:ID\` map to schema fields (for example \`name: bound <symbol>\`).
+
+### Schemas for \`.calcLang\`
+
+Define schemas **before** the parser inline. Recursive expression nodes use **\`bound <expr>\`**; identifiers use **\`<symbol>+\`** with a byte array:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+135wire<expr> ast = .calcLang:packAst("1+2*3", "expression", "expr")
+show(ast; <expr>)
+\`\`\`
+
+The mask selects **\`CallAdd\`**; nested **\`CallMul\`** appears under \`right\`. Use **\`show(wire; <schema>)\`** to decode the packed tree.
+
+### Literal number
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+9wire<expr> n = .mini:packAst("42", "expression", "expr")
+show(n; <expr>)
+\`\`\`
+
+### Assignment and program root
+
+Pack a full program with start rule **\`program\`** and schema **\`program\`**:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+100wire<program> prog = .calcLang:packAst("a=1;", "program", "program")
+\`\`\`
+
+Two statements require a wider wire — derive the width from a pack in the same script or allocate generously:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+200wire<program> prog2 = .calcLang:packAst("a=1;b=2;", "program", "program")
+\`\`\`
+
+Wire width must match the packed bit length (declare enough bits, or derive width from a prior pack in the same script).
+
+### Overflow and validation
+
+| Rule | Behaviour |
+|------|-----------|
+| **Numeric fields** | Values above the field width (e.g. \`999\` in \`value: 8\`) → pack error |
+| **Symbol text** | ASCII only; empty or non-ASCII → pack error |
+| **Max one branch** | At most one \`?\` field set per \`<name>+\` node |
+| **Schema root** | AST schemas must use **\`<name>+:\`** |
+
+\`\`\`logts-play
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+9wire<expr> ok = .mini:packAst("255", "expression", "expr")
+show(ok; <expr>)
+\`\`\`
+
+Packing **\`999\`** with **\`value: 8\`** fails with an overflow error (max 255).
+
+### API summary
+
+| Method | Arguments | Result |
+|--------|-----------|--------|
+| **\`:parseText(src)\`** | source text | Formatted parse tree (debug) |
+| **\`:parseText(src, startRule)\`** | source + rule name | Parse tree from given rule |
+| **\`:packAst(src, startRule, schemaName)\`** | source + rule + schema registry name | Packed wire bits (assign to \`Nwire<schema>\`) |
+
+---
+
 ## Related pages
 
 | Page | Topic |
@@ -50226,6 +50521,30 @@ Use grouped literals \`{ { code=\\16 }{ code=\\32 }<country> }\` for list elemen
 | \`show(wire; <schema>)\` | Indented tree; only present optional branches are shown |
 
 Wave and legacy propagation produce the same packing, field reads, and \`show\` output for these schemas.
+
+---
+
+### Variable-length symbol text (\`<symbol>+\`)
+
+Parser captures such as \`$name:ID\` can map to a **symbol** schema — one byte (8 bits) per ASCII character, length prefixed via **\`bound <byte>[1-]\`**:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallAssign>:
+    name: bound <symbol>
+:
+\`\`\`
+
+Non-ASCII text or values that do not fit the declared field width produce a **pack error** (no silent truncation).
+
+When using **\`:packAst\`**, see [inline-parser.md — AST wire packing](inline-parser.md#ast-wire-packing-packast) for a full calculator schema set.
 
 ---
 

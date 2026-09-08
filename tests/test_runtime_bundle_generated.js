@@ -87,6 +87,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/logic-engine.js",
   "core/parser-assembler.js",
   "core/parser-engine.js",
+  "core/ast-builder.js",
   "core/canvas-assembler.js",
   "core/canvas-hitbox-assembler.js",
   "core/canvas-wire.js",
