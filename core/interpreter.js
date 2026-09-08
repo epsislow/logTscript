@@ -4581,10 +4581,15 @@ class Interpreter {
     if (wire && wire.schemaRef) {
       opts.schema = this._resolveSchema(wire.schemaRef);
     }
-    if (wire && wire.ref && wire.ref !== '&-') {
-      const wireBits = this.getValueFromRef(wire.ref);
-      if (wireBits != null) opts.wireBits = String(wireBits);
+    opts.resolveSchemaRef = (name) => this._resolveSchema(name);
+    let wireBits = null;
+    if (wireVar) {
+      wireBits = this.getWireEffectiveValue(wireVar);
     }
+    if (wireBits == null && wire && wire.ref && wire.ref !== '&-') {
+      wireBits = this.getValueFromRef(wire.ref);
+    }
+    if (wireBits != null) opts.wireBits = String(wireBits);
     if (wire && wire.effectiveBitLen != null) opts.declaredWidth = wire.effectiveBitLen;
     else if (wire && wire.type) {
       const w = this.getBitWidth(wire.type);
@@ -4836,7 +4841,7 @@ class Interpreter {
       }
       const lit = atom.schemaLiteral;
       const schema = this._resolveSchema(lit.schemaRef);
-      if (schema.hasVarArray) {
+      if (schema.hasVarArray || schema.hasDynamicWidth) {
         let total = 0;
         for (const [name, expr] of Object.entries(lit.fields || {})) {
           const node = schema.structure.find((n) => n.name === name && n.kind === 'var_array');
@@ -5160,6 +5165,14 @@ class Interpreter {
       }
     }
     let totalBits = '';
+    const SB = typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
+    if (schema.isUnionRoot && SB) {
+      for (const fields of elements) {
+        const presence = {};
+        for (const k of Object.keys(fields || {})) presence[k] = true;
+        SB.validateUnionLiteral(presence, schema.unionVariants, schema.name);
+      }
+    }
     for (const fields of elements) {
       const fieldValues = {};
       for (const [name, expr] of Object.entries(fields || {})) {
@@ -5185,6 +5198,13 @@ class Interpreter {
     const schema = this._resolveSchema(lit.schemaRef);
     const fieldValues = {};
     const fieldShapes = {};
+    const SB = typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
+    if (schema.isUnionRoot && SB) {
+      const keys = Object.keys(lit.fields || {});
+      const presence = {};
+      for (const k of keys) presence[k] = true;
+      SB.validateUnionLiteral(presence, schema.unionVariants, schema.name);
+    }
     for (const [name, expr] of Object.entries(lit.fields || {})) {
       if (expr && expr.groupedSchemaLiteral && expr.groupedSchemaLiteral.shape) {
         fieldShapes[name] = expr.groupedSchemaLiteral.shape;
@@ -5226,12 +5246,12 @@ class Interpreter {
     if (!schemaName) return null;
     try {
       const schema = this._resolveSchema(schemaName);
-      if (schema.hasVarArray) {
-        if (valueStr.length < schema.minWidth) return null;
-      } else if (valueStr.length !== schema.totalWidth) {
-        return null;
-      }
-      if (bitWidth != null && !schema.hasVarArray && bitWidth !== schema.totalWidth) return null;
+    if (schema.hasVarArray || schema.hasDynamicWidth) {
+      if (valueStr.length < schema.minWidth) return null;
+    } else if (valueStr.length !== schema.totalWidth) {
+      return null;
+    }
+    if (bitWidth != null && !schema.hasVarArray && !schema.hasDynamicWidth && bitWidth !== schema.totalWidth) return null;
       return SS.formatSchemaShowInline(
         valueStr,
         schema,
@@ -5285,18 +5305,26 @@ class Interpreter {
     const schema = this._resolveSchema(schemaName);
     const wireDeclared = this.getBitWidth(wire.type) || valueStr.length;
     let widthForValidate = wireDeclared;
-    if (!schema.hasVarArray && schema.totalWidth === valueStr.length && wireDeclared > schema.totalWidth) {
+    if (!schema.hasVarArray && !schema.hasDynamicWidth && schema.totalWidth === valueStr.length && wireDeclared > schema.totalWidth) {
       widthForValidate = schema.totalWidth;
     }
     SS.validateSchemaWidthForShow(schema, widthForValidate);
     const declaredWidth = wireDeclared;
     const effectiveCounts = SS.effectiveVarArrayCountsForWire(schema, wire.varArrayCounts || {});
-    const schemaUsed = SS.totalRuntimeWidth(schema, effectiveCounts);
+    let schemaUsed;
+    if (schema.hasVarArray) {
+      schemaUsed = SS.totalRuntimeWidth(schema, effectiveCounts);
+    } else if (schema.hasDynamicWidth) {
+      schemaUsed = valueStr.length;
+    } else {
+      schemaUsed = SS.totalRuntimeWidth(schema, effectiveCounts);
+    }
     const payloadBits = valueStr.length >= schemaUsed ? valueStr.substring(0, schemaUsed) : valueStr;
     const showOpts = Object.assign({}, opts || {}, {
       varArrayCounts: effectiveCounts,
       wireBits: payloadBits,
       schema,
+      resolveSchemaRef: (name) => this._resolveSchema(name),
     });
     const typeLabel = displayName
       ? `${displayName} (${this.getWireTypeLabel(wire)})`

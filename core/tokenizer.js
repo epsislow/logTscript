@@ -292,7 +292,14 @@ pushSource({ src, alias }) {
   }
 
   // Logic literal prefix ?X1X (MODE ZSTATE) — before generic symbols
+  // Schema optional field `name?:` uses bare `?` before `:`
   if (c === '?') {
+    let j = this.i + 1;
+    while (j < this.src.length && /\s/.test(this.src[j])) j++;
+    if (j < this.src.length && this.src[j] === ':') {
+      this.next();
+      return this.token('SYM', '?');
+    }
     this.next();
     let v = '';
     while (!this.eof() && /[01XZ]/i.test(this.peek())) {

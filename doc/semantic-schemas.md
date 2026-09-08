@@ -460,6 +460,146 @@ Within one script, referenced schemas must be defined in the same unit (or loade
 
 ---
 
+## Recursive schemas (`bound` and union `?`)
+
+For **tree-shaped** data (expression ASTs, tagged unions, recursive structures), schemas combine three features:
+
+| Syntax | Meaning |
+|--------|---------|
+| `field: bound <schema>` | **Bit-bounded substream** — each instance is a **16-bit unsigned length** prefix followed by the payload bits for one `<schema>` instance |
+| `branch?: <schema>` | **Union variant** — optional field name with `?`; exactly **one** branch may be present at that level in a literal or on the wire |
+| `branch?: <schema>: … :` | **Inline sugar** — same as a separate `<schema>:` block plus the union field (only when the field is optional with `?`) |
+
+**Nested fixed-width** composition (`field:<schema>` without `bound`) is unchanged — same fixed bit layout and access paths as before.
+
+### Minimal expression tree
+
+```logts
+<number>:
+    value: 8
+:
+
+<add>:
+    left: bound <expr>
+    right: bound <expr>
+:
+
+<expr>:
+    number?: <number>
+    add?: <add>
+:
+```
+
+- **`bound <expr>`** on `left` / `right` allows recursive children; self-reference requires `bound` (fixed nested refs cannot flatten a recursive type).
+- **Union `?`** on `number?` / `add?` — wire layout is **4-bit variant tag** + payload. A literal must fill **one** branch only.
+- Nested grouped literals use the **schema tag** on each group: `{ value=\2 }<number>`, `{ … }<add>`, `{ … }<expr>`.
+
+**Load & Run** — number leaf, then a small `add` tree; read a deep field:
+
+```logts-play
+<number>:
+    value: 8
+:
+
+<add>:
+    left: bound <expr>
+    right: bound <expr>
+:
+
+<expr>:
+    number?: <number>
+    add?: <add>
+:
+
+12wire<expr> num = { number={ value=\2 }<number> }<expr>
+60wire<expr> tree = {
+    add={
+        left={ number={ value=\2 }<number> }<expr>
+        right={ number={ value=\3 }<number> }<expr>
+    }<add>
+}<expr>
+8wire leftVal = tree:add:left:number:value
+show(tree)
+```
+
+After **Load & Run**: `num` is 12 bits (tag + 8-bit payload); `tree` is 60 bits; `leftVal` reads `00000010` (decimal 2). **Output** shows the nested `add` / `number` / `value` tree from `show(tree)`.
+
+Same script under **wave** propagation (`logts-play wave` badge) produces the same field values.
+
+### Inline sugar (equivalent blocks)
+
+These two forms are equivalent:
+
+```logts
+<add>:
+    left: bound <expr>
+    right: bound <expr>
+:
+
+<expr>:
+    number?: <number>
+    add?: <add>
+:
+```
+
+```logts
+<expr>:
+    number?: <number>: value: 8 :
+    add?: <add>: left: bound <expr>  right: bound <expr> :
+:
+```
+
+**Load & Run** — inline sugar packs the same bits as separate blocks:
+
+```logts-play
+<number>:
+    value: 8
+:
+
+<expr>:
+    number?: <number>: value: 8 :
+    add?: <add>: left: bound <expr>  right: bound <expr> :
+:
+
+12wire<expr> ast = { number={ value=\5 }<number> }<expr>
+```
+
+### Union rules and errors
+
+| Rule | Detail |
+|------|--------|
+| One branch per level | `{ number=… add=… }<expr>` with both branches set → error |
+| Tag on wire | 4-bit variant index (declaration order of `?` fields) |
+| `bound` prefix | 16-bit unsigned bit length before each bounded payload |
+| Field access | Full path through union and bound layers, e.g. `tree:add:left:number:value` |
+| `show(wire)` | Indented tree with active union branch and nested bounded children |
+
+**Load & Run** — union rejects two branches at once (expect an error in **Output**):
+
+```logts
+<number>:
+    value: 8
+:
+
+<add>:
+    left: bound <expr>
+    right: bound <expr>
+:
+
+<expr>:
+    number?: <number>
+    add?: <add>
+:
+
+60wire<expr> bad = { number={ value=\1 }<number> add={ left={ number={ value=\2 }<number> }<expr> }<add> }<expr>
+```
+
+Message: `Union schema 'expr' allows at most one branch; multiple provided`.
+
+Wave and legacy propagation produce the same literal packing, field reads, and error messages for these schemas.
+
+---
+
 ## Error reference
 
 | Situation | Message (example) |
@@ -476,6 +616,11 @@ Within one script, referenced schemas must be defined in the same unit (or loade
 | Unknown schema | `Unknown schema 'opcode'` |
 | Reserved schema name | `Reserved schema name 'none' — choose another name for a user-defined schema` |
 | Ambiguous variable layout | `Ambiguous variable array layout for schema '…'` — see [Variable arrays (1D)](schema-variable-arrays.md) |
+| Union — no branch | `Union schema 'expr' requires exactly one branch; none provided` |
+| Union — two branches | `Union schema 'expr' allows at most one branch; multiple provided` |
+| Union — wrong path | `Union schema 'expr' active variant is 'number', not 'add'` |
+| Missing bound field | `Missing bound field 'left' in schema 'add'` |
+| Unknown union tag | `Unknown union variant index N in schema 'expr'` |
 
 ---
 

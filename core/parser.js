@@ -154,19 +154,16 @@ class Parser {
     return name;
   }
 
-  parseSchemaDecl() {
-    const name = this.parseSchemaRef();
-    this.eat('SYM', ':');
+  _parseSchemaBodyFields(parentName) {
     const fields = [];
     while (true) {
       while (this.c.type === 'EOL') {
         this.c = this.t.get();
       }
       if (this.c.type === 'EOF') {
-        throw Error(`Unclosed schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        throw Error(`Unclosed schema '${parentName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
       if (this.c.type === 'SYM' && this.c.value === ':') {
-        this.eat('SYM', ':');
         break;
       }
       if (this.c.type === 'SYM' && this.c.value === '<') {
@@ -177,113 +174,158 @@ class Parser {
         }
         continue;
       }
-      if (this.c.type !== 'ID') {
-        throw Error(`Expected field name in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-      const fieldName = this.c.value;
-      this.eat('ID');
-      this.eat('SYM', ':');
-      if (this.c.type === 'SYM' && this.c.value === '<') {
-        const ref = this.parseSchemaRef();
-        const shape = this.parseSchemaArraySuffix();
-        if (shape && (shape.varRange || shape.countRef || shape.countRefDim === 'both')) {
-          if (shape.countRefDim === 'both') {
-            this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
-            this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
-          } else if (shape.countRef) {
-            this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
-          } else if (shape.rowsSpec && shape.rowsSpec.countRef) {
-            this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
-          } else if (shape.colsSpec && shape.colsSpec.countRef) {
-            this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
-          }
-          fields.push({
-            kind: 'schema_var_array',
-            name: fieldName,
-            ref,
-            countRef: shape.countRef || null,
-            countRefDim: shape.countRefDim || null,
-            minCount: shape.minCount,
-            maxCount: shape.maxCount,
-            singleDim: shape.singleDim !== false,
-            matrixVar: !!shape.matrixVar,
-            rowsSpec: shape.rowsSpec || null,
-            colsSpec: shape.colsSpec || null,
-          });
-        } else if (shape) {
-          fields.push({
-            kind: 'schema_array',
-            name: fieldName,
-            ref,
-            rows: shape.rows,
-            cols: shape.cols,
-            singleDim: shape.singleDim,
-          });
-        } else {
-          fields.push({ kind: 'nested', name: fieldName, ref });
-        }
-      } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
-        const width = parseInt(this.c.value, 10);
-        this.eat(this.c.type);
-        let sugarRange = null;
-        if (this.c.type === 'SYM' && this.c.value === '+') {
-          this.eat('SYM', '+');
-          sugarRange = { varRange: true, minCount: 1, maxCount: null };
-        } else if (this.c.type === 'SYM' && this.c.value === '*') {
-          this.eat('SYM', '*');
-          sugarRange = { varRange: true, minCount: 0, maxCount: null };
-        }
-        const shape = this.parseSchemaArraySuffix();
-        const varRange = (shape && shape.varRange) ? shape : sugarRange;
-        if (shape && (shape.countRef || shape.countRefDim === 'both')) {
-          if (shape.countRefDim === 'both') {
-            this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
-            this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
-          } else {
-            this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
-          }
-          fields.push({
-            kind: 'var_array',
-            name: fieldName,
-            elementWidth: width,
-            countRef: shape.countRef || null,
-            countRefDim: shape.countRefDim || null,
-            singleDim: shape.singleDim !== false,
-            matrixVar: !!shape.matrixVar,
-            rowsSpec: shape.rowsSpec || null,
-            colsSpec: shape.colsSpec || null,
-          });
-        } else if (varRange) {
-          fields.push({
-            kind: 'var_array',
-            name: fieldName,
-            elementWidth: width,
-            minCount: varRange.minCount,
-            maxCount: varRange.maxCount,
-            singleDim: varRange.singleDim !== false,
-            matrixVar: !!varRange.matrixVar,
-            rowsSpec: varRange.rowsSpec || null,
-            colsSpec: varRange.colsSpec || null,
-          });
-        } else if (shape) {
-          fields.push({
-            kind: 'array',
-            name: fieldName,
-            elementWidth: width,
-            rows: shape.rows,
-            cols: shape.cols,
-            singleDim: shape.singleDim,
-          });
-        } else {
-          fields.push({ kind: 'leaf', name: fieldName, width });
-        }
-      } else {
-        throw Error(`Expected field width or schema ref for '${fieldName}' in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
+      fields.push(this._parseOneSchemaField(parentName, fields));
       while (this.c.type === 'EOL') {
         this.c = this.t.get();
       }
     }
+    return fields;
+  }
+
+  _parseOneSchemaField(name, fields) {
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected field name in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const fieldName = this.c.value;
+    this.eat('ID');
+    let optional = false;
+    if (this.c.type === 'SYM' && this.c.value === '?') {
+      optional = true;
+      this.eat('SYM', '?');
+    }
+    this.eat('SYM', ':');
+    let isBound = false;
+    if (this.c.type === 'ID' && this.c.value === 'bound') {
+      isBound = true;
+      this.eat('ID');
+    }
+    if (this.c.type === 'SYM' && this.c.value === '<') {
+      const ref = this.parseSchemaRef();
+      let inlineFields = null;
+      if (optional && this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        inlineFields = this._parseSchemaBodyFields(ref);
+        this.eat('SYM', ':');
+      }
+      const shape = this.parseSchemaArraySuffix();
+      if (isBound) {
+        if (optional) {
+          throw Error(`Optional '?' with bound <schema> is not supported here at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        if (shape) {
+          throw Error(`bound <schema> with array suffix is not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        return { kind: 'bound', name: fieldName, ref, inlineFields };
+      }
+      if (optional) {
+        if (shape) {
+          throw Error(`Union variant '${fieldName}?' cannot use array suffix at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        return { kind: 'union_variant', name: fieldName, ref, optional: true, inlineFields };
+      }
+      if (shape && (shape.varRange || shape.countRef || shape.countRefDim === 'both')) {
+        if (shape.countRefDim === 'both') {
+          this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
+          this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
+        } else if (shape.countRef) {
+          this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
+        } else if (shape.rowsSpec && shape.rowsSpec.countRef) {
+          this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
+        } else if (shape.colsSpec && shape.colsSpec.countRef) {
+          this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
+        }
+        return {
+          kind: 'schema_var_array',
+          name: fieldName,
+          ref,
+          countRef: shape.countRef || null,
+          countRefDim: shape.countRefDim || null,
+          minCount: shape.minCount,
+          maxCount: shape.maxCount,
+          singleDim: shape.singleDim !== false,
+          matrixVar: !!shape.matrixVar,
+          rowsSpec: shape.rowsSpec || null,
+          colsSpec: shape.colsSpec || null,
+        };
+      }
+      if (shape) {
+        return {
+          kind: 'schema_array',
+          name: fieldName,
+          ref,
+          rows: shape.rows,
+          cols: shape.cols,
+          singleDim: shape.singleDim,
+          inlineFields,
+        };
+      }
+      return { kind: 'nested', name: fieldName, ref, inlineFields };
+    }
+    if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+      const width = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      let sugarRange = null;
+      if (this.c.type === 'SYM' && this.c.value === '+') {
+        this.eat('SYM', '+');
+        sugarRange = { varRange: true, minCount: 1, maxCount: null };
+      } else if (this.c.type === 'SYM' && this.c.value === '*') {
+        this.eat('SYM', '*');
+        sugarRange = { varRange: true, minCount: 0, maxCount: null };
+      }
+      const shape = this.parseSchemaArraySuffix();
+      const varRange = (shape && shape.varRange) ? shape : sugarRange;
+      if (shape && (shape.countRef || shape.countRefDim === 'both')) {
+        if (shape.countRefDim === 'both') {
+          this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
+          this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
+        } else {
+          this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
+        }
+        return {
+          kind: 'var_array',
+          name: fieldName,
+          elementWidth: width,
+          countRef: shape.countRef || null,
+          countRefDim: shape.countRefDim || null,
+          singleDim: shape.singleDim !== false,
+          matrixVar: !!shape.matrixVar,
+          rowsSpec: shape.rowsSpec || null,
+          colsSpec: shape.colsSpec || null,
+        };
+      }
+      if (varRange) {
+        return {
+          kind: 'var_array',
+          name: fieldName,
+          elementWidth: width,
+          minCount: varRange.minCount,
+          maxCount: varRange.maxCount,
+          singleDim: varRange.singleDim !== false,
+          matrixVar: !!varRange.matrixVar,
+          rowsSpec: varRange.rowsSpec || null,
+          colsSpec: varRange.colsSpec || null,
+        };
+      }
+      if (shape) {
+        return {
+          kind: 'array',
+          name: fieldName,
+          elementWidth: width,
+          rows: shape.rows,
+          cols: shape.cols,
+          singleDim: shape.singleDim,
+        };
+      }
+      return { kind: 'leaf', name: fieldName, width };
+    }
+    throw Error(`Expected field width or schema ref for '${fieldName}' in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  parseSchemaDecl() {
+    const name = this.parseSchemaRef();
+    this.eat('SYM', ':');
+    const fields = this._parseSchemaBodyFields(name);
+    this.eat('SYM', ':');
     return { name, fields };
   }
 

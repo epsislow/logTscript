@@ -7,6 +7,10 @@
 
   const RESERVED_SCHEMA_NAMES = new Set(['none']);
 
+  function schemaBoundModule() {
+    return typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
+  }
+
   function assertSchemaNameAllowed(name) {
     if (RESERVED_SCHEMA_NAMES.has(name)) {
       throw new Error(`Reserved schema name '${name}' — choose another name for a user-defined schema`);
@@ -53,6 +57,12 @@
         rowsSpec: spec.rowsSpec,
         colsSpec: spec.colsSpec,
       };
+    }
+    if (spec.kind === 'bound') {
+      return { kind: 'bound', name: spec.name, ref: spec.ref, inlineFields: spec.inlineFields || null };
+    }
+    if (spec.kind === 'union_variant') {
+      return { kind: 'union_variant', name: spec.name, ref: spec.ref, optional: !!spec.optional, inlineFields: spec.inlineFields || null };
     }
     if (spec.ref && spec.name && spec.kind !== 'leaf') {
       return { kind: 'nested', name: spec.name, ref: spec.ref };
@@ -647,14 +657,38 @@
   }
 
   function applySchemaMinMaxMeta(schema) {
+    const SB = schemaBoundModule();
     let minWidth = 0;
     let maxWidth = 0;
     let maxOpen = false;
+    if (schema.isUnionRoot && SB) {
+      let minPayload = Infinity;
+      let maxPayload = 0;
+      for (const variant of schema.unionVariants || []) {
+        const sub = variant.schema;
+        const mm = SB.schemaPayloadMinMax(sub);
+        if (mm.min < minPayload) minPayload = mm.min;
+        if (mm.open || sub.hasBound || sub.isUnionRoot || sub.hasDynamicWidth) maxOpen = true;
+        else if (mm.max > maxPayload) maxPayload = mm.max;
+      }
+      if (!Number.isFinite(minPayload)) minPayload = 0;
+      schema.minWidth = SB.UNION_TAG_BITS + minPayload;
+      schema.maxWidth = maxOpen ? null : SB.UNION_TAG_BITS + maxPayload;
+      schema.hasDynamicWidth = true;
+      schema.totalWidth = schema.minWidth;
+      return schema;
+    }
     for (const node of schema.structure) {
       if (node.kind === 'var_array') {
         minWidth += node.minWidth;
         if (node.maxWidth != null) maxWidth += node.maxWidth;
         else maxOpen = true;
+      } else if (node.kind === 'bound') {
+        minWidth += node.minWidth != null ? node.minWidth : node.width;
+        if (node.maxWidth != null) maxWidth += node.maxWidth;
+        else maxOpen = true;
+      } else if (node.kind === 'union_variant') {
+        continue;
       } else {
         minWidth += node.width;
         maxWidth += node.width;
@@ -663,7 +697,9 @@
     schema.minWidth = minWidth;
     schema.maxWidth = maxOpen ? null : maxWidth;
     schema.hasVarArray = schema.structure.some((n) => n.kind === 'var_array');
+    schema.hasDynamicWidth = schema.hasVarArray || schema.hasBound || schema.isUnionRoot;
     schema.totalWidth = minWidth;
+    if (schema.hasBound && maxOpen) schema.maxWidth = null;
     return schema;
   }
 
@@ -793,23 +829,39 @@
 
   function getResolvedSchema(refName, ctx) {
     if (ctx.registry.has(refName)) {
-      return ensureSchemaShape(ctx.registry.get(refName));
+      const existing = ctx.registry.get(refName);
+      if (existing._building) {
+        return ensureSchemaShape(existing);
+      }
+      return ensureSchemaShape(existing);
     }
     if (!ctx.pending || !ctx.pending.has(refName)) {
       throw new Error(`Unknown schema '${refName}'`);
     }
-    if (ctx.visiting.has(refName)) {
-      const chain = [...ctx.visiting, refName];
-      throw new Error(`Circular schema reference: ${chain.join(' → ')}`);
-    }
-    ctx.visiting.add(refName);
     const rawFields = ctx.pending.get(refName);
+    const shell = {
+      name: refName,
+      _building: true,
+      totalWidth: 0,
+      minWidth: 0,
+      maxWidth: 0,
+      structure: [],
+      leafPaths: new Map(),
+      rawFields: [],
+    };
+    ctx.registry.set(refName, shell);
     const def = buildResolvedSchema(refName, rawFields, ctx);
-    ctx.visiting.delete(refName);
-    if (!ctx.registry.has(refName)) {
-      ctx.registry.set(refName, def);
-    }
+    delete def._building;
+    ctx.registry.set(refName, def);
     return def;
+  }
+
+  function assertNoCircularNested(refName, sub, parentName) {
+    if (sub && sub._building) {
+      throw new Error(
+        `Circular schema reference: ${parentName} → ${refName} — use bound <${refName}> for recursive refs`
+      );
+    }
   }
 
   function appendStructureNodes(targetStructure, targetLeafPaths, subSchema, bitOffset, pathPrefix, duplicateContext) {
@@ -889,6 +941,7 @@
       }
       if (spec.kind === 'nested') {
         const sub = getResolvedSchema(spec.ref, ctx);
+        assertNoCircularNested(spec.ref, sub, name);
         const width = sub.totalWidth;
         if (!spec.name) {
           throw new Error(`Nested schema field requires a name in schema '${name}'`);
@@ -922,6 +975,44 @@
           });
         }
         bitStart += width;
+        continue;
+      }
+      if (spec.kind === 'bound') {
+        const sub = getResolvedSchema(spec.ref, ctx);
+        const SB = schemaBoundModule();
+        const mm = SB ? SB.boundFieldMinMax(sub) : { minWidth: 16 + sub.totalWidth, maxWidth: null, open: true };
+        if (leafPaths.has(spec.name)) {
+          throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
+        }
+        structure.push({
+          kind: 'bound',
+          name: spec.name,
+          width: mm.minWidth,
+          minWidth: mm.minWidth,
+          maxWidth: mm.maxWidth,
+          bitStart,
+          bitEnd: bitStart + mm.minWidth - 1,
+          schema: sub,
+          schemaRef: spec.ref,
+        });
+        bitStart += mm.minWidth;
+        continue;
+      }
+      if (spec.kind === 'union_variant') {
+        if (leafPaths.has(spec.name)) {
+          throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
+        }
+        const sub = getResolvedSchema(spec.ref, ctx);
+        structure.push({
+          kind: 'union_variant',
+          name: spec.name,
+          optional: !!spec.optional,
+          schema: sub,
+          schemaRef: spec.ref,
+          width: 0,
+          bitStart,
+          bitEnd: bitStart - 1,
+        });
         continue;
       }
       if (spec.kind === 'array') {
@@ -1097,6 +1188,10 @@
         const spec = normalizeRawFieldSpec(raw);
         if (spec.kind === 'merge') return { kind: 'merge', ref: spec.ref };
         if (spec.kind === 'nested') return { kind: 'nested', name: spec.name, ref: spec.ref };
+        if (spec.kind === 'bound') return { kind: 'bound', name: spec.name, ref: spec.ref };
+        if (spec.kind === 'union_variant') {
+          return { kind: 'union_variant', name: spec.name, ref: spec.ref, optional: !!spec.optional };
+        }
         if (spec.kind === 'array') {
           return {
             kind: 'array',
@@ -1150,6 +1245,17 @@
         return { kind: 'leaf', name: spec.name, width: spec.width };
       }),
     };
+    const unionNodes = structure.filter((n) => n.kind === 'union_variant');
+    if (unionNodes.length && unionNodes.length === structure.length) {
+      schema.isUnionRoot = true;
+      schema.unionVariants = unionNodes.map((node, index) => ({
+        name: node.name,
+        index,
+        schema: node.schema,
+        schemaRef: node.schemaRef,
+      }));
+    }
+    schema.hasBound = structure.some((n) => n.kind === 'bound');
     applySchemaMinMaxMeta(schema);
     return syncFieldsFromLeafPaths(schema);
   }
@@ -1177,9 +1283,13 @@
 
   function resolveSchemaDecls(stmtsOrDecls, registry, options) {
     if (!registry) throw new Error('schema registry missing');
-    const decls = Array.isArray(stmtsOrDecls) && stmtsOrDecls[0] && stmtsOrDecls[0].schemaDecl
+    let decls = Array.isArray(stmtsOrDecls) && stmtsOrDecls[0] && stmtsOrDecls[0].schemaDecl
       ? collectSchemaDeclsFromStmts(stmtsOrDecls)
       : stmtsOrDecls;
+    const SB = schemaBoundModule();
+    if (SB && typeof SB.expandInlineSchemaDecls === 'function') {
+      decls = SB.expandInlineSchemaDecls(decls);
+    }
     const pending = new Map();
     for (const decl of decls) {
       if (!decl || !decl.name) continue;
@@ -1191,23 +1301,17 @@
     const ctx = {
       registry,
       pending,
-      visiting: new Set(),
     };
     const resolved = [];
     for (const [name, rawFields] of pending) {
-      if (registry.has(name) && !(options && options.overwrite)) {
-        continue;
+      if (registry.has(name)) {
+        const existing = registry.get(name);
+        if (existing && !existing._building) {
+          continue;
+        }
       }
       const def = buildResolvedSchema(name, rawFields, ctx);
-      if (registry.has(name)) {
-        if (options && options.overwrite) {
-          registry.set(name, def);
-        } else {
-          throw new Error(`Duplicate schema '${name}'`);
-        }
-      } else {
-        registry.set(name, def);
-      }
+      registry.set(name, def);
       resolved.push(def);
     }
     return resolved;
@@ -1225,10 +1329,15 @@
   function validateSchemaWidth(schema, wireWidth) {
     if (!schema) return;
     ensureSchemaShape(schema);
-    if (schema.hasVarArray) {
+    if (schema.hasVarArray || schema.hasDynamicWidth) {
       if (wireWidth < schema.minWidth) {
         throw new Error(
           `width mismatch between ${schema.name} (min ${schema.minWidth}bit) and definition (${wireWidth}bit)`
+        );
+      }
+      if (!schema.hasVarArray && schema.maxWidth != null && wireWidth > schema.maxWidth) {
+        throw new Error(
+          `width mismatch between ${schema.name} (max ${schema.maxWidth}bit) and definition (${wireWidth}bit)`
         );
       }
       return;
@@ -1243,7 +1352,7 @@
   function validateSchemaWidthForShow(schema, wireWidth) {
     if (!schema) return;
     ensureSchemaShape(schema);
-    if (schema.hasVarArray) {
+    if (schema.hasVarArray || schema.hasDynamicWidth) {
       if (wireWidth < schema.minWidth) {
         throw new Error(
           `${schema.name} (min ${schema.minWidth}bit) width incompatible with wire (${wireWidth}bit)`
@@ -1570,6 +1679,11 @@
     throw new Error(`Invalid path for array field '${arrayNode.name}' in schema '${schemaName}'`);
   }
 
+  function absViewBits(opts, relativeStart, width) {
+    const bitStart = (opts && opts.absBitOffset ? opts.absBitOffset : 0) + relativeStart;
+    return { bitStart, bitEnd: bitStart + width - 1 };
+  }
+
   function resolveSchemaView(schema, path, opts) {
     ensureSchemaShape(schema);
     if (!path || !path.length) {
@@ -1578,6 +1692,121 @@
     const wireVar = opts && opts.wireVar;
     const rootName = schema.name;
     const varArrayCounts = (opts && opts.varArrayCounts) || {};
+    const wireBits = opts && opts.wireBits;
+
+    if (schema.isUnionRoot && wireBits) {
+      const unionCtx = activeUnionContext(schema, wireBits, opts);
+      const variantName = path[0];
+      if (variantName !== unionCtx.variant.name) {
+        throw new Error(
+          `Union schema '${schema.name}' active variant is '${unionCtx.variant.name}', not '${variantName}'`
+        );
+      }
+      if (path.length === 1) {
+        return {
+          kind: 'nested',
+          name: unionCtx.variant.name,
+          width: wireBits.length - unionCtx.payloadStart,
+          bitStart: unionCtx.payloadStart,
+          bitEnd: wireBits.length - 1,
+          schema: unionCtx.variant.schema,
+          path: path.slice(),
+        };
+      }
+      return resolveSchemaView(unionCtx.variant.schema, path.slice(1), {
+        ...opts,
+        wireVar,
+        wireBits: unionCtx.payloadBits,
+        absBitOffset: (opts.absBitOffset || 0) + unionCtx.payloadStart,
+      });
+    }
+
+    if (schema.hasBound && wireBits && !schema.hasVarArray) {
+      const SB = schemaBoundModule();
+      let offset = 0;
+      let currentSchema = schema;
+      let currentBits = wireBits;
+      let absBase = 0;
+      for (let i = 0; i < path.length; i++) {
+        const seg = path[i];
+        const boundNode = currentSchema.structure.find((n) => n.kind === 'bound' && n.name === seg);
+        if (boundNode) {
+          const sub = SB.readBoundSubstream(currentBits, offset);
+          const fieldAbsStart = absBase + offset;
+          if (i === path.length - 1) {
+            return {
+              kind: 'nested',
+              name: seg,
+              width: sub.totalWidth,
+              bitStart: fieldAbsStart,
+              bitEnd: fieldAbsStart + sub.totalWidth - 1,
+              schema: boundNode.schema,
+              path: path.slice(0, i + 1),
+            };
+          }
+          const inner = resolveSchemaView(schemaFromRef(boundNode, opts), path.slice(i + 1), {
+            ...opts,
+            wireVar,
+            wireBits: sub.payloadBits,
+            absBitOffset: (opts.absBitOffset || 0) + fieldAbsStart + SB.BOUND_LEN_BITS,
+          });
+          return {
+            ...inner,
+            bitStart: (inner.bitStart || 0),
+            bitEnd: (inner.bitEnd != null ? inner.bitEnd : inner.bitStart || 0),
+            path: path.slice(),
+          };
+        }
+        const nestedNode = currentSchema.structure.find((n) => n.kind === 'nested' && n.name === seg);
+        if (nestedNode) {
+          if (i === path.length - 1) {
+            return {
+              kind: 'nested',
+              name: seg,
+              width: nestedNode.width,
+              bitStart: absBase + nestedNode.bitStart,
+              bitEnd: absBase + nestedNode.bitStart + nestedNode.width - 1,
+              schema: nestedNode.schema,
+              path: path.slice(0, i + 1),
+            };
+          }
+          return resolveSchemaView(nestedNode.schema, path.slice(i + 1), {
+            ...opts,
+            wireVar,
+            wireBits: currentBits.substring(nestedNode.bitStart, nestedNode.bitStart + nestedNode.width),
+          });
+        }
+        const remaining = path.slice(i);
+        const leaf = currentSchema.leafPaths.get(pathKeyFromSegments(remaining));
+        if (leaf) {
+          const abs = absViewBits(opts, absBase + leaf.bitStart, leaf.width);
+          return {
+            kind: 'leaf',
+            name: leaf.name,
+            width: leaf.width,
+            bitStart: abs.bitStart,
+            bitEnd: abs.bitEnd,
+            path: path.slice(),
+          };
+        }
+        if (remaining.length === 1) {
+          const segLeaf = currentSchema.structure.find((n) => n.kind === 'leaf' && n.name === seg);
+          if (segLeaf) {
+            const abs = absViewBits(opts, absBase + segLeaf.bitStart, segLeaf.width);
+            return {
+              kind: 'leaf',
+              name: segLeaf.name,
+              width: segLeaf.width,
+              bitStart: abs.bitStart,
+              bitEnd: abs.bitEnd,
+              path: path.slice(),
+            };
+          }
+        }
+        break;
+      }
+    }
+
     const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts) : null;
 
     let currentSchema = schema;
@@ -1621,25 +1850,27 @@
       const key = pathKeyFromSegments(remaining);
       const leaf = currentSchema.leafPaths.get(key);
       if (leaf && !offsets) {
+        const abs = absViewBits(opts, absBase + leaf.bitStart, leaf.width);
         return {
           kind: 'leaf',
           name: leaf.name,
           width: leaf.width,
-          bitStart: absBase + leaf.bitStart,
-          bitEnd: absBase + leaf.bitEnd,
+          bitStart: abs.bitStart,
+          bitEnd: abs.bitEnd,
           path: path.slice(),
         };
       }
       if (remaining.length === 1) {
         const segLeaf = currentSchema.structure.find((n) => n.kind === 'leaf' && n.name === seg);
         if (segLeaf) {
-          const bitStart = offsets ? offsets.get(segLeaf.name) : absBase + segLeaf.bitStart;
+          const relStart = offsets ? offsets.get(segLeaf.name) : absBase + segLeaf.bitStart;
+          const abs = absViewBits(opts, relStart, segLeaf.width);
           return {
             kind: 'leaf',
             name: segLeaf.name,
             width: segLeaf.width,
-            bitStart,
-            bitEnd: bitStart + segLeaf.width - 1,
+            bitStart: abs.bitStart,
+            bitEnd: abs.bitEnd,
             path: path.slice(),
           };
         }
@@ -1731,8 +1962,12 @@
 
   function extractViewBits(bits, schema, view) {
     const s = bits == null ? '' : String(bits);
-    if (s.length < schema.totalWidth) {
+    const needLen = schema.hasDynamicWidth ? (view.bitEnd + 1) : schema.totalWidth;
+    if (!schema.hasDynamicWidth && s.length < schema.totalWidth) {
       throw new Error(`Wire value shorter than schema '${schema.name}' (${s.length} < ${schema.totalWidth})`);
+    }
+    if (schema.hasDynamicWidth && s.length < view.bitStart + view.width) {
+      throw new Error(`Wire value too short for field in schema '${schema.name}'`);
     }
     if (view.kind === 'array_col') {
       return gatherSchemaArrayColumnBits(s, schema, view);
@@ -1792,9 +2027,93 @@
     return base.substring(0, bitStart) + fv + base.substring(bitStart + width);
   }
 
+  function computeSequentialOffsets(schema, wireBits) {
+    const SB = schemaBoundModule();
+    const offsets = new Map();
+    const bits = wireBits == null ? '' : String(wireBits);
+    let offset = 0;
+    for (const node of schema.structure) {
+      offsets.set(node.name, offset);
+      if (node.kind === 'bound' && SB) {
+        const sub = SB.readBoundSubstream(bits, offset);
+        offsets.set(`${node.name}.__payload`, sub.payloadBits);
+        offset += sub.totalWidth;
+      } else if (node.kind === 'var_array') {
+        offset += node.minWidth;
+      } else if (node.kind !== 'union_variant') {
+        offset += node.width;
+      }
+    }
+    offsets.set('.__total', offset);
+    return offsets;
+  }
+
+  function schemaFromRef(node, opts) {
+    if (opts && typeof opts.resolveSchemaRef === 'function' && node.schemaRef) {
+      return opts.resolveSchemaRef(node.schemaRef);
+    }
+    return node.schema;
+  }
+
+  function activeUnionContext(schema, wireBits, opts) {
+    const SB = schemaBoundModule();
+    if (!schema.isUnionRoot || !SB) return null;
+    const bits = wireBits == null ? '' : String(wireBits);
+    if (bits.length < SB.UNION_TAG_BITS) {
+      throw new Error(`Wire too short for union schema '${schema.name}'`);
+    }
+    const tagged = SB.readUnionTag(bits, 0);
+    const variant = SB.findUnionVariantByIndex(schema, tagged.tag);
+    if (!variant) {
+      throw new Error(`Unknown union variant index ${tagged.tag} in schema '${schema.name}'`);
+    }
+    const variantSchema = schemaFromRef(variant, opts) || variant.schema;
+    return {
+      variant: { ...variant, schema: variantSchema },
+      payloadBits: bits.substring(tagged.payloadStart),
+      payloadStart: tagged.payloadStart,
+    };
+  }
+
   function buildSchemaLiteralBits(schema, fieldValues, options) {
     ensureSchemaShape(schema);
+    const SB = schemaBoundModule();
     const varArrayCounts = {};
+    if (schema.isUnionRoot && SB) {
+      const branch = SB.validateUnionLiteral(fieldValues, schema.unionVariants, schema.name);
+      const variant = SB.findUnionVariant(schema, branch);
+      const payload = fieldValues[branch];
+      if (payload == null || payload === '') {
+        throw new Error(`Missing union branch '${branch}' in schema '${schema.name}'`);
+      }
+      const bits = SB.packUnionPayload(variant.index, String(payload));
+      return { bits, varArrayCounts };
+    }
+    if ((schema.hasBound || schema.isUnionRoot) && SB && !schema.hasVarArray) {
+      let bits = '';
+      for (const node of schema.structure) {
+        if (node.kind === 'bound') {
+          const payload = fieldValues[node.name];
+          if (payload == null || payload === '') {
+            throw new Error(`Missing bound field '${node.name}' in schema '${schema.name}'`);
+          }
+          bits += SB.packBoundPayload(String(payload));
+        } else if (node.kind === 'leaf') {
+          const val = fieldValues[node.name];
+          if (val == null) {
+            throw new Error(`Missing field '${node.name}' in schema '${schema.name}'`);
+          }
+          bits += normalizeSliceBits(val, node.width);
+        } else if (node.kind === 'nested' || node.kind === 'array') {
+          const val = fieldValues[node.name];
+          if (val == null) {
+            throw new Error(`Missing field '${node.name}' in schema '${schema.name}'`);
+          }
+          bits += String(val);
+        }
+      }
+      return { bits, varArrayCounts };
+    }
     const declaredWidth = options && options.declaredWidth;
     let bits = declaredWidth != null ? '0'.repeat(declaredWidth) : '0'.repeat(schema.totalWidth);
     for (const [key, val] of Object.entries(fieldValues || {})) {
@@ -1892,17 +2211,31 @@
     ensureSchemaShape(schema);
     const pad = '  '.repeat(indent);
     const varArrayCounts = (opts && opts.varArrayCounts) || {};
-    const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts) : null;
+    const SB = schemaBoundModule();
+    if (schema.isUnionRoot && SB) {
+      const unionCtx = activeUnionContext(schema, bits, opts);
+      lines.push(`${pad}${unionCtx.variant.name}`);
+      appendSchemaShowTreeLines(lines, unionCtx.payloadBits, unionCtx.variant.schema, opts, formatValueFn, indent + 1);
+      return;
+    }
+    const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts)
+      : (schema.hasBound ? computeSequentialOffsets(schema, bits) : null);
     for (const node of schema.structure) {
       const nodeStart = offsets ? offsets.get(node.name) : node.bitStart;
       const nodeWidth = node.kind === 'var_array'
         ? node.elementWidth * (varArrayCounts[node.name] != null ? varArrayCounts[node.name] : node.minCount)
-        : node.width;
+        : (node.kind === 'bound' && SB
+          ? SB.readBoundSubstream(bits, nodeStart).totalWidth
+          : node.width);
       if (node.kind === 'leaf') {
         const fieldBits = bits.substring(nodeStart, nodeStart + node.width);
         const formatted = formatSchemaFieldValue(fieldBits, node.width, opts, formatValueFn);
         const padName = node.name.padEnd(Math.max(10 - indent * 2, 4), ' ');
         lines.push(`${pad}${padName}= ${formatted}`);
+      } else if (node.kind === 'bound' && SB) {
+        const sub = SB.readBoundSubstream(bits, nodeStart);
+        lines.push(`${pad}${node.name}`);
+        appendSchemaShowTreeLines(lines, sub.payloadBits, schemaFromRef(node, opts), opts, formatValueFn, indent + 1);
       } else if (node.kind === 'nested') {
         lines.push(`${pad}${node.name}`);
         const subBits = bits.substring(nodeStart, nodeStart + node.width);
@@ -2013,7 +2346,8 @@
 
   function formatSchemaShowLines(bits, schema, opts, formatValueFn, wireTypeLabel) {
     ensureSchemaShape(schema);
-    if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array' || n.kind === 'var_array')) {
+    if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array' || n.kind === 'var_array' || n.kind === 'bound')
+        || schema.isUnionRoot) {
       return formatSchemaShowTree(bits, schema, opts, formatValueFn, wireTypeLabel);
     }
     const lines = [];

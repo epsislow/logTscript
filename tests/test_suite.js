@@ -54032,5 +54032,125 @@ rule statement = assignStmt | exprStmt;
     h.assert('CallVariable', factor.alternatives[2].call, 'CallVariable');
   });
 
+  const F2A_NUMBER = [
+    '<number>:',
+    '    value: 8',
+    ':',
+  ].join('\n');
+
+  const F2A_ADD = [
+    '<add>:',
+    '    left: bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2A_EXPR = [
+    '<expr>:',
+    '    number?: <number>',
+    '    add?: <add>',
+    ':',
+  ].join('\n');
+
+  const F2A_EXPR_INLINE = [
+    '<expr>:',
+    '    number?: <number>: value: 8 :',
+    '    add?: <add>: left: bound <expr>  right: bound <expr> :',
+    ':',
+  ].join('\n');
+
+  const F2A_CORE = F2A_NUMBER + '\n' + F2A_ADD + '\n' + F2A_EXPR;
+
+  reg(4971, 'semantic-schemas', 'circular recursive schemas with bound resolve', function(h, session) {
+    session.run(F2A_CORE);
+    h.assert('expr union variants', session.interp.schemaRegistry.has('expr'), true);
+    h.assert('add bound fields', session.interp.schemaRegistry.has('add'), true);
+  });
+
+  reg(4972, 'semantic-schemas', 'union number literal packs tag and payload', function(h, session) {
+    session.run(F2A_CORE + '\n12wire<expr> ast = { number={ value=\\2 }<number> }<expr>');
+    const bits = session.getWire(session.interp, 'ast');
+    h.assert('number literal width', bits.length, 12);
+    h.assert('number tag', bits.substring(0, 4), '0000');
+  });
+
+  reg(4973, 'semantic-schemas', 'recursive add literal with bound children', function(h, session) {
+    session.run(F2A_CORE + [
+      '60wire<expr> ast = {',
+      '  add={',
+      '    left={ number={ value=\\2 }<number> }<expr>',
+      '    right={ number={ value=\\3 }<number> }<expr>',
+      '  }<add>',
+      '}<expr>',
+    ].join('\n'));
+    const bits = session.getWire(session.interp, 'ast');
+    h.assert('add literal width', bits.length, 60);
+  });
+
+  reg(4974, 'semantic-schemas', 'union literal rejects two branches', function(h, session) {
+    session.run(F2A_CORE + '\n60wire<expr> ast = { number={ value=\\1 }<number> add={ left={ number={ value=\\2 }<number> }<expr> }<add> }<expr>');
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('union two branches error', err && err.message.indexOf('at most one branch') >= 0, true);
+  });
+
+  reg(4975, 'semantic-schemas', 'inline sugar desugars to separate blocks', function(h, session) {
+    session.run(F2A_NUMBER + '\n' + F2A_ADD + '\n' + F2A_EXPR_INLINE + '\n12wire<expr> ast = { number={ value=\\5 }<number> }<expr>');
+    const bits = session.getWire(session.interp, 'ast');
+    h.assert('inline sugar width', bits.length, 12);
+    h.assert('inline value low bits', bits.substring(bits.length - 8), '00000101');
+  });
+
+  reg(4976, 'semantic-schemas', 'nested fix schema unchanged regression', function(h, session) {
+    session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+      '16wire<instruction> instr = {',
+      '    opcode=\\5',
+      '    flags={ carry=1 zero=0 }<flags>',
+      '    immediate=^0F',
+      '}<instruction>',
+      '1wire c = instr:flags:carry',
+    ].join('\n'));
+    h.assert('nested fix carry', session.getWire(session.interp, 'c'), '1');
+  });
+
+  function runF2aFieldAccess(h, session) {
+    session.run(F2A_CORE + [
+      '60wire<expr> ast = {',
+      '  add={',
+      '    left={ number={ value=\\2 }<number> }<expr>',
+      '    right={ number={ value=\\3 }<number> }<expr>',
+      '  }<add>',
+      '}<expr>',
+      '8wire v = ast:add:left:number:value',
+    ].join('\n'));
+    h.assert('deep field read', session.getWire(session.interp, 'v'), '00000010');
+    session.run(F2A_CORE + [
+      '60wire<expr> ast = {',
+      '  add={',
+      '    left={ number={ value=\\2 }<number> }<expr>',
+      '    right={ number={ value=\\3 }<number> }<expr>',
+      '  }<add>',
+      '}<expr>',
+      'ast:add:left:number:value := \\7',
+    ].join('\n'));
+    h.assert('deep field write', session.getWire(session.interp, 'ast').length, 60);
+  }
+
+  reg(4977, 'semantic-schemas', 'bound union field access read write legacy', runF2aFieldAccess);
+  reg(4978, 'semantic-schemas', 'bound union field access read write wave', runF2aFieldAccess, { propagation: 'wave' });
+
+  function runF2aShowTree(h, session) {
+    session.run(F2A_CORE + [
+      '60wire<expr> ast = { add={ left={ number={ value=\\2 }<number> }<expr> right={ number={ value=\\3 }<number> }<expr> }<add> }<expr>',
+      'show(ast)',
+    ].join('\n'));
+    const out = session.outIncludes(session.interp, 'add') ? session.interp.out.join('\n') : '';
+    h.assert('show has add branch', out.indexOf('add') >= 0, true);
+    h.assert('show has nested number', out.indexOf('number') >= 0, true);
+    h.assert('show has value field', out.indexOf('value') >= 0, true);
+  }
+
+  reg(4979, 'semantic-schemas', 'show nested bound union tree legacy', runF2aShowTree);
+  reg(4980, 'semantic-schemas', 'show nested bound union tree wave', runF2aShowTree, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();
