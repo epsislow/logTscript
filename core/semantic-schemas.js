@@ -59,10 +59,21 @@
       };
     }
     if (spec.kind === 'bound') {
-      return { kind: 'bound', name: spec.name, ref: spec.ref, inlineFields: spec.inlineFields || null };
+      return { kind: 'bound', name: spec.name, ref: spec.ref, optional: !!spec.optional, inlineFields: spec.inlineFields || null };
     }
-    if (spec.kind === 'union_variant') {
-      return { kind: 'union_variant', name: spec.name, ref: spec.ref, optional: !!spec.optional, inlineFields: spec.inlineFields || null };
+    if (spec.kind === 'bound_var_array') {
+      return {
+        kind: 'bound_var_array',
+        name: spec.name,
+        ref: spec.ref,
+        optional: !!spec.optional,
+        inlineFields: spec.inlineFields || null,
+        minCount: spec.minCount,
+        maxCount: spec.maxCount,
+      };
+    }
+    if (spec.kind === 'optional_field') {
+      return { kind: 'optional_field', name: spec.name, ref: spec.ref, inlineFields: spec.inlineFields || null };
     }
     if (spec.ref && spec.name && spec.kind !== 'leaf') {
       return { kind: 'nested', name: spec.name, ref: spec.ref };
@@ -661,19 +672,37 @@
     let minWidth = 0;
     let maxWidth = 0;
     let maxOpen = false;
-    if (schema.isUnionRoot && SB) {
-      let minPayload = Infinity;
+    if (schema.hasPresenceMask && SB) {
+      const maskBits = schema.presenceMaskBits || 0;
+      let minPayload = 0;
       let maxPayload = 0;
-      for (const variant of schema.unionVariants || []) {
-        const sub = variant.schema;
-        const mm = SB.schemaPayloadMinMax(sub);
-        if (mm.min < minPayload) minPayload = mm.min;
-        if (mm.open || sub.hasBound || sub.isUnionRoot || sub.hasDynamicWidth) maxOpen = true;
-        else if (mm.max > maxPayload) maxPayload = mm.max;
+      for (const node of schema.structure) {
+        if (node.kind === 'optional_field') {
+          const sub = node.schema;
+          const mm = node.isBound ? SB.boundFieldMinMax(sub) : SB.schemaPayloadMinMax(sub);
+          if (mm.open || (node.isBound && mm.maxWidth == null) || sub.hasDynamicWidth) maxOpen = true;
+          else maxPayload += node.isBound ? mm.maxWidth : mm.max;
+        } else if (node.kind === 'bound_var_array') {
+          const ew = node.elementMinWidth || node.minWidth;
+          const maxEw = node.elementMaxWidth;
+          minPayload += (node.minCount || 0) * ew;
+          if (maxEw == null || node.maxCount == null) maxOpen = true;
+          else maxPayload += (node.maxCount || 0) * maxEw;
+        } else if (node.kind === 'var_array') {
+          minPayload += node.minWidth;
+          if (node.maxWidth != null) maxPayload += node.maxWidth;
+          else maxOpen = true;
+        } else if (node.kind === 'bound') {
+          minPayload += node.minWidth != null ? node.minWidth : node.width;
+          if (node.maxWidth != null) maxPayload += node.maxWidth;
+          else maxOpen = true;
+        } else if (node.kind !== 'optional_field') {
+          minPayload += node.width;
+          maxPayload += node.width;
+        }
       }
-      if (!Number.isFinite(minPayload)) minPayload = 0;
-      schema.minWidth = SB.UNION_TAG_BITS + minPayload;
-      schema.maxWidth = maxOpen ? null : SB.UNION_TAG_BITS + maxPayload;
+      schema.minWidth = maskBits + minPayload;
+      schema.maxWidth = maxOpen ? null : maskBits + maxPayload;
       schema.hasDynamicWidth = true;
       schema.totalWidth = schema.minWidth;
       return schema;
@@ -687,7 +716,7 @@
         minWidth += node.minWidth != null ? node.minWidth : node.width;
         if (node.maxWidth != null) maxWidth += node.maxWidth;
         else maxOpen = true;
-      } else if (node.kind === 'union_variant') {
+      } else if (node.kind === 'optional_field') {
         continue;
       } else {
         minWidth += node.width;
@@ -697,7 +726,7 @@
     schema.minWidth = minWidth;
     schema.maxWidth = maxOpen ? null : maxWidth;
     schema.hasVarArray = schema.structure.some((n) => n.kind === 'var_array');
-    schema.hasDynamicWidth = schema.hasVarArray || schema.hasBound || schema.isUnionRoot;
+    schema.hasDynamicWidth = schema.hasVarArray || schema.hasBound || schema.hasPresenceMask;
     schema.totalWidth = minWidth;
     if (schema.hasBound && maxOpen) schema.maxWidth = null;
     return schema;
@@ -924,6 +953,7 @@
 
   function buildResolvedSchema(name, rawFields, ctx) {
     assertSchemaNameAllowed(name);
+    const hasPresenceMask = ctx.presenceMask && ctx.presenceMask.get(name);
     const structure = [];
     const leafPaths = new Map();
     let bitStart = 0;
@@ -984,6 +1014,28 @@
         if (leafPaths.has(spec.name)) {
           throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
         }
+        if (spec.optional && !hasPresenceMask) {
+          throw new Error(`Optional bound field '${spec.name}?' requires schema '<${name}>+' declaration`);
+        }
+        if (spec.optional) {
+          if (sub.hasDynamicWidth && !sub._building) {
+            /* bound wrapper required for variable payload */
+          }
+          structure.push({
+            kind: 'optional_field',
+            name: spec.name,
+            optional: true,
+            isBound: true,
+            schema: sub,
+            schemaRef: spec.ref,
+            minWidth: 0,
+            maxWidth: mm.maxWidth,
+            width: 0,
+            bitStart,
+            bitEnd: bitStart - 1,
+          });
+          continue;
+        }
         structure.push({
           kind: 'bound',
           name: spec.name,
@@ -998,18 +1050,70 @@
         bitStart += mm.minWidth;
         continue;
       }
-      if (spec.kind === 'union_variant') {
+      if (spec.kind === 'bound_var_array') {
+        const sub = getResolvedSchema(spec.ref, ctx);
+        const SB = schemaBoundModule();
+        const mm = SB ? SB.boundFieldMinMax(sub) : { minWidth: 16 + sub.totalWidth, maxWidth: null, open: true };
+        const minCount = spec.minCount != null ? spec.minCount : 0;
+        const maxCount = spec.maxCount != null ? spec.maxCount : null;
+        if (spec.optional && !hasPresenceMask) {
+          throw new Error(`Optional bound array '${spec.name}?' requires schema '<${name}>+' declaration`);
+        }
         if (leafPaths.has(spec.name)) {
           throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
         }
-        const sub = getResolvedSchema(spec.ref, ctx);
-        structure.push({
-          kind: 'union_variant',
+        const node = {
+          kind: 'bound_var_array',
           name: spec.name,
           optional: !!spec.optional,
           schema: sub,
           schemaRef: spec.ref,
+          minCount,
+          maxCount,
+          elementMinWidth: mm.minWidth,
+          elementMaxWidth: mm.maxWidth,
+          minWidth: minCount * mm.minWidth,
+          maxWidth: maxCount != null ? maxCount * mm.maxWidth : null,
           width: 0,
+          bitStart,
+          bitEnd: bitStart - 1,
+        };
+        if (spec.optional) {
+          structure.push({
+            ...node,
+            kind: 'optional_field',
+            isBoundVarArray: true,
+            isBound: true,
+          });
+        } else {
+          structure.push(node);
+          bitStart += node.minWidth;
+        }
+        continue;
+      }
+      if (spec.kind === 'optional_field') {
+        if (!hasPresenceMask) {
+          throw new Error(`Optional field '${spec.name}?' requires schema '<${name}>+' declaration`);
+        }
+        const sub = getResolvedSchema(spec.ref, ctx);
+        if (sub.hasDynamicWidth || sub.hasBound || sub.hasPresenceMask) {
+          throw new Error(
+            `Optional field '${spec.name}?' in schema '${name}' requires bound <${spec.ref}> for variable-width payload`
+          );
+        }
+        if (leafPaths.has(spec.name)) {
+          throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
+        }
+        structure.push({
+          kind: 'optional_field',
+          name: spec.name,
+          optional: true,
+          isBound: false,
+          schema: sub,
+          schemaRef: spec.ref,
+          width: sub.totalWidth,
+          minWidth: 0,
+          maxWidth: sub.totalWidth,
           bitStart,
           bitEnd: bitStart - 1,
         });
@@ -1184,13 +1288,17 @@
       totalWidth: bitStart,
       structure,
       leafPaths,
+      hasPresenceMask: !!hasPresenceMask,
       rawFields: rawFields.map((raw) => {
         const spec = normalizeRawFieldSpec(raw);
         if (spec.kind === 'merge') return { kind: 'merge', ref: spec.ref };
         if (spec.kind === 'nested') return { kind: 'nested', name: spec.name, ref: spec.ref };
-        if (spec.kind === 'bound') return { kind: 'bound', name: spec.name, ref: spec.ref };
-        if (spec.kind === 'union_variant') {
-          return { kind: 'union_variant', name: spec.name, ref: spec.ref, optional: !!spec.optional };
+        if (spec.kind === 'bound') return { kind: 'bound', name: spec.name, ref: spec.ref, optional: !!spec.optional };
+        if (spec.kind === 'bound_var_array') {
+          return { kind: 'bound_var_array', name: spec.name, ref: spec.ref, optional: !!spec.optional, minCount: spec.minCount, maxCount: spec.maxCount };
+        }
+        if (spec.kind === 'optional_field') {
+          return { kind: 'optional_field', name: spec.name, ref: spec.ref };
         }
         if (spec.kind === 'array') {
           return {
@@ -1245,17 +1353,20 @@
         return { kind: 'leaf', name: spec.name, width: spec.width };
       }),
     };
-    const unionNodes = structure.filter((n) => n.kind === 'union_variant');
-    if (unionNodes.length && unionNodes.length === structure.length) {
-      schema.isUnionRoot = true;
-      schema.unionVariants = unionNodes.map((node, index) => ({
-        name: node.name,
-        index,
-        schema: node.schema,
-        schemaRef: node.schemaRef,
-      }));
+    if (hasPresenceMask) {
+      schema.optionalFields = structure
+        .filter((n) => n.kind === 'optional_field')
+        .map((node, index) => ({
+          name: node.name,
+          index,
+          schema: node.schema,
+          schemaRef: node.schemaRef,
+          isBound: !!node.isBound,
+          isBoundVarArray: !!node.isBoundVarArray,
+        }));
+      schema.presenceMaskBits = schema.optionalFields.length;
     }
-    schema.hasBound = structure.some((n) => n.kind === 'bound');
+    schema.hasBound = structure.some((n) => n.kind === 'bound' || (n.kind === 'optional_field' && n.isBound));
     applySchemaMinMaxMeta(schema);
     return syncFieldsFromLeafPaths(schema);
   }
@@ -1291,16 +1402,19 @@
       decls = SB.expandInlineSchemaDecls(decls);
     }
     const pending = new Map();
+    const presenceMask = new Map();
     for (const decl of decls) {
       if (!decl || !decl.name) continue;
       if (pending.has(decl.name)) {
         throw new Error(`Duplicate schema '${decl.name}'`);
       }
       pending.set(decl.name, decl.fields || decl.rawFields || []);
+      presenceMask.set(decl.name, !!decl.hasPresenceMask);
     }
     const ctx = {
       registry,
       pending,
+      presenceMask,
     };
     const resolved = [];
     for (const [name, rawFields] of pending) {
@@ -1317,13 +1431,19 @@
     return resolved;
   }
 
-  function buildSchemaDef(name, fieldSpecs) {
+  function buildSchemaDef(name, fieldSpecs, options) {
     const rawFields = (fieldSpecs || []).map((spec) => {
       if (spec.kind) return spec;
       return { kind: 'leaf', name: spec.name, width: spec.width };
     });
     const registry = new Map();
-    return resolveSchemaComposition(name, rawFields, registry, new Map([[name, rawFields]]));
+    const presenceMask = new Map([[name, !!(options && options.hasPresenceMask)]]);
+    const ctx = {
+      registry,
+      pending: new Map([[name, rawFields]]),
+      presenceMask,
+    };
+    return buildResolvedSchema(name, rawFields, ctx);
   }
 
   function validateSchemaWidth(schema, wireWidth) {
@@ -1686,6 +1806,7 @@
 
   function resolveSchemaView(schema, path, opts) {
     ensureSchemaShape(schema);
+    const SB = schemaBoundModule();
     if (!path || !path.length) {
       throw new Error(`Empty schema field path in schema '${schema.name}'`);
     }
@@ -1694,34 +1815,169 @@
     const varArrayCounts = (opts && opts.varArrayCounts) || {};
     const wireBits = opts && opts.wireBits;
 
-    if (schema.isUnionRoot && wireBits) {
-      const unionCtx = activeUnionContext(schema, wireBits, opts);
-      const variantName = path[0];
-      if (variantName !== unionCtx.variant.name) {
-        throw new Error(
-          `Union schema '${schema.name}' active variant is '${unionCtx.variant.name}', not '${variantName}'`
-        );
+    if (wireBits && (schema.hasBound || schema.hasPresenceMask) && !schema.hasVarArray) {
+      const seqOffsets = computeSequentialOffsets(schema, wireBits);
+      let offset = 0;
+      let currentSchema = schema;
+      let currentBits = wireBits;
+      let absBase = opts.absBitOffset || 0;
+      for (let i = 0; i < path.length; i++) {
+        const seg = path[i];
+        const optNode = currentSchema.structure.find((n) => n.kind === 'optional_field' && n.name === seg);
+        if (optNode) {
+          const nodeOff = seqOffsets.get(seg);
+          if (nodeOff == null || nodeOff < 0) {
+            throw new Error(`Optional field '${seg}' is not present in schema '${currentSchema.name}'`);
+          }
+          let payloadBits = '';
+          let payloadAbs = absBase + nodeOff;
+          if (optNode.isBoundVarArray) {
+            const idx = segmentAsIndex(path[i + 1]);
+            if (idx == null) {
+              throw new Error(`Bound variable array '${seg}' requires numeric index`);
+            }
+            let elemOff = nodeOff;
+            let elemPayload = '';
+            for (let e = 0; e <= idx; e++) {
+              const sub = SB.readBoundSubstream(currentBits, elemOff);
+              if (e === idx) elemPayload = sub.payloadBits;
+              elemOff += sub.totalWidth;
+            }
+            return resolveSchemaView(optNode.schema, path.slice(i + 2), {
+              ...opts,
+              wireVar,
+              wireBits: elemPayload,
+              absBitOffset: payloadAbs + SB.BOUND_LEN_BITS,
+            });
+          }
+          if (optNode.isBound) {
+            const sub = SB.readBoundSubstream(currentBits, nodeOff);
+            payloadBits = sub.payloadBits;
+            payloadAbs += SB.BOUND_LEN_BITS;
+          } else {
+            payloadBits = currentBits.substring(nodeOff, nodeOff + optNode.schema.totalWidth);
+          }
+          if (i === path.length - 1) {
+            return {
+              kind: 'nested',
+              name: seg,
+              width: payloadBits.length,
+              bitStart: absBase + nodeOff,
+              bitEnd: absBase + nodeOff + payloadBits.length - 1,
+              schema: optNode.schema,
+              path: path.slice(0, i + 1),
+            };
+          }
+          return resolveSchemaView(optNode.schema, path.slice(i + 1), {
+            ...opts,
+            wireVar,
+            wireBits: payloadBits,
+            absBitOffset: payloadAbs,
+          });
+        }
+        const bvaNode = currentSchema.structure.find((n) => n.kind === 'bound_var_array' && n.name === seg);
+        if (bvaNode) {
+          const nodeOff = seqOffsets.get(seg);
+          const idx = segmentAsIndex(path[i + 1]);
+          if (idx == null) {
+            throw new Error(`Bound variable array '${seg}' requires numeric index`);
+          }
+          let elemOff = nodeOff;
+          let elemPayload = '';
+          let elemStart = nodeOff;
+          for (let e = 0; e <= idx; e++) {
+            const sub = SB.readBoundSubstream(currentBits, elemOff);
+            if (e === idx) {
+              elemPayload = sub.payloadBits;
+              elemStart = elemOff;
+            }
+            elemOff += sub.totalWidth;
+          }
+          return resolveSchemaView(bvaNode.schema, path.slice(i + 2), {
+            ...opts,
+            wireVar,
+            wireBits: elemPayload,
+            absBitOffset: absBase + elemStart + SB.BOUND_LEN_BITS,
+          });
+        }
+        const boundNode = currentSchema.structure.find((n) => n.kind === 'bound' && n.name === seg);
+        if (boundNode) {
+          const nodeOff = seqOffsets.get(seg);
+          const sub = SB.readBoundSubstream(currentBits, nodeOff);
+          const fieldAbsStart = absBase + nodeOff;
+          if (i === path.length - 1) {
+            return {
+              kind: 'nested',
+              name: seg,
+              width: sub.totalWidth,
+              bitStart: fieldAbsStart,
+              bitEnd: fieldAbsStart + sub.totalWidth - 1,
+              schema: boundNode.schema,
+              path: path.slice(0, i + 1),
+            };
+          }
+          return resolveSchemaView(schemaFromRef(boundNode, opts), path.slice(i + 1), {
+            ...opts,
+            wireVar,
+            wireBits: sub.payloadBits,
+            absBitOffset: fieldAbsStart + SB.BOUND_LEN_BITS,
+          });
+        }
+        const nestedNode = currentSchema.structure.find((n) => n.kind === 'nested' && n.name === seg);
+        if (nestedNode) {
+          const nodeOff = seqOffsets.get(seg);
+          if (i === path.length - 1) {
+            return {
+              kind: 'nested',
+              name: seg,
+              width: nestedNode.width,
+              bitStart: absBase + nodeOff,
+              bitEnd: absBase + nodeOff + nestedNode.width - 1,
+              schema: nestedNode.schema,
+              path: path.slice(0, i + 1),
+            };
+          }
+          return resolveSchemaView(nestedNode.schema, path.slice(i + 1), {
+            ...opts,
+            wireVar,
+            wireBits: currentBits.substring(nodeOff, nodeOff + nestedNode.width),
+            absBitOffset: absBase + nodeOff,
+          });
+        }
+        const remaining = path.slice(i);
+        const leaf = currentSchema.leafPaths.get(pathKeyFromSegments(remaining));
+        if (leaf) {
+          const nodeOff = seqOffsets.get(path[0]) != null ? seqOffsets.get(path[0]) : leaf.bitStart;
+          const abs = absViewBits(opts, absBase + (seqOffsets.has(leaf.path[0]) ? seqOffsets.get(leaf.path[0]) : leaf.bitStart), leaf.width);
+          return {
+            kind: 'leaf',
+            name: leaf.name,
+            width: leaf.width,
+            bitStart: abs.bitStart,
+            bitEnd: abs.bitEnd,
+            path: path.slice(),
+          };
+        }
+        if (remaining.length === 1) {
+          const segLeaf = currentSchema.structure.find((n) => n.kind === 'leaf' && n.name === seg);
+          if (segLeaf) {
+            const relStart = seqOffsets.get(segLeaf.name);
+            const abs = absViewBits(opts, absBase + relStart, segLeaf.width);
+            return {
+              kind: 'leaf',
+              name: segLeaf.name,
+              width: segLeaf.width,
+              bitStart: abs.bitStart,
+              bitEnd: abs.bitEnd,
+              path: path.slice(),
+            };
+          }
+        }
+        break;
       }
-      if (path.length === 1) {
-        return {
-          kind: 'nested',
-          name: unionCtx.variant.name,
-          width: wireBits.length - unionCtx.payloadStart,
-          bitStart: unionCtx.payloadStart,
-          bitEnd: wireBits.length - 1,
-          schema: unionCtx.variant.schema,
-          path: path.slice(),
-        };
-      }
-      return resolveSchemaView(unionCtx.variant.schema, path.slice(1), {
-        ...opts,
-        wireVar,
-        wireBits: unionCtx.payloadBits,
-        absBitOffset: (opts.absBitOffset || 0) + unionCtx.payloadStart,
-      });
     }
 
-    if (schema.hasBound && wireBits && !schema.hasVarArray) {
+    if (schema.hasBound && wireBits && !schema.hasVarArray && !schema.hasPresenceMask) {
       const SB = schemaBoundModule();
       let offset = 0;
       let currentSchema = schema;
@@ -2027,7 +2283,81 @@
     return base.substring(0, bitStart) + fv + base.substring(bitStart + width);
   }
 
+  function computePresenceMaskOffsets(schema, wireBits) {
+    const SB = schemaBoundModule();
+    const bits = wireBits == null ? '' : String(wireBits);
+    const offsets = new Map();
+    if (!schema.hasPresenceMask || !SB) {
+      offsets.set('.__total', bits.length);
+      return offsets;
+    }
+    const maskBits = schema.presenceMaskBits || 0;
+    const maskInfo = SB.readPresenceMask(bits, maskBits, 0);
+    offsets.set('.__mask', 0);
+    let offset = maskInfo.payloadStart;
+    let optIdx = 0;
+    for (const node of schema.structure) {
+      if (node.kind === 'optional_field') {
+        const present = maskInfo.mask.charAt(optIdx) === '1';
+        optIdx++;
+        if (!present) {
+          offsets.set(node.name, -1);
+          continue;
+        }
+        offsets.set(node.name, offset);
+        if (node.isBoundVarArray) {
+          let elemOff = offset;
+          let count = 0;
+          while (elemOff < bits.length) {
+            const sub = SB.readBoundSubstream(bits, elemOff);
+            if (sub.len === 0 && count >= (node.minCount || 0)) break;
+            elemOff += sub.totalWidth;
+            count++;
+            if (node.maxCount != null && count >= node.maxCount) break;
+          }
+          offsets.set(`${node.name}.__count`, count);
+          offset = elemOff;
+        } else if (node.isBound) {
+          const sub = SB.readBoundSubstream(bits, offset);
+          offsets.set(`${node.name}.__payload`, sub.payloadBits);
+          offset += sub.totalWidth;
+        } else {
+          offset += node.schema.totalWidth;
+        }
+      } else if (node.kind === 'bound' && SB) {
+        offsets.set(node.name, offset);
+        const sub = SB.readBoundSubstream(bits, offset);
+        offsets.set(`${node.name}.__payload`, sub.payloadBits);
+        offset += sub.totalWidth;
+      } else if (node.kind === 'bound_var_array' && SB) {
+        offsets.set(node.name, offset);
+        let elemOff = offset;
+        let count = 0;
+        while (elemOff < bits.length) {
+          const sub = SB.readBoundSubstream(bits, elemOff);
+          if (sub.len === 0 && count >= (node.minCount || 0)) break;
+          elemOff += sub.totalWidth;
+          count++;
+          if (node.maxCount != null && count >= node.maxCount) break;
+        }
+        offsets.set(`${node.name}.__count`, count);
+        offset = elemOff;
+      } else if (node.kind === 'var_array') {
+        offsets.set(node.name, offset);
+        offset += node.minWidth;
+      } else {
+        offsets.set(node.name, offset);
+        offset += node.width;
+      }
+    }
+    offsets.set('.__total', offset);
+    return offsets;
+  }
+
   function computeSequentialOffsets(schema, wireBits) {
+    if (schema.hasPresenceMask) {
+      return computePresenceMaskOffsets(schema, wireBits);
+    }
     const SB = schemaBoundModule();
     const offsets = new Map();
     const bits = wireBits == null ? '' : String(wireBits);
@@ -2040,7 +2370,7 @@
         offset += sub.totalWidth;
       } else if (node.kind === 'var_array') {
         offset += node.minWidth;
-      } else if (node.kind !== 'union_variant') {
+      } else {
         offset += node.width;
       }
     }
@@ -2055,23 +2385,61 @@
     return node.schema;
   }
 
-  function activeUnionContext(schema, wireBits, opts) {
+  function activePresenceContext(schema, wireBits, opts) {
     const SB = schemaBoundModule();
-    if (!schema.isUnionRoot || !SB) return null;
+    if (!schema.hasPresenceMask || !SB) return null;
     const bits = wireBits == null ? '' : String(wireBits);
-    if (bits.length < SB.UNION_TAG_BITS) {
-      throw new Error(`Wire too short for union schema '${schema.name}'`);
+    const maskBits = schema.presenceMaskBits || 0;
+    if (bits.length < maskBits) {
+      throw new Error(`Wire too short for schema '${schema.name}' presence mask (${maskBits} bits required)`);
     }
-    const tagged = SB.readUnionTag(bits, 0);
-    const variant = SB.findUnionVariantByIndex(schema, tagged.tag);
-    if (!variant) {
-      throw new Error(`Unknown union variant index ${tagged.tag} in schema '${schema.name}'`);
+    const maskInfo = SB.readPresenceMask(bits, maskBits, 0);
+    const fields = [];
+    let offset = maskInfo.payloadStart;
+    let optIdx = 0;
+    for (const node of schema.structure) {
+      if (node.kind !== 'optional_field') continue;
+      const present = maskInfo.mask.charAt(optIdx) === '1';
+      optIdx++;
+      const variantSchema = schemaFromRef(node, opts) || node.schema;
+      let payloadBits = '';
+      let payloadStart = offset;
+      if (present) {
+        if (node.isBoundVarArray) {
+          const elements = [];
+          let elemOff = offset;
+          while (elemOff < bits.length) {
+            const sub = SB.readBoundSubstream(bits, elemOff);
+            if (sub.len === 0 && elements.length >= (node.minCount || 0)) break;
+            elements.push(sub.payloadBits);
+            elemOff += sub.totalWidth;
+            if (node.maxCount != null && elements.length >= node.maxCount) break;
+          }
+          payloadBits = elements.join('');
+          offset = elemOff;
+        } else if (node.isBound) {
+          const sub = SB.readBoundSubstream(bits, offset);
+          payloadBits = sub.payloadBits;
+          offset += sub.totalWidth;
+        } else {
+          payloadBits = bits.substring(offset, offset + variantSchema.totalWidth);
+          offset += variantSchema.totalWidth;
+        }
+      }
+      fields.push({
+        name: node.name,
+        present,
+        schema: variantSchema,
+        payloadBits,
+        payloadStart,
+        isBound: !!node.isBound,
+        isBoundVarArray: !!node.isBoundVarArray,
+      });
     }
-    const variantSchema = schemaFromRef(variant, opts) || variant.schema;
     return {
-      variant: { ...variant, schema: variantSchema },
-      payloadBits: bits.substring(tagged.payloadStart),
-      payloadStart: tagged.payloadStart,
+      mask: maskInfo.mask,
+      payloadStart: maskInfo.payloadStart,
+      fields,
     };
   }
 
@@ -2079,17 +2447,54 @@
     ensureSchemaShape(schema);
     const SB = schemaBoundModule();
     const varArrayCounts = {};
-    if (schema.isUnionRoot && SB) {
-      const branch = SB.validateUnionLiteral(fieldValues, schema.unionVariants, schema.name);
-      const variant = SB.findUnionVariant(schema, branch);
-      const payload = fieldValues[branch];
-      if (payload == null || payload === '') {
-        throw new Error(`Missing union branch '${branch}' in schema '${schema.name}'`);
+    if (schema.hasPresenceMask && SB) {
+      const optionalNodes = schema.structure.filter((n) => n.kind === 'optional_field');
+      const mask = SB.buildPresenceMaskBits(optionalNodes, fieldValues);
+      let bits = SB.packPresenceMask(mask);
+      for (const node of optionalNodes) {
+        const val = fieldValues[node.name];
+        if (val == null || val === '') continue;
+        if (node.isBoundVarArray) {
+          bits += String(val);
+        } else if (node.isBound) {
+          bits += SB.packBoundPayload(String(val));
+        } else {
+          bits += String(val);
+        }
       }
-      const bits = SB.packUnionPayload(variant.index, String(payload));
+      for (const node of schema.structure) {
+        if (node.kind === 'bound') {
+          const payload = fieldValues[node.name];
+          if (payload == null || payload === '') {
+            throw new Error(`Missing bound field '${node.name}' in schema '${schema.name}'`);
+          }
+          bits += SB.packBoundPayload(String(payload));
+        } else if (node.kind === 'bound_var_array') {
+          const payload = fieldValues[node.name];
+          if (payload == null || payload === '') {
+            if ((node.minCount || 0) > 0) {
+              throw new Error(`Missing bound array field '${node.name}' in schema '${schema.name}'`);
+            }
+            continue;
+          }
+          bits += String(payload);
+        } else if (node.kind === 'leaf') {
+          const val = fieldValues[node.name];
+          if (val == null) {
+            throw new Error(`Missing field '${node.name}' in schema '${schema.name}'`);
+          }
+          bits += normalizeSliceBits(val, node.width);
+        } else if (node.kind === 'nested' || node.kind === 'array') {
+          const val = fieldValues[node.name];
+          if (val == null) {
+            throw new Error(`Missing field '${node.name}' in schema '${schema.name}'`);
+          }
+          bits += String(val);
+        }
+      }
       return { bits, varArrayCounts };
     }
-    if ((schema.hasBound || schema.isUnionRoot) && SB && !schema.hasVarArray) {
+    if (schema.hasBound && SB && !schema.hasVarArray) {
       let bits = '';
       for (const node of schema.structure) {
         if (node.kind === 'bound') {
@@ -2212,10 +2617,29 @@
     const pad = '  '.repeat(indent);
     const varArrayCounts = (opts && opts.varArrayCounts) || {};
     const SB = schemaBoundModule();
-    if (schema.isUnionRoot && SB) {
-      const unionCtx = activeUnionContext(schema, bits, opts);
-      lines.push(`${pad}${unionCtx.variant.name}`);
-      appendSchemaShowTreeLines(lines, unionCtx.payloadBits, unionCtx.variant.schema, opts, formatValueFn, indent + 1);
+    if (schema.hasPresenceMask && SB) {
+      const presenceCtx = activePresenceContext(schema, bits, opts);
+      for (const field of presenceCtx.fields) {
+        if (!field.present) continue;
+        lines.push(`${pad}${field.name}`);
+        if (field.isBoundVarArray) {
+          let elemOff = field.payloadStart;
+          let idx = 0;
+          const wireStr = bits;
+          while (elemOff < wireStr.length) {
+            const sub = SB.readBoundSubstream(wireStr, elemOff);
+            if (sub.len === 0 && idx > 0) break;
+            appendSchemaShowTreeLines(lines, sub.payloadBits, field.schema, opts, formatValueFn, indent + 1);
+            elemOff += sub.totalWidth;
+            idx++;
+          }
+          if (opts && opts.showVarArrayLength !== false) {
+            lines.push(`${pad}${field.name} has length [${idx}]`);
+          }
+        } else {
+          appendSchemaShowTreeLines(lines, field.payloadBits, field.schema, opts, formatValueFn, indent + 1);
+        }
+      }
       return;
     }
     const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts)
@@ -2346,8 +2770,8 @@
 
   function formatSchemaShowLines(bits, schema, opts, formatValueFn, wireTypeLabel) {
     ensureSchemaShape(schema);
-    if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array' || n.kind === 'var_array' || n.kind === 'bound')
-        || schema.isUnionRoot) {
+    if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array' || n.kind === 'var_array' || n.kind === 'bound' || n.kind === 'optional_field')
+        || schema.hasPresenceMask) {
       return formatSchemaShowTree(bits, schema, opts, formatValueFn, wireTypeLabel);
     }
     const lines = [];

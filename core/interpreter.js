@@ -4753,7 +4753,9 @@ class Interpreter {
     const SS = this._semanticSchemas();
     if (!SS || !s.schemaDecl) return;
     if (this.schemaRegistry.has(s.schemaDecl.name)) return;
-    const def = SS.buildSchemaDef(s.schemaDecl.name, s.schemaDecl.fields);
+    const def = SS.buildSchemaDef(s.schemaDecl.name, s.schemaDecl.fields, {
+      hasPresenceMask: !!s.schemaDecl.hasPresenceMask,
+    });
     SS.registerSchema(this.schemaRegistry, def);
   }
 
@@ -5111,11 +5113,24 @@ class Interpreter {
 
   _evalSchemaLiteralFieldBits(schema, name, expr) {
     const SS = this._semanticSchemas();
+    const SB = typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
+    const node = schema.structure.find((n) => n.name === name);
     if (expr && expr.groupedSchemaLiteral) {
       const gs = expr.groupedSchemaLiteral;
-      const node = schema.structure.find((n) => n.name === name && n.kind === 'var_array');
-      if (node) {
+      if (node && node.kind === 'var_array') {
         SS.validateGroupedLiteralShape(node, gs.shape || null, (gs.elements || []).length, schema.name);
+      }
+      if (node && node.kind === 'bound_var_array' && SB) {
+        const elemSchema = node.schema;
+        let total = '';
+        for (const fields of gs.elements || []) {
+          const fieldValues = {};
+          for (const [fname, fexpr] of Object.entries(fields || {})) {
+            fieldValues[fname] = this._evalSchemaLiteralFieldBits(elemSchema, fname, fexpr);
+          }
+          total += SB.packBoundPayload(SS.buildSchemaLiteralBits(elemSchema, fieldValues).bits);
+        }
+        return total;
       }
       return this.evalGroupedSchemaLiteralAtom(expr, false).value;
     }
@@ -5132,8 +5147,8 @@ class Interpreter {
       }
     }
     const path = name.includes('.') ? name.split('.') : [name];
-    const node = schema.structure.find((n) => n.name === path[0] && n.kind === 'var_array');
-    if (!node) {
+    const varNode = schema.structure.find((n) => n.name === path[0] && n.kind === 'var_array');
+    if (!varNode) {
       SS.resolveFieldPath(schema, path);
     }
     return bits;
@@ -5165,14 +5180,6 @@ class Interpreter {
       }
     }
     let totalBits = '';
-    const SB = typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
-    if (schema.isUnionRoot && SB) {
-      for (const fields of elements) {
-        const presence = {};
-        for (const k of Object.keys(fields || {})) presence[k] = true;
-        SB.validateUnionLiteral(presence, schema.unionVariants, schema.name);
-      }
-    }
     for (const fields of elements) {
       const fieldValues = {};
       for (const [name, expr] of Object.entries(fields || {})) {
@@ -5198,13 +5205,6 @@ class Interpreter {
     const schema = this._resolveSchema(lit.schemaRef);
     const fieldValues = {};
     const fieldShapes = {};
-    const SB = typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
-    if (schema.isUnionRoot && SB) {
-      const keys = Object.keys(lit.fields || {});
-      const presence = {};
-      for (const k of keys) presence[k] = true;
-      SB.validateUnionLiteral(presence, schema.unionVariants, schema.name);
-    }
     for (const [name, expr] of Object.entries(lit.fields || {})) {
       if (expr && expr.groupedSchemaLiteral && expr.groupedSchemaLiteral.shape) {
         fieldShapes[name] = expr.groupedSchemaLiteral.shape;

@@ -54046,16 +54046,16 @@ rule statement = assignStmt | exprStmt;
   ].join('\n');
 
   const F2A_EXPR = [
-    '<expr>:',
+    '<expr>+:',
     '    number?: <number>',
-    '    add?: <add>',
+    '    add?: bound <add>',
     ':',
   ].join('\n');
 
   const F2A_EXPR_INLINE = [
-    '<expr>:',
+    '<expr>+:',
     '    number?: <number>: value: 8 :',
-    '    add?: <add>: left: bound <expr>  right: bound <expr> :',
+    '    add?: bound <add>: left: bound <expr>  right: bound <expr> :',
     ':',
   ].join('\n');
 
@@ -54063,20 +54063,22 @@ rule statement = assignStmt | exprStmt;
 
   reg(4971, 'semantic-schemas', 'circular recursive schemas with bound resolve', function(h, session) {
     session.run(F2A_CORE);
-    h.assert('expr union variants', session.interp.schemaRegistry.has('expr'), true);
+    h.assert('expr optional fields', session.interp.schemaRegistry.has('expr'), true);
     h.assert('add bound fields', session.interp.schemaRegistry.has('add'), true);
+    const exprSchema = session.interp.schemaRegistry.get('expr');
+    h.assert('expr has presence mask', exprSchema && exprSchema.hasPresenceMask, true);
   });
 
-  reg(4972, 'semantic-schemas', 'union number literal packs tag and payload', function(h, session) {
-    session.run(F2A_CORE + '\n12wire<expr> ast = { number={ value=\\2 }<number> }<expr>');
+  reg(4972, 'semantic-schemas', 'presence mask number literal packs mask and payload', function(h, session) {
+    session.run(F2A_CORE + '\n10wire<expr> ast = { number={ value=\\2 }<number> }<expr>');
     const bits = session.getWire(session.interp, 'ast');
-    h.assert('number literal width', bits.length, 12);
-    h.assert('number tag', bits.substring(0, 4), '0000');
+    h.assert('number literal width', bits.length, 10);
+    h.assert('number mask', bits.substring(0, 2), '10');
   });
 
   reg(4973, 'semantic-schemas', 'recursive add literal with bound children', function(h, session) {
     session.run(F2A_CORE + [
-      '60wire<expr> ast = {',
+      '70wire<expr> ast = {',
       '  add={',
       '    left={ number={ value=\\2 }<number> }<expr>',
       '    right={ number={ value=\\3 }<number> }<expr>',
@@ -54084,19 +54086,20 @@ rule statement = assignStmt | exprStmt;
       '}<expr>',
     ].join('\n'));
     const bits = session.getWire(session.interp, 'ast');
-    h.assert('add literal width', bits.length, 60);
+    h.assert('add literal width', bits.length, 70);
   });
 
-  reg(4974, 'semantic-schemas', 'union literal rejects two branches', function(h, session) {
-    session.run(F2A_CORE + '\n60wire<expr> ast = { number={ value=\\1 }<number> add={ left={ number={ value=\\2 }<number> }<expr> }<add> }<expr>');
-    const err = session.interp && session.interp.lastReportedError;
-    h.assert('union two branches error', err && err.message.indexOf('at most one branch') >= 0, true);
+  reg(4974, 'semantic-schemas', 'presence mask allows two optional fields', function(h, session) {
+    session.run(F2A_CORE + '\n78wire<expr> ast = { number={ value=\\1 }<number> add={ left={ number={ value=\\2 }<number> }<expr> right={ number={ value=\\3 }<number> }<expr> }<add> }<expr>');
+    const bits = session.getWire(session.interp, 'ast');
+    h.assert('both branches packed', bits.substring(0, 2), '11');
+    h.assert('multi optional width', bits.length, 78);
   });
 
   reg(4975, 'semantic-schemas', 'inline sugar desugars to separate blocks', function(h, session) {
-    session.run(F2A_NUMBER + '\n' + F2A_ADD + '\n' + F2A_EXPR_INLINE + '\n12wire<expr> ast = { number={ value=\\5 }<number> }<expr>');
+    session.run(F2A_NUMBER + '\n' + F2A_ADD + '\n' + F2A_EXPR_INLINE + '\n10wire<expr> ast = { number={ value=\\5 }<number> }<expr>');
     const bits = session.getWire(session.interp, 'ast');
-    h.assert('inline sugar width', bits.length, 12);
+    h.assert('inline sugar width', bits.length, 10);
     h.assert('inline value low bits', bits.substring(bits.length - 8), '00000101');
   });
 
@@ -54114,7 +54117,7 @@ rule statement = assignStmt | exprStmt;
 
   function runF2aFieldAccess(h, session) {
     session.run(F2A_CORE + [
-      '60wire<expr> ast = {',
+      '70wire<expr> ast = {',
       '  add={',
       '    left={ number={ value=\\2 }<number> }<expr>',
       '    right={ number={ value=\\3 }<number> }<expr>',
@@ -54124,7 +54127,7 @@ rule statement = assignStmt | exprStmt;
     ].join('\n'));
     h.assert('deep field read', session.getWire(session.interp, 'v'), '00000010');
     session.run(F2A_CORE + [
-      '60wire<expr> ast = {',
+      '70wire<expr> ast = {',
       '  add={',
       '    left={ number={ value=\\2 }<number> }<expr>',
       '    right={ number={ value=\\3 }<number> }<expr>',
@@ -54132,15 +54135,15 @@ rule statement = assignStmt | exprStmt;
       '}<expr>',
       'ast:add:left:number:value := \\7',
     ].join('\n'));
-    h.assert('deep field write', session.getWire(session.interp, 'ast').length, 60);
+    h.assert('deep field write', session.getWire(session.interp, 'ast').length, 70);
   }
 
-  reg(4977, 'semantic-schemas', 'bound union field access read write legacy', runF2aFieldAccess);
-  reg(4978, 'semantic-schemas', 'bound union field access read write wave', runF2aFieldAccess, { propagation: 'wave' });
+  reg(4977, 'semantic-schemas', 'presence mask field access read write legacy', runF2aFieldAccess);
+  reg(4978, 'semantic-schemas', 'presence mask field access read write wave', runF2aFieldAccess, { propagation: 'wave' });
 
   function runF2aShowTree(h, session) {
     session.run(F2A_CORE + [
-      '60wire<expr> ast = { add={ left={ number={ value=\\2 }<number> }<expr> right={ number={ value=\\3 }<number> }<expr> }<add> }<expr>',
+      '70wire<expr> ast = { add={ left={ number={ value=\\2 }<number> }<expr> right={ number={ value=\\3 }<number> }<expr> }<add> }<expr>',
       'show(ast)',
     ].join('\n'));
     const out = session.outIncludes(session.interp, 'add') ? session.interp.out.join('\n') : '';
@@ -54149,8 +54152,106 @@ rule statement = assignStmt | exprStmt;
     h.assert('show has value field', out.indexOf('value') >= 0, true);
   }
 
-  reg(4979, 'semantic-schemas', 'show nested bound union tree legacy', runF2aShowTree);
-  reg(4980, 'semantic-schemas', 'show nested bound union tree wave', runF2aShowTree, { propagation: 'wave' });
+  reg(4979, 'semantic-schemas', 'show nested presence mask tree legacy', runF2aShowTree);
+  reg(4980, 'semantic-schemas', 'show nested presence mask tree wave', runF2aShowTree, { propagation: 'wave' });
+
+  const F2A_TWO_NUMBERS = [
+    '<twoNumbers>+:',
+    '    add?: <number>',
+    '    sub?: <number>',
+    ':',
+  ].join('\n');
+
+  reg(4981, 'semantic-schemas', 'twoNumbers mask add only legacy', function(h, session) {
+    session.run(F2A_NUMBER + '\n' + F2A_TWO_NUMBERS + '\n10wire<twoNumbers> w = { add={ value=\\7 }<number> }<twoNumbers>');
+    const bits = session.getWire(session.interp, 'w');
+    h.assert('add-only mask', bits.substring(0, 2), '10');
+    h.assert('add-only width', bits.length, 10);
+  });
+
+  reg(4982, 'semantic-schemas', 'twoNumbers mask add only wave', function(h, session) {
+    session.run(F2A_NUMBER + '\n' + F2A_TWO_NUMBERS + '\n10wire<twoNumbers> w = { add={ value=\\7 }<number> }<twoNumbers>');
+    const bits = session.getWire(session.interp, 'w');
+    h.assert('add-only mask wave', bits.substring(0, 2), '10');
+  }, { propagation: 'wave' });
+
+  reg(4983, 'semantic-schemas', 'zero wire show decodes empty mask legacy', function(h, session) {
+    session.run(F2A_CORE + '\n2wire<expr> empty = 00\nshow(empty; <expr>)');
+    h.assert('show empty mask ok', session.interp.out.join('\n').length > 0, true);
+  });
+
+  reg(4984, 'semantic-schemas', 'zero wire show decodes empty mask wave', function(h, session) {
+    session.run(F2A_CORE + '\n2wire<expr> empty = 00\nshow(empty; <expr>)');
+    h.assert('show empty mask wave ok', session.interp.out.join('\n').length > 0, true);
+  }, { propagation: 'wave' });
+
+  const F2A_COUNTRY = [
+    '<country>:',
+    '    code: 16',
+    ':',
+  ].join('\n');
+
+  const F2A_VOTED_BY = [
+    '<votedBy>+:',
+    '    countries: bound <country>[1-]',
+    ':',
+  ].join('\n');
+
+  reg(4985, 'semantic-schemas', 'bound var array schema compiles legacy', function(h, session) {
+    session.run(F2A_COUNTRY + '\n' + F2A_VOTED_BY);
+    const schema = session.interp.schemaRegistry.get('votedBy');
+    h.assert('votedBy presence mask', schema && schema.hasPresenceMask, true);
+    h.assert('countries bound var array', schema && schema.structure.some((n) => n.kind === 'bound_var_array' && n.name === 'countries'), true);
+  });
+
+  reg(4986, 'semantic-schemas', 'bound var array schema compiles wave', function(h, session) {
+    session.run(F2A_COUNTRY + '\n' + F2A_VOTED_BY);
+    const schema = session.interp.schemaRegistry.get('votedBy');
+    h.assert('votedBy presence mask wave', schema && schema.hasPresenceMask, true);
+  }, { propagation: 'wave' });
+
+  reg(4987, 'semantic-schemas', 'optional without plus rejected at parse legacy', function(h, session) {
+    h.assertThrows('no plus optional', function() {
+      session.run('<y>:\n    v: 8\n:\n<x>:\n    a?: <y>\n:');
+    });
+  });
+
+  reg(4988, 'semantic-schemas', 'show slice with schema decodes mask legacy', function(h, session) {
+    session.run(F2A_CORE + [
+      '70wire<expr> tree = { add={ left={ number={ value=\\2 }<number> }<expr> right={ number={ value=\\3 }<number> }<expr> }<add> }<expr>',
+      '70wire<expr> slice = tree',
+      'show(slice; <expr>)',
+    ].join('\n'));
+    const out = session.interp.out.join('\n');
+    h.assert('slice show has add', out.indexOf('add') >= 0, true);
+  });
+
+  reg(4989, 'semantic-schemas', 'show slice with schema decodes mask wave', function(h, session) {
+    session.run(F2A_CORE + [
+      '70wire<expr> tree = { add={ left={ number={ value=\\2 }<number> }<expr> right={ number={ value=\\3 }<number> }<expr> }<add> }<expr>',
+      '70wire<expr> slice = tree',
+      'show(slice; <expr>)',
+    ].join('\n'));
+    h.assert('slice show wave has add', session.interp.out.join('\n').indexOf('add') >= 0, true);
+  }, { propagation: 'wave' });
+
+  reg(4990, 'semantic-schemas', 'doubleList optional bound schema legacy', function(h, session) {
+    const SINGLE_LIST = [
+      '<singleList>:',
+      '    values: 8[1-]',
+      ':',
+    ].join('\n');
+    const DOUBLE_LIST = [
+      '<doubleList>+:',
+      '    left?: bound <singleList>',
+      '    right?: bound <singleList>',
+      ':',
+    ].join('\n');
+    session.run(SINGLE_LIST + '\n' + DOUBLE_LIST);
+    const schema = session.interp.schemaRegistry.get('doubleList');
+    h.assert('doubleList mask bits', schema && schema.presenceMaskBits, 2);
+    h.assert('two optional bound fields', schema && schema.optionalFields && schema.optionalFields.length, 2);
+  });
 
   window.LogTScriptTestSuite.finalize();
 })();

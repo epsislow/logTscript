@@ -1,10 +1,10 @@
 'use strict';
 
-/** Extra checks for doc/semantic-schemas.md (recursive bound + union sections). */
+/** Extra checks for doc/semantic-schemas.md (recursive bound + presence_mask sections). */
 module.exports = {
   cases: [
     {
-      name: 'bound union number literal width',
+      name: 'presence mask number literal width',
       src: `<number>:
     value: 8
 :
@@ -14,17 +14,17 @@ module.exports = {
     right: bound <expr>
 :
 
-<expr>:
+<expr>+:
     number?: <number>
-    add?: <add>
+    add?: bound <add>
 :
 
-12wire<expr> num = { number={ value=\\2 }<number> }<expr>`,
+10wire<expr> num = { number={ value=\\2 }<number> }<expr>`,
       check: (interp) => {
         const w = interp.wires.get('num');
         if (!w || !w.ref) return false;
         const bits = interp.getValueFromRef(w.ref);
-        return bits && bits.length === 12 && bits.substring(0, 4) === '0000';
+        return bits && bits.length === 10 && bits.substring(0, 2) === '10';
       },
     },
     {
@@ -38,12 +38,12 @@ module.exports = {
     right: bound <expr>
 :
 
-<expr>:
+<expr>+:
     number?: <number>
-    add?: <add>
+    add?: bound <add>
 :
 
-60wire<expr> tree = {
+70wire<expr> tree = {
     add={
         left={ number={ value=\\2 }<number> }<expr>
         right={ number={ value=\\3 }<number> }<expr>
@@ -57,25 +57,25 @@ module.exports = {
       },
     },
     {
-      name: 'union two branches reports error',
+      name: 'multi optional mask allows both fields',
       src: `<number>:
     value: 8
 :
 
-<add>:
-    left: bound <expr>
-    right: bound <expr>
+<twoNumbers>+:
+    add?: <number>
+    sub?: <number>
 :
 
-<expr>:
-    number?: <number>
-    add?: <add>
-:
-
-60wire<expr> bad = { number={ value=\\1 }<number> add={ left={ number={ value=\\2 }<number> }<expr> }<add> }<expr>`,
+18wire<twoNumbers> both = {
+    add={ value=\\1 }<number>
+    sub={ value=\\2 }<number>
+}<twoNumbers>`,
       check: (interp) => {
-        const err = interp.lastReportedError;
-        return err && String(err.message).indexOf('at most one branch') >= 0;
+        const w = interp.wires.get('both');
+        if (!w || !w.ref) return false;
+        const bits = interp.getValueFromRef(w.ref);
+        return bits && bits.length === 18 && bits.substring(0, 2) === '11';
       },
     },
     {
@@ -84,17 +84,17 @@ module.exports = {
     value: 8
 :
 
-<expr>:
+<expr>+:
     number?: <number>: value: 8 :
-    add?: <add>: left: bound <expr>  right: bound <expr> :
+    add?: bound <add>: left: bound <expr>  right: bound <expr> :
 :
 
-12wire<expr> ast = { number={ value=\\5 }<number> }<expr>`,
+10wire<expr> ast = { number={ value=\\5 }<number> }<expr>`,
       check: (interp) => {
         const w = interp.wires.get('ast');
         if (!w || !w.ref) return false;
         const bits = interp.getValueFromRef(w.ref);
-        return bits && bits.length === 12 && bits.substring(bits.length - 8) === '00000101';
+        return bits && bits.length === 10 && bits.substring(bits.length - 8) === '00000101';
       },
     },
   ],

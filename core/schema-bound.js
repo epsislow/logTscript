@@ -1,11 +1,10 @@
 /**
- * Bound substreams and union-variant wire encoding for semantic schemas (F2a).
+ * Bound substreams and presence_mask wire encoding for semantic schemas (F2a+).
  */
 (function (global) {
   'use strict';
 
   const BOUND_LEN_BITS = 16;
-  const UNION_TAG_BITS = 4;
 
   function padUInt(value, width) {
     const v = Math.max(0, value | 0);
@@ -38,34 +37,31 @@
     };
   }
 
-  function packUnionPayload(variantIndex, payloadBits) {
-    return padUInt(variantIndex, UNION_TAG_BITS) + (payloadBits == null ? '' : String(payloadBits));
+  function packPresenceMask(presenceBits) {
+    return presenceBits == null ? '' : String(presenceBits);
   }
 
-  function readUnionTag(wireBits, offset) {
+  function readPresenceMask(wireBits, numBits, offset) {
     const off = offset || 0;
+    const mask = wireBits.substring(off, off + numBits);
     return {
-      tag: readUInt(wireBits, off, UNION_TAG_BITS),
-      payloadStart: off + UNION_TAG_BITS,
+      mask,
+      payloadStart: off + numBits,
     };
+  }
+
+  function buildPresenceMaskBits(optionalFields, fieldValues) {
+    let mask = '';
+    for (const field of optionalFields) {
+      const val = fieldValues[field.name];
+      const present = val != null && val !== '';
+      mask += present ? '1' : '0';
+    }
+    return mask;
   }
 
   function schemaPayloadMinMax(schema) {
     if (!schema) return { min: 0, max: 0, open: false };
-    if (schema.isUnionRoot) {
-      let min = Infinity;
-      let max = 0;
-      let open = false;
-      for (const v of schema.unionVariants || []) {
-        const sub = v.schema;
-        const mm = schemaPayloadMinMax(sub);
-        if (mm.min < min) min = mm.min;
-        if (mm.open) open = true;
-        else if (mm.max > max) max = mm.max;
-      }
-      if (!Number.isFinite(min)) min = 0;
-      return { min, max: open ? null : max, open };
-    }
     if (schema.hasDynamicWidth) {
       return {
         min: schema.minWidth != null ? schema.minWidth : schema.totalWidth,
@@ -86,37 +82,13 @@
     };
   }
 
-  function countUnionBranches(fieldValues, unionVariants) {
-    let count = 0;
-    let lastName = null;
-    for (const v of unionVariants) {
-      if (fieldValues[v.name] != null && fieldValues[v.name] !== '') {
-        count++;
-        lastName = v.name;
-      }
+  function optionalFieldMinMax(subSchema, isBound) {
+    if (isBound) {
+      const mm = boundFieldMinMax(subSchema);
+      return { minWidth: 0, maxWidth: mm.maxWidth, open: mm.open };
     }
-    return { count, lastName };
-  }
-
-  function validateUnionLiteral(fieldValues, unionVariants, schemaName) {
-    const { count, lastName } = countUnionBranches(fieldValues, unionVariants);
-    if (count === 0) {
-      throw new Error(`Union schema '${schemaName}' requires exactly one branch; none provided`);
-    }
-    if (count > 1) {
-      throw new Error(`Union schema '${schemaName}' allows at most one branch; multiple provided`);
-    }
-    return lastName;
-  }
-
-  function findUnionVariant(schema, name) {
-    if (!schema || !schema.unionVariants) return null;
-    return schema.unionVariants.find((v) => v.name === name) || null;
-  }
-
-  function findUnionVariantByIndex(schema, index) {
-    if (!schema || !schema.unionVariants) return null;
-    return schema.unionVariants[index] || null;
+    const mm = schemaPayloadMinMax(subSchema);
+    return { minWidth: 0, maxWidth: mm.max, open: mm.open };
   }
 
   function expandInlineSchemaDecls(decls) {
@@ -137,33 +109,28 @@
         }
         delete field.inlineFields;
       }
-      out.push({ name: decl.name, fields });
+      out.push({
+        name: decl.name,
+        fields,
+        hasPresenceMask: !!decl.hasPresenceMask,
+      });
     }
     return out;
   }
 
-  function detectUnionRoot(fields) {
-    if (!fields || !fields.length) return false;
-    return fields.every((f) => f.kind === 'union_variant');
-  }
-
   const api = {
     BOUND_LEN_BITS,
-    UNION_TAG_BITS,
     padUInt,
     readUInt,
     packBoundPayload,
     readBoundSubstream,
-    packUnionPayload,
-    readUnionTag,
+    packPresenceMask,
+    readPresenceMask,
+    buildPresenceMaskBits,
     schemaPayloadMinMax,
     boundFieldMinMax,
-    countUnionBranches,
-    validateUnionLiteral,
-    findUnionVariant,
-    findUnionVariantByIndex,
+    optionalFieldMinMax,
     expandInlineSchemaDecls,
-    detectUnionRoot,
   };
 
   global.LogTScriptSchemaBound = api;

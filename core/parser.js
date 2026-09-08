@@ -154,7 +154,7 @@ class Parser {
     return name;
   }
 
-  _parseSchemaBodyFields(parentName) {
+  _parseSchemaBodyFields(parentName, hasPresenceMask) {
     const fields = [];
     while (true) {
       while (this.c.type === 'EOL') {
@@ -174,7 +174,7 @@ class Parser {
         }
         continue;
       }
-      fields.push(this._parseOneSchemaField(parentName, fields));
+      fields.push(this._parseOneSchemaField(parentName, fields, hasPresenceMask));
       while (this.c.type === 'EOL') {
         this.c = this.t.get();
       }
@@ -182,7 +182,7 @@ class Parser {
     return fields;
   }
 
-  _parseOneSchemaField(name, fields) {
+  _parseOneSchemaField(name, fields, hasPresenceMask) {
     if (this.c.type !== 'ID') {
       throw Error(`Expected field name in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
@@ -209,19 +209,27 @@ class Parser {
       }
       const shape = this.parseSchemaArraySuffix();
       if (isBound) {
-        if (optional) {
-          throw Error(`Optional '?' with bound <schema> is not supported here at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-        }
         if (shape) {
-          throw Error(`bound <schema> with array suffix is not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          return {
+            kind: 'bound_var_array',
+            name: fieldName,
+            ref,
+            optional,
+            inlineFields,
+            minCount: shape.minCount != null ? shape.minCount : 0,
+            maxCount: shape.maxCount != null ? shape.maxCount : null,
+          };
         }
-        return { kind: 'bound', name: fieldName, ref, inlineFields };
+        return { kind: 'bound', name: fieldName, ref, optional, inlineFields };
       }
       if (optional) {
-        if (shape) {
-          throw Error(`Union variant '${fieldName}?' cannot use array suffix at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        if (!hasPresenceMask && shape) {
+          throw Error(`Optional field '${fieldName}?' cannot use array suffix without presence mask schema at ${this.c.file}: ${this.c.line}:${this.c.col}`);
         }
-        return { kind: 'union_variant', name: fieldName, ref, optional: true, inlineFields };
+        if (hasPresenceMask) {
+          return { kind: 'optional_field', name: fieldName, ref, inlineFields };
+        }
+        throw Error(`Optional field '${fieldName}?' requires schema '<${name}>+' declaration at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
       if (shape && (shape.varRange || shape.countRef || shape.countRefDim === 'both')) {
         if (shape.countRefDim === 'both') {
@@ -323,10 +331,15 @@ class Parser {
 
   parseSchemaDecl() {
     const name = this.parseSchemaRef();
+    let hasPresenceMask = false;
+    if (this.c.type === 'SYM' && this.c.value === '+') {
+      hasPresenceMask = true;
+      this.eat('SYM', '+');
+    }
     this.eat('SYM', ':');
-    const fields = this._parseSchemaBodyFields(name);
+    const fields = this._parseSchemaBodyFields(name, hasPresenceMask);
     this.eat('SYM', ':');
-    return { name, fields };
+    return { name, fields, hasPresenceMask };
   }
 
   _attachSchemaFieldPath(atom) {
