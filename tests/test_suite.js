@@ -54529,6 +54529,191 @@ rule expression = value | INT -> CallNumber;
     h.assert('names bad rule', out.indexOf('myUnknownRuleName') >= 0, true);
   });
 
+  const F2F_CALL_ASSIGN_FIXED = [
+    '<CallAssign>:',
+    '    name:  32',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2F_ASCII_TEXT_NAME = [
+    '<asciiTextName>:',
+    '    text: 2048',
+    ':',
+  ].join('\n');
+
+  const F2F_CALL_ASSIGN_ASCII = [
+    '<CallAssign>:',
+    '    name:  bound <asciiTextName>',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2F_SHORT_NAME = [
+    '<shortName>+:',
+    '    bytes: bound <byte>[1-8]',
+    ':',
+  ].join('\n');
+
+  const F2F_CALL_ASSIGN_SHORT = [
+    '<CallAssign>:',
+    '    name:  bound <shortName>',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F2F_CALL_WIDE_NUMBER = [
+    '<CallWideNumber>:',
+    '    value: 32',
+    ':',
+  ].join('\n');
+
+  const F2F_EXPR_WIDE = [
+    '<expr>+:',
+    '    CallWideNumber?: <CallWideNumber>',
+    '    CallNumber?:    <CallNumber>',
+    '    CallAdd?:       bound <CallAdd>',
+    '    CallMul?:       bound <CallMul>',
+    ':',
+  ].join('\n');
+
+  function f2fSchemaCore(callAssignDef, extraSchemas) {
+    const chunks = [
+      F2C_BYTE,
+      extraSchemas || '',
+      F2C_SYMBOL,
+      F2C_CALL_NUMBER,
+      F2F_CALL_WIDE_NUMBER,
+      F2C_CALL_ADD,
+      F2C_CALL_MUL,
+      F2F_EXPR_WIDE,
+      callAssignDef,
+      F2C_CALL_STATEMENT,
+      F2C_PROGRAM,
+      INLINE_PARSER_CALC,
+    ];
+    return chunks.filter(function(s) { return s; }).join('\n');
+  }
+
+  function f2fPackProgram(h, session, src, schemaCore) {
+    session.run(schemaCore);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, src, 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('parse pack ok', String(built.ok), '1');
+    session.run(schemaCore + '\n' + built.bitWidth + 'wire<program> prog =: .calcLang:packAst("' + src + '", <program>, "program")');
+    h.assert('wire bits', session.getWire(session.interp, 'prog'), built.bits);
+    return built;
+  }
+
+  function runF2fFixedName32(h, session) {
+    const core = f2fSchemaCore(F2F_CALL_ASSIGN_FIXED);
+    f2fPackProgram(h, session, 'ab=1;', core);
+    session.run(core + '\n300wire<program> prog =: .calcLang:packAst("ab=1;", <program>, "program")\nshow(prog; <program> ascii)');
+    const out = session.interp.out.join('\n');
+    h.assert('CallAssign', out.indexOf('CallAssign') >= 0, true);
+  }
+
+  reg(5037, 'parser', 'f2f fixed name 32 ascii pack legacy', runF2fFixedName32);
+  reg(5038, 'parser', 'f2f fixed name 32 ascii pack wave', runF2fFixedName32, { propagation: 'wave' });
+
+  function runF2fFixedNameOverflow(h, session) {
+    const core = f2fSchemaCore(F2F_CALL_ASSIGN_FIXED);
+    session.run(core);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, 'abcde=1;', 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack fail', String(built.ok), '0');
+    h.assert('overflow', built.error && built.error.message.indexOf('overflow') >= 0, true);
+    h.assert('max 4', built.error && built.error.message.indexOf('max 4') >= 0, true);
+  }
+
+  reg(5039, 'parser', 'f2f fixed name 32 overflow legacy', runF2fFixedNameOverflow);
+  reg(5040, 'parser', 'f2f fixed name 32 overflow wave', runF2fFixedNameOverflow, { propagation: 'wave' });
+
+  function runF2fBoundAsciiTextName(h, session) {
+    const core = f2fSchemaCore(F2F_CALL_ASSIGN_ASCII, F2F_ASCII_TEXT_NAME);
+    f2fPackProgram(h, session, 'xy=2;', core);
+  }
+
+  reg(5041, 'parser', 'f2f bound asciiTextName pack legacy', runF2fBoundAsciiTextName);
+  reg(5042, 'parser', 'f2f bound asciiTextName pack wave', runF2fBoundAsciiTextName, { propagation: 'wave' });
+
+  function runF2fSymbolRegression(h, session) {
+    f2fPackProgram(h, session, 'a=1;', F2C_CORE);
+  }
+
+  reg(5043, 'parser', 'f2f symbol bva regression legacy', runF2fSymbolRegression);
+  reg(5044, 'parser', 'f2f symbol bva regression wave', runF2fSymbolRegression, { propagation: 'wave' });
+
+  reg(5045, 'parser', 'f2f INT capture on bound symbol cannot fill legacy', function(h, session) {
+    session.run(F2C_CORE);
+    const tree = {
+      kind: 'call',
+      call: 'CallAssign',
+      captures: { name: { kind: 'token', name: 'INT', text: '42' } },
+      children: {
+        value: {
+          kind: 'call',
+          call: 'CallNumber',
+          children: { value: { kind: 'token', name: 'INT', text: '1' } },
+        },
+      },
+    };
+    h.assertThrows('cannot fill', function() {
+      buildAstWire(tree, 'CallStatement', session.interp.schemaRegistry);
+    });
+  });
+
+  reg(5046, 'parser', 'f2f INT capture on bound symbol cannot fill wave', function(h, session) {
+    session.run(F2C_CORE);
+    const tree = {
+      kind: 'call',
+      call: 'CallAssign',
+      captures: { name: { kind: 'token', name: 'INT', text: '42' } },
+      children: {
+        value: {
+          kind: 'call',
+          call: 'CallNumber',
+          children: { value: { kind: 'token', name: 'INT', text: '1' } },
+        },
+      },
+    };
+    h.assertThrows('cannot fill', function() {
+      buildAstWire(tree, 'CallStatement', session.interp.schemaRegistry);
+    });
+  }, { propagation: 'wave' });
+
+  function runF2fIntOnLeaf32(h, session) {
+    session.run([
+      F2F_CALL_WIDE_NUMBER,
+      '<expr>+:',
+      '    CallWideNumber?: <CallWideNumber>',
+      ':',
+    ].join('\n'));
+    const tree = {
+      kind: 'call',
+      call: 'CallWideNumber',
+      children: { value: { kind: 'token', name: 'INT', text: '123' } },
+    };
+    const built = buildAstWire(tree, 'expr', session.interp.schemaRegistry);
+    h.assert('bit width', built.bitWidth, 33);
+    h.assert('numeric 123', built.bits.slice(-32), (123).toString(2).padStart(32, '0'));
+  }
+
+  reg(5047, 'parser', 'f2f INT token packs numeric leaf 32 legacy', runF2fIntOnLeaf32);
+  reg(5048, 'parser', 'f2f INT token packs numeric leaf 32 wave', runF2fIntOnLeaf32, { propagation: 'wave' });
+
+  function runF2fShortNameMax(h, session) {
+    const core = f2fSchemaCore(F2F_CALL_ASSIGN_SHORT, F2F_SHORT_NAME);
+    session.run(core);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, 'longenough=1;', 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack fail', String(built.ok), '0');
+    h.assert('overflow max 8', built.error && built.error.message.indexOf('exceeds max 8') >= 0, true);
+  }
+
+  reg(5049, 'parser', 'f2f bva max count overflow legacy', runF2fShortNameMax);
+  reg(5050, 'parser', 'f2f bva max count overflow wave', runF2fShortNameMax, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

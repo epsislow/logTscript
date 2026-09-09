@@ -266,5 +266,43 @@ inline [parser] .mini:
         return r && r.ok === 0 && r.bitWidth > 100;
       },
     },
+    {
+      name: 'packAst fixed name leaf 32',
+      src: CALC_FULL.replace(
+        '    name:  bound <symbol>',
+        '    name:  32'
+      ).replace(
+        '<symbol>+:\n    bytes: bound <byte>[1-]\n:\n\n',
+        ''
+      ),
+      check: (interp) => {
+        const r = packCalc(interp, 'ab=1;', 'program', 'program');
+        return r && r.ok === 1 && r.bitWidth > 48;
+      },
+    },
+    {
+      name: 'packAst fixed name overflow',
+      src: CALC_FULL.replace(
+        '    name:  bound <symbol>',
+        '    name:  32'
+      ).replace(
+        '<symbol>+:\n    bytes: bound <byte>[1-]\n:\n\n',
+        ''
+      ),
+      check: (interp) => {
+        const r = packCalc(interp, 'abcde=1;', 'program', 'program');
+        return r && r.ok === 0 && r.error && r.error.message.indexOf('overflow') >= 0;
+      },
+    },
+    {
+      name: 'packAst bound asciiTextName sub-schema',
+      src: CALC_FULL
+        .replace('<symbol>+:\n    bytes: bound <byte>[1-]\n:\n\n', '<asciiTextName>:\n    text: 2048\n:\n\n')
+        .replace('    name:  bound <symbol>', '    name:  bound <asciiTextName>'),
+      check: (interp) => {
+        const r = packCalc(interp, 'xy=2;', 'program', 'program');
+        return r && r.ok === 1 && r.bitWidth > 48;
+      },
+    },
   ],
 };

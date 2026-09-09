@@ -677,9 +677,18 @@ Wave and legacy propagation produce the same packing, field reads, and `show` ou
 
 ---
 
-### Variable-length symbol text (`<symbol>+`)
+### Parser text captures (AST packing)
 
-Parser captures such as `$name:ID` can map to a **symbol** schema — one byte (8 bits) per ASCII character, length prefixed via **`bound <byte>[1-]`**:
+**`:packAst`** maps `$field:TOKEN` captures using the **field shape**, not special schema names:
+
+| Shape | Text token (`ID`, …) | `INT` token |
+|-------|----------------------|-------------|
+| **`f: N`** with **`N % 8 === 0`** | fixed ASCII + `\0` pad to **N** bits | unsigned numeric on **N** bits |
+| **Single leaf sub-schema** (e.g. `text: 2048`) | fixed ASCII in that leaf | numeric in that leaf |
+| **`bytes: bound <byte>[1-]`** on a schema | variable bytes (1 char = 8 bits) | **cannot fill** |
+| **`bytes: bound <byte>[1-M]`** | same, max **M** characters | **cannot fill** |
+
+Variable-length example (any schema name with a BVA byte field):
 
 ```logts-play
 <byte>:
@@ -695,9 +704,26 @@ Parser captures such as `$name:ID` can map to a **symbol** schema — one byte (
 :
 ```
 
-Non-ASCII text or values that do not fit the declared field width produce a **pack error** (no silent truncation).
+Fixed-width example on the call schema directly:
 
-When using **`:packAst`**, see [inline-parser.md — AST wire packing](inline-parser.md#ast-wire-packing-packast) for a full calculator schema set.
+```logts-play
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+<CallAssign>:
+    name: 32
+    value: bound <expr>
+:
+```
+
+Non-ASCII text, empty text, fixed-width overflow, or incompatible token vs field → **pack error** (no silent truncation).
+
+See [inline-parser.md — Text captures](inline-parser.md#text-captures) for full `.calcLang` examples with **Load** / **Load & Run**.
 
 ---
 

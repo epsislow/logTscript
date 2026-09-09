@@ -25271,11 +25271,11 @@ Reserved built-in schema names (\`parseResult\`, \`parseError\`, \`asciiText256\
 
 ## AST wire packing (\`:packAst\`)
 
-After parsing, **\`:packAst\`** builds a **typed semantic wire** from source text using AST schemas (\`<name>+:\`). Grammar \`-> CallName\` targets map **1:1** to schema fields (\`CallAdd?:\`, \`CallAssign?:\`, …). Captures such as \`$name:ID\` map to schema fields (for example \`name: bound <symbol>\`).
+After parsing, **\`:packAst\`** builds a **typed semantic wire** from source text using AST schemas (\`<name>+:\`). Grammar \`-> CallName\` targets map **1:1** to schema fields (\`CallAdd?:\`, \`CallAssign?:\`, …). Captures such as \`$name:ID\` map to schema fields according to the **field shape** in the schema (see **Text captures** below).
 
 ### Schemas for \`.calcLang\`
 
-Define schemas **before** the parser inline. Recursive expression nodes use **\`bound <expr>\`**; identifiers use **\`<symbol>+\`** with a byte array:
+Define schemas **before** the parser inline. Recursive expression nodes use **\`bound <expr>\`**; identifiers typically use a **byte array** schema (variable-length ASCII):
 
 \`\`\`logts-play
 <byte>:
@@ -25526,12 +25526,256 @@ show(prog2; <program>)
 
 Wire width must match the packed bit length (declare enough bits, or derive width from a prior pack in the same script).
 
+### Text captures
+
+Token captures (\`$field:TOKEN\`) are packed from the **lexer token type** (\`INT\`, \`ID\`, …) and the **schema field shape** — not from the capture variable name (\`$name\` vs \`$value\`) or the schema field name (\`name\` vs \`code\`).
+
+| Schema field shape | Token \`INT\` | Text token (\`ID\`, …) |
+|--------------------|-------------|----------------------|
+| **Leaf \`N\`** (unsigned) | numeric on **N** bits | if **\`N % 8 === 0\`**: fixed ASCII + \`\\0\` pad; else **cannot fill** |
+| **Single leaf sub-schema** (\`text: 2048\`, …) | numeric in that leaf | fixed ASCII when width is a multiple of 8 |
+| **\`bytes: bound <byte>[1-]\`** (BVA) | **cannot fill** | one byte per character (variable length) |
+| **\`bound <expr>\`** / nested **\`call\`** | sub-tree from grammar | sub-tree (not a bare token) |
+
+**Fixed-width ASCII** — max **\`N / 8\`** characters; shorter text is padded with \`\\0\` on the wire; longer text is a **pack error** (no truncation):
+
+\`\`\`logts-play
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  32
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+120wire<program> prog =: .calcLang:packAst("ab=1;", <program>, "program")
+show(prog; <program> ascii)
+\`\`\`
+
+**Reusable fixed-text schema** (same packing rules):
+
+\`\`\`logts-play
+<asciiTextName>:
+    text: 2048
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <asciiTextName>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+120wire<program> prog =: .calcLang:packAst("xy=2;", <program>, "program")
+show(prog; <program>)
+\`\`\`
+
+**Variable-length identifiers** — schema with **\`bytes: bound <byte>[1-]\`** (any schema name; one 8-bit byte per ASCII character). Optional max: **\`[1-8]\`** rejects longer names:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<shortName>+:
+    bytes: bound <byte>[1-8]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <shortName>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+120wire<program> ok =: .calcLang:packAst("id=3;", <program>, "program")
+show(ok; <program>)
+\`\`\`
+
+**\`INT\` tokens** always pack as **unsigned numeric** on the target leaf width (example: **\`123\`** → binary **123** on **\`value: 32\`**, not ASCII \`"123"\`):
+
+\`\`\`logts-play
+<CallWideNumber>:
+    value: 32
+:
+
+<expr>+:
+    CallWideNumber?: <CallWideNumber>
+:
+
+inline [parser] .wideNum:
+    token INT = [0-9]+;
+    rule expression = INT -> CallWideNumber;
+:
+
+33wire<expr> w = .wideNum:packAst("123", <expr>, "expression")
+show(w; <expr>)
+\`\`\`
+
+Incompatible capture vs field shape → **\`Schema 'CallX': field 'f' cannot be filled from capture\`**.
+
 ### Overflow and validation
 
 | Rule | Behaviour |
 |------|-----------|
 | **Numeric fields** | Values above the field width (e.g. \`999\` in \`value: 8\`) → pack error |
-| **Symbol text** | ASCII only; empty or non-ASCII → pack error |
+| **Text captures** | ASCII only; empty or non-ASCII → pack error; fixed width overflow → pack error |
+| **BVA text max** | \`bytes: bound <byte>[1-N]\` — text longer than **N** chars → pack error |
 | **Max one branch** | At most one \`?\` field set per \`<name>+\` node |
 | **Schema root** | AST schemas must use **\`<name>+:\`** |
 
@@ -50744,9 +50988,18 @@ Wave and legacy propagation produce the same packing, field reads, and \`show\` 
 
 ---
 
-### Variable-length symbol text (\`<symbol>+\`)
+### Parser text captures (AST packing)
 
-Parser captures such as \`$name:ID\` can map to a **symbol** schema — one byte (8 bits) per ASCII character, length prefixed via **\`bound <byte>[1-]\`**:
+**\`:packAst\`** maps \`$field:TOKEN\` captures using the **field shape**, not special schema names:
+
+| Shape | Text token (\`ID\`, …) | \`INT\` token |
+|-------|----------------------|-------------|
+| **\`f: N\`** with **\`N % 8 === 0\`** | fixed ASCII + \`\\0\` pad to **N** bits | unsigned numeric on **N** bits |
+| **Single leaf sub-schema** (e.g. \`text: 2048\`) | fixed ASCII in that leaf | numeric in that leaf |
+| **\`bytes: bound <byte>[1-]\`** on a schema | variable bytes (1 char = 8 bits) | **cannot fill** |
+| **\`bytes: bound <byte>[1-M]\`** | same, max **M** characters | **cannot fill** |
+
+Variable-length example (any schema name with a BVA byte field):
 
 \`\`\`logts-play
 <byte>:
@@ -50762,9 +51015,26 @@ Parser captures such as \`$name:ID\` can map to a **symbol** schema — one byte
 :
 \`\`\`
 
-Non-ASCII text or values that do not fit the declared field width produce a **pack error** (no silent truncation).
+Fixed-width example on the call schema directly:
 
-When using **\`:packAst\`**, see [inline-parser.md — AST wire packing](inline-parser.md#ast-wire-packing-packast) for a full calculator schema set.
+\`\`\`logts-play
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+<CallAssign>:
+    name: 32
+    value: bound <expr>
+:
+\`\`\`
+
+Non-ASCII text, empty text, fixed-width overflow, or incompatible token vs field → **pack error** (no silent truncation).
+
+See [inline-parser.md — Text captures](inline-parser.md#text-captures) for full \`.calcLang\` examples with **Load** / **Load & Run**.
 
 ---
 

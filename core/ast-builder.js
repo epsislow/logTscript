@@ -1,5 +1,5 @@
 /**
- * F2c — parse tree IR → typed AST wire (semantic schema pack).
+ * F2c / F2f — parse tree IR → typed AST wire (semantic schema pack).
  */
 (function (global) {
   'use strict';
@@ -24,6 +24,14 @@
     throw new Error('schema-bound.js is not loaded');
   }
 
+  function wl() {
+    if (typeof LogTScriptWireLiterals !== 'undefined') return LogTScriptWireLiterals;
+    try {
+      return require('./wire-literals.js');
+    } catch (e) { /* ignore */ }
+    throw new Error('wire-literals.js is not loaded');
+  }
+
   function parseGrammarFn() {
     if (typeof parseGrammar === 'function') return parseGrammar;
     if (typeof global !== 'undefined' && typeof global.parseGrammar === 'function') return global.parseGrammar;
@@ -38,6 +46,10 @@
     return (value >>> 0).toString(2).padStart(width, '0');
   }
 
+  function wireStringToBin(str) {
+    return wl().wireStringToBin(str == null ? '' : String(str));
+  }
+
   function validateUnsigned(value, width, label) {
     if (!Number.isFinite(value) || value < 0 || Math.floor(value) !== value) {
       throw new Error(`Field '${label}': value must be a non-negative integer (got ${value})`);
@@ -50,7 +62,7 @@
 
   function validateAsciiText(text, label) {
     if (text == null || text === '') {
-      throw new Error(`Field '${label}': symbol text must not be empty`);
+      throw new Error(`Field '${label}': text must not be empty`);
     }
     for (let i = 0; i < text.length; i++) {
       if (text.charCodeAt(i) > 127) {
@@ -97,15 +109,47 @@
     return ss().buildSchemaLiteralBits(schema, fieldValues).bits;
   }
 
-  function numericFromTree(tree, label) {
-    let text = null;
-    if (tree && tree.kind === 'token') text = tree.text;
-    else if (tree && tree.children && tree.children.value != null) {
-      text = typeof tree.children.value === 'string' ? tree.children.value : (tree.children.value.text || null);
-    } else if (tree && tree.captures && tree.captures.value) {
-      const cap = tree.captures.value;
-      text = cap.kind === 'token' ? cap.text : null;
+  function isIntCapture(cap) {
+    return cap && cap.kind === 'token' && cap.name === 'INT';
+  }
+
+  function isTextCapture(cap) {
+    return cap && cap.kind === 'token' && cap.name !== 'INT';
+  }
+
+  function cannotFillError(schemaName, fieldName) {
+    throw new Error(`Schema '${schemaName}': field '${fieldName}' cannot be filled from capture`);
+  }
+
+  function getSingleLeaf(schema) {
+    if (!schema || !schema.structure || schema.structure.length !== 1) return null;
+    const node = schema.structure[0];
+    return node.kind === 'leaf' ? node : null;
+  }
+
+  function isByteElementSchema(schema) {
+    const leaf = getSingleLeaf(schema);
+    return !!(leaf && leaf.width === 8);
+  }
+
+  function findBvaBytesField(schema) {
+    if (!schema || !schema.structure) return null;
+    for (const node of schema.structure) {
+      if (node.kind !== 'bound_var_array') continue;
+      const elem = node.schema || null;
+      if (elem && isByteElementSchema(elem)) return node;
     }
+    return null;
+  }
+
+  function tokenTextFromCapture(cap, label) {
+    if (!cap || cap.kind !== 'token') {
+      throw new Error(`Field '${label}': expected token capture`);
+    }
+    return cap.text;
+  }
+
+  function numericFromTokenText(text, label) {
     if (text == null || text === '') {
       throw new Error(`Field '${label}': missing numeric token text`);
     }
@@ -116,35 +160,76 @@
     return num;
   }
 
-  function tokenTextFromCapture(cap, label) {
-    if (!cap || cap.kind !== 'token') {
-      throw new Error(`Field '${label}': expected token capture`);
+  function numericFromTree(tree, label) {
+    let text = null;
+    if (tree && tree.kind === 'token') text = tree.text;
+    else if (tree && tree.captures && tree.captures[label]) {
+      const cap = tree.captures[label];
+      text = cap.kind === 'token' ? cap.text : null;
+    } else if (tree && tree.children && tree.children[label] != null) {
+      const child = tree.children[label];
+      text = typeof child === 'string' ? child : (child && child.text != null ? child.text : null);
+    } else if (tree && tree.children && tree.children.value != null) {
+      text = typeof tree.children.value === 'string' ? tree.children.value : (tree.children.value.text || null);
+    } else if (tree && tree.captures && tree.captures.value) {
+      const cap = tree.captures.value;
+      text = cap.kind === 'token' ? cap.text : null;
     }
-    return cap.text;
+    return numericFromTokenText(text, label);
   }
 
-  function packLeafNumeric(tree, leafNode, label) {
+  function packAsciiFixedWidth(text, width, schemaName, fieldName) {
+    validateAsciiText(text, fieldName);
+    if (width % 8 !== 0) {
+      cannotFillError(schemaName, fieldName);
+    }
+    const maxChars = width / 8;
+    if (text.length > maxChars) {
+      throw new Error(
+        `Schema '${schemaName}': field '${fieldName}' overflow: text length ${text.length} exceeds max ${maxChars} (${width} bit)`
+      );
+    }
+    let bits = wireStringToBin(text);
+    while (bits.length < width) bits += '00000000';
+    return bits.substring(0, width);
+  }
+
+  function packTokenToLeafBits(cap, leafNode, schemaName, fieldName) {
+    if (isIntCapture(cap)) {
+      const num = numericFromTokenText(cap.text, fieldName);
+      validateUnsigned(num, leafNode.width, fieldName);
+      return intToBits(num, leafNode.width);
+    }
+    if (isTextCapture(cap) && leafNode.width % 8 === 0) {
+      return packAsciiFixedWidth(cap.text, leafNode.width, schemaName, fieldName);
+    }
+    cannotFillError(schemaName, fieldName);
+  }
+
+  function packLeafNumeric(tree, leafNode, label, schemaName) {
+    const cap = tree && tree.captures && tree.captures[label];
+    if (cap && cap.kind === 'token') {
+      return packTokenToLeafBits(cap, leafNode, schemaName || leafNode.name, label);
+    }
     const num = numericFromTree(tree, label);
     validateUnsigned(num, leafNode.width, label);
     return intToBits(num, leafNode.width);
   }
 
-  function packSymbolFromText(text, symbolSchema, registry) {
+  function packBvaTextFromCapture(text, schema, fieldName, parentSchemaName, registry) {
     const SS = ss();
     const SB = sb();
-    symbolSchema = canonicalSchema(symbolSchema, registry);
-    validateAsciiText(text, 'symbol');
-    const bvaNode = symbolSchema.structure.find(
-      (n) => n.kind === 'bound_var_array' || (n.kind === 'optional_field' && n.isBoundVarArray)
-    );
+    schema = canonicalSchema(schema, registry);
+    validateAsciiText(text, fieldName);
+    const bvaNode = findBvaBytesField(schema);
     if (!bvaNode) {
-      throw new Error(`Schema '${symbolSchema.name}': expected bound byte array field for symbol text`);
+      cannotFillError(parentSchemaName || schema.name, fieldName);
     }
-    const elemSchema = bvaNode.schema;
     const maxCount = bvaNode.maxCount;
     if (maxCount != null && text.length > maxCount) {
-      throw new Error(`Field 'symbol' overflow: text length ${text.length} exceeds max ${maxCount}`);
+      throw new Error(`Field '${fieldName}' overflow: text length ${text.length} exceeds max ${maxCount}`);
     }
+    const elemSchema = canonicalSchema(bvaNode.schema, registry);
     let bytesPayload = '';
     for (let i = 0; i < text.length; i++) {
       const byteBits = SS.buildSchemaLiteralBits(elemSchema, {
@@ -152,7 +237,47 @@
       }).bits;
       bytesPayload += SB.packBoundPayload(byteBits);
     }
-    return buildSchemaLiteralBitsChecked(symbolSchema, { [bvaNode.name]: bytesPayload });
+    return buildSchemaLiteralBitsChecked(schema, { [bvaNode.name]: bytesPayload });
+  }
+
+  function packCaptureIntoSchema(cap, subSchema, fieldName, parentSchemaName, registry) {
+    subSchema = canonicalSchema(subSchema, registry);
+    const reportSchema = parentSchemaName || subSchema.name;
+
+    const bvaNode = findBvaBytesField(subSchema);
+    if (bvaNode) {
+      if (isIntCapture(cap)) {
+        cannotFillError(reportSchema, fieldName);
+      }
+      return packBvaTextFromCapture(
+        tokenTextFromCapture(cap, fieldName),
+        subSchema,
+        fieldName,
+        reportSchema,
+        registry
+      );
+    }
+
+    if (subSchema.hasPresenceMask) {
+      cannotFillError(reportSchema, fieldName);
+    }
+
+    const leaf = getSingleLeaf(subSchema);
+    if (leaf) {
+      const bits = packTokenToLeafBits(cap, leaf, subSchema.name, leaf.name);
+      return buildSchemaLiteralBitsChecked(subSchema, { [leaf.name]: bits });
+    }
+
+    cannotFillError(reportSchema, fieldName);
+  }
+
+  function resolveCallFieldSource(tree, fieldName) {
+    const child = tree.children && tree.children[fieldName];
+    if (child != null) return child;
+    const cap = tree.captures && tree.captures[fieldName];
+    if (cap == null) return null;
+    if (cap.kind === 'token') return cap;
+    return cap;
   }
 
   function packCallPayload(tree, schema, registry) {
@@ -161,20 +286,22 @@
 
     for (const node of schema.structure) {
       if (node.kind === 'leaf') {
-        fieldValues[node.name] = packLeafNumeric(tree, node, node.name);
+        const src = resolveCallFieldSource(tree, node.name);
+        if (src != null && src.kind === 'token') {
+          fieldValues[node.name] = packTokenToLeafBits(src, node, schema.name, node.name);
+        } else {
+          fieldValues[node.name] = packLeafNumeric(tree, node, node.name, schema.name);
+        }
       } else if (node.kind === 'bound') {
         let packed = null;
-        const child = tree.children && tree.children[node.name];
-        const cap = tree.captures && tree.captures[node.name];
+        const src = resolveCallFieldSource(tree, node.name);
         const subSchema = canonicalSchema(node.schema, registry);
-        if (child != null) {
-          packed = packTree(child, subSchema, registry);
-        } else if (cap != null) {
-          if (subSchema.name === 'symbol') {
-            packed = packSymbolFromText(tokenTextFromCapture(cap, node.name), subSchema, registry);
-          } else {
-            packed = packTree(cap, subSchema, registry);
-          }
+        if (src != null && src.kind === 'call') {
+          packed = packTree(src, subSchema, registry);
+        } else if (src != null && src.kind === 'repeat') {
+          packed = packTree(src, subSchema, registry);
+        } else if (src != null && src.kind === 'token') {
+          packed = packCaptureIntoSchema(src, subSchema, node.name, schema.name, registry);
         }
         if (packed == null) {
           throw new Error(`Missing field '${node.name}' for call '${tree.call}' in schema '${schema.name}'`);
@@ -239,13 +366,12 @@
     }
 
     if (tree.kind === 'token') {
-      const leaf = schema.structure.find((n) => n.kind === 'leaf');
-      if (!leaf || schema.structure.length !== 1) {
+      const leaf = getSingleLeaf(schema);
+      if (!leaf) {
         throw new Error(`Bare token cannot map to schema '${schema.name}'`);
       }
-      return buildSchemaLiteralBitsChecked(schema, {
-        [leaf.name]: packLeafNumeric(tree, leaf, leaf.name),
-      });
+      const bits = packTokenToLeafBits(tree, leaf, schema.name, leaf.name);
+      return buildSchemaLiteralBitsChecked(schema, { [leaf.name]: bits });
     }
 
     throw new Error(`Cannot pack tree kind '${tree.kind}' into schema '${schema.name}'`);
