@@ -2586,6 +2586,11 @@
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const bits = fieldBits == null ? '' : String(fieldBits);
+    // bound payload may be shorter than a max-width leaf; ascii must not pad to schema width
+    let formatWidth = fieldWidth;
+    if (opts && opts.ascii && bits.length > 0 && bits.length < fieldWidth) {
+      formatWidth = bits.length;
+    }
 
     if (!opts || !(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) {
       if (typeof formatValueFn === 'function') return formatValueFn(bits, fieldWidth);
@@ -2594,19 +2599,19 @@
 
     if (opts.numericFormat && NF) {
       const formatW = NF.getFormatModeWidth(opts.numericFormat);
-      if (formatW != null && formatW === fieldWidth) {
+      if (formatW != null && formatW === formatWidth) {
         return NF.formatGroupedShow(bits, opts.numericFormat, { elementWidth: formatW });
       }
-      if (formatW != null && fieldWidth < formatW && DF) {
-        return DF.formatDebugDisplayValue(bits, fieldWidth, opts, false, fieldWidth);
+      if (formatW != null && formatWidth < formatW && DF) {
+        return DF.formatDebugDisplayValue(bits, formatWidth, opts, false, formatWidth);
       }
-      if (formatW != null && fieldWidth > formatW && NF) {
+      if (formatW != null && formatWidth > formatW && NF) {
         return NF.formatGroupedShow(bits, opts.numericFormat, { elementWidth: formatW });
       }
     }
 
     if (DF) {
-      const formatted = DF.formatDebugDisplayValue(bits, fieldWidth, opts, false, fieldWidth);
+      const formatted = DF.formatDebugDisplayValue(bits, formatWidth, opts, false, formatWidth);
       if (formatted !== bits) return formatted;
     }
 

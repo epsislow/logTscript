@@ -54633,5 +54633,34 @@ rule expression = value | INT -> CallNumber;
     h.assert('two optional bound fields', schema && schema.optionalFields && schema.optionalFields.length, 2);
   });
 
+  reg(5020, 'semantic-schemas', 'show ascii on bound text leaf uses payload length not max width', function(h, session) {
+    const SB = LogTScriptSchemaBound;
+    const msg = 'Hello';
+    let payload = '';
+    for (let i = 0; i < msg.length; i++) {
+      payload += msg.charCodeAt(i).toString(2).padStart(8, '0');
+    }
+    const bound = SB.packBoundPayload(payload);
+    const errSchemaDecl = [
+      '<asciiText256>:',
+      '    text: 2048',
+      ':',
+      '<err>:',
+      '    kind: 4',
+      '    message: bound <asciiText256>',
+      ':',
+    ].join('\n');
+    session.run(errSchemaDecl);
+    const errSchema = session.interp.schemaRegistry.get('err');
+    h.assert('err min width', errSchema && errSchema.minWidth, 2068);
+    const kind = '0000';
+    const wireBits = kind + bound + '0'.repeat(errSchema.minWidth - kind.length - bound.length);
+    h.assert('wire width', wireBits.length, errSchema.minWidth);
+    session.run(errSchemaDecl + '\n' + errSchema.minWidth + 'wire<err> e = ' + wireBits + '\nshow(e; <err> ascii)');
+    const out = session.interp.out.join('\n');
+    h.assert('hello quoted', out.indexOf('text  = "Hello"') >= 0, true);
+    h.assert('no nul pad before hello', out.indexOf('\u25E6Hello') < 0, true);
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
