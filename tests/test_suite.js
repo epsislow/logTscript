@@ -55239,6 +55239,212 @@ inline [interp] .vecInterp {
     }, 'incompatible');
   }, { propagation: 'wave' });
 
+  function f3iAsciiBits(str) {
+    let bits = '';
+    for (let i = 0; i < str.length; i++) {
+      bits += str.charCodeAt(i).toString(2).padStart(8, '0');
+    }
+    return bits;
+  }
+
+  const F3I_U16_5 = f3hU16Wire([1, 2, 3, 4, 5]);
+  const F3I_ASCII_CEVA = f3iAsciiBits('ceva\0\0altceva');
+  const F3I_ASCII_CEVA_TRAIL = f3iAsciiBits('ceva\0\0altceva\0');
+  const F3I_ASCII_CEVA_DBL = f3iAsciiBits('ceva\0\0altceva\0\0');
+  const F3I_ASCII_CEVA_BLA = f3iAsciiBits('ceva\0\0altceva\0\0bla');
+
+  const F3I_U16_SCHEMA = [
+    '<F3iU16Five>:',
+    '    values: 80',
+    ':',
+  ].join('\n');
+
+  const F3I_ASCII5_SCHEMA = [
+    '<F3iAsciiFive>:',
+    '    text: 40',
+    ':',
+  ].join('\n');
+
+  const F3I_STR10_SCHEMA = [
+    '<F3iStrPair>:',
+    '    data: 160',
+    ':',
+  ].join('\n');
+
+  function f3iTextSchema(name, blobWidth) {
+    return [
+      '<' + name + '>:',
+      '    blob: ' + blobWidth,
+      ':',
+    ].join('\n');
+  }
+
+  const F3I_TEXT_SCHEMA = f3iTextSchema('F3iTextVar', 144);
+  const F3I_TEXT144_SCHEMA = f3iTextSchema('F3iTextThree', 144);
+
+  const F3I_VEC_INTERP = `
+inline [interp] .f3iInterp {
+    F3iU16Five(values[5]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(values)) {
+            total = total + values[i];
+            i = i + 1;
+        }
+        return total;
+    }
+    F3iAsciiFive(text[5]/ascii) {
+        return vectorLen(text);
+    }
+    F3iStrPair(data[2]10/ascii) {
+        return vectorLen(data);
+    }
+    F3iTextVar(blob[]~/ascii) {
+        return vectorLen(blob);
+    }
+    F3iTextThree(blob[3]~/ascii) {
+        return vectorLen(blob);
+    }
+}`;
+
+  const F3I_CORE = [
+    F3I_U16_SCHEMA,
+    F3I_ASCII5_SCHEMA,
+    F3I_STR10_SCHEMA,
+    F3I_TEXT_SCHEMA,
+    F3I_TEXT144_SCHEMA,
+    F3I_VEC_INTERP,
+  ].join('\n');
+
+  function f3iInst(session) {
+    return session.interp.inlineInstances.get('.f3iInterp');
+  }
+
+  function f3iEval(h, session, bits, schemaName, opts, blobWidth) {
+    let core = F3I_CORE;
+    if (blobWidth != null) {
+      core = core.replace('blob: 144', 'blob: ' + blobWidth);
+    }
+    session.run(core);
+    return evalInterpWire(bits, schemaName, session.interp.schemaRegistry, f3iInst(session), opts || {});
+  }
+
+  reg(5106, 'interp', 'parse param [5]/u16 syntax', function(h) {
+    const body = parseInterpBody('sum(values[5]/u16) { return 0; }');
+    h.assert('vector', body.methods.sum.params[0].vector, true);
+    h.assert('N=5', body.methods.sum.params[0].vectorFixedCount, 5);
+    h.assert('u16', body.methods.sum.params[0].typeName, 'u16');
+  });
+
+  reg(5107, 'interp', 'parse param [2]10/ascii syntax', function(h) {
+    const body = parseInterpBody('read(data[2]10/ascii) { return 0; }');
+    h.assert('N=2', body.methods.read.params[0].vectorFixedCount, 2);
+    h.assert('M=10', body.methods.read.params[0].asciiCharsPerElem, 10);
+  });
+
+  reg(5108, 'interp', 'parse param []~/ascii syntax', function(h) {
+    const body = parseInterpBody('read(blob[]~/ascii) { return 0; }');
+    h.assert('null delim', body.methods.read.params[0].asciiNullDelim, true);
+    h.assert('no N', body.methods.read.params[0].vectorFixedCount, 0);
+  });
+
+  reg(5109, 'interp', 'parse param [3]~/ascii syntax', function(h) {
+    const body = parseInterpBody('read(blob[3]~/ascii) { return 0; }');
+    h.assert('N=3', body.methods.read.params[0].vectorFixedCount, 3);
+    h.assert('null delim', body.methods.read.params[0].asciiNullDelim, true);
+  });
+
+  function runF3iU16Fixed(h, session) {
+    h.assert('80 bits', F3I_U16_5.length, 80);
+    const v = f3iEval(h, session, F3I_U16_5, 'F3iU16Five', { declaredWidth: 80 });
+    h.assert('sum 1+2+3+4+5=15', v, 15);
+  }
+
+  reg(5110, 'interp', 'vector [5]/u16 fixed count legacy', runF3iU16Fixed);
+  reg(5111, 'interp', 'vector [5]/u16 fixed count wave', runF3iU16Fixed, { propagation: 'wave' });
+
+  function runF3iAsciiFive(h, session) {
+    const bits = f3iAsciiBits('hello');
+    h.assert('40 bits', bits.length, 40);
+    const v = f3iEval(h, session, bits, 'F3iAsciiFive', { declaredWidth: 40 });
+    h.assert('five chars', v, 5);
+  }
+
+  reg(5112, 'interp', 'vector [5]/ascii shorthand legacy', runF3iAsciiFive);
+  reg(5113, 'interp', 'vector [5]/ascii shorthand wave', runF3iAsciiFive, { propagation: 'wave' });
+
+  function runF3iStrPair(h, session) {
+    const bits = f3iAsciiBits('0123456789abcdefghij');
+    h.assert('160 bits', bits.length, 160);
+    const v = f3iEval(h, session, bits, 'F3iStrPair', { declaredWidth: 160 });
+    h.assert('two strings', v, 2);
+  }
+
+  reg(5114, 'interp', 'vector [2]10/ascii fixed strings legacy', runF3iStrPair);
+  reg(5115, 'interp', 'vector [2]10/ascii fixed strings wave', runF3iStrPair, { propagation: 'wave' });
+
+  function runF3iNullVar(h, session) {
+    const v = f3iEval(h, session, F3I_ASCII_CEVA, 'F3iTextVar', { declaredWidth: F3I_ASCII_CEVA.length }, F3I_ASCII_CEVA.length);
+    h.assert('three elements', v, 3);
+  }
+
+  reg(5116, 'interp', 'vector []~/ascii null-delimited legacy', runF3iNullVar);
+  reg(5117, 'interp', 'vector []~/ascii null-delimited wave', runF3iNullVar, { propagation: 'wave' });
+
+  function runF3iNullTrail(h, session) {
+    const v = f3iEval(h, session, F3I_ASCII_CEVA_TRAIL, 'F3iTextVar', { declaredWidth: F3I_ASCII_CEVA_TRAIL.length }, F3I_ASCII_CEVA_TRAIL.length);
+    h.assert('trailing single nul ignored', v, 3);
+  }
+
+  reg(5118, 'interp', 'vector []~/ascii trailing nul ignored legacy', runF3iNullTrail);
+  reg(5119, 'interp', 'vector []~/ascii trailing nul ignored wave', runF3iNullTrail, { propagation: 'wave' });
+
+  function runF3iNullDbl(h, session) {
+    const v = f3iEval(h, session, F3I_ASCII_CEVA_DBL, 'F3iTextVar', { declaredWidth: F3I_ASCII_CEVA_DBL.length }, F3I_ASCII_CEVA_DBL.length);
+    h.assert('four elements with empty tail', v, 4);
+  }
+
+  reg(5120, 'interp', 'vector []~/ascii double trailing nul legacy', runF3iNullDbl);
+  reg(5121, 'interp', 'vector []~/ascii double trailing nul wave', runF3iNullDbl, { propagation: 'wave' });
+
+  function runF3iNullFixed3(h, session) {
+    const v = f3iEval(h, session, F3I_ASCII_CEVA_BLA, 'F3iTextThree', { declaredWidth: F3I_ASCII_CEVA_BLA.length }, F3I_ASCII_CEVA_BLA.length);
+    h.assert('first three only', v, 3);
+  }
+
+  reg(5122, 'interp', 'vector [3]~/ascii fixed take legacy', runF3iNullFixed3);
+  reg(5123, 'interp', 'vector [3]~/ascii fixed take wave', runF3iNullFixed3, { propagation: 'wave' });
+
+  function runF3iNullFive(h, session) {
+    const v = f3iEval(h, session, F3I_ASCII_CEVA_BLA, 'F3iTextVar', { declaredWidth: F3I_ASCII_CEVA_BLA.length }, F3I_ASCII_CEVA_BLA.length);
+    h.assert('five elements', v, 5);
+  }
+
+  reg(5124, 'interp', 'vector []~/ascii five null-delimited legacy', runF3iNullFive);
+  reg(5125, 'interp', 'vector []~/ascii five null-delimited wave', runF3iNullFive, { propagation: 'wave' });
+
+  reg(5126, 'interp', 'vector [5]/u16 short wire abort legacy', function(h, session) {
+    session.run(F3I_CORE);
+    h.assertThrows('corrupt', function() {
+      evalInterpWire(F3I_U16_5.substring(0, 64), 'F3iU16Five', session.interp.schemaRegistry, f3iInst(session), { declaredWidth: 64 });
+    }, 'corrupt');
+  });
+
+  reg(5127, 'interp', 'vector [5]/u16 short wire abort wave', function(h, session) {
+    session.run(F3I_CORE);
+    h.assertThrows('corrupt', function() {
+      evalInterpWire(F3I_U16_5.substring(0, 64), 'F3iU16Five', session.interp.schemaRegistry, f3iInst(session), { declaredWidth: 64 });
+    }, 'corrupt');
+  }, { propagation: 'wave' });
+
+  function runF3iWireEval(h, session) {
+    session.run(F3I_CORE + '\n80wire<F3iU16Five> w = ^0001000200030004' + '0005\n8wire r = .f3iInterp:eval(w, <F3iU16Five>)');
+    h.assert('wire eval sum 15', session.getWire(session.interp, 'r'), '00001111');
+  }
+
+  reg(5128, 'interp', 'vector [5]/u16 wire eval legacy', runF3iWireEval);
+  reg(5129, 'interp', 'vector [5]/u16 wire eval wave', runF3iWireEval, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

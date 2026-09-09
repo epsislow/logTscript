@@ -23,7 +23,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Syntax** | `CallAdd(left/s16, right/s16) { return left + right; }` |
 | **`/type`** | Required on every parameter of methods invoked from AST (`CallNumber`, `CallAdd`, …) |
 | **Helpers** | Internal methods may omit `/type` — called only from other interp methods |
-| **Vectors** | `param[]/type` decodes schema field containers into JS arrays — `vectorLen`, `arr[i]` in body |
+| **Vectors** | `param[]/type`, `[N]/type`, `[N]M/ascii`, `[]~/ascii`, `[N]~/ascii` — see [Vector parameters](#vector-parameters) |
 | **Runtime API** | `.myInterp:eval(astWire, <schema>)` → numeric wire (width from assignment LHS) |
 | **Env** | `env[name]` inside method bodies for `CallAssign` / `CallVariable` programs |
 | **Doc** | `doc(inline.interp)`, `doc(.myInterp)` |
@@ -96,13 +96,15 @@ Helpers are **not** valid AST dispatch targets — if the parser emits `-> addPa
 | `f32`, `f64`, `fp16`, `bf16` | IEEE floats via `numeric-formats.js` |
 | `q4p4`, `q8p8`, … | Fixed-point via `numeric-formats.js` |
 
-### Vector element types (`param[]/type`)
+### Vector element types
 
 | Annotation | Element decode |
 |------------|----------------|
-| `values[]/u16`, `flags[]/u1`, … | Same rules as scalar `/type`, one value per element |
-| `names[]/ascii` | One ASCII character per element (8 bits) |
-| `names[]8/ascii` | Fixed **8** characters per element (64 bits) |
+| `values[]/u16`, `flags[]/u1`, … | Count from schema container; element width from `/type` |
+| `values[5]/u16`, `text[5]/ascii`, … | **Fixed N** elements; width per element from `/type` |
+| `names[]/ascii`, `names[5]/ascii` | One ASCII character per element (8 bits) |
+| `names[]8/ascii`, `names[2]10/ascii` | Fixed **M** characters per element (`M×8` bits each) |
+| `tags[]~/ascii`, `tags[3]~/ascii` | Null-delimited ASCII strings (`\0` between elements) |
 
 Vectors are **copy-on-entry** (same as `inline [canvas]`): method bodies receive a fresh array and may not mutate wire bits in place.
 
@@ -120,6 +122,10 @@ Use **`param[]/type`** when a schema field holds many elements. The **`/type`** 
 | BVA (`bytes: bound <byte>[1-]`) | One bound substream per element | Number of bound elements |
 
 If the container bit length is not an exact multiple of the element width, or a var-array count does not match available bits, eval **aborts** (`corrupt vector field bit length`).
+
+**Fixed count `[N]`** in the parameter signature overrides element count from the schema. The container must supply exactly **`N × elemWidth`** bits (for `[N]/type` and `[N]M/ascii`). Schema width mismatch → **abort** at first dispatch.
+
+**Null-delimited `~/ascii`** stores concatenated strings in one blob: `str0\0str1\0…`. A single trailing `\0` after the last string does **not** add an extra empty element; `\0\0` at the end **does** (`"a\0\0"` → `["a", ""]`). With **`[N]~/ascii`**, only the first **N** elements are returned; remaining container bits are ignored.
 
 Method bodies use **`vectorLen(arr)`** and **`arr[i]`** (same subset as `inline [canvas]`).
 
@@ -204,6 +210,122 @@ show(result)
 ```
 
 Expected: **`00000011`** (three ASCII bytes `a`, `b`, `c`).
+
+### Fixed count: `values[5]/u16`
+
+Exactly **five** `u16` values in an **80-bit** leaf (`5 × 16`).
+
+```logts-play
+<F3iU16Five>:
+    values: 80
+:
+
+inline [interp] .f3iInterp {
+    F3iU16Five(values[5]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(values)) {
+            total = total + values[i];
+            i = i + 1;
+        }
+        return total;
+    }
+}
+
+80wire<F3iU16Five> w = ^00010002000300040005
+8wire result = .f3iInterp:eval(w, <F3iU16Five>)
+show(result)
+```
+
+Expected: **`00001111`** (1+2+3+4+5 = 15).
+
+### Fixed count shorthand: `text[5]/ascii`
+
+Five one-character ASCII elements (40 bits). Use a **binary literal** (not `^`).
+
+```logts-play
+<F3iAsciiFive>:
+    text: 40
+:
+
+inline [interp] .f3iInterp {
+    F3iAsciiFive(text[5]/ascii) {
+        return vectorLen(text);
+    }
+}
+
+40wire<F3iAsciiFive> w = 0110100001100101011011000110110001101111
+8wire result = .f3iInterp:eval(w, <F3iAsciiFive>)
+show(result)
+```
+
+Expected: **`00000101`** (`hello` → five characters).
+
+### Fixed-width strings: `data[2]10/ascii`
+
+Two elements, **10** ASCII characters each (160 bits total).
+
+```logts-play
+<F3iStrPair>:
+    data: 160
+:
+
+inline [interp] .f3iInterp {
+    F3iStrPair(data[2]10/ascii) {
+        return vectorLen(data);
+    }
+}
+
+160wire<F3iStrPair> w = 0011000000110001001100100011001100110100001101010011011000110111001110000011100101100001011000100110001101100100011001010110011001100111011010000110100101101010
+8wire result = .f3iInterp:eval(w, <F3iStrPair>)
+show(result)
+```
+
+Expected: **`00000010`** (two fixed 10-character strings).
+
+### Null-delimited variable count: `blob[]~/ascii`
+
+Blob layout: `str0\0str1\0…`. Wire width must match the leaf exactly (104 bits here).
+
+```logts-play
+<F3iTextVar>:
+    blob: 104
+:
+
+inline [interp] .f3iInterp {
+    F3iTextVar(blob[]~/ascii) {
+        return vectorLen(blob);
+    }
+}
+
+104wire<F3iTextVar> w = 01100011011001010111011001100001000000000000000001100001011011000111010001100011011001010111011001100001
+8wire result = .f3iInterp:eval(w, <F3iTextVar>)
+show(result)
+```
+
+Expected: **`00000011`** (`ceva`, empty string, `altceva`).
+
+### Null-delimited fixed take: `blob[3]~/ascii`
+
+Same blob rules; **`[3]`** returns only the first three elements (extra bits in the container are ignored).
+
+```logts-play
+<F3iTextThree>:
+    blob: 144
+:
+
+inline [interp] .f3iInterp {
+    F3iTextThree(blob[3]~/ascii) {
+        return vectorLen(blob);
+    }
+}
+
+144wire<F3iTextThree> w = 011000110110010101110110011000010000000000000000011000010110110001110100011000110110010101110110011000010000000000000000011000100110110001100001
+8wire result = .f3iInterp:eval(w, <F3iTextThree>)
+show(result)
+```
+
+Expected: **`00000011`** (first three of `ceva`, ``, `altceva`, … — remainder ignored).
 
 ---
 
@@ -622,6 +744,8 @@ On the **first runtime dispatch** of each `(method, schema)` pair, the engine ch
 | `bound <expr>` | `s16`, `u32`, `f32`, … |
 | `bound <symbol>` (BVA bytes) | `ascii` |
 | Leaf / var-array + `values[]/u16` | Element width from `/type`; container from schema |
+| Leaf + `values[5]/u16` | Leaf width must equal **5 × 16** bits |
+| Leaf + `data[2]10/ascii` | Leaf width must equal **2 × 10 × 8** bits |
 | BVA + `bytes[]/ascii` | One decode per bound element |
 | `bound <word8>` + `values[]/u8` | Element schema width must match `/type` width |
 
@@ -643,6 +767,8 @@ Eval stops immediately on:
 | Invalid vector index | Error |
 | Corrupt / truncated wire vs schema | Error |
 | Vector container bit length not multiple of element width | `corrupt vector field bit length` |
+| `[N]/type` or `[N]M/ascii` container width mismatch | Abort at dispatch or decode |
+| `[N]~/ascii` with fewer than N null-delimited elements | `corrupt vector field bit length` |
 | Var-array count inconsistent with available bits | `corrupt vector field bit length` |
 | Loop > 10 000 iterations | Error |
 

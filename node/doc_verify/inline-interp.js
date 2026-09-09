@@ -260,3 +260,77 @@ module.exports = {
     },
   ],
 };
+
+const F3I_VEC = [
+  '<F3iU16Five>:',
+  '    values: 80',
+  ':',
+  '<F3iTextVar>:',
+  '    blob: 104',
+  ':',
+  '<F3iTextThree>:',
+  '    blob: 144',
+  ':',
+  `inline [interp] .f3iInterp {
+    F3iU16Five(values[5]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(values)) {
+            total = total + values[i];
+            i = i + 1;
+        }
+        return total;
+    }
+    F3iTextVar(blob[]~/ascii) {
+        return vectorLen(blob);
+    }
+    F3iTextThree(blob[3]~/ascii) {
+        return vectorLen(blob);
+    }
+}`,
+].join('\n');
+
+function f3iInst(interp) {
+  return interp.inlineInstances.get('.f3iInterp');
+}
+
+function f3iAsciiBits(str) {
+  let bits = '';
+  for (let i = 0; i < str.length; i++) {
+    bits += str.charCodeAt(i).toString(2).padStart(8, '0');
+  }
+  return bits;
+}
+
+module.exports.cases.push(
+  {
+    name: 'vector [5]/u16 fixed sum',
+    src: F3I_VEC,
+    check: (interp) => {
+      const inst = f3iInst(interp);
+      if (!inst) return false;
+      const bits = [1, 2, 3, 4, 5].map((v) => v.toString(2).padStart(16, '0')).join('');
+      return ie.evalInterpWire(bits, 'F3iU16Five', interp.schemaRegistry, inst, { declaredWidth: 80 }) === 15;
+    },
+  },
+  {
+    name: 'vector []~/ascii null-delimited',
+    src: F3I_VEC,
+    check: (interp) => {
+      const inst = f3iInst(interp);
+      if (!inst) return false;
+      const bits = f3iAsciiBits('ceva\0\0altceva');
+      return ie.evalInterpWire(bits, 'F3iTextVar', interp.schemaRegistry, inst, { declaredWidth: 104 }) === 3;
+    },
+  },
+  {
+    name: 'vector [3]~/ascii fixed take',
+    src: F3I_VEC,
+    check: (interp) => {
+      const inst = f3iInst(interp);
+      if (!inst) return false;
+      const bits = f3iAsciiBits('ceva\0\0altceva\0\0bla');
+      return ie.evalInterpWire(bits, 'F3iTextThree', interp.schemaRegistry, inst, { declaredWidth: 144 }) === 3;
+    },
+  },
+);

@@ -175,7 +175,7 @@ function interpValidateSchemaType(param, fieldNode, methodName, schemaName, cach
   if (!param.typeName) {
     interpError(`method '${methodName}' param '${param.name}' missing /type annotation`);
   }
-  const key = `${schemaName}:${methodName}:${param.name}:${param.typeName}:${param.vector ? 1 : 0}:${param.asciiCharsPerElem || 0}`;
+  const key = `${schemaName}:${methodName}:${param.name}:${param.typeName}:${param.vector ? 1 : 0}:${param.asciiCharsPerElem || 0}:${param.vectorFixedCount || 0}:${param.asciiNullDelim ? 1 : 0}`;
   if (cache && cache.has(key)) return;
   const kind = interpSchemaFieldKind(fieldNode, cache && cache.registry);
   const tn = param.typeName;
@@ -184,11 +184,21 @@ function interpValidateSchemaType(param, fieldNode, methodName, schemaName, cach
     if (kind === 'expr') {
       interpError(`schema '${schemaName}' field '${param.name}' cannot be vector /${tn} (expr subtree)`);
     }
+    if (param.asciiNullDelim && kind === 'bva') {
+      interpError(`schema '${schemaName}' field '${param.name}' incompatible with ~/ascii (bound array container)`);
+    }
     const elemW = interpTypeElemWidth(param);
     if (kind === 'bva') {
       const leafW = interpBvaElemLeafWidth(fieldNode, registry);
       if (leafW != null && leafW !== elemW && !(tn === 'ascii' && leafW === 8 && elemW === 8)) {
         interpError(`schema '${schemaName}' field '${param.name}' element width ${leafW} incompatible with /${tn}`);
+      }
+    }
+    if (param.vectorFixedCount > 0 && !param.asciiNullDelim && kind === 'leaf') {
+      const need = param.vectorFixedCount * elemW;
+      const w = fieldNode.width || 0;
+      if (w !== need) {
+        interpError(`schema '${schemaName}' field '${param.name}' width ${w} incompatible with [${param.vectorFixedCount}]/${tn} (needs ${need} bits)`);
       }
     }
     if (tn === 'ascii' && param.asciiCharsPerElem > 0 && param.asciiCharsPerElem !== 1) {
@@ -347,6 +357,90 @@ function interpSliceVectorFromBlob(blob, param) {
   return out;
 }
 
+function interpDecodeFixedCountVector(blob, param) {
+  const n = param.vectorFixedCount;
+  const elemW = interpTypeElemWidth(param);
+  const need = n * elemW;
+  const bits = blob == null ? '' : String(blob);
+  if (bits.length !== need) {
+    interpError('corrupt vector field bit length');
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push(interpDecodeElementBits(bits.substring(i * elemW, (i + 1) * elemW), param));
+  }
+  return out;
+}
+
+function interpBitsToAsciiByteString(bits) {
+  const b = bits == null ? '' : String(bits);
+  if (b.length % 8 !== 0) {
+    interpError('corrupt vector field bit length');
+  }
+  let s = '';
+  for (let i = 0; i < b.length; i += 8) {
+    const code = parseInt(b.substring(i, i + 8), 2);
+    if (code > 127) interpError('non-ASCII byte in /ascii field');
+    s += String.fromCharCode(code);
+  }
+  return s;
+}
+
+function interpParseNullDelimAscii(str, fixedCount) {
+  const out = [];
+  let start = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) === 0) {
+      out.push(str.substring(start, i));
+      start = i + 1;
+    }
+  }
+  if (start < str.length) {
+    out.push(str.substring(start));
+  }
+  if (fixedCount > 0) {
+    if (out.length < fixedCount) {
+      interpError('corrupt vector field bit length');
+    }
+    return out.slice(0, fixedCount);
+  }
+  return out;
+}
+
+function interpExtractVectorContainerBits(walk, kind, node, param, SB) {
+  if (kind === 'bva') {
+    return walk.bits.substring(walk.offset);
+  }
+  if (kind === 'var_array') {
+    if (param.vectorFixedCount > 0 && !param.asciiNullDelim) {
+      const elemW = node.elementWidth || interpTypeElemWidth(param);
+      const need = param.vectorFixedCount * elemW;
+      const seg = walk.bits.substring(walk.offset, walk.offset + need);
+      if (seg.length !== need) interpError('corrupt vector field bit length');
+      return seg;
+    }
+    const ss = interpSs();
+    const count = walk.counts[node.name];
+    if (count == null) interpError(`missing variable array count for '${param.name}'`);
+    const elemW = node.elementWidth || interpTypeElemWidth(param);
+    const need = count * elemW;
+    const seg = walk.bits.substring(walk.offset, walk.offset + need);
+    if (seg.length !== need) interpError('corrupt vector field bit length');
+    return seg;
+  }
+  if (kind === 'bound') {
+    const sub = SB.readBoundSubstream(walk.bits, walk.offset);
+    return sub.payloadBits;
+  }
+  if (kind === 'leaf') {
+    const w = node.width || 0;
+    const seg = walk.bits.substring(walk.offset, walk.offset + w);
+    if (seg.length !== w) interpError('corrupt vector field bit length');
+    return seg;
+  }
+  interpError(`cannot decode vector param from field shape '${kind}'`);
+}
+
 function interpDecodeBvaVector(bits, fieldNode, param, registry) {
   const SB = interpSb();
   let offset = 0;
@@ -368,18 +462,22 @@ function interpDecodeVectorParam(payloadBits, payloadSchema, param, fieldNode, r
   const node = interpNormalizeFieldNode(walk.node);
   const kind = interpSchemaFieldKind(node, registry);
   const SB = interpSb();
+  if (param.asciiNullDelim) {
+    const blob = interpExtractVectorContainerBits(walk, kind, node, param, SB);
+    const str = interpBitsToAsciiByteString(blob);
+    const fixed = param.vectorFixedCount > 0 ? param.vectorFixedCount : 0;
+    return interpCopyVector(interpParseNullDelimAscii(str, fixed));
+  }
+  if (param.vectorFixedCount > 0) {
+    const blob = interpExtractVectorContainerBits(walk, kind, node, param, SB);
+    return interpCopyVector(interpDecodeFixedCountVector(blob, param));
+  }
   if (kind === 'bva') {
     const seg = walk.bits.substring(walk.offset);
     return interpCopyVector(interpDecodeBvaVector(seg, node, param, registry));
   }
   if (kind === 'var_array') {
-    const ss = interpSs();
-    const count = walk.counts[node.name];
-    if (count == null) interpError(`missing variable array count for '${param.name}'`);
-    const elemW = node.elementWidth || interpTypeElemWidth(param);
-    const need = count * elemW;
-    const seg = walk.bits.substring(walk.offset, walk.offset + need);
-    if (seg.length !== need) interpError('corrupt vector field bit length');
+    const seg = interpExtractVectorContainerBits(walk, kind, node, param, SB);
     return interpCopyVector(interpSliceVectorFromBlob(seg, param));
   }
   if (kind === 'bound') {

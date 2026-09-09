@@ -122,7 +122,7 @@ function interpTokenize(src) {
       i += 2;
       continue;
     }
-    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === ':' || ch === '[' || ch === ']') {
+    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === ':' || ch === '[' || ch === ']' || ch === '~') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
       continue;
@@ -202,11 +202,21 @@ class InterpParser {
   parseParam() {
     const nameTok = this.eat('ID');
     let vector = false;
+    let vectorFixedCount = 0;
     let asciiCharsPerElem = 0;
+    let asciiNullDelim = false;
     if (this.match('SYM', '[')) {
-      this.eat('SYM', ']');
       vector = true;
       if (this.peek().type === 'NUM') {
+        vectorFixedCount = parseInt(this.eat('NUM').value, 10);
+        if (!Number.isFinite(vectorFixedCount) || vectorFixedCount < 1) {
+          interpError('[N]/type requires positive N', nameTok.line);
+        }
+      }
+      this.eat('SYM', ']');
+      if (this.match('SYM', '~')) {
+        asciiNullDelim = true;
+      } else if (this.peek().type === 'NUM') {
         asciiCharsPerElem = parseInt(this.eat('NUM').value, 10);
         if (!Number.isFinite(asciiCharsPerElem) || asciiCharsPerElem < 1) {
           interpError('[]M/ascii requires positive M', nameTok.line);
@@ -219,10 +229,24 @@ class InterpParser {
       validateInterpType(typeTok.value, typeTok.line);
       typeName = typeTok.value;
     }
+    if (asciiNullDelim && typeName !== 'ascii') {
+      interpError('~/ is only valid for /ascii', nameTok.line);
+    }
+    if (asciiNullDelim && asciiCharsPerElem > 0) {
+      interpError('param cannot combine ~/ascii with []M/ascii', nameTok.line);
+    }
     if (asciiCharsPerElem > 0 && typeName !== 'ascii') {
       interpError('[]M/type is only valid for /ascii', nameTok.line);
     }
-    return { name: nameTok.value, vector, typeName, asciiCharsPerElem, line: nameTok.line };
+    return {
+      name: nameTok.value,
+      vector,
+      typeName,
+      asciiCharsPerElem,
+      vectorFixedCount,
+      asciiNullDelim,
+      line: nameTok.line,
+    };
   }
 
   parseMethod() {
@@ -609,7 +633,9 @@ function formatInterpInstanceDoc(name, inst) {
     const sig = (m.params || []).map((p) => {
       let s = p.name;
       if (p.vector) {
-        s = p.name + '[]' + (p.asciiCharsPerElem > 0 ? String(p.asciiCharsPerElem) : '');
+        s = p.name + '[' + (p.vectorFixedCount > 0 ? String(p.vectorFixedCount) : '') + ']';
+        if (p.asciiNullDelim) s += '~';
+        else if (p.asciiCharsPerElem > 0) s += String(p.asciiCharsPerElem);
       }
       if (p.typeName) s = s + '/' + p.typeName;
       return s;
