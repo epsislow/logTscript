@@ -304,5 +304,23 @@ inline [parser] .mini:
         return r && r.ok === 1 && r.bitWidth > 48;
       },
     },
+    {
+      name: 'parse program envelope two statements',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = parseResultCalc(interp, 'a=1;b=2;', 'program', 'program');
+        return r && r.ok === 1 && r.parseAstSchemaRef === 'program' && r.bitWidth > 48;
+      },
+    },
+    {
+      name: 'parse expr ast width matches packAst',
+      src: CALC_FULL,
+      check: (interp) => {
+        const pack = packCalc(interp, '1+2*3', 'expr', 'expression');
+        const parse = parseResultCalc(interp, '1+2*3', 'expr', 'expression');
+        return pack && pack.ok === 1 && parse && parse.ok === 1 &&
+          pack.bitWidth === 135 && parse.parseAstSchemaRef === 'expr' && parse.bitWidth > pack.bitWidth;
+      },
+    },
   ],
 };

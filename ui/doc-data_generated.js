@@ -24536,7 +24536,16 @@ doc(.character)
 
 \`inline [parser]\` defines a **grammar** for a custom language: lexical **tokens** and syntactic **rules**. The grammar is stored at load time, inspected with \`doc()\`, and used at runtime by **\`:parse\`**, **\`:packAst\`**, and **\`:parseText\`**.
 
-In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run**.
+> **Development feature:** \`inline [parser]\` is available for experimentation in current builds. It is **not** part of the production language surface yet.
+
+### Running examples (Load / Load & Run)
+
+Runnable blocks on this page use the \`logts-play\` format. Each block shows two buttons in the documentation viewer:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor **without** running it. Inspect or edit the example, then press toolbar **RUN** when ready. |
+| **Load & Run** | Copies the script and runs it immediately — check the **Output** panel for \`show\` results. |
 
 ---
 
@@ -25273,9 +25282,19 @@ Reserved built-in schema names (\`parseResult\`, \`parseError\`, \`asciiText256\
 
 After parsing, **\`:packAst\`** builds a **typed semantic wire** from source text using AST schemas (\`<name>+:\`). Grammar \`-> CallName\` targets map **1:1** to schema fields (\`CallAdd?:\`, \`CallAssign?:\`, …). Captures such as \`$name:ID\` map to schema fields according to the **field shape** in the schema (see **Text captures** below).
 
+| Grammar | Schema |
+|---------|--------|
+| \`-> CallAdd\` on a rule | \`CallAdd?: bound <CallAdd>\` on \`<expr>+\` |
+| \`-> CallNumber\` | \`CallNumber?: <CallNumber>\` |
+| \`$name:ID\` capture | maps to \`name:\` — shape decides packing (BVA bytes, fixed ASCII, …) |
+| \`rule+\` (e.g. \`statement+\`) | \`bound <CallStatement>[1-]\` list on \`<program>+\` |
+| Recursive subtree | \`left:\` / \`right:\` as **\`bound <expr>\`** |
+
+See [semantic-schemas.md — Grammar ↔ schema mapping](semantic-schemas.md#grammar--schema-mapping-calclang) for the full \`.calcLang\` table.
+
 ### Schemas for \`.calcLang\`
 
-Define schemas **before** the parser inline. Recursive expression nodes use **\`bound <expr>\`**; identifiers typically use a **byte array** schema (variable-length ASCII):
+Define schemas **before** the parser inline. Recursive expression nodes use **\`bound <expr>\`**. For identifier captures (\`$name:ID\`), choose a **packable field shape** — variable-length bytes (\`bytes: bound <byte>[1-]\`), fixed-width ASCII (\`name: 32\`), or a reusable leaf sub-schema (\`bound <asciiTextName>\`). The examples below use BVA bytes; alternatives are in **Text captures**.
 
 \`\`\`logts-play
 <byte>:
@@ -25832,6 +25851,244 @@ show(packed; <expr>)
 | **\`:parse(src, <SchemaRef> [, startRule])\`** | source + AST schema ref + optional rule | \`<parseResult>\` wire (success or error envelope) |
 | **\`:packAst(src, <SchemaRef> [, startRule])\`** | source + AST schema ref + optional rule | Packed AST wire — assign to \`Nwire<schema>\` |
 | **\`:parseText(src [, startRule])\`** | source + optional rule | ASCII wire (8 bits/char) — use \`show(w; ascii)\` |
+
+---
+
+## End-to-end tutorial
+
+This section ties together **recursive AST schemas**, a **\`.calcLang\` grammar**, **\`:parse\`**, and **typed wire use**. The flow is:
+
+\`\`\`text
+1. Declare <schema>+ blocks (presence_mask, bound, optional ?)
+2. Declare inline [parser] .calcLang (tokens + rules + -> Call*)
+3. :parse(src, <SchemaRef> [, startRule])  →  wire<parseResult>
+4. show(pr; <parseResult>)  or  field reads on pr:ast / copied <program> wire
+\`\`\`
+
+### Full program: parse, show, field read
+
+**Load & Run** — two assignments, envelope show, numeric reads from the packed AST:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+4096wire<parseResult> pr =: .calcLang:parse("a=1;b=2;", <program>, "program")
+show(pr; <parseResult>)
+8wire firstVal = pr:ast:statements:0:CallAssign:value:CallNumber:value
+8wire secondVal = pr:ast:statements:1:CallAssign:value:CallNumber:value
+200wire<program> prog = pr:ast
+show(prog; <program>)
+\`\`\`
+
+After **Load & Run**: **\`ok = 1\`** on the envelope; **\`firstVal\`** is **\`00000001\`**, **\`secondVal\`** is **\`00000010\`**. The copied **\`prog\`** wire matches the packed program AST (200 bits for this source).
+
+### Expression only: precedence in one call
+
+Same schemas and grammar, parse a single expression with **\`startRule\`** (third argument):
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber;
+
+:
+
+4096wire<parseResult> pr =: .calcLang:parse("1+2*3", <expr>, "expression")
+show(pr; <parseResult>)
+135wire<expr> ast = pr:ast
+show(ast; <expr>)
+\`\`\`
+
+Root of **\`ast\`**: **\`CallAdd\`** with **\`CallMul\`** on the right (multiplication binds tighter than addition).
+
+### Wave propagation
+
+The same scripts behave identically under **legacy** and **wave** propagation — packing, field paths, and **\`show\`** output match.
+
+\`\`\`logts-play wave
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+4096wire<parseResult> pr =: .calcLang:parse("x=3;", <program>, "program")
+8wire val = pr:ast:statements:0:CallAssign:value:CallNumber:value
+show(pr; <parseResult>)
+\`\`\`
+
+Expected: **\`val\`** = **\`00000011\`**.
+
+### Choosing an API
+
+| Goal | Use |
+|------|-----|
+| Success/error without exceptions | **\`:parse\`** → \`<parseResult>\` |
+| Direct AST wire (known width) | **\`:packAst\`** → \`Nwire<schema>\` |
+| Debug tree text | **\`:parseText\`** → \`show(w; ascii)\` |
+| Decode envelope AST explicitly | **\`show(pr:ast; <schema>)\`** or assign **\`pr:ast\`** to \`Nwire<schema>\` |
 
 ---
 
@@ -50985,6 +51242,98 @@ Use grouped literals \`{ { code=\\16 }{ code=\\32 }<country> }\` for list elemen
 | \`show(wire; <schema>)\` | Indented tree; only present optional branches are shown |
 
 Wave and legacy propagation produce the same packing, field reads, and \`show\` output for these schemas.
+
+---
+
+### Grammar ↔ schema mapping (\`.calcLang\`)
+
+When **\`inline [parser]\`** and **\`:packAst\`** / **\`:parse\`** are used together, grammar rules and AST schemas must agree. The **\`-> CallName\`** target on a rule alternative maps **1:1** to an optional field **\`CallName?:\`** on a **\`<name>+:\`** schema (same spelling, including the \`Call\` prefix).
+
+| Grammar (\`.calcLang\`) | AST schema | Wire shape |
+|-----------------------|------------|------------|
+| \`rule expression = … \\| INT -> CallNumber\` | \`<expr>+:\` → \`CallNumber?: <CallNumber>\` | mask bit + 8-bit \`value\` |
+| \`… -> CallAdd\` | \`CallAdd?: bound <CallAdd>\` | mask + 16b bound len + nested \`<CallAdd>\` |
+| \`<CallAdd>:\` fields \`left\` / \`right\` | \`left: bound <expr>\`, \`right: bound <expr>\` | recursive children |
+| \`rule program = statement+\` | \`<program>+:\` → \`statements: bound <CallStatement>[1-]\` | variable list of statements |
+| \`rule statement = … -> CallAssign\` | \`<CallStatement>+:\` → \`CallAssign?: bound <CallAssign>\` | one statement variant |
+| \`$name:ID\` capture on \`CallAssign\` | \`name:\` field — BVA, fixed ASCII, or sub-schema | see [Text captures](#parser-text-captures-ast-packing) |
+
+**Load & Run** — pack a program and read a nested field (same layout as **\`:parse\`** would produce on success):
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+200wire<program> prog = .calcLang:packAst("a=1;b=2;", <program>, "program")
+8wire secondRhs = prog:statements:1:CallAssign:value:CallNumber:value
+show(prog; <program>)
+\`\`\`
+
+Expected: **\`secondRhs\`** = **\`00000010\`**. Full parse envelope walkthrough → [inline-parser.md — End-to-end tutorial](inline-parser.md#end-to-end-tutorial).
 
 ---
 

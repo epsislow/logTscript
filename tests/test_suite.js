@@ -54714,6 +54714,37 @@ rule expression = value | INT -> CallNumber;
   reg(5049, 'parser', 'f2f bva max count overflow legacy', runF2fShortNameMax);
   reg(5050, 'parser', 'f2f bva max count overflow wave', runF2fShortNameMax, { propagation: 'wave' });
 
+  function runF2eParseProgramE2e(h, session) {
+    session.run(
+      f2dParseScript('a=1;b=2;', 4096, '<program>', 'program') +
+        '\n8wire v0 = pr:ast:statements:0:CallAssign:value:CallNumber:value' +
+        '\n8wire v1 = pr:ast:statements:1:CallAssign:value:CallNumber:value' +
+        '\nshow(pr; <parseResult>)'
+    );
+    const out = session.interp.out.join('\n');
+    h.assert('ok=1', f2dOutHasOk(out, 1), true);
+    h.assert('CallAssign x2', (out.match(/CallAssign/g) || []).length >= 2, true);
+    h.assert('first value 1', session.getWire(session.interp, 'v0'), '00000001');
+    h.assert('second value 2', session.getWire(session.interp, 'v1'), '00000010');
+  }
+
+  reg(5051, 'parser', 'f2e parse program e2e field read legacy', runF2eParseProgramE2e);
+  reg(5052, 'parser', 'f2e parse program e2e field read wave', runF2eParseProgramE2e, { propagation: 'wave' });
+
+  function runF2eTypedAstDownstream(h, session) {
+    session.run(
+      f2dParseScript('1+2*3', 4096, '<expr>', 'expression') +
+        '\n135wire<expr> ast = pr:ast' +
+        '\n8wire mulRhs = ast:CallAdd:right:CallMul:right:CallNumber:value'
+    );
+    h.assert('ast width', session.getWire(session.interp, 'ast').length, 135);
+    h.assert('mul rhs 3', session.getWire(session.interp, 'mulRhs'), '00000011');
+    h.assert('parseAstSchemaRef', session.interp.wires.get('pr').parseAstSchemaRef, 'expr');
+  }
+
+  reg(5053, 'parser', 'f2e typed pr ast downstream legacy', runF2eTypedAstDownstream);
+  reg(5054, 'parser', 'f2e typed pr ast downstream wave', runF2eTypedAstDownstream, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

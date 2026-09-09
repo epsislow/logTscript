@@ -677,6 +677,98 @@ Wave and legacy propagation produce the same packing, field reads, and `show` ou
 
 ---
 
+### Grammar ↔ schema mapping (`.calcLang`)
+
+When **`inline [parser]`** and **`:packAst`** / **`:parse`** are used together, grammar rules and AST schemas must agree. The **`-> CallName`** target on a rule alternative maps **1:1** to an optional field **`CallName?:`** on a **`<name>+:`** schema (same spelling, including the `Call` prefix).
+
+| Grammar (`.calcLang`) | AST schema | Wire shape |
+|-----------------------|------------|------------|
+| `rule expression = … \| INT -> CallNumber` | `<expr>+:` → `CallNumber?: <CallNumber>` | mask bit + 8-bit `value` |
+| `… -> CallAdd` | `CallAdd?: bound <CallAdd>` | mask + 16b bound len + nested `<CallAdd>` |
+| `<CallAdd>:` fields `left` / `right` | `left: bound <expr>`, `right: bound <expr>` | recursive children |
+| `rule program = statement+` | `<program>+:` → `statements: bound <CallStatement>[1-]` | variable list of statements |
+| `rule statement = … -> CallAssign` | `<CallStatement>+:` → `CallAssign?: bound <CallAssign>` | one statement variant |
+| `$name:ID` capture on `CallAssign` | `name:` field — BVA, fixed ASCII, or sub-schema | see [Text captures](#parser-text-captures-ast-packing) |
+
+**Load & Run** — pack a program and read a nested field (same layout as **`:parse`** would produce on success):
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | ID  -> CallVariable;
+
+:
+
+200wire<program> prog = .calcLang:packAst("a=1;b=2;", <program>, "program")
+8wire secondRhs = prog:statements:1:CallAssign:value:CallNumber:value
+show(prog; <program>)
+```
+
+Expected: **`secondRhs`** = **`00000010`**. Full parse envelope walkthrough → [inline-parser.md — End-to-end tutorial](inline-parser.md#end-to-end-tutorial).
+
+---
+
 ### Parser text captures (AST packing)
 
 **`:packAst`** maps `$field:TOKEN` captures using the **field shape**, not special schema names:
