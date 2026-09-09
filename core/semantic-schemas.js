@@ -5,7 +5,13 @@
 (function (global) {
   'use strict';
 
-  const RESERVED_SCHEMA_NAMES = new Set(['none']);
+  const RESERVED_SCHEMA_NAMES = new Set([
+    'none',
+    'asciiText256',
+    'parseError',
+    'parseResult',
+    'parseAstOpaque',
+  ]);
 
   function schemaBoundModule() {
     return typeof LogTScriptSchemaBound !== 'undefined' ? LogTScriptSchemaBound : null;
@@ -952,7 +958,7 @@
   }
 
   function buildResolvedSchema(name, rawFields, ctx) {
-    assertSchemaNameAllowed(name);
+    if (!ctx || !ctx.allowReserved) assertSchemaNameAllowed(name);
     const hasPresenceMask = ctx.presenceMask && ctx.presenceMask.get(name);
     const structure = [];
     const leafPaths = new Map();
@@ -1431,19 +1437,31 @@
     return resolved;
   }
 
-  function buildSchemaDef(name, fieldSpecs, options) {
+  function buildSchemaDefIntoRegistry(registry, name, fieldSpecs, options) {
+    if (!registry) throw new Error('schema registry missing');
     const rawFields = (fieldSpecs || []).map((spec) => {
       if (spec.kind) return spec;
       return { kind: 'leaf', name: spec.name, width: spec.width };
     });
-    const registry = new Map();
     const presenceMask = new Map([[name, !!(options && options.hasPresenceMask)]]);
     const ctx = {
       registry,
       pending: new Map([[name, rawFields]]),
       presenceMask,
+      allowReserved: !!(options && options.allowReserved),
     };
-    return buildResolvedSchema(name, rawFields, ctx);
+    if (registry.has(name)) {
+      const existing = registry.get(name);
+      if (!existing._building) return ensureSchemaShape(existing);
+    }
+    const def = buildResolvedSchema(name, rawFields, ctx);
+    registry.set(name, def);
+    return def;
+  }
+
+  function buildSchemaDef(name, fieldSpecs, options) {
+    const registry = new Map();
+    return buildSchemaDefIntoRegistry(registry, name, fieldSpecs, options);
   }
 
   function validateSchemaWidth(schema, wireWidth) {
@@ -1858,17 +1876,19 @@
             payloadBits = currentBits.substring(nodeOff, nodeOff + optNode.schema.totalWidth);
           }
           if (i === path.length - 1) {
+            const resolvedSchema = schemaFromRef(optNode, opts) || optNode.schema;
+            const sliceStart = optNode.isBound ? payloadAbs : absBase + nodeOff;
             return {
               kind: 'nested',
               name: seg,
               width: payloadBits.length,
-              bitStart: absBase + nodeOff,
-              bitEnd: absBase + nodeOff + payloadBits.length - 1,
-              schema: optNode.schema,
+              bitStart: sliceStart,
+              bitEnd: sliceStart + payloadBits.length - 1,
+              schema: resolvedSchema,
               path: path.slice(0, i + 1),
             };
           }
-          return resolveSchemaView(optNode.schema, path.slice(i + 1), {
+          return resolveSchemaView(schemaFromRef(optNode, opts) || optNode.schema, path.slice(i + 1), {
             ...opts,
             wireVar,
             wireBits: payloadBits,
@@ -2258,7 +2278,7 @@
     if (s.length !== field.width) {
       throw new Error(`Field '${field.name}' expects ${field.width} bits, got ${s.length}`);
     }
-    if (/^[01]+$/.test(s)) {
+    if (/^[01]+$/.test(s) && field.width <= 31) {
       const max = (1 << field.width) - 1;
       const val = parseInt(s, 2);
       if (val > max) {
@@ -2405,6 +2425,10 @@
   }
 
   function schemaFromRef(node, opts) {
+    if (node && node.name === 'ast' && node.schemaRef === 'parseAstOpaque'
+        && opts && opts.parseAstSchemaRef && typeof opts.resolveSchemaRef === 'function') {
+      return opts.resolveSchemaRef(opts.parseAstSchemaRef);
+    }
     if (opts && typeof opts.resolveSchemaRef === 'function' && node.schemaRef) {
       return opts.resolveSchemaRef(node.schemaRef);
     }
@@ -2672,6 +2696,12 @@
       const presenceCtx = activePresenceContext(schema, bits, opts);
       for (const field of presenceCtx.fields) {
         if (!field.present) continue;
+        if (field.name === 'ast' && field.isBound
+            && (!opts || !opts.parseAstSchemaRef)) {
+          lines.push(`${pad}${field.name}`);
+          lines.push(`${pad}  (payload bound, ${field.payloadBits.length} bit)`);
+          continue;
+        }
         lines.push(`${pad}${field.name}`);
         if (field.isBoundVarArray) {
           let elemOff = field.payloadStart;
@@ -3129,6 +3159,7 @@
 
   const api = {
     buildSchemaDef,
+    buildSchemaDefIntoRegistry,
     resolveSchemaComposition,
     resolveSchemaDecls,
     collectSchemaDeclsFromStmts,

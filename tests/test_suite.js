@@ -54253,11 +54253,11 @@ rule expression = value | INT -> CallNumber;
   }
 
   function f2cPackExprScript(src, width) {
-    return F2C_CORE + '\n' + width + 'wire<expr> ast = .calcLang:packAst("' + src + '", "expression", "expr")';
+    return F2C_CORE + '\n' + width + 'wire<expr> ast = .calcLang:packAst("' + src + '", <expr>, "expression")';
   }
 
   function f2cPackProgramScript(src, width) {
-    return F2C_CORE + '\n' + width + 'wire<program> prog = .calcLang:packAst("' + src + '", "program", "program")';
+    return F2C_CORE + '\n' + width + 'wire<program> prog = .calcLang:packAst("' + src + '", <program>, "program")';
   }
 
   function f2cPackExprWire(h, session, src) {
@@ -54265,7 +54265,7 @@ rule expression = value | INT -> CallNumber;
     const r = parseGrammar(f2cGrammar(session), src, { startRule: 'expression' });
     h.assert('parse ok', String(r.ok), '1');
     const built = buildAstWire(r.tree, 'expr', session.interp.schemaRegistry);
-    session.run(F2C_CORE + '\n' + built.bitWidth + 'wire<expr> ast = .calcLang:packAst("' + src + '", "expression", "expr")');
+    session.run(F2C_CORE + '\n' + built.bitWidth + 'wire<expr> ast = .calcLang:packAst("' + src + '", <expr>, "expression")');
     h.assert('wire bits match', session.getWire(session.interp, 'ast'), built.bits);
     return built;
   }
@@ -54277,7 +54277,7 @@ rule expression = value | INT -> CallNumber;
     const built = buildAstWire(r.tree, 'program', session.interp.schemaRegistry);
     const wn = wireName || 'prog';
     const tail = [
-      built.bitWidth + 'wire<program> ' + wn + ' = .calcLang:packAst("' + src + '", "program", "program")',
+      built.bitWidth + 'wire<program> ' + wn + ' = .calcLang:packAst("' + src + '", <program>, "program")',
     ].concat(extraLines || []);
     session.run(F2C_CORE + '\n' + tail.join('\n'));
     h.assert('wire bits match', session.getWire(session.interp, wn), built.bits);
@@ -54289,7 +54289,7 @@ rule expression = value | INT -> CallNumber;
     const r = parseGrammar(f2cGrammar(session), '1+2*3', { startRule: 'expression' });
     h.assert('parse ok', String(r.ok), '1');
     const built = buildAstWire(r.tree, 'expr', session.interp.schemaRegistry);
-    session.run(F2C_CORE + '\n' + built.bitWidth + 'wire<expr> ast = .calcLang:packAst("1+2*3", "expression", "expr")\nshow(ast; <expr>)');
+    session.run(F2C_CORE + '\n' + built.bitWidth + 'wire<expr> ast = .calcLang:packAst("1+2*3", <expr>, "expression")\nshow(ast; <expr>)');
     h.assert('mask CallAdd', built.bits.substring(0, 3), '010');
     const out = session.interp.out.join('\n');
     h.assert('show CallAdd', out.indexOf('CallAdd') >= 0, true);
@@ -54357,7 +54357,7 @@ rule expression = value | INT -> CallNumber;
       session.interp.schemaRegistry
     );
     session.run(F2C_CORE + '\n' + [
-      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("1+2*3", "expression", "expr")',
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("1+2*3", <expr>, "expression")',
       built.bitWidth + 'wire<expr> slice = ast',
       'show(slice; <expr>)',
     ].join('\n'));
@@ -54411,6 +54411,123 @@ rule expression = value | INT -> CallNumber;
 
   reg(5017, 'parser', 'ast pack show program two stmt legacy', runF2cShowProgram);
   reg(5018, 'parser', 'ast pack show program two stmt wave', runF2cShowProgram, { propagation: 'wave' });
+
+  function f2dOutHasOk(out, bit) {
+    return new RegExp('\\bok\\s*=\\s*' + bit + '\\b').test(out);
+  }
+
+  function f2dParseScript(src, width, schemaTag, startRule, assignPad) {
+    const pad = assignPad || '=:';
+    const wireWidth = width != null ? width : 4096;
+    const schemaRef = schemaTag.indexOf('<') === 0 ? schemaTag : ('<' + schemaTag + '>');
+    const callArgs = startRule
+      ? '.calcLang:parse("' + src + '", ' + schemaRef + ', "' + startRule + '")'
+      : '.calcLang:parse("' + src + '", ' + schemaRef + ')';
+    return F2C_CORE + '\n' + wireWidth + 'wire<parseResult> pr ' + pad + ' ' + callArgs;
+  }
+
+  function runF2dParse42(h, session) {
+    session.run(f2dParseScript('42', 300, '<expr>', 'expression') + '\nshow(pr; <parseResult>)');
+    const out = session.interp.out.join('\n');
+    h.assert('ok=1', f2dOutHasOk(out, 1), true);
+    h.assert('CallNumber', out.indexOf('CallNumber') >= 0, true);
+    const pr = session.getWire(session.interp, 'pr');
+    h.assert('parseAstSchemaRef', session.interp.wires.get('pr').parseAstSchemaRef, 'expr');
+    h.assert('wire bits', pr.length > 20, true);
+  }
+
+  reg(5021, 'parser', 'parse 42 expr ok legacy', runF2dParse42);
+  reg(5028, 'parser', 'parse 42 expr ok wave', runF2dParse42, { propagation: 'wave' });
+
+  reg(5032, 'parser', 'parse missing schema error legacy', function(h, session) {
+    session.run(F2C_CORE + '\n300wire<parseResult> pr = .calcLang:parse("42")');
+    const out = session.interp.out.join('\n');
+    h.assert('schema required', out.indexOf('schema reference') >= 0 || out.indexOf('second argument') >= 0, true);
+  });
+
+  function runF2dLexFail(h, session) {
+    session.run(f2dParseScript('@', 4096, '<expr>', 'expression') + '\nshow(pr; <parseResult>)');
+    const out = session.interp.out.join('\n');
+    h.assert('ok=0', f2dOutHasOk(out, 0), true);
+    h.assert('no CallNumber', out.indexOf('CallNumber') < 0, true);
+    h.assert('kind lex', out.indexOf('kind') >= 0, true);
+  }
+
+  reg(5022, 'parser', 'parse lex fail legacy', runF2dLexFail);
+  reg(5029, 'parser', 'parse lex fail wave', runF2dLexFail, { propagation: 'wave' });
+
+  reg(5023, 'parser', 'parse syntax trailing legacy', function(h, session) {
+    session.run(f2dParseScript('1+2 xxx', 4096, '<expr>', 'expression') + '\nshow(pr; <parseResult>)');
+    const out = session.interp.out.join('\n');
+    h.assert('ok=0', f2dOutHasOk(out, 0), true);
+    h.assert('error block', out.indexOf('error') >= 0, true);
+  });
+
+  reg(5024, 'parser', 'parse pack overflow legacy', function(h, session) {
+    session.run(f2dParseScript('999', 4096, '<expr>', 'expression') + '\nshow(pr; <parseResult>)');
+    const out = session.interp.out.join('\n');
+    h.assert('ok=0', f2dOutHasOk(out, 0), true);
+    h.assert('pack kind 2', out.indexOf('kind') >= 0 && (out.indexOf('0010') >= 0 || out.indexOf('kind= 2') >= 0 || out.indexOf('kind= 0010') >= 0), true);
+  });
+
+  reg(5025, 'parser', 'parse show envelope ast legacy', function(h, session) {
+    session.run(f2dParseScript('1+2*3', 400, '<expr>', 'expression') + '\nshow(pr; <parseResult>)');
+    const out = session.interp.out.join('\n');
+    h.assert('CallAdd', out.indexOf('CallAdd') >= 0, true);
+    h.assert('CallMul', out.indexOf('CallMul') >= 0, true);
+  });
+
+  reg(5026, 'parser', 'parse show pr ast manual legacy', function(h, session) {
+    session.run(f2dParseScript('42', 300, '<expr>', 'expression') + '\nshow(pr:ast; <expr>)');
+    const out = session.interp.out.join('\n');
+    h.assert('CallNumber', out.indexOf('CallNumber') >= 0, true);
+  });
+
+  reg(5027, 'parser', 'parseResult paddingRight legacy', function(h, session) {
+    session.run(f2dParseScript('42', 300, '<expr>', 'expression', '=:') + '\nshow(pr; <parseResult>)');
+    const out = session.interp.out.join('\n');
+    h.assert('paddingRight', out.indexOf('paddingRight') >= 0, true);
+  });
+
+  reg(5030, 'parser', 'parseText wire ascii legacy', function(h, session) {
+    session.run(F2C_CORE + '\n400wire treeDbg =: .calcLang:parseText("42", "expression")\nshow(treeDbg; ascii)');
+    const out = session.interp.out.join('\n');
+    h.assert('CallNumber in tree', out.indexOf('CallNumber') >= 0, true);
+    h.assert('wire stored', session.getWire(session.interp, 'treeDbg').length, 400);
+  });
+
+  reg(5031, 'parser', 'parseText wire ascii wave', function(h, session) {
+    session.run(F2C_CORE + '\n400wire treeDbg =: .calcLang:parseText("42", "expression")\nshow(treeDbg; ascii)');
+    const out = session.interp.out.join('\n');
+    h.assert('CallNumber in tree', out.indexOf('CallNumber') >= 0, true);
+  });
+
+  reg(5033, 'parser', 'parseText schema ref error legacy', function(h, session) {
+    session.run(F2C_CORE + '\n400wire t =: .calcLang:parseText("42", <expr>, "expression")');
+    const out = session.interp.out.join('\n');
+    h.assert('schema not start rule', out.indexOf('start rule parameter should be ascii text, not a schema') >= 0, true);
+  });
+
+  reg(5034, 'parser', 'parseText unknown start rule legacy', function(h, session) {
+    session.run(F2C_CORE + '\n400wire t =: .calcLang:parseText("42", "myUnknownRuleName")');
+    const out = session.interp.out.join('\n');
+    h.assert('unknown start rule', out.indexOf('unknown start rule') >= 0, true);
+    h.assert('names bad rule', out.indexOf('myUnknownRuleName') >= 0, true);
+  });
+
+  reg(5035, 'parser', 'parse unknown start rule legacy', function(h, session) {
+    session.run(F2C_CORE + '\n4096wire<parseResult> pr =: .calcLang:parse("42", <expr>, "myUnknownRuleName")');
+    const out = session.interp.out.join('\n');
+    h.assert('unknown start rule', out.indexOf('unknown start rule') >= 0, true);
+    h.assert('names bad rule', out.indexOf('myUnknownRuleName') >= 0, true);
+  });
+
+  reg(5036, 'parser', 'packAst unknown start rule legacy', function(h, session) {
+    session.run(F2C_CORE + '\n64wire<expr> ast =: .calcLang:packAst("42", <expr>, "myUnknownRuleName")');
+    const out = session.interp.out.join('\n');
+    h.assert('unknown start rule', out.indexOf('unknown start rule') >= 0, true);
+    h.assert('names bad rule', out.indexOf('myUnknownRuleName') >= 0, true);
+  });
 
   const F2A_NUMBER = [
     '<number>:',
@@ -54642,12 +54759,12 @@ rule expression = value | INT -> CallNumber;
     }
     const bound = SB.packBoundPayload(payload);
     const errSchemaDecl = [
-      '<asciiText256>:',
+      '<errBlob256>:',
       '    text: 2048',
       ':',
       '<err>:',
       '    kind: 4',
-      '    message: bound <asciiText256>',
+      '    message: bound <errBlob256>',
       ':',
     ].join('\n');
     session.run(errSchemaDecl);

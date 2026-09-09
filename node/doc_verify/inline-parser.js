@@ -47,6 +47,7 @@ function parseCalc(interp, src, startRule) {
 }
 
 const ab = require('../../core/ast-builder.js');
+const pr = require('../../core/parse-result.js');
 
 const F2C_SCHEMAS = `
 <byte>:
@@ -93,13 +94,22 @@ const F2C_SCHEMAS = `
 
 const CALC_FULL = F2C_SCHEMAS + CALC_LANG;
 
-function packCalc(interp, src, startRule, schemaName) {
+function packCalc(interp, src, schemaName, startRule) {
   const g = calcFromInterp(interp);
   if (!g) return null;
   if (typeof globalThis.compileParserTokenRegex !== 'function') {
     globalThis.compileParserTokenRegex = pa.compileParserTokenRegex;
   }
   return ab.buildAstFromParse(g, src, schemaName, interp.schemaRegistry, { startRule, validateMapping: false });
+}
+
+function parseResultCalc(interp, src, schemaName, startRule) {
+  const g = calcFromInterp(interp);
+  if (!g) return null;
+  if (typeof globalThis.compileParserTokenRegex !== 'function') {
+    globalThis.compileParserTokenRegex = pa.compileParserTokenRegex;
+  }
+  return pr.buildParseResultFromCall(g, src, schemaName, interp.schemaRegistry, { startRule, validateMapping: false });
 }
 
 /** Extra checks for doc/inline-parser.md */
@@ -151,7 +161,7 @@ module.exports = {
     {
       name: 'doc inline.parser template',
       src: 'doc(inline.parser)',
-      expect: ['token INT = [0-9]+', 'parseText', 'packAst'],
+      expect: ['token INT = [0-9]+', 'parseText', 'packAst', ':parse'],
     },
     {
       name: 'parseText program tree via engine',
@@ -204,7 +214,7 @@ inline [parser] .mini:
       name: 'packAst expression precedence mask',
       src: CALC_FULL,
       check: (interp) => {
-        const r = packCalc(interp, '1+2*3', 'expression', 'expr');
+        const r = packCalc(interp, '1+2*3', 'expr', 'expression');
         return r && r.ok === 1 && r.bitWidth === 135 && r.bits.charAt(1) === '1';
       },
     },
@@ -212,7 +222,7 @@ inline [parser] .mini:
       name: 'packAst CallNumber literal',
       src: CALC_FULL,
       check: (interp) => {
-        const r = packCalc(interp, '42', 'expression', 'expr');
+        const r = packCalc(interp, '42', 'expr', 'expression');
         return r && r.ok === 1 && r.bits.substring(0, 3) === '100' && r.bitWidth === 11;
       },
     },
@@ -228,8 +238,32 @@ inline [parser] .mini:
       name: 'packAst numeric overflow',
       src: CALC_FULL,
       check: (interp) => {
-        const r = packCalc(interp, '999', 'expression', 'expr');
+        const r = packCalc(interp, '999', 'expr', 'expression');
         return r && r.ok === 0 && r.error && r.error.kind === 'pack';
+      },
+    },
+    {
+      name: 'parse expression success envelope',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = parseResultCalc(interp, '42', 'expr', 'expression');
+        return r && r.ok === 1 && r.parseAstSchemaRef === 'expr' && r.bitWidth > 20;
+      },
+    },
+    {
+      name: 'parse lex error envelope',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = parseResultCalc(interp, '@', 'expr', 'expression');
+        return r && r.ok === 0 && r.bitWidth > 100;
+      },
+    },
+    {
+      name: 'parse pack overflow envelope',
+      src: CALC_FULL,
+      check: (interp) => {
+        const r = parseResultCalc(interp, '999', 'expr', 'expression');
+        return r && r.ok === 0 && r.bitWidth > 100;
       },
     },
   ],

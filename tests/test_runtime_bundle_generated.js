@@ -114,6 +114,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/numeric-formats.js",
   "core/schema-bound.js",
   "core/semantic-schemas.js",
+  "core/parse-result.js",
   "core/debug-display-wrap.js",
   "core/debug-display-format.js",
   "core/probe-cause.js",

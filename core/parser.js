@@ -4988,6 +4988,11 @@ assignment() {
       return addNot({ var: null, property, phzSelf: true });
     }
 
+    if (this.c.type === 'SYM' && this.c.value === '<') {
+      const ref = this.parseSchemaRef();
+      return addNot({ schemaRef: ref });
+    }
+
     if (this.c.type === 'SYM' && this.c.value === '{') {
       return addNot(this.parseSchemaLiteralAtom());
     }

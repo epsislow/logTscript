@@ -406,6 +406,9 @@ class Interpreter {
     this._probeDriverSnapshots = new Map();
     this.aliases = new Map();
     this.schemaRegistry = new Map();
+    if (typeof registerParseBuiltinSchemas === 'function') {
+      registerParseBuiltinSchemas(this.schemaRegistry);
+    }
     this.components=new Map(); // Component name -> {type, componentType, attributes, initialValue, returnType, ref, deviceIds}
     this.componentConnections=new Map(); // Component name -> {source: ref or expr, bitRange}
     this.componentPendingProperties=new Map(); // Component name -> {property: {expr, value}} - properties waiting to be applied
@@ -1210,6 +1213,17 @@ class Interpreter {
     }
   }
 
+  _syncParseAstSchemaRefMeta(wireOrName, exprResult) {
+    const wire = typeof wireOrName === 'string' ? this.wires.get(wireOrName) : wireOrName;
+    if (!wire || !exprResult) return;
+    const astPart = exprResult.find(p => p.parseAstSchemaRef != null);
+    if (astPart && astPart.parseAstSchemaRef != null) {
+      wire.parseAstSchemaRef = astPart.parseAstSchemaRef;
+    } else if (wire.schemaRef !== 'parseResult') {
+      delete wire.parseAstSchemaRef;
+    }
+  }
+
   _syncAssignPaddingMeta(wire, blobLen, declaredBits, assignPad) {
     if (!wire) return;
     if (wire.schemaRef) {
@@ -1924,15 +1938,95 @@ class Interpreter {
   _exprWireStringArg(expr) {
     if (!expr || !Array.isArray(expr) || !expr.length) return '';
     const a = expr[0];
+    if (a && a.schemaRef) {
+      throw new Error(`unexpected schema reference <${a.schemaRef}> where a string literal was expected`);
+    }
     if (a && a.wireString != null) return String(a.wireString);
     const parts = this.evalExpr(expr, false);
     let out = '';
     for (const part of parts) {
+      if (!part) continue;
       if (part.isText && part.value != null) out += String(part.value);
       else if (part.displayText != null) out += String(part.displayText);
       else if (part.value != null && part.value !== '-') out += String(part.value);
     }
     return out;
+  }
+
+  _parserKnownRuleNames(grammar) {
+    const rules = (grammar && grammar.rules) || [];
+    return rules.map((r) => r && r.name).filter(Boolean);
+  }
+
+  _assertParserStartRuleKnown(grammar, startRule, instName, methodName) {
+    if (!startRule) return;
+    const known = this._parserKnownRuleNames(grammar);
+    if (known.length && !known.includes(startRule)) {
+      const label = instName || '.parser';
+      throw new Error(`${label}:${methodName} unknown start rule '${startRule}'`);
+    }
+  }
+
+  _resolveParseTextMethodArgs(args, grammar, instName) {
+    const label = instName || '.parser';
+    if (!args || !args.length) {
+      throw new Error(`${label}:parseText requires source text as first argument`);
+    }
+    if (args.length >= 2 && args[1] != null) {
+      const arg1 = args[1];
+      if (Array.isArray(arg1) && arg1[0] && arg1[0].schemaRef) {
+        throw new Error(`${label}:parseText start rule parameter should be ascii text, not a schema`);
+      }
+    }
+    if (args.length > 2) {
+      throw new Error(
+        `${label}:parseText accepts at most 2 arguments (src [, startRule]) — `
+        + 'for schema-based parsing use :parse(src, <schema> [, startRule]) or :packAst(src, <schema> [, startRule])'
+      );
+    }
+    const srcText = this._exprWireStringArg(args[0]);
+    if (args.length < 2 || args[1] == null) {
+      return { srcText, startRule: undefined };
+    }
+    const startRule = this._exprWireStringArg(args[1]);
+    if (!startRule) {
+      throw new Error(`${label}:parseText start rule must be a non-empty string (e.g. "program")`);
+    }
+    this._assertParserStartRuleKnown(grammar, startRule, instName, 'parseText');
+    return { srcText, startRule };
+  }
+
+  _exprSchemaRefArg(expr, methodName) {
+    if (!expr || !Array.isArray(expr) || !expr.length) {
+      throw new Error(`${methodName} requires schema reference as second argument (e.g. <expr>)`);
+    }
+    const a = expr[0];
+    if (a && a.schemaRef) return String(a.schemaRef).replace(/\+$/, '');
+    throw new Error(`${methodName} requires schema reference as second argument (e.g. <expr>)`);
+  }
+
+  _resolveParserMethodArgs(args, methodName) {
+    if (!args || !args.length) {
+      throw new Error(`${methodName} requires source text as first argument`);
+    }
+    const srcText = this._exprWireStringArg(args[0]);
+    if (args.length < 2 || !args[1]) {
+      throw new Error(`${methodName} requires schema reference as second argument (e.g. <expr>)`);
+    }
+    const schemaName = this._exprSchemaRefArg(args[1], methodName);
+    const startRule = args[2] != null ? this._exprWireStringArg(args[2]) : undefined;
+    return { srcText, schemaName, startRule };
+  }
+
+  _inlineParserWireReturn(bits, bitWidth, computeRefs, extra) {
+    const payload = Object.assign({ value: bits, varName: null, bitWidth }, extra || {});
+    if (computeRefs) {
+      const idx = this.storeValue(bits);
+      payload.ref = `&${idx}`;
+    } else {
+      payload.ref = null;
+    }
+    return payload;
   }
 
   evalInlineMethod(invoke, computeRefs) {
@@ -2078,28 +2172,36 @@ class Interpreter {
     }
 
     if (inlineInst && inlineInst.kind === 'parser' && method === 'parseText') {
-      const parseFn = typeof parseGrammar === 'function' ? parseGrammar : null;
-      if (!parseFn) throw new Error('Parser engine is not loaded');
-      const srcText = this._exprWireStringArg(args[0]);
+      const buildTextFn = typeof buildParseTextWire === 'function' ? buildParseTextWire : null;
+      if (!buildTextFn) throw new Error('parse-result.js is not loaded');
       const grammar = { tokens: inlineInst.tokens || [], rules: inlineInst.rules || [] };
-      const startRule = args[1] != null ? this._exprWireStringArg(args[1]) : undefined;
-      const result = parseFn(grammar, srcText, startRule ? { startRule } : undefined);
-      if (!result.ok) {
-        const err = result.error || {};
-        return 'parse error (' + (err.kind || 'syntax') + ' at ' + err.line + ':' + err.col + '): ' + (err.message || '');
-      }
+      const { srcText, startRule } = this._resolveParseTextMethodArgs(args, grammar, instName);
       const fmt = typeof formatParseTree === 'function' ? formatParseTree : null;
-      return fmt ? fmt(result.tree) : JSON.stringify(result.tree);
+      const built = buildTextFn(grammar, srcText, startRule, fmt);
+      return this._inlineParserWireReturn(built.bits, built.bitWidth, computeRefs);
+    }
+
+    if (inlineInst && inlineInst.kind === 'parser' && method === 'parse') {
+      const parseFn = typeof buildParseResultFromCall === 'function' ? buildParseResultFromCall : null;
+      if (!parseFn) throw new Error('parse-result.js is not loaded');
+      const grammar = { tokens: inlineInst.tokens || [], rules: inlineInst.rules || [] };
+      const { srcText, schemaName, startRule } = this._resolveParserMethodArgs(args, 'parse');
+      this._assertParserStartRuleKnown(grammar, startRule, instName, 'parse');
+      const result = parseFn(grammar, srcText, schemaName, this.schemaRegistry, {
+        startRule: startRule || undefined,
+        validateMapping: false,
+      });
+      return this._inlineParserWireReturn(result.bits, result.bitWidth, computeRefs, {
+        parseAstSchemaRef: result.parseAstSchemaRef || schemaName,
+      });
     }
 
     if (inlineInst && inlineInst.kind === 'parser' && method === 'packAst') {
       const buildFn = typeof buildAstFromParse === 'function' ? buildAstFromParse : null;
       if (!buildFn) throw new Error('ast-builder.js is not loaded');
-      const srcText = this._exprWireStringArg(args[0]);
-      const startRule = args[1] != null ? this._exprWireStringArg(args[1]) : undefined;
-      const schemaName = args[2] != null ? this._exprWireStringArg(args[2]) : 'expr';
-      if (!schemaName) throw new Error('packAst requires schema name as third argument');
       const grammar = { tokens: inlineInst.tokens || [], rules: inlineInst.rules || [] };
+      const { srcText, schemaName, startRule } = this._resolveParserMethodArgs(args, 'packAst');
+      this._assertParserStartRuleKnown(grammar, startRule, instName, 'packAst');
       const result = buildFn(grammar, srcText, schemaName, this.schemaRegistry, {
         startRule: startRule || undefined,
         validateMapping: false,
@@ -2108,11 +2210,7 @@ class Interpreter {
         const err = result.error || {};
         throw new Error('packAst error (' + (err.kind || 'pack') + '): ' + (err.message || ''));
       }
-      if (computeRefs) {
-        const idx = this.storeValue(result.bits);
-        return { value: result.bits, ref: `&${idx}`, varName: null, bitWidth: result.bitWidth };
-      }
-      return { value: result.bits, ref: null, varName: null, bitWidth: result.bitWidth };
+      return this._inlineParserWireReturn(result.bits, result.bitWidth, computeRefs);
     }
 
     throw new Error(`Unknown method '${method}' for ${instName}`);
@@ -4625,6 +4723,9 @@ class Interpreter {
     } else if (!this.schemaRegistry) {
       this.schemaRegistry = new Map();
     }
+    if (typeof registerParseBuiltinSchemas === 'function') {
+      registerParseBuiltinSchemas(this.schemaRegistry);
+    }
   }
 
   _semanticSchemas() {
@@ -4653,10 +4754,11 @@ class Interpreter {
     }
     if (wireBits != null) opts.wireBits = String(wireBits);
     if (wire && wire.effectiveBitLen != null) opts.declaredWidth = wire.effectiveBitLen;
-    else if (wire && wire.type) {
+    else     if (wire && wire.type) {
       const w = this.getBitWidth(wire.type);
       if (w) opts.declaredWidth = w;
     }
+    if (wire && wire.parseAstSchemaRef) opts.parseAstSchemaRef = wire.parseAstSchemaRef;
     return opts;
   }
 
@@ -5388,6 +5490,7 @@ class Interpreter {
       schema,
       resolveSchemaRef: (name) => this._resolveSchema(name),
     });
+    if (wire.parseAstSchemaRef) showOpts.parseAstSchemaRef = wire.parseAstSchemaRef;
     const typeLabel = displayName
       ? `${displayName} (${this.getWireTypeLabel(wire)})`
       : this.getWireTypeLabel(wire);
@@ -5454,13 +5557,21 @@ class Interpreter {
       varArrayCounts: wire.varArrayCounts || {},
       wireBits: fullWireBits != null ? String(fullWireBits) : valueStr,
       schema: rootSchema,
+      resolveSchemaRef: (name) => this._resolveSchema(name),
     });
+    if (wire.parseAstSchemaRef) showOpts.parseAstSchemaRef = wire.parseAstSchemaRef;
     if (view.kind === 'nested') {
-      SS.validateSchemaWidthForShow(view.schema, valueStr.length);
-      const typeLabel = `${displayName} (${view.width}wire<${view.schema.name}>)`;
+      let nestedSchema = view.schema;
+      if (opts && opts.schemaRef) {
+        nestedSchema = this._resolveSchema(opts.schemaRef);
+      } else if (wire.parseAstSchemaRef && view.name === 'ast') {
+        nestedSchema = this._resolveSchema(wire.parseAstSchemaRef);
+      }
+      SS.validateSchemaWidthForShow(nestedSchema, valueStr.length);
+      const typeLabel = `${displayName} (${view.width}wire<${nestedSchema.name}>)`;
       const lines = SS.formatSchemaShowTree(
         valueStr,
-        view.schema,
+        nestedSchema,
         showOpts,
         (bits, w) => this.formatValue(bits, w)
       );
@@ -12976,6 +13087,8 @@ if (s.assignment) {
         let asmModuleId = modPart ? modPart.asmModuleId : null;
         const viewPart = exprResult.find(p => p.parseViewId != null);
         let parseViewId = viewPart ? viewPart.parseViewId : null;
+        const parseAstPart = exprResult.find(p => p.parseAstSchemaRef != null);
+        let parseAstSchemaRef = parseAstPart ? parseAstPart.parseAstSchemaRef : null;
         if (asmModuleId == null) {
           const srcPart = exprResult.find(p => p.varName && this.wires.has(p.varName));
           if (srcPart) {
@@ -12992,6 +13105,7 @@ if (s.assignment) {
         }
         if (asmModuleId != null) wireEntry.asmModuleId = asmModuleId;
         if (parseViewId != null) wireEntry.parseViewId = parseViewId;
+        if (parseAstSchemaRef != null) wireEntry.parseAstSchemaRef = parseAstSchemaRef;
         this._syncAssignPaddingMeta(wireEntry, blobLenBeforePad, bits, declAssignPad);
         if(!this.wires.has(d.name)){
           this._mergeVarArrayCountsFromExpr(wireEntry, exprResult);
@@ -13010,6 +13124,8 @@ if (s.assignment) {
           else if (!hasProtocolBlob) delete existing.asmModuleId;
           if (parseViewId != null) existing.parseViewId = parseViewId;
           else if (!hasProtocolBlob) delete existing.parseViewId;
+          if (parseAstSchemaRef != null) existing.parseAstSchemaRef = parseAstSchemaRef;
+          else if (d.schemaRef !== 'parseResult') delete existing.parseAstSchemaRef;
           this._mergeVarArrayCountsFromExpr(existing, exprResult);
           this._syncVarArrayCountsFromFlatAssign(existing, wireValue || '0'.repeat(bits), {
             allowAmbiguousZeroInit: declAssignPad === 'left',
@@ -13163,6 +13279,7 @@ if (s.assignment) {
           outputs.push([wireName, wireValue]);
           this._syncAsmModuleMeta(wire, exprResult);
           this._syncParseViewMeta(wire, exprResult);
+          this._syncParseAstSchemaRefMeta(wire, exprResult);
         } else if (s.assignment.busEnable && this.zstate && this.deferWirePropagation()) {
           this.queueWireContribution(wireName, wireValue);
         } else {
@@ -13189,6 +13306,7 @@ if (s.assignment) {
           wire.ref = `&${storageIdx}`;
           this._syncAsmModuleMeta(wire, exprResult);
           this._syncParseViewMeta(wire, exprResult);
+          this._syncParseAstSchemaRefMeta(wire, exprResult);
           this._emitProbeForWire(wireName, wireValue);
         }
       } catch(e){
@@ -13299,6 +13417,7 @@ if (s.assignment) {
         outputs.push([d.name, wireValue || '0'.repeat(bits)]);
         this._syncAsmModuleMeta(d.name, exprResult);
         this._syncParseViewMeta(d.name, exprResult);
+        this._syncParseAstSchemaRefMeta(d.name, exprResult);
       } else {
         let storageIdx;
         if(this.wireStorageMap.has(d.name)){
@@ -13333,6 +13452,7 @@ if (s.assignment) {
           });
           this._syncAsmModuleMeta(existing, exprResult);
           this._syncParseViewMeta(existing, exprResult);
+          this._syncParseAstSchemaRefMeta(existing, exprResult);
         } else {
           this._syncAssignPaddingMeta(wireEntry, blobLenBeforePad, bits, declPad);
           for (const part of exprResult) {
@@ -13343,11 +13463,12 @@ if (s.assignment) {
           });
           this._syncAsmModuleMeta(wireEntry, exprResult);
           this._syncParseViewMeta(wireEntry, exprResult);
+          this._syncParseAstSchemaRefMeta(wireEntry, exprResult);
           this.wires.set(d.name, wireEntry);
         }
         this._emitProbeForWire(d.name, wireValue || '0'.repeat(bits));
       }
-      
+
       bitOffset += bits;
     }
     } catch (e) {

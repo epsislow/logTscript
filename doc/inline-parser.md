@@ -1,6 +1,6 @@
 # Inline parser — `inline [parser]`
 
-`inline [parser]` defines a **grammar** for a custom language: lexical **tokens** and syntactic **rules**. It is a **definition only** — the grammar is stored at load time and can be inspected with `doc()`. Runtime parsing via `:parse()` is wired separately when the parse engine is available.
+`inline [parser]` defines a **grammar** for a custom language: lexical **tokens** and syntactic **rules**. The grammar is stored at load time, inspected with `doc()`, and used at runtime by **`:parse`**, **`:packAst`**, and **`:parseText`**.
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run**.
 
@@ -16,7 +16,9 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Comments** | `#` to end of line |
 | **Captures** | `$name:Symbol` — binds a matched subtree (token or rule) |
 | **Calls** | `-> CallName` at end of a rule alternative (for interpreter dispatch) |
-| **Runtime parse** | `.lang:parseText(source)` — parse source text with the stored grammar (see [Parse engine](#parse-engine)) |
+| **`:parse`** | `(src, <SchemaRef> [, startRule])` → wire `<parseResult>` (success AST or structured error) |
+| **`:packAst`** | `(src, <SchemaRef> [, startRule])` → packed AST wire for the schema |
+| **`:parseText`** | `(src [, startRule])` → ASCII debug wire (8 bits per character) |
 | **Doc** | `doc(inline.parser)`, `doc(.myLang)` |
 
 ---
@@ -323,7 +325,13 @@ An empty body is valid — zero tokens and zero rules.
 
 ## Parse engine
 
-After a grammar is loaded, the **parse engine** reads source text with the declared **tokens** and **rules**, and builds an internal **parse tree** (a structured match result). This tree is an implementation detail used when assembling typed AST wires elsewhere; it is exposed for inspection via **`:parseText`**.
+After a grammar is loaded, the **parse engine** reads source text with the declared **tokens** and **rules**, and builds an internal **parse tree**. Runtime methods turn that tree into wires:
+
+| Method | Output |
+|--------|--------|
+| **`:parse`** | Typed **`<parseResult>`** envelope (packed AST or error + `ok` bit) |
+| **`:packAst`** | Direct AST wire for a user schema (`<expr>`, `<program>`, …) |
+| **`:parseText`** | Human-readable tree text as an **ASCII wire** (debug) |
 
 ### Pipeline
 
@@ -354,9 +362,9 @@ parse tree (internal)
 
 ### Inspecting with `:parseText`
 
-**Load** loads the grammar. **Load & Run** parses sample strings and prints the tree via `show()`.
+**`:parseText`** parses source and returns a **wire** whose bits encode the formatted tree as **ASCII** (8 bits per character). Assign with **`=:`** when the declared width is larger than the text payload. Use **`show(wire; ascii)`** to print the tree.
 
-Start rule defaults to the **first `rule`** in the grammar. Pass a second argument to override:
+Start rule defaults to the **first `rule`**. Pass a second argument to override:
 
 ```logts-play
 inline [parser] .calcLang:
@@ -385,25 +393,11 @@ inline [parser] .calcLang:
 
 :
 
-show(.calcLang:parseText("n=1+2*3;"))
+400wire treeDbg =: .calcLang:parseText("n=1+2*3;")
+show(treeDbg; ascii)
 ```
 
-Expected tree (abbreviated):
-
-```text
-repeat(+):
-  call CallAssign:
-    $name:
-      token ID "n"
-    $value:
-      call CallAdd:
-        left:
-          call CallNumber: value "1"
-        right:
-          call CallMul:
-            left: call CallNumber: value "2"
-            right: call CallNumber: value "3"
-```
+On failure, the ASCII wire contains a line such as `parse error (syntax at …): …` instead of a tree.
 
 ### Precedence — expression only
 
@@ -436,7 +430,8 @@ inline [parser] .calcLang:
 
 :
 
-show(.calcLang:parseText("1+2*3", "expression"))
+400wire precDbg =: .calcLang:parseText("1+2*3", "expression")
+show(precDbg; ascii)
 ```
 
 Root call is **`CallAdd`**; the right child is **`CallMul`** (`1 + (2 * 3)`).
@@ -464,7 +459,8 @@ inline [parser] .calcLang:
 
 :
 
-show(.calcLang:parseText("(1+2)", "expression"))
+400wire parenDbg =: .calcLang:parseText("(1+2)", "expression")
+show(parenDbg; ascii)
 ```
 
 The tree is a **`CallAdd`** — no `Parens` or `expression` wrapper.
@@ -485,8 +481,10 @@ inline [parser] .stmts:
 
 :
 
-show(.stmts:parseText("x=x;", "statement"))
-show(.stmts:parseText("x;", "statement"))
+400wire s1 =: .stmts:parseText("x=x;", "statement")
+400wire s2 =: .stmts:parseText("x;", "statement")
+show(s1; ascii)
+show(s2; ascii)
 ```
 
 Both succeed. The first matches **`assignStmt`**; the second tries **`assignStmt`**, fails at `"="`, backtracks to **`exprStmt`**.
@@ -517,7 +515,8 @@ inline [parser] .calcLang:
 
 :
 
-show(.calcLang:parseText("a=1;b=2;"))
+512wire progDbg =: .calcLang:parseText("a=1;b=2;")
+show(progDbg; ascii)
 ```
 
 Root is **`repeat(+)`** with **two** `CallAssign` items.
@@ -536,9 +535,203 @@ inline [parser] .mini:
     rule main = INT -> CallNumber;
 :
 
-show(.mini:parseText("@"))
-show(.mini:parseText("1+2 xxx"))
+256wire lexDbg =: .mini:parseText("@")
+256wire trailDbg =: .mini:parseText("1+2 xxx")
+show(lexDbg; ascii)
+show(trailDbg; ascii)
 ```
+
+---
+
+## Typed parse result (`:parse`)
+
+**`:parse`** combines lex/parse, AST packing, and a **result envelope** in one call. The second argument is a **schema reference** (e.g. `<expr>`) naming which AST schema to pack on success.
+
+### Envelope wire `<parseResult>`
+
+Assign to a wire tagged **`<parseResult>`** (built-in schema):
+
+```text
+parseResult envelope
+├── ast?     bound payload (opaque in schema; decoded via metadata on success)
+├── error?   structured parseError (kind, offset, line, column, message text)
+└── ok       1 = packed AST present, 0 = error present
+```
+
+At most one of **`ast`** or **`error`** is present (presence mask). On success, the wire carries **`parseAstSchemaRef`** metadata so **`show(pr; <parseResult>)`** expands **`ast`** with your schema (e.g. `<expr>`).
+
+Declare enough bit width — error messages can be large. Use **`=:`** padding when the payload is smaller than the wire:
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber;
+
+:
+
+4096wire<parseResult> pr =: .calcLang:parse("42", <expr>, "expression")
+show(pr; <parseResult>)
+```
+
+Expected: **`ok = 1`**, **`CallNumber`**, **`value = 42`**.
+
+### Precedence via `:parse`
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+    CallMul?:    bound <CallMul>
+:
+
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber;
+
+:
+
+4096wire<parseResult> pr =: .calcLang:parse("1+2*3", <expr>, "expression")
+show(pr; <parseResult>)
+```
+
+Root under **`ast`**: **`CallAdd`** with nested **`CallMul`** on the right.
+
+### Manual AST slice
+
+Decode the bound **`ast`** field with your schema explicitly:
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+4096wire<parseResult> pr =: .mini:parse("42", <expr>, "expression")
+show(pr:ast; <expr>)
+```
+
+### Parse and pack errors inside the envelope
+
+Failures do **not** throw — they set **`ok = 0`** and fill **`error`**:
+
+| Situation | `error.kind` | Meaning |
+|-----------|--------------|---------|
+| Bad character (`@`) | lex (0) | Lexer failure |
+| Trailing text (`1+2 xxx`) | syntax (1) | Input not fully consumed |
+| Pack overflow (`999` in 8-bit field) | pack (2) | AST schema rejected value |
+
+```logts-play
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+4096wire<parseResult> badLex =: .mini:parse("@", <expr>, "expression")
+4096wire<parseResult> badTrail =: .mini:parse("1+2 xxx", <expr>, "expression")
+4096wire<parseResult> badPack =: .mini:parse("999", <expr>, "expression")
+show(badLex; <parseResult>)
+show(badTrail; <parseResult>)
+show(badPack; <parseResult>)
+```
+
+Each **`show`** prints **`ok = 0`** and an **`error`** block (kind, offset, line, column, message).
+
+### Schema argument is required
+
+**`:parse`** requires the schema reference as the **second** argument:
+
+```logts
+.calcLang:parse("42")          /* error — missing <schema> */
+.calcLang:parse("42", <expr>)  /* ok when start rule defaults suffice */
+```
+
+Reserved built-in schema names (`parseResult`, `parseError`, `asciiText256`, `parseAstOpaque`) are registered automatically — do not redeclare them in user scripts.
 
 ---
 
@@ -618,7 +811,7 @@ inline [parser] .calcLang:
 
 :
 
-135wire<expr> ast = .calcLang:packAst("1+2*3", "expression", "expr")
+135wire<expr> ast = .calcLang:packAst("1+2*3", <expr>, "expression")
 show(ast; <expr>)
 ```
 
@@ -644,7 +837,7 @@ inline [parser] .mini:
     rule expression = INT -> CallNumber;
 :
 
-9wire<expr> n = .mini:packAst("42", "expression", "expr")
+9wire<expr> n = .mini:packAst("42", <expr>, "expression")
 show(n; <expr>)
 ```
 
@@ -720,7 +913,7 @@ inline [parser] .calcLang:
 
 :
 
-100wire<program> prog = .calcLang:packAst("a=1;", "program", "program")
+100wire<program> prog = .calcLang:packAst("a=1;", <program>, "program")
 ```
 
 Two statements require a wider wire — derive the width from a pack in the same script or allocate generously:
@@ -793,7 +986,7 @@ inline [parser] .calcLang:
 
 :
 
-200wire<program> prog2 = .calcLang:packAst("a=1;b=2;", "program", "program")
+200wire<program> prog2 = .calcLang:packAst("a=1;b=2;", <program>, "program")
 show(prog2; <program>)
 ```
 
@@ -822,19 +1015,45 @@ inline [parser] .mini:
     rule expression = INT -> CallNumber;
 :
 
-9wire<expr> ok = .mini:packAst("255", "expression", "expr")
+9wire<expr> ok = .mini:packAst("255", <expr>, "expression")
 show(ok; <expr>)
 ```
 
 Packing **`999`** with **`value: 8`** fails with an overflow error (max 255).
 
+After **`:packAst`**, assign to **`Nwire<schema>`** with **`=`** when you know the exact packed width, or derive width from a prior pack in the same script.
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .mini:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+9wire<expr> packed = .mini:packAst("42", <expr>, "expression")
+show(packed; <expr>)
+```
+
+**`:packAst`** throws on parse/pack failure (unlike **`:parse`**, which returns an error envelope).
+
 ### API summary
 
 | Method | Arguments | Result |
 |--------|-----------|--------|
-| **`:parseText(src)`** | source text | Formatted parse tree (debug) |
-| **`:parseText(src, startRule)`** | source + rule name | Parse tree from given rule |
-| **`:packAst(src, startRule, schemaName)`** | source + rule + schema registry name | Packed wire bits (assign to `Nwire<schema>`) |
+| **`:parse(src, <SchemaRef> [, startRule])`** | source + AST schema ref + optional rule | `<parseResult>` wire (success or error envelope) |
+| **`:packAst(src, <SchemaRef> [, startRule])`** | source + AST schema ref + optional rule | Packed AST wire — assign to `Nwire<schema>` |
+| **`:parseText(src [, startRule])`** | source + optional rule | ASCII wire (8 bits/char) — use `show(w; ascii)` |
 
 ---
 

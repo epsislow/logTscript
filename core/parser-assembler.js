@@ -447,7 +447,9 @@ function formatParserTypeDoc() {
     'doc(inline.parser)  doc(.myLang)',
     '',
     'Runtime:  .lang:parseText(source)  .lang:parseText(source, startRule)',
-    '          .lang:packAst(source, startRule, schemaName)  — parse + pack AST wire',
+    '          .lang:parse(source, <schema> [, startRule])  — parse + pack <parseResult> wire',
+    '          .lang:packAst(source, <schema> [, startRule])  — parse + pack AST wire',
+    '          .lang:parseText(source [, startRule])  — parse tree as ASCII wire (debug)',
   ];
 }
 
