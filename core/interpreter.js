@@ -1953,6 +1953,28 @@ class Interpreter {
     return out;
   }
 
+  _exprWireBitsArg(expr, label) {
+    if (!expr || !Array.isArray(expr) || !expr.length) {
+      throw new Error(`${label || 'eval'} requires AST wire as first argument`);
+    }
+    const a = expr[0];
+    if (a && a.schemaRef) {
+      throw new Error(`${label || 'eval'} first argument must be a wire value, not a schema reference`);
+    }
+    if (a && a.var && !a.schemaField && a.property == null && a.bitRange == null
+        && a.tensorSlice == null && a.vectorIndex == null && a.vectorIndexExpr == null) {
+      const bits = this.getWireEffectiveValue(a.var);
+      return bits != null ? bits : '';
+    }
+    const parts = this.evalExpr(expr, false);
+    let bits = '';
+    for (const part of parts) {
+      if (!part || part.value == null || part.value === '-') continue;
+      bits += String(part.value);
+    }
+    return bits;
+  }
+
   _parserKnownRuleNames(grammar) {
     const rules = (grammar && grammar.rules) || [];
     return rules.map((r) => r && r.name).filter(Boolean);
@@ -2213,6 +2235,20 @@ class Interpreter {
       return this._inlineParserWireReturn(result.bits, result.bitWidth, computeRefs);
     }
 
+    if (inlineInst && inlineInst.kind === 'interp' && method === 'eval') {
+      const evalFn = typeof evalInterpInline === 'function' ? evalInterpInline : null;
+      const encFn = typeof encodeInterpResult === 'function' ? encodeInterpResult : null;
+      if (!evalFn || !encFn) throw new Error('interp-engine.js is not loaded');
+      if (!args || args.length < 2) {
+        throw new Error(`${instName}:eval requires (astWire, <schema>)`);
+      }
+      const wireBits = this._exprWireBitsArg(args[0], `${instName}:eval`);
+      const schemaName = this._exprSchemaRefArg(args[1], `${instName}:eval`);
+      const numResult = evalFn(inlineInst, wireBits, schemaName, this.schemaRegistry, {});
+      const bits = encFn(numResult, null);
+      return this._inlineParserWireReturn(bits, bits.length, computeRefs);
+    }
+
     throw new Error(`Unknown method '${method}' for ${instName}`);
   }
 
@@ -2428,7 +2464,19 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas, parser)`);
+    if (inline.kind === 'interp') {
+      const parseInterpFn = typeof parseInterpBody === 'function' ? parseInterpBody : null;
+      if (!parseInterpFn) throw Error('Interp assembler is not loaded');
+      const prog = parseInterpFn(inline.bodyRaw, `inline ${inline.name}`);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        methods: prog.methods || {},
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas, parser, interp)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -18937,6 +18985,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         if (kindName === 'parser' && typeof formatParserInstanceDoc === 'function') {
           return formatParserInstanceDoc(alias, inst);
         }
+        if (kindName === 'interp' && typeof formatInterpInstanceDoc === 'function') {
+          return formatInterpInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
@@ -18959,6 +19010,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
           }
           if (kindName === 'parser' && typeof formatParserInstanceDoc === 'function') {
             return formatParserInstanceDoc(instName, inst);
+          }
+          if (kindName === 'interp' && typeof formatInterpInstanceDoc === 'function') {
+            return formatInterpInstanceDoc(instName, inst);
           }
         }
       }
@@ -18984,6 +19038,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     if (kindName === 'parser' && typeof formatParserTypeDoc === 'function') {
       return formatParserTypeDoc();
     }
+    if (kindName === 'interp' && typeof formatInterpTypeDoc === 'function') {
+      return formatInterpTypeDoc();
+    }
     return [`${name}: (no inline doc available)`];
   }
 
@@ -19008,6 +19065,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
       if (inst.kind === 'parser' && typeof formatParserInstanceDoc === 'function') {
         return formatParserInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'interp' && typeof formatInterpInstanceDoc === 'function') {
+        return formatInterpInstanceDoc(name, inst);
       }
     }
   }

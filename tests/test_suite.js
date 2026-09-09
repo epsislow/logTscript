@@ -54745,6 +54745,298 @@ rule expression = value | INT -> CallNumber;
   reg(5053, 'parser', 'f2e typed pr ast downstream legacy', runF2eTypedAstDownstream);
   reg(5054, 'parser', 'f2e typed pr ast downstream wave', runF2eTypedAstDownstream, { propagation: 'wave' });
 
+  const INLINE_INTERP_CALC = `
+inline [interp] .calcInterp {
+    addPair(a, b) {
+        return a + b;
+    }
+    CallNumber(value/u8) {
+        return value;
+    }
+    CallAdd(left/s16, right/s16) {
+        return addPair(left, right);
+    }
+    CallMul(left/s16, right/s16) {
+        return left * right;
+    }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) {
+        return env[name];
+    }
+}`;
+
+  const INLINE_INTERP_BRACE = `
+inline [interp] .miniInterp {
+    CallNumber(value/u8) { return value; }
+}`;
+
+  const F3C_CALL_VARIABLE = [
+    '<CallVariable>:',
+    '    name: bound <symbol>',
+    ':',
+  ].join('\n');
+
+  const F3C_EXPR = [
+    '<expr>+:',
+    '    CallNumber?:   <CallNumber>',
+    '    CallAdd?:      bound <CallAdd>',
+    '    CallMul?:      bound <CallMul>',
+    '    CallVariable?: bound <CallVariable>',
+    ':',
+  ].join('\n');
+
+  const F3C_SCHEMAS = [
+    F2C_BYTE,
+    F2C_SYMBOL,
+    F2C_CALL_NUMBER,
+    F2C_CALL_ADD,
+    F2C_CALL_MUL,
+    F3C_CALL_VARIABLE,
+    F3C_EXPR,
+    F2C_CALL_ASSIGN,
+    F2C_CALL_STATEMENT,
+    F2C_PROGRAM,
+  ].join('\n');
+
+  const F3_INLINE_PARSER_CALC = `
+inline [parser] .calcLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule program = statement+;
+
+    rule statement
+        = $name:ID "=" $value:expression ";"
+          -> CallAssign;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+
+:`;
+
+  const F3_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + INLINE_INTERP_CALC;
+
+  function f3PackAndEvalExpr(h, session, src, wireName) {
+    session.run(F3_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, src, 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('pack ok', String(built.ok), '1');
+    const wn = wireName || 'result';
+    session.run(F3_CORE + '\n' + [
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("' + src + '", <expr>, "expression")',
+      '8wire ' + wn + ' = .calcInterp:eval(ast, <expr>)',
+    ].join('\n'));
+    return session.getWire(session.interp, wn);
+  }
+
+  function f3PackAndEvalProgram(h, session, src, wireName) {
+    session.run(F3_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, src, 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack ok', String(built.ok), '1');
+    const wn = wireName || 'result';
+    session.run(F3_CORE + '\n' + [
+      built.bitWidth + 'wire<program> prog = .calcLang:packAst("' + src + '", <program>, "program")',
+      '8wire ' + wn + ' = .calcInterp:eval(prog, <program>)',
+    ].join('\n'));
+    return session.getWire(session.interp, wn);
+  }
+
+  reg(5055, 'interp', 'parse inline [interp] colon form', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_INTERP_CALC)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('one stmt', stmts.length, 1);
+    h.assert('kind interp', stmts[0].inline.kind, 'interp');
+    h.assert('name', stmts[0].inline.name, '.calcInterp');
+  });
+
+  reg(5056, 'interp', 'parse inline [interp] brace form', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_INTERP_BRACE)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('kind interp', stmts[0].inline.kind, 'interp');
+    h.assert('name', stmts[0].inline.name, '.miniInterp');
+  });
+
+  reg(5057, 'interp', 'interp unknown /type rejected at parse', function(h) {
+    h.assertThrows('bad type', function() {
+      parseInterpBody('CallX(x/badtype) { return 0; }');
+    });
+  });
+
+  reg(5058, 'interp', 'execInline stores interp methods', function(h, session) {
+    session.run(INLINE_INTERP_CALC);
+    const inst = session.interp.inlineInstances.get('.calcInterp');
+    h.assert('kind', inst.kind, 'interp');
+    h.assert('CallAdd', typeof inst.methods.CallAdd, 'object');
+    h.assert('typed param', inst.methods.CallAdd.params[0].typeName, 's16');
+    h.assert('helper no type', inst.methods.addPair.params[0].typeName == null, true);
+  });
+
+  reg(5059, 'interp', 'doc(.calcInterp) after load', function(h, session) {
+    const out = session.runDoc(F3_CORE + '\ndoc(.calcInterp)');
+    h.assert('header', String(out.some((l) => l.indexOf('.calcInterp') >= 0)), 'true');
+    h.assert('lists CallAdd', String(out.some((l) => l.indexOf('CallAdd') >= 0)), 'true');
+  });
+
+  reg(5060, 'interp', 'doc(inline.interp) type doc', function(h, session) {
+    const out = session.runDoc('doc(inline.interp)');
+    h.assert('inline [interp]', String(out.some((l) => l.indexOf('inline [interp]') >= 0)), 'true');
+    h.assert('eval api', String(out.some((l) => l.indexOf('eval(astWire') >= 0)), 'true');
+  });
+
+  reg(5061, 'interp', 'engine eval CallNumber 42 unit', function(h, session) {
+    session.run(F3_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, '42', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('pack ok', String(built.ok), '1');
+    const v = evalInterpWire(built.bits, 'expr', session.interp.schemaRegistry, session.interp.inlineInstances.get('.calcInterp'), {});
+    h.assert('value 42', v, 42);
+  });
+
+  reg(5062, 'interp', 'engine empty union abort', function(h, session) {
+    session.run(F3_CORE);
+    h.assertThrows('empty union', function() {
+      evalInterpWire('000', 'expr', session.interp.schemaRegistry, session.interp.inlineInstances.get('.calcInterp'), {});
+    });
+  });
+
+  reg(5063, 'interp', 'engine unknown AST method abort', function(h, session) {
+    session.run(F3_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, '42', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    const inst = Object.assign({}, session.interp.inlineInstances.get('.calcInterp'));
+    delete inst.methods.CallNumber;
+    h.assertThrows('unknown AST', function() {
+      evalInterpWire(built.bits, 'expr', session.interp.schemaRegistry, inst, {});
+    });
+  });
+
+  reg(5064, 'interp', 'engine schema /type mismatch at dispatch', function(h, session) {
+    const badInterp = `
+inline [interp] .calcInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/ascii, right/s16) { return right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+}`;
+    session.run(F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + badInterp);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, '1+2', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assertThrows('incompatible', function() {
+      evalInterpWire(built.bits, 'expr', session.interp.schemaRegistry, session.interp.inlineInstances.get('.calcInterp'), {});
+    }, 'incompatible');
+  });
+
+  reg(5065, 'interp', 'decode u8 CallNumber wire', function(h, session) {
+    session.run(F3_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstWire(parseGrammar(g, '10', { startRule: 'expression' }).tree, 'expr', session.interp.schemaRegistry);
+    h.assert('mask', built.bits.substring(0, 4), '1000');
+    const v = evalInterpWire(built.bits, 'expr', session.interp.schemaRegistry, session.interp.inlineInstances.get('.calcInterp'), {});
+    h.assert('decoded 10', v, 10);
+  });
+
+  reg(5066, 'interp', 'decode ascii symbol name on assign', function(h, session) {
+    const v = f3PackAndEvalProgram(h, session, 'ab=3;');
+    h.assert('stored value 3', v, '00000011');
+  });
+
+  reg(5067, 'interp', 'decode bound expr subtree add', function(h, session) {
+    const v = f3PackAndEvalExpr(h, session, '1+2');
+    h.assert('1+2=3', v, '00000011');
+  });
+
+  reg(5068, 'interp', 'decode precedence mul before add', function(h, session) {
+    const v = f3PackAndEvalExpr(h, session, '1+2*3');
+    h.assert('1+2*3=7', v, '00000111');
+  });
+
+  function runF3dEval42(h, session) {
+    const v = f3PackAndEvalExpr(h, session, '42');
+    h.assert('42', v, '00101010');
+  }
+
+  reg(5073, 'interp', 'eval expr 42 legacy', runF3dEval42);
+  reg(5074, 'interp', 'eval expr 42 wave', runF3dEval42, { propagation: 'wave' });
+
+  function runF3dEvalPrecedence(h, session) {
+    const v = f3PackAndEvalExpr(h, session, '1+2*3');
+    h.assert('7', v, '00000111');
+  }
+
+  reg(5075, 'interp', 'eval expr 1+2*3 legacy', runF3dEvalPrecedence);
+  reg(5076, 'interp', 'eval expr 1+2*3 wave', runF3dEvalPrecedence, { propagation: 'wave' });
+
+  function runF3eProgramAssign(h, session) {
+    const v = f3PackAndEvalProgram(h, session, 'a=1;');
+    h.assert('last value 1', v, '00000001');
+  }
+
+  reg(5079, 'interp', 'eval program assign legacy', runF3eProgramAssign);
+  reg(5080, 'interp', 'eval program assign wave', runF3eProgramAssign, { propagation: 'wave' });
+
+  function runF3eProgramTwo(h, session) {
+    const v = f3PackAndEvalProgram(h, session, 'a=1;b=2;');
+    h.assert('last value 2', v, '00000010');
+  }
+
+  reg(5081, 'interp', 'eval program two stmt legacy', runF3eProgramTwo);
+  reg(5082, 'interp', 'eval program two stmt wave', runF3eProgramTwo, { propagation: 'wave' });
+
+  function runF3eVariableRead(h, session) {
+    const v = f3PackAndEvalProgram(h, session, 'x=5;y=0+x;');
+    h.assert('read x=5', v, '00000101');
+  }
+
+  reg(5083, 'interp', 'eval program variable read legacy', runF3eVariableRead);
+  reg(5084, 'interp', 'eval program variable read wave', runF3eVariableRead, { propagation: 'wave' });
+
+  function runF3eUndefinedAbort(h, session) {
+    session.run(F3_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, 'a=1;b=0+y;', 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack ok', String(built.ok), '1');
+    const tail = F3_CORE + '\n' + built.bitWidth + 'wire<program> prog = .calcLang:packAst("a=1;b=0+y;", <program>, "program")\n8wire r = .calcInterp:eval(prog, <program>)';
+    try {
+      session.run(tail);
+    } catch (e) {
+      h.assert('undefined', String(e.message.indexOf('undefined variable') >= 0), 'true');
+      return;
+    }
+    const out = session.interp.out.join('\n');
+    h.assert('undefined', out.indexOf('undefined variable') >= 0, true);
+  }
+
+  reg(5085, 'interp', 'eval undefined variable abort legacy', runF3eUndefinedAbort);
+  reg(5086, 'interp', 'eval undefined variable abort wave', runF3eUndefinedAbort, { propagation: 'wave' });
+
+  function f3ParseEvalPipelineScript(src) {
+    return F3_CORE + '\n4096wire<parseResult> pr =: .calcLang:parse("' + src + '", <expr>, "expression")\n8wire result = .calcInterp:eval(pr:ast, <expr>)';
+  }
+
+  reg(5087, 'interp', 'parse+eval e2e full pipeline legacy', function(h, session) {
+    session.run(f3ParseEvalPipelineScript('1+2*3'));
+    h.assert('result 7', session.getWire(session.interp, 'result'), '00000111');
+  });
+
+  reg(5088, 'interp', 'parse+eval e2e full pipeline wave', function(h, session) {
+    session.run(f3ParseEvalPipelineScript('1+2*3'));
+    h.assert('result 7', session.getWire(session.interp, 'result'), '00000111');
+  }, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

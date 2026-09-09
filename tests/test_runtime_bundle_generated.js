@@ -92,6 +92,8 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/canvas-hitbox-assembler.js",
   "core/canvas-wire.js",
   "core/canvas-engine.js",
+  "core/interp-assembler.js",
+  "core/interp-engine.js",
   "core/lut-labels.js",
   "core/lut-decode.js",
   "core/lut-writable.js",
