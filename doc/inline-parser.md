@@ -794,6 +794,7 @@ inline [parser] .calcLang:
 :
 
 200wire<program> prog2 = .calcLang:packAst("a=1;b=2;", "program", "program")
+show(prog2; <program>)
 ```
 
 Wire width must match the packed bit length (declare enough bits, or derive width from a prior pack in the same script).

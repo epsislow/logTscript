@@ -2370,12 +2370,38 @@
         offset += sub.totalWidth;
       } else if (node.kind === 'var_array') {
         offset += node.minWidth;
+      } else if (node.kind === 'bound_var_array' && SB) {
+        let elemOff = offset;
+        let count = 0;
+        while (elemOff < bits.length) {
+          const sub = SB.readBoundSubstream(bits, elemOff);
+          if (sub.len === 0 && count >= (node.minCount || 0)) break;
+          elemOff += sub.totalWidth;
+          count++;
+          if (node.maxCount != null && count >= node.maxCount) break;
+        }
+        offsets.set(`${node.name}.__count`, count);
+        offset = elemOff;
       } else {
         offset += node.width;
       }
     }
     offsets.set('.__total', offset);
     return offsets;
+  }
+
+  function schemaWireUsedWidth(schema, wireBits, varArrayCounts) {
+    ensureSchemaShape(schema);
+    const bits = wireBits == null ? '' : String(wireBits);
+    if (schema.hasVarArray) {
+      return totalRuntimeWidth(schema, effectiveVarArrayCountsForWire(schema, varArrayCounts));
+    }
+    if (schema.hasPresenceMask || schema.hasBound
+        || schema.structure.some((n) => n.kind === 'bound_var_array')) {
+      const total = computePresenceMaskOffsets(schema, bits).get('.__total');
+      return total != null ? total : bits.length;
+    }
+    return schema.totalWidth;
   }
 
   function schemaFromRef(node, opts) {
@@ -2612,6 +2638,26 @@
     }
   }
 
+  function appendBoundVarArrayShowLines(lines, bits, node, nodeStart, opts, formatValueFn, indent) {
+    const SB = schemaBoundModule();
+    const pad = '  '.repeat(indent);
+    const subSchema = schemaFromRef(node, opts);
+    lines.push(`${pad}${node.name}`);
+    let elemOff = nodeStart;
+    let idx = 0;
+    while (elemOff < bits.length) {
+      const sub = SB.readBoundSubstream(bits, elemOff);
+      if (sub.len === 0 && idx >= (node.minCount || 0)) break;
+      appendSchemaShowTreeLines(lines, sub.payloadBits, subSchema, opts, formatValueFn, indent + 1);
+      elemOff += sub.totalWidth;
+      idx++;
+      if (node.maxCount != null && idx >= node.maxCount) break;
+    }
+    if (opts && opts.showVarArrayLength !== false) {
+      lines.push(`${pad}${node.name} has length [${idx}]`);
+    }
+  }
+
   function appendSchemaShowTreeLines(lines, bits, schema, opts, formatValueFn, indent) {
     ensureSchemaShape(schema);
     const pad = '  '.repeat(indent);
@@ -2625,9 +2671,8 @@
         if (field.isBoundVarArray) {
           let elemOff = field.payloadStart;
           let idx = 0;
-          const wireStr = bits;
-          while (elemOff < wireStr.length) {
-            const sub = SB.readBoundSubstream(wireStr, elemOff);
+          while (elemOff < bits.length) {
+            const sub = SB.readBoundSubstream(bits, elemOff);
             if (sub.len === 0 && idx > 0) break;
             appendSchemaShowTreeLines(lines, sub.payloadBits, field.schema, opts, formatValueFn, indent + 1);
             elemOff += sub.totalWidth;
@@ -2638,6 +2683,47 @@
           }
         } else {
           appendSchemaShowTreeLines(lines, field.payloadBits, field.schema, opts, formatValueFn, indent + 1);
+        }
+      }
+      const offsets = computePresenceMaskOffsets(schema, bits);
+      for (const node of schema.structure) {
+        if (node.kind === 'optional_field') continue;
+        const nodeStart = offsets.get(node.name);
+        if (nodeStart == null || nodeStart < 0) continue;
+        if (node.kind === 'bound_var_array') {
+          appendBoundVarArrayShowLines(lines, bits, node, nodeStart, opts, formatValueFn, indent);
+        } else if (node.kind === 'bound') {
+          const sub = SB.readBoundSubstream(bits, nodeStart);
+          lines.push(`${pad}${node.name}`);
+          appendSchemaShowTreeLines(lines, sub.payloadBits, schemaFromRef(node, opts), opts, formatValueFn, indent + 1);
+        } else if (node.kind === 'leaf') {
+          const fieldBits = bits.substring(nodeStart, nodeStart + node.width);
+          const formatted = formatSchemaFieldValue(fieldBits, node.width, opts, formatValueFn);
+          const padName = node.name.padEnd(Math.max(10 - indent * 2, 4), ' ');
+          lines.push(`${pad}${padName}= ${formatted}`);
+        } else if (node.kind === 'nested') {
+          lines.push(`${pad}${node.name}`);
+          const subBits = bits.substring(nodeStart, nodeStart + node.width);
+          appendSchemaShowTreeLines(lines, subBits, node.schema, opts, formatValueFn, indent + 1);
+        } else if (node.kind === 'array') {
+          lines.push(`${pad}${node.name}`);
+          const sliceBits = bits.substring(nodeStart, nodeStart + node.width);
+          appendSchemaArrayElementLines(lines, sliceBits, node, opts, formatValueFn, indent + 1, node.elementSchema || null);
+        } else if (node.kind === 'var_array') {
+          lines.push(`${pad}${node.name}`);
+          const count = varArrayCounts[node.name] != null ? varArrayCounts[node.name] : node.minCount;
+          const nodeWidth = node.elementWidth * count;
+          const sliceBits = bits.substring(nodeStart, nodeStart + nodeWidth);
+          const runtimeNode = runtimeArrayNode(
+            { ...node, bitStart: nodeStart },
+            varArrayCounts,
+            schema.name,
+            { wireBits: bits, schema }
+          );
+          appendSchemaArrayElementLines(lines, sliceBits, runtimeNode, opts, formatValueFn, indent + 1, node.elementSchema || null);
+          if (opts && opts.showVarArrayLength !== false) {
+            lines.push(`${pad}${node.name} has length [${count}]`);
+          }
         }
       }
       return;
@@ -2668,6 +2754,8 @@
         lines.push(`${pad}${node.name}`);
         const sliceBits = bits.substring(nodeStart, nodeStart + node.width);
         appendSchemaArrayElementLines(lines, sliceBits, node, opts, formatValueFn, indent + 1, node.elementSchema || null);
+      } else if (node.kind === 'bound_var_array') {
+        appendBoundVarArrayShowLines(lines, bits, node, nodeStart, opts, formatValueFn, indent);
       } else if (node.kind === 'var_array') {
         lines.push(`${pad}${node.name}`);
         const count = varArrayCounts[node.name] != null ? varArrayCounts[node.name] : node.minCount;
@@ -3081,6 +3169,7 @@
     totalRuntimeWidth,
     effectiveVarArrayCountsForWire,
     schemaFramePaddingWidth,
+    schemaWireUsedWidth,
     varArrayCountsChanged,
     validateVarArrayAssignFrame,
     rebuildWireVarArrayAssign,

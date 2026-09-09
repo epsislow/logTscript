@@ -54396,6 +54396,22 @@ rule expression = value | INT -> CallNumber;
     h.assert('symbol packed', built.bitWidth > 48, true);
   });
 
+  function runF2cShowProgram(h, session) {
+    const built = f2cPackProgramWire(h, session, 'a=1;b=2;', 'p', [
+      'show(p; <program>)',
+    ]);
+    const out = session.interp.out.join('\n');
+    h.assert('show statements', out.indexOf('statements') >= 0, true);
+    h.assert('show CallAssign x2', (out.match(/CallAssign/g) || []).length, 2);
+    h.assert('show name a', out.indexOf('01100001') >= 0, true);
+    h.assert('show name b', out.indexOf('01100010') >= 0, true);
+    h.assert('no spurious padding line', out.indexOf('paddingRight') < 0, true);
+    h.assert('packed width', built.bitWidth, 200);
+  }
+
+  reg(5017, 'parser', 'ast pack show program two stmt legacy', runF2cShowProgram);
+  reg(5018, 'parser', 'ast pack show program two stmt wave', runF2cShowProgram, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

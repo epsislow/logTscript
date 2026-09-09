@@ -1215,7 +1215,7 @@ class Interpreter {
     if (wire.schemaRef) {
       const schema = this._resolveSchema(wire.schemaRef);
       if (schema) {
-        this._syncSchemaFramePadding(wire, schema);
+        this._syncSchemaFramePadding(wire, schema, blobLen);
         return;
       }
     }
@@ -1230,24 +1230,34 @@ class Interpreter {
     }
   }
 
-  _syncSchemaFramePadding(wire, schema) {
+  _syncSchemaFramePadding(wire, schema, blobLen) {
     if (!wire || !schema) return;
     const SS = this._semanticSchemas();
     if (!SS) return;
     const declared = this.getBitWidth(wire.type);
     if (!declared) return;
     delete wire.paddingLeftWidth;
+    let used;
     if (schema.hasVarArray) {
       const counts = SS.effectiveVarArrayCountsForWire(schema, wire.varArrayCounts || {});
-      const used = SS.totalRuntimeWidth(schema, counts);
-      const pad = SS.schemaFramePaddingWidth(declared, used);
-      if (pad >= 1) wire.paddingRightWidth = pad;
-      else delete wire.paddingRightWidth;
+      used = SS.totalRuntimeWidth(schema, counts);
+    } else if (schema.hasDynamicWidth) {
+      if (blobLen != null) {
+        used = blobLen;
+      } else if (wire.ref) {
+        const val = this.getValueFromRef(wire.ref);
+        used = val
+          ? SS.schemaWireUsedWidth(schema, val, wire.varArrayCounts)
+          : schema.totalWidth;
+      } else {
+        used = schema.totalWidth;
+      }
     } else {
-      const pad = SS.schemaFramePaddingWidth(declared, schema.totalWidth);
-      if (pad >= 1) wire.paddingRightWidth = pad;
-      else delete wire.paddingRightWidth;
+      used = schema.totalWidth;
     }
+    const pad = SS.schemaFramePaddingWidth(declared, used);
+    if (pad >= 1) wire.paddingRightWidth = pad;
+    else delete wire.paddingRightWidth;
     wire.effectiveBitLen = declared;
   }
 
