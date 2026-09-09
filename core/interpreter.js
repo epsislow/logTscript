@@ -2242,9 +2242,23 @@ class Interpreter {
       if (!args || args.length < 2) {
         throw new Error(`${instName}:eval requires (astWire, <schema>)`);
       }
-      const wireBits = this._exprWireBitsArg(args[0], `${instName}:eval`);
+      const wireExpr = args[0];
+      const wireBits = this._exprWireBitsArg(wireExpr, `${instName}:eval`);
       const schemaName = this._exprSchemaRefArg(args[1], `${instName}:eval`);
-      const numResult = evalFn(inlineInst, wireBits, schemaName, this.schemaRegistry, {});
+      const evalOpts = {};
+      if (wireExpr && Array.isArray(wireExpr) && wireExpr[0] && wireExpr[0].var) {
+        const w = this.wires.get(wireExpr[0].var);
+        if (w) {
+          if (w.varArrayCounts) evalOpts.varArrayCounts = w.varArrayCounts;
+          if (w.effectiveBitLen != null) evalOpts.declaredWidth = w.effectiveBitLen;
+          else if (w.type) {
+            const bw = this.getBitWidth(w.type);
+            if (bw) evalOpts.declaredWidth = bw;
+          }
+        }
+      }
+      if (evalOpts.declaredWidth == null && wireBits) evalOpts.declaredWidth = wireBits.length;
+      const numResult = evalFn(inlineInst, wireBits, schemaName, this.schemaRegistry, evalOpts);
       const bits = encFn(numResult, null);
       return this._inlineParserWireReturn(bits, bits.length, computeRefs);
     }

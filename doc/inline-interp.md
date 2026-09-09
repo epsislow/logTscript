@@ -23,6 +23,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Syntax** | `CallAdd(left/s16, right/s16) { return left + right; }` |
 | **`/type`** | Required on every parameter of methods invoked from AST (`CallNumber`, `CallAdd`, …) |
 | **Helpers** | Internal methods may omit `/type` — called only from other interp methods |
+| **Vectors** | `param[]/type` decodes schema field containers into JS arrays — `vectorLen`, `arr[i]` in body |
 | **Runtime API** | `.myInterp:eval(astWire, <schema>)` → numeric wire (width from assignment LHS) |
 | **Env** | `env[name]` inside method bodies for `CallAssign` / `CallVariable` programs |
 | **Doc** | `doc(inline.interp)`, `doc(.myInterp)` |
@@ -94,6 +95,115 @@ Helpers are **not** valid AST dispatch targets — if the parser emits `-> addPa
 | `bool`, `u1` | Boolean |
 | `f32`, `f64`, `fp16`, `bf16` | IEEE floats via `numeric-formats.js` |
 | `q4p4`, `q8p8`, … | Fixed-point via `numeric-formats.js` |
+
+### Vector element types (`param[]/type`)
+
+| Annotation | Element decode |
+|------------|----------------|
+| `values[]/u16`, `flags[]/u1`, … | Same rules as scalar `/type`, one value per element |
+| `names[]/ascii` | One ASCII character per element (8 bits) |
+| `names[]8/ascii` | Fixed **8** characters per element (64 bits) |
+
+Vectors are **copy-on-entry** (same as `inline [canvas]`): method bodies receive a fresh array and may not mutate wire bits in place.
+
+---
+
+## Vector parameters
+
+Use **`param[]/type`** when a schema field holds many elements. The **`/type`** says how to decode **each element**; the **schema field shape** says where the bits live and how element count is determined.
+
+| Schema field shape | Bit container | Element count |
+|--------------------|---------------|---------------|
+| Leaf fix (`flags: 32`, `id: bound 64`) | All bits of the field | `fieldWidth / elemWidth` |
+| Var-array (`values: 16[1-8]`, `values: 8[n]`) | Var-array segment on the wire | From `varArrayCounts` or available bits (must agree) |
+| Bound singular (`msg: bound <S>`) | Payload after 16-bit length prefix | `len(payload) / elemWidth` |
+| BVA (`bytes: bound <byte>[1-]`) | One bound substream per element | Number of bound elements |
+
+If the container bit length is not an exact multiple of the element width, or a var-array count does not match available bits, eval **aborts** (`corrupt vector field bit length`).
+
+Method bodies use **`vectorLen(arr)`** and **`arr[i]`** (same subset as `inline [canvas]`).
+
+### Var-array sum: `values[]/u16`
+
+Four big-endian `u16` values packed in a `16[1-8]` field (64 bits). Use **`^`** hex groups for fixed-width numeric fields.
+
+```logts-play
+<F3hCallSum>:
+    values: 16[1-8]
+:
+
+inline [interp] .vecInterp {
+    F3hCallSum(values[]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(values)) {
+            total = total + values[i];
+            i = i + 1;
+        }
+        return total;
+    }
+}
+
+64wire<F3hCallSum> w = ^0001000200030004
+8wire result = .vecInterp:eval(w, <F3hCallSum>)
+show(result)
+```
+
+Expected: **`00001010`** (1+2+3+4 = 10).
+
+### Leaf bit slice: `flags[]/u1`
+
+A fixed **32-bit** leaf decoded as 32 boolean elements. Use a **binary literal** (no `^` prefix — `^` is for hex/octal grouped literals).
+
+```logts-play
+<F3hFlags>:
+    flags: 32
+:
+
+inline [interp] .vecInterp {
+    F3hFlags(flags[]/u1) {
+        n = 0;
+        i = 0;
+        while (i < vectorLen(flags)) {
+            n = n + flags[i];
+            i = i + 1;
+        }
+        return n;
+    }
+}
+
+32wire<F3hFlags> w = 10100000000000000000000000000000
+8wire result = .vecInterp:eval(w, <F3hFlags>)
+show(result)
+```
+
+Expected: **`00000010`** (bits 0 and 2 are set → sum = 2).
+
+### BVA bytes → `[]/ascii`
+
+Each bound `<byte>` substream becomes one one-character string. Dynamic-width payloads use **`:=`** on the wire declaration.
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<F3hBytes>:
+    bytes: bound <byte>[1-]
+:
+
+inline [interp] .vecInterp {
+    F3hBytes(bytes[]/ascii) {
+        return vectorLen(bytes);
+    }
+}
+
+72wire w := 000000000000100001100001000000000000100001100010000000000000100001100011
+8wire result = .vecInterp:eval(w, <F3hBytes>)
+show(result)
+```
+
+Expected: **`00000011`** (three ASCII bytes `a`, `b`, `c`).
 
 ---
 
@@ -511,6 +621,9 @@ On the **first runtime dispatch** of each `(method, schema)` pair, the engine ch
 | Leaf `value: 8` | `u8`, `s8`, … |
 | `bound <expr>` | `s16`, `u32`, `f32`, … |
 | `bound <symbol>` (BVA bytes) | `ascii` |
+| Leaf / var-array + `values[]/u16` | Element width from `/type`; container from schema |
+| BVA + `bytes[]/ascii` | One decode per bound element |
+| `bound <word8>` + `values[]/u8` | Element schema width must match `/type` width |
 
 Mismatch → **abort** (no partial numeric result). The check is **memoized** for subsequent dispatches.
 
@@ -529,6 +642,8 @@ Eval stops immediately on:
 | Numeric overflow for `/type` | Error |
 | Invalid vector index | Error |
 | Corrupt / truncated wire vs schema | Error |
+| Vector container bit length not multiple of element width | `corrupt vector field bit length` |
+| Var-array count inconsistent with available bits | `corrupt vector field bit length` |
 | Loop > 10 000 iterations | Error |
 
 Errors surface in the **Output** panel (legacy propagation) or as a thrown runtime error (wave propagation).

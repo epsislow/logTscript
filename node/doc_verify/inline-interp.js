@@ -83,6 +83,57 @@ inline [interp] .calcInterp {
 
 const CORE = SCHEMAS + PARSER + INTERP;
 
+const F3H_BYTE = [
+  '<byte>:',
+  '    value: 8',
+  ':',
+].join('\n');
+
+const F3H_VEC = [
+  F3H_BYTE,
+  '<F3hCallSum>:',
+  '    values: 16[1-8]',
+  ':',
+  '<F3hFlags>:',
+  '    flags: 32',
+  ':',
+  '<F3hBytes>:',
+  '    bytes: bound <byte>[1-]',
+  ':',
+  `inline [interp] .vecInterp {
+    F3hCallSum(values[]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(values)) {
+            total = total + values[i];
+            i = i + 1;
+        }
+        return total;
+    }
+    F3hFlags(flags[]/u1) {
+        n = 0;
+        i = 0;
+        while (i < vectorLen(flags)) {
+            n = n + flags[i];
+            i = i + 1;
+        }
+        return n;
+    }
+    F3hBytes(bytes[]/ascii) {
+        return vectorLen(bytes);
+    }
+}`,
+].join('\n');
+
+function f3hVecInst(interp) {
+  return interp.inlineInstances.get('.vecInterp');
+}
+
+function f3hPackBoundByte(ch) {
+  const payload = ch.charCodeAt(0).toString(2).padStart(8, '0');
+  return '0000000000001000' + payload;
+}
+
 function grammar(interp) {
   const inst = interp.inlineInstances.get('.calcLang');
   if (!inst) return null;
@@ -159,6 +210,51 @@ module.exports = {
           return false;
         } catch (e) {
           return String(e.message).indexOf('undefined variable') >= 0;
+        }
+      },
+    },
+    {
+      name: 'vector var-array u16 sum',
+      src: F3H_VEC,
+      check: (interp) => {
+        const inst = f3hVecInst(interp);
+        if (!inst) return false;
+        const bits = [1, 2, 3, 4].map((v) => v.toString(2).padStart(16, '0')).join('');
+        return ie.evalInterpWire(bits, 'F3hCallSum', interp.schemaRegistry, inst, { declaredWidth: 64 }) === 10;
+      },
+    },
+    {
+      name: 'vector leaf u1 count',
+      src: F3H_VEC,
+      check: (interp) => {
+        const inst = f3hVecInst(interp);
+        if (!inst) return false;
+        const bits = '10100000000000000000000000000000';
+        return ie.evalInterpWire(bits, 'F3hFlags', interp.schemaRegistry, inst, { declaredWidth: 32 }) === 2;
+      },
+    },
+    {
+      name: 'vector bva ascii length',
+      src: F3H_VEC,
+      check: (interp) => {
+        const inst = f3hVecInst(interp);
+        if (!inst) return false;
+        const bits = f3hPackBoundByte('a') + f3hPackBoundByte('b') + f3hPackBoundByte('c');
+        return ie.evalInterpWire(bits, 'F3hBytes', interp.schemaRegistry, inst, { declaredWidth: bits.length }) === 3;
+      },
+    },
+    {
+      name: 'vector corrupt remainder aborts',
+      src: F3H_VEC,
+      check: (interp) => {
+        const inst = f3hVecInst(interp);
+        if (!inst) return false;
+        const bits = '1010' + '0'.repeat(21);
+        try {
+          ie.evalInterpWire(bits, 'F3hFlags', interp.schemaRegistry, inst, { declaredWidth: 25 });
+          return false;
+        } catch (e) {
+          return String(e.message).indexOf('corrupt') >= 0;
         }
       },
     },

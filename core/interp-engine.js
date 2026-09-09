@@ -114,7 +114,50 @@ function interpIsBvaBytesSchema(schema, registry) {
   return false;
 }
 
+function interpBvaElemLeafWidth(fieldNode, registry) {
+  if (!fieldNode || fieldNode.kind !== 'bound_var_array') return null;
+  const sub = fieldNode.schema
+    ? interpResolveSchema(registry, fieldNode.schema.name || fieldNode.schemaRef || fieldNode.schema)
+    : null;
+  if (!sub || !sub.structure || sub.structure.length !== 1 || sub.structure[0].kind !== 'leaf') return null;
+  return sub.structure[0].width || null;
+}
+
+function interpTypeElemWidth(param) {
+  const tn = param.typeName;
+  if (tn === 'ascii') {
+    const chars = param.asciiCharsPerElem > 0 ? param.asciiCharsPerElem : 1;
+    return chars * 8;
+  }
+  if (tn === 'bool' || tn === 'u1') return 1;
+  const uMatch = /^u(\d+)$/.exec(tn);
+  if (uMatch) return parseInt(uMatch[1], 10);
+  const sMatch = /^s(\d+)$/.exec(tn);
+  if (sMatch) return parseInt(sMatch[1], 10);
+  if (tn === 'f32') return 32;
+  if (tn === 'f64') return 64;
+  if (tn === 'fp16' || tn === 'bf16') return 16;
+  const qMatch = /^q(\d+)p(\d+)$/.exec(tn);
+  if (qMatch) return parseInt(qMatch[1], 10) + parseInt(qMatch[2], 10);
+  interpError(`unsupported vector element type '/${tn}'`);
+}
+
+function interpIsNumericTypeName(tn) {
+  return /^(u|s)\d+$/.test(tn) || tn === 'bool' || tn === 'u1'
+    || tn === 'f32' || tn === 'f64' || tn === 'fp16' || tn === 'bf16' || /^q\d+p\d+$/.test(tn);
+}
+
+function interpNormalizeFieldNode(fieldNode) {
+  if (!fieldNode) return fieldNode;
+  if (fieldNode.kind === 'optional_field') {
+    if (fieldNode.isBoundVarArray) return Object.assign({}, fieldNode, { kind: 'bound_var_array' });
+    if (fieldNode.isBound) return Object.assign({}, fieldNode, { kind: 'bound' });
+  }
+  return fieldNode;
+}
+
 function interpSchemaFieldKind(fieldNode, registry) {
+  fieldNode = interpNormalizeFieldNode(fieldNode);
   if (!fieldNode) return 'unknown';
   if (fieldNode.isBound || fieldNode.kind === 'bound') {
     const sub = fieldNode.schema ? interpResolveSchema(registry, fieldNode.schema.name || fieldNode.schema) : null;
@@ -122,6 +165,7 @@ function interpSchemaFieldKind(fieldNode, registry) {
     if (sub && interpIsBvaBytesSchema(sub, registry)) return 'ascii-bva';
     return 'bound';
   }
+  if (fieldNode.kind === 'var_array') return 'var_array';
   if (fieldNode.kind === 'leaf' || (fieldNode.width && fieldNode.kind !== 'bound_var_array')) return 'leaf';
   if (fieldNode.kind === 'bound_var_array') return 'bva';
   return 'unknown';
@@ -131,17 +175,37 @@ function interpValidateSchemaType(param, fieldNode, methodName, schemaName, cach
   if (!param.typeName) {
     interpError(`method '${methodName}' param '${param.name}' missing /type annotation`);
   }
-  const key = `${schemaName}:${methodName}:${param.name}:${param.typeName}`;
+  const key = `${schemaName}:${methodName}:${param.name}:${param.typeName}:${param.vector ? 1 : 0}:${param.asciiCharsPerElem || 0}`;
   if (cache && cache.has(key)) return;
   const kind = interpSchemaFieldKind(fieldNode, cache && cache.registry);
   const tn = param.typeName;
+  const registry = cache && cache.registry;
+  if (param.vector) {
+    if (kind === 'expr') {
+      interpError(`schema '${schemaName}' field '${param.name}' cannot be vector /${tn} (expr subtree)`);
+    }
+    const elemW = interpTypeElemWidth(param);
+    if (kind === 'bva') {
+      const leafW = interpBvaElemLeafWidth(fieldNode, registry);
+      if (leafW != null && leafW !== elemW && !(tn === 'ascii' && leafW === 8 && elemW === 8)) {
+        interpError(`schema '${schemaName}' field '${param.name}' element width ${leafW} incompatible with /${tn}`);
+      }
+    }
+    if (tn === 'ascii' && param.asciiCharsPerElem > 0 && param.asciiCharsPerElem !== 1) {
+      /* []M/ascii — valid on any slice container */
+    } else if (!interpIsNumericTypeName(tn) && tn !== 'ascii') {
+      interpError(`schema '${schemaName}' field '${param.name}' incompatible with vector /${tn}`);
+    }
+    if (cache) cache.set(key, true);
+    return;
+  }
   let ok = false;
   if (kind === 'expr') {
-    ok = /^(u|s)\d+$/.test(tn) || tn === 'f32' || tn === 'f64' || tn === 'fp16' || tn === 'bf16' || /^q\d+p\d+$/.test(tn);
+    ok = interpIsNumericTypeName(tn);
   } else if (kind === 'ascii-bva' || kind === 'bva') {
     ok = tn === 'ascii';
-  } else if (kind === 'leaf') {
-    ok = /^(u|s)\d+$/.test(tn) || tn === 'ascii' || tn === 'bool' || tn === 'u1';
+  } else if (kind === 'leaf' || kind === 'var_array') {
+    ok = interpIsNumericTypeName(tn) || tn === 'ascii';
   } else if (kind === 'bound') {
     ok = true;
   }
@@ -149,6 +213,186 @@ function interpValidateSchemaType(param, fieldNode, methodName, schemaName, cach
     interpError(`schema '${schemaName}' field '${param.name}' incompatible with /${tn}`);
   }
   if (cache) cache.set(key, true);
+}
+
+function interpCopyVector(value) {
+  if (!Array.isArray(value)) interpError('expected vector');
+  const out = [];
+  for (let i = 0; i < value.length; i++) {
+    if (Array.isArray(value[i])) interpError('nested vector not allowed');
+    out.push(value[i]);
+  }
+  return out;
+}
+
+function interpResolveVarArrayCounts(schema, bits, options) {
+  const ss = interpSs();
+  const base = { ...(options && options.varArrayCounts ? options.varArrayCounts : {}) };
+  if (!schema.hasVarArray) return ss.effectiveVarArrayCountsForWire(schema, base);
+  const declared = options && options.declaredWidth != null ? options.declaredWidth : bits.length;
+  try {
+    const resolved = ss.resolveFlatVarArrayCounts(schema, declared, bits);
+    return ss.effectiveVarArrayCountsForWire(schema, { ...resolved, ...base });
+  } catch (e) {
+    return ss.effectiveVarArrayCountsForWire(schema, base);
+  }
+}
+
+function interpWalkFieldOffset(payloadBits, payloadSchema, fieldName, options) {
+  const bits = payloadBits == null ? '' : String(payloadBits);
+  const SB = interpSb();
+  const counts = interpResolveVarArrayCounts(payloadSchema, bits, options || {});
+  const ss = interpSs();
+  if (payloadSchema.hasPresenceMask && SB) {
+    const maskBits = payloadSchema.presenceMaskBits || 0;
+    const maskInfo = SB.readPresenceMask(bits, maskBits, 0);
+    let offset = maskInfo.payloadStart;
+    let optIdx = 0;
+    for (const node of payloadSchema.structure || []) {
+      if (node.kind === 'optional_field') {
+        const present = maskInfo.mask.charAt(optIdx) === '1';
+        optIdx++;
+        if (!present) {
+          if (node.name === fieldName) interpError(`schema field '${fieldName}' not present on wire`);
+          continue;
+        }
+        if (node.name === fieldName) {
+          return { node, offset, counts, bits };
+        }
+        if (node.isBoundVarArray || node.kind === 'bound_var_array') {
+          let elemOff = offset;
+          let count = 0;
+          while (elemOff < bits.length) {
+            const sub = SB.readBoundSubstream(bits, elemOff);
+            if (sub.len === 0 && count >= (node.minCount || 0)) break;
+            elemOff += sub.totalWidth;
+            count++;
+            if (node.maxCount != null && count >= node.maxCount) break;
+          }
+          offset = elemOff;
+        } else if (node.isBound || node.kind === 'bound') {
+          const sub = SB.readBoundSubstream(bits, offset);
+          offset += sub.totalWidth;
+        } else {
+          offset += (node.schema && node.schema.totalWidth) || node.width || 0;
+        }
+      }
+    }
+    interpError(`schema '${payloadSchema.name}' has no field '${fieldName}'`);
+  }
+  if (payloadSchema.hasVarArray || payloadSchema.hasBound) {
+    const offsets = ss.computeStructureOffsets(payloadSchema, counts);
+    const off = offsets.get(fieldName);
+    if (off == null) interpError(`schema '${payloadSchema.name}' has no field '${fieldName}'`);
+    const node = interpFindFieldNode(payloadSchema, fieldName);
+    return { node, offset: off, counts, bits };
+  }
+  const node = interpFindFieldNode(payloadSchema, fieldName);
+  if (!node) interpError(`schema '${payloadSchema.name}' has no field '${fieldName}'`);
+  if (node.kind === 'leaf') {
+    return { node, offset: node.bitStart || 0, counts, bits };
+  }
+  return { node, offset: 0, counts, bits };
+}
+
+function interpDecodeAsciiElem(bits, charCount) {
+  const chars = charCount > 0 ? charCount : 1;
+  const need = chars * 8;
+  const slice = bits.length >= need ? bits.substring(0, need) : bits.padEnd(need, '0');
+  if (chars === 1) {
+    const code = parseInt(slice.substring(slice.length - 8), 2);
+    if (code === 0) return '';
+    if (code > 127) interpError('non-ASCII byte in /ascii field');
+    return String.fromCharCode(code);
+  }
+  let s = '';
+  for (let i = 0; i < need; i += 8) {
+    const byte = slice.substring(i, i + 8);
+    const code = parseInt(byte, 2);
+    if (code > 127) interpError('non-ASCII byte in /ascii field');
+    s += String.fromCharCode(code);
+  }
+  return s;
+}
+
+function interpDecodeElementBits(elemBits, param, fieldNode) {
+  const tn = param.typeName;
+  const w = interpTypeElemWidth(param);
+  const slice = elemBits.length > w ? elemBits.substring(elemBits.length - w) : elemBits.padStart(w, '0');
+  if (tn === 'ascii') {
+    return interpDecodeAsciiElem(slice, param.asciiCharsPerElem > 0 ? param.asciiCharsPerElem : 1);
+  }
+  if (interpIsNumericTypeName(tn)) {
+    const val = interpDecodeNumeric(slice, tn);
+    const uMatch = /^u(\d+)$/.exec(tn);
+    if (uMatch) {
+      const max = (1 << parseInt(uMatch[1], 10)) - 1;
+      if (val > max || val < 0) interpError(`overflow decoding /${tn}`);
+    }
+    return val;
+  }
+  interpError(`cannot decode vector element with /${tn}`);
+}
+
+function interpSliceVectorFromBlob(blob, param) {
+  const elemW = interpTypeElemWidth(param);
+  const bits = blob == null ? '' : String(blob);
+  if (bits.length % elemW !== 0) {
+    interpError('corrupt vector field bit length');
+  }
+  const out = [];
+  for (let i = 0; i < bits.length; i += elemW) {
+    out.push(interpDecodeElementBits(bits.substring(i, i + elemW), param));
+  }
+  return out;
+}
+
+function interpDecodeBvaVector(bits, fieldNode, param, registry) {
+  const SB = interpSb();
+  let offset = 0;
+  const out = [];
+  const bBits = bits == null ? '' : String(bits);
+  while (offset < bBits.length) {
+    const sub = SB.readBoundSubstream(bBits, offset);
+    if (sub.len === 0 && out.length >= (fieldNode.minCount || 0)) break;
+    if (sub.len === 0) break;
+    out.push(interpDecodeElementBits(sub.payloadBits, param, fieldNode));
+    offset += sub.totalWidth;
+    if (fieldNode.maxCount != null && out.length >= fieldNode.maxCount) break;
+  }
+  return out;
+}
+
+function interpDecodeVectorParam(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options) {
+  const walk = interpWalkFieldOffset(payloadBits, payloadSchema, param.name, options);
+  const node = interpNormalizeFieldNode(walk.node);
+  const kind = interpSchemaFieldKind(node, registry);
+  const SB = interpSb();
+  if (kind === 'bva') {
+    const seg = walk.bits.substring(walk.offset);
+    return interpCopyVector(interpDecodeBvaVector(seg, node, param, registry));
+  }
+  if (kind === 'var_array') {
+    const ss = interpSs();
+    const count = walk.counts[node.name];
+    if (count == null) interpError(`missing variable array count for '${param.name}'`);
+    const elemW = node.elementWidth || interpTypeElemWidth(param);
+    const need = count * elemW;
+    const seg = walk.bits.substring(walk.offset, walk.offset + need);
+    if (seg.length !== need) interpError('corrupt vector field bit length');
+    return interpCopyVector(interpSliceVectorFromBlob(seg, param));
+  }
+  if (kind === 'bound') {
+    const sub = SB.readBoundSubstream(walk.bits, walk.offset);
+    return interpCopyVector(interpSliceVectorFromBlob(sub.payloadBits, param));
+  }
+  if (kind === 'leaf') {
+    const w = node.width || 0;
+    const seg = walk.bits.substring(walk.offset, walk.offset + w);
+    if (seg.length !== w) interpError('corrupt vector field bit length');
+    return interpCopyVector(interpSliceVectorFromBlob(seg, param));
+  }
+  interpError(`cannot decode vector param '${param.name}' from field shape '${kind}'`);
 }
 
 function interpFindFieldNode(schema, fieldName) {
@@ -171,10 +415,15 @@ function interpAssertAstMethod(method, methodName) {
   }
 }
 
-function interpDecodeParamBits(bits, param, fieldNode, registry, program, env, options) {
+function interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options) {
   if (param.vector) {
-    interpError('vector params decode not implemented in MVP');
+    return interpDecodeVectorParam(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options);
   }
+  const bits = interpExtractFieldBits(payloadBits, payloadSchema, param.name);
+  return interpDecodeParamBits(bits, param, fieldNode, registry, program, env, options);
+}
+
+function interpDecodeParamBits(bits, param, fieldNode, registry, program, env, options) {
   const tn = param.typeName;
   const kind = interpSchemaFieldKind(fieldNode, registry);
   if (kind === 'expr') {
@@ -255,8 +504,7 @@ function interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry,
     const fieldNode = interpFindFieldNode(payloadSchema, param.name);
     if (!fieldNode) interpError(`schema '${payloadSchema.name}' has no field '${param.name}'`);
     interpValidateSchemaType(param, fieldNode, methodName, payloadSchema.name, cache);
-    const fieldBits = interpExtractFieldBits(payloadBits, payloadSchema, param.name);
-    argValues.push(interpDecodeParamBits(fieldBits, param, fieldNode, registry, program, env, options));
+    argValues.push(interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options));
   }
   return interpExecuteMethod(method, argValues, program, env, options);
 }
@@ -290,6 +538,9 @@ function evalInterpProgramFromMaskedRoot(bits, schema, stmtsNode, registry, prog
 }
 
 function evalInterpSchemaPayload(bits, schema, registry, program, env, options) {
+  if (program.methods[schema.name]) {
+    return interpInvokeAstMethod(schema.name, bits, schema, registry, program, env, options);
+  }
   const stmtsNode = interpFindProgramStatementsNode(schema);
   if (stmtsNode && schema.hasPresenceMask) {
     return evalInterpProgramFromMaskedRoot(bits, schema, stmtsNode, registry, program, env, options);
@@ -570,7 +821,11 @@ function interpExecuteMethod(method, argValues, program, sharedEnv, options) {
   frameEnv.env = sharedEnv;
   for (let i = 0; i < method.params.length; i++) {
     const param = method.params[i];
-    frameEnv[param.name] = argValues[i];
+    let val = argValues[i];
+    if (param && param.vector && Array.isArray(val)) {
+      val = interpCopyVector(val);
+    }
+    frameEnv[param.name] = val;
   }
   const locals = new Set(method.params.map((p) => p.name));
   const callMethodFn = (name, args, line) => {

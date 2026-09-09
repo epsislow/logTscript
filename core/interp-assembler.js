@@ -202,9 +202,16 @@ class InterpParser {
   parseParam() {
     const nameTok = this.eat('ID');
     let vector = false;
+    let asciiCharsPerElem = 0;
     if (this.match('SYM', '[')) {
       this.eat('SYM', ']');
       vector = true;
+      if (this.peek().type === 'NUM') {
+        asciiCharsPerElem = parseInt(this.eat('NUM').value, 10);
+        if (!Number.isFinite(asciiCharsPerElem) || asciiCharsPerElem < 1) {
+          interpError('[]M/ascii requires positive M', nameTok.line);
+        }
+      }
     }
     let typeName = null;
     if (this.match('SYM', '/')) {
@@ -212,7 +219,10 @@ class InterpParser {
       validateInterpType(typeTok.value, typeTok.line);
       typeName = typeTok.value;
     }
-    return { name: nameTok.value, vector, typeName, line: nameTok.line };
+    if (asciiCharsPerElem > 0 && typeName !== 'ascii') {
+      interpError('[]M/type is only valid for /ascii', nameTok.line);
+    }
+    return { name: nameTok.value, vector, typeName, asciiCharsPerElem, line: nameTok.line };
   }
 
   parseMethod() {
@@ -598,7 +608,9 @@ function formatInterpInstanceDoc(name, inst) {
     lines.push('');
     const sig = (m.params || []).map((p) => {
       let s = p.name;
-      if (p.vector) s = s + '[]';
+      if (p.vector) {
+        s = p.name + '[]' + (p.asciiCharsPerElem > 0 ? String(p.asciiCharsPerElem) : '');
+      }
       if (p.typeName) s = s + '/' + p.typeName;
       return s;
     }).join(', ');

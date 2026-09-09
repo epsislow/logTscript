@@ -55037,6 +55037,208 @@ inline [interp] .calcInterp {
     h.assert('result 7', session.getWire(session.interp, 'result'), '00000111');
   }, { propagation: 'wave' });
 
+  const F3H_BYTE = [
+    '<byte>:',
+    '    value: 8',
+    ':',
+  ].join('\n');
+
+  const F3H_CALL_SUM = [
+    '<F3hCallSum>:',
+    '    values: 16[1-8]',
+    ':',
+  ].join('\n');
+
+  const F3H_FLAGS = [
+    '<F3hFlags>:',
+    '    flags: 32',
+    ':',
+  ].join('\n');
+
+  const F3H_BYTES = [
+    '<F3hBytes>:',
+    '    bytes: bound <byte>[1-]',
+    ':',
+  ].join('\n');
+
+  const F3H_ID = [
+    '<F3hId>:',
+    '    id: 64',
+    ':',
+  ].join('\n');
+
+  const F3H_COUNTED = [
+    '<counted>:',
+    '    n: 4',
+    '    values: 16[n]',
+    ':',
+  ].join('\n');
+
+  const F3H_VEC_INTERP = `
+inline [interp] .vecInterp {
+    F3hCallSum(values[]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(values)) {
+            total = total + values[i];
+            i = i + 1;
+        }
+        return total;
+    }
+    F3hFlags(flags[]/u1) {
+        n = 0;
+        i = 0;
+        while (i < vectorLen(flags)) {
+            n = n + flags[i];
+            i = i + 1;
+        }
+        return n;
+    }
+    F3hBytes(bytes[]/ascii) {
+        return vectorLen(bytes);
+    }
+    F3hId(id[]/u16) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(id)) {
+            total = total + id[i];
+            i = i + 1;
+        }
+        return total;
+    }
+    counted(values[]/u16) {
+        return vectorLen(values);
+    }
+}`;
+
+  function f3hU16Wire(values) {
+    return values.map((v) => v.toString(2).padStart(16, '0')).join('');
+  }
+
+  const F3H_U16_1234 = f3hU16Wire([1, 2, 3, 4]);
+
+  const F3H_CORE = [
+    F3H_BYTE,
+    F3H_CALL_SUM,
+    F3H_FLAGS,
+    F3H_BYTES,
+    F3H_ID,
+    F3H_COUNTED,
+    F3H_VEC_INTERP,
+  ].join('\n');
+
+  function f3hPackBoundByte(ch) {
+    const payload = ch.charCodeAt(0).toString(2).padStart(8, '0');
+    return '0000000000001000' + payload;
+  }
+
+  function f3hVecInst(session) {
+    return session.interp.inlineInstances.get('.vecInterp');
+  }
+
+  function f3hEvalWire(h, session, bits, schemaName, opts) {
+    session.run(F3H_CORE);
+    const v = evalInterpWire(bits, schemaName, session.interp.schemaRegistry, f3hVecInst(session), opts || {});
+    return v;
+  }
+
+  function f3hEvalScript(h, session, wireDecl, schemaName) {
+    session.run(F3H_CORE + '\n' + wireDecl + '\n8wire r = .vecInterp:eval(w, <' + schemaName + '>)');
+    return session.getWire(session.interp, 'r');
+  }
+
+  reg(5089, 'interp', 'parse param []8/ascii syntax', function(h) {
+    const body = parseInterpBody('read(names[]8/ascii) { return vectorLen(names); }');
+    h.assert('vector', body.methods.read.params[0].vector, true);
+    h.assert('ascii', body.methods.read.params[0].typeName, 'ascii');
+    h.assert('M=8', body.methods.read.params[0].asciiCharsPerElem, 8);
+  });
+
+  function runF3hSumVarArray(h, session) {
+    const bits = F3H_U16_1234;
+    h.assert('width 64', bits.length, 64);
+    const v = f3hEvalWire(h, session, bits, 'F3hCallSum', { declaredWidth: 64 });
+    h.assert('sum 1+2+3+4=10', v, 10);
+  }
+
+  reg(5090, 'interp', 'vector decode u16 var-array sum legacy', runF3hSumVarArray);
+  reg(5091, 'interp', 'vector decode u16 var-array sum wave', runF3hSumVarArray, { propagation: 'wave' });
+
+  function runF3hSumWireEval(h, session) {
+    const w = f3hEvalScript(h, session, '64wire<F3hCallSum> w = ^0001000200030004', 'F3hCallSum');
+    h.assert('wire eval sum 10', w, '00001010');
+  }
+
+  reg(5092, 'interp', 'vector eval wire u16 var-array legacy', runF3hSumWireEval);
+  reg(5093, 'interp', 'vector eval wire u16 var-array wave', runF3hSumWireEval, { propagation: 'wave' });
+
+  function runF3hFlagsU1(h, session) {
+    const bits = '10100000000000000000000000000000';
+    const v = f3hEvalWire(h, session, bits, 'F3hFlags', { declaredWidth: 32 });
+    h.assert('two flags set', v, 2);
+  }
+
+  reg(5094, 'interp', 'vector decode u1 leaf slice legacy', runF3hFlagsU1);
+  reg(5095, 'interp', 'vector decode u1 leaf slice wave', runF3hFlagsU1, { propagation: 'wave' });
+
+  function runF3hBvaAscii(h, session) {
+    const bits = f3hPackBoundByte('a') + f3hPackBoundByte('b') + f3hPackBoundByte('c');
+    const v = f3hEvalWire(h, session, bits, 'F3hBytes', { declaredWidth: bits.length });
+    h.assert('3 chars', v, 3);
+  }
+
+  reg(5096, 'interp', 'vector decode bva ascii legacy', runF3hBvaAscii);
+  reg(5097, 'interp', 'vector decode bva ascii wave', runF3hBvaAscii, { propagation: 'wave' });
+
+  function runF3hIdBound64(h, session) {
+    const bits = F3H_U16_1234;
+    const v = f3hEvalWire(h, session, bits, 'F3hId', { declaredWidth: 64 });
+    h.assert('id slice sum 10', v, 10);
+  }
+
+  reg(5098, 'interp', 'vector decode bound 64 leaf u16 legacy', runF3hIdBound64);
+  reg(5099, 'interp', 'vector decode bound 64 leaf u16 wave', runF3hIdBound64, { propagation: 'wave' });
+
+  function runF3hCountRefCorrupt(h, session) {
+    session.run(F3H_CORE);
+    const bits = '0101' + f3hU16Wire([1, 2, 3]);
+    h.assert('52 bits', bits.length, 52);
+    h.assertThrows('corrupt', function() {
+      evalInterpWire(bits, 'counted', session.interp.schemaRegistry, f3hVecInst(session), { declaredWidth: 52 });
+    }, 'corrupt');
+  }
+
+  reg(5100, 'interp', 'vector countRef bit length mismatch abort legacy', runF3hCountRefCorrupt);
+  reg(5101, 'interp', 'vector countRef bit length mismatch abort wave', runF3hCountRefCorrupt, { propagation: 'wave' });
+
+  function runF3hCorruptRemainder(h, session) {
+    session.run(F3H_CORE);
+    const bits = '1010' + '0'.repeat(21);
+    h.assert('25 bits', bits.length, 25);
+    h.assertThrows('corrupt', function() {
+      evalInterpWire(bits, 'F3hFlags', session.interp.schemaRegistry, f3hVecInst(session), { declaredWidth: 25 });
+    }, 'corrupt');
+  }
+
+  reg(5102, 'interp', 'vector slice remainder bits abort legacy', runF3hCorruptRemainder);
+  reg(5103, 'interp', 'vector slice remainder bits abort wave', runF3hCorruptRemainder, { propagation: 'wave' });
+
+  reg(5104, 'interp', 'vector bva width mismatch at dispatch legacy', function(h, session) {
+    const bad = F3H_CORE.replace('bytes[]/ascii', 'bytes[]/u16');
+    session.run(bad);
+    h.assertThrows('incompatible', function() {
+      evalInterpWire(f3hPackBoundByte('a'), 'F3hBytes', session.interp.schemaRegistry, session.interp.inlineInstances.get('.vecInterp'), { declaredWidth: 24 });
+    }, 'incompatible');
+  });
+
+  reg(5105, 'interp', 'vector bva width mismatch at dispatch wave', function(h, session) {
+    const bad = F3H_CORE.replace('bytes[]/ascii', 'bytes[]/u16');
+    session.run(bad);
+    h.assertThrows('incompatible', function() {
+      evalInterpWire(f3hPackBoundByte('a'), 'F3hBytes', session.interp.schemaRegistry, session.interp.inlineInstances.get('.vecInterp'), { declaredWidth: 24 });
+    }, 'incompatible');
+  }, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',
