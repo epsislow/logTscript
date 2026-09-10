@@ -853,6 +853,185 @@ function interpExecuteDestructuringAssign(stmt, env, locals, program, callMethod
   }
 }
 
+function interpCompParamFromDecl(decl) {
+  return {
+    name: decl.channel,
+    vector: !!decl.vector,
+    typeName: decl.typeName,
+    vectorFixedCount: decl.vectorFixedCount || 0,
+    asciiCharsPerElem: decl.asciiCharsPerElem || 0,
+    asciiNullDelim: !!decl.asciiNullDelim,
+  };
+}
+
+function interpCompDeclBitWidth(decl) {
+  const fn = typeof interpCompPinPoutBitWidth === 'function' ? interpCompPinPoutBitWidth : null;
+  if (fn) return fn(decl);
+  return null;
+}
+
+function decodeInterpCompPinBits(bits, decl, execAlias) {
+  const alias = execAlias || decl.execAlias;
+  const param = interpCompParamFromDecl(decl);
+  const raw = bits == null ? '' : String(bits);
+  try {
+    if (decl.vector) {
+      if (param.asciiNullDelim) {
+        const str = interpBitsToAsciiByteString(raw);
+        const fixed = param.vectorFixedCount > 0 ? param.vectorFixedCount : 0;
+        return interpCopyVector(interpParseNullDelimAscii(str, fixed));
+      }
+      const elemW = interpTypeElemWidth(param);
+      if (!elemW || raw.length % elemW !== 0) {
+        throw new Error('wire width mismatch');
+      }
+      const out = [];
+      for (let i = 0; i < raw.length; i += elemW) {
+        out.push(interpDecodeElementBits(raw.substring(i, i + elemW), param));
+      }
+      return out;
+    }
+    const w = interpCompDeclBitWidth(decl) || raw.length;
+    const slice = raw.length > w ? raw.substring(raw.length - w) : raw.padStart(w, '0');
+    return interpDecodeElementBits(slice, param);
+  } catch (err) {
+    const detail = err && err.message ? err.message : String(err);
+    throw new Error(`cannot decode value from type /${decl.typeName} on ${alias}: ${detail}`);
+  }
+}
+
+function interpEncodeScalarValue(value, typeName, targetBits, alias) {
+  const label = alias || 'pout';
+  const fail = (v) => {
+    throw new Error(`cannot encode value ${JSON.stringify(v)} for type /${typeName} on ${label}`);
+  };
+  if (typeName === 'u1' || typeName === 'bool') {
+    const v = value ? 1 : 0;
+    if (typeof value === 'string' && value !== '0' && value !== '1' && value.length > 1) fail(value);
+    const w = targetBits && targetBits > 0 ? targetBits : 1;
+    return (v ? 1 : 0).toString(2).padStart(w, '0');
+  }
+  const uMatch = /^u(\d+)$/.exec(typeName);
+  if (uMatch) {
+    const w = parseInt(uMatch[1], 10);
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0 || n > (1 << w) - 1 || Math.trunc(n) !== n) fail(value);
+    return Math.trunc(n).toString(2).padStart(w, '0');
+  }
+  const sMatch = /^s(\d+)$/.exec(typeName);
+  if (sMatch) {
+    const w = parseInt(sMatch[1], 10);
+    const n = Number(value);
+    if (!Number.isFinite(n) || Math.trunc(n) !== n) fail(value);
+    const max = (1 << (w - 1)) - 1;
+    const min = -(1 << (w - 1));
+    if (n > max || n < min) fail(value);
+    const u = n < 0 ? (1 << w) + n : n;
+    return u.toString(2).padStart(w, '0');
+  }
+  if (typeName === 'ascii') {
+    const s = value == null ? '' : String(value);
+    const w = targetBits && targetBits > 0 ? targetBits : s.length * 8;
+    if (w % 8 !== 0) fail(value);
+    const maxChars = w / 8;
+    if (s.length > maxChars) fail(value);
+    for (let i = 0; i < s.length; i++) {
+      if (s.charCodeAt(i) > 127) fail(value);
+    }
+    let bits = '';
+    for (let i = 0; i < s.length; i++) {
+      bits += s.charCodeAt(i).toString(2).padStart(8, '0');
+    }
+    while (bits.length < w) bits += '00000000';
+    return bits;
+  }
+  if (typeName === 'f32' || typeName === 'f64' || typeName === 'fp16' || typeName === 'bf16' || /^q\d+p\d+$/.test(typeName)) {
+    const encFn = typeof encodeNformatValue === 'function' ? encodeNformatValue : null;
+    const nf = typeof encodeFromFloat === 'function' ? encodeFromFloat : null;
+    const w = targetBits && targetBits > 0 ? targetBits : interpCompDeclBitWidth({ typeName });
+    if (!w) fail(value);
+    if ((typeName === 'f32' || typeName === 'f64' || typeName === 'fp16' || typeName === 'bf16') && nf) {
+      const bits = nf(Number(value), typeName, w);
+      if (!bits || bits.length !== w) fail(value);
+      return bits;
+    }
+    if (encFn && /^q\d+p\d+$/.test(typeName)) {
+      const bits = encFn(Number(value), typeName, w);
+      if (!bits || bits.length !== w) fail(value);
+      return bits;
+    }
+    fail(value);
+  }
+  fail(value);
+}
+
+function encodeInterpCompPoutValue(value, decl, wireBits, execAlias) {
+  const alias = execAlias || decl.execAlias;
+  const param = interpCompParamFromDecl(decl);
+  const targetBits = wireBits != null ? wireBits.length : interpCompDeclBitWidth(decl);
+  if (decl.vector) {
+    if (!Array.isArray(value)) {
+      throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
+    }
+    if (param.asciiNullDelim) {
+      let str = '';
+      for (const el of value) {
+        const s = el == null ? '' : String(el);
+        for (let i = 0; i < s.length; i++) {
+          if (s.charCodeAt(i) > 127) {
+            throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
+          }
+        }
+        str += s + '\0';
+      }
+      return interpEncodeScalarValue(str, 'ascii', targetBits, alias);
+    }
+    const elemW = interpTypeElemWidth(param);
+    let bits = '';
+    for (const el of value) {
+      bits += interpEncodeScalarValue(el, decl.typeName, elemW, alias);
+    }
+    if (targetBits != null && bits.length > targetBits) {
+      throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
+    }
+    if (targetBits != null && bits.length < targetBits) {
+      bits = bits.padStart(targetBits, '0');
+    }
+    return bits;
+  }
+  return interpEncodeScalarValue(value, decl.typeName, targetBits, alias);
+}
+
+function interpExecutePush(stmt, env, callMethodFn, options) {
+  const buffer = options && options.poutBuffer;
+  const defs = options && options.poutChannelDefs;
+  if (!buffer || !defs) {
+    interpError('push requires comp [interp] execution context', stmt.line);
+  }
+  for (const entry of stmt.entries || []) {
+    const def = defs[entry.channel];
+    if (!def) {
+      interpError(`unknown pout channel '${entry.channel}'`, entry.line || stmt.line);
+    }
+    const val = interpEvalExpr(entry.expr, env, callMethodFn, entry.line || stmt.line);
+    const wireBits = def.wireBits != null ? def.wireBits : null;
+    const encoded = encodeInterpCompPoutValue(val, def, wireBits, def.execAlias);
+    buffer[entry.channel] = encoded;
+  }
+}
+
+function interpExecuteRemove(stmt, options) {
+  const buffer = options && options.poutBuffer;
+  const defs = options && options.poutChannelDefs;
+  if (!buffer || !defs) {
+    interpError('remove requires comp [interp] execution context', stmt.line);
+  }
+  if (!defs[stmt.channel]) {
+    interpError(`unknown pout channel '${stmt.channel}'`, stmt.line);
+  }
+  delete buffer[stmt.channel];
+}
+
 function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, sharedEnv, options) {
   for (const stmt of stmts || []) {
     if (stmt.kind === 'assign') {
@@ -934,6 +1113,16 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
       throw { interpFlow: 'break' };
     } else if (stmt.kind === 'continue') {
       throw { interpFlow: 'continue' };
+    } else if (stmt.kind === 'push') {
+      interpExecutePush(stmt, env, callMethodFn, options);
+    } else if (stmt.kind === 'remove') {
+      interpExecuteRemove(stmt, options);
+    } else if (stmt.kind === 'removeall') {
+      const buffer = options && options.poutBuffer;
+      if (!buffer) {
+        interpError('removeall requires comp [interp] execution context', stmt.line);
+      }
+      for (const key of Object.keys(buffer)) delete buffer[key];
     }
   }
 }
@@ -997,10 +1186,52 @@ function evalInterpInline(inst, wireBits, schemaName, registry, options) {
   return evalInterpWire(wireBits, schemaName, registry, inst, env, options || {});
 }
 
+function evalInterpCompExec(wireBits, schemaName, registry, program, pinEnv, compOptions) {
+  const env = Object.assign({}, pinEnv || {});
+  if (!env.env || typeof env.env !== 'object') env.env = {};
+  const options = Object.assign({}, compOptions || {});
+  options.poutBuffer = options.poutBuffer || {};
+  try {
+    evalInterpWire(wireBits, schemaName, registry, program, env, options);
+  } catch (err) {
+    if (err && err.message && err.message.indexOf('interp:') === 0) {
+      const detail = err.message.replace(/^interp:\s*/, '');
+      throw new Error(`ast binary is invalid for schema ${schemaName}: ${detail}`);
+    }
+    throw err;
+  }
+  return options.poutBuffer;
+}
+
+function validateInterpAstWire(wireBits, schemaName, registry) {
+  const SS = interpSs();
+  const schema = interpResolveSchema(registry, schemaName);
+  if (!schema) throw new Error(`unknown schema '${schemaName}'`);
+  const bits = wireBits == null ? '' : String(wireBits);
+  if (schema.hasDynamicWidth || schema.hasVarArray || schema.hasBound) {
+    if (!bits.length) throw new Error('empty wire');
+    return;
+  }
+  const expected = schema.totalWidth;
+  if (expected > 0 && bits.length < expected) {
+    throw new Error(`wire has ${bits.length} bits, schema '${schemaName}' needs at least ${expected}`);
+  }
+  if (SS && typeof SS.schemaWireUsedWidth === 'function') {
+    const used = SS.schemaWireUsedWidth(schema, bits, null);
+    if (used > bits.length) {
+      throw new Error(`wire has ${bits.length} bits, payload needs ${used}`);
+    }
+  }
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.evalInterpWire = evalInterpWire;
   globalThis.evalInterpInline = evalInterpInline;
+  globalThis.evalInterpCompExec = evalInterpCompExec;
   globalThis.encodeInterpResult = encodeInterpResult;
+  globalThis.decodeInterpCompPinBits = decodeInterpCompPinBits;
+  globalThis.encodeInterpCompPoutValue = encodeInterpCompPoutValue;
+  globalThis.validateInterpAstWire = validateInterpAstWire;
   globalThis.INTERP_MAX_LOOP_ITERATIONS = INTERP_MAX_LOOP_ITERATIONS;
 }
 
@@ -1008,7 +1239,11 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     evalInterpWire,
     evalInterpInline,
+    evalInterpCompExec,
     encodeInterpResult,
+    decodeInterpCompPinBits,
+    encodeInterpCompPoutValue,
+    validateInterpAstWire,
     INTERP_MAX_LOOP_ITERATIONS,
   };
 }

@@ -55538,6 +55538,170 @@ inline [interp] .calcInterp {
   reg(5138, 'interp', 'multi-return helper eval 2*3 legacy', runF3gEvalMul);
   reg(5139, 'interp', 'multi-return helper eval 2*3 wave', runF3gEvalMul, { propagation: 'wave' });
 
+  const INLINE_INTERP_F4 = `
+inline [interp] .calcInterp {
+    CallNumber(value/u8) {
+        return value;
+    }
+    CallAdd(left/s16, right/s16) {
+        push res: left + right;
+        return left + right;
+    }
+    CallMul(left/s16, right/s16) {
+        push res: left * right;
+        return left * right;
+    }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) {
+        return env[name];
+    }
+}`;
+
+  const COMP_INTERP_CALC = `
+comp [interp] .calculator:
+    on: 1
+    astSchema = .program
+    .calcInterp { }
+    pin limit/s32 as limitIn
+    pout res/s16 as resOut
+    :
+`;
+
+  const F4_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + INLINE_INTERP_F4 + '\n' + COMP_INTERP_CALC;
+
+  function f4PackProgram(h, session, src) {
+    session.run(F4_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, src, 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack ok', String(built.ok), '1');
+    return built;
+  }
+
+  function f4RunComp(h, session, src, opts) {
+    const built = f4PackProgram(h, session, src);
+    const limitBits = (opts && opts.limit != null)
+      ? Number(opts.limit).toString(2).padStart(32, '0')
+      : '0'.repeat(32);
+    session.run(F4_CORE + '\n' + [
+      built.bitWidth + 'wire<program> prog = .calcLang:packAst("' + src + '", <program>, "program")',
+      '16wire result = 0000000000000000',
+      '32wire limitWire = ' + limitBits,
+      '1wire run = 1',
+      '.calculator:{',
+      '    ast = prog',
+      '    limitIn = limitWire',
+      '    resOut >= result',
+      '    set = run',
+      '}',
+    ].join('\n'));
+    return session.getWire(session.interp, 'result');
+  }
+
+  reg(5140, 'interp', 'parse comp [interp] header pin pout', function(h, session) {
+    session.run(F4_CORE);
+    const comp = session.interp.components.get('.calculator');
+    h.assert('type interp', comp.type, 'interp');
+    h.assert('astSchema', comp.astSchemaRef, 'program');
+    h.assert('limitIn pin', typeof comp.pinByAlias.limitIn, 'object');
+    h.assert('resOut pout', typeof comp.poutByAlias.resOut, 'object');
+    h.assert('push inline flag', session.interp.inlineInstances.get('.calcInterp').requiresCompContext, true);
+  });
+
+  reg(5141, 'interp', 'push inline blocks :eval', function(h, session) {
+    session.run(F4_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, 'x=1;', 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack ok', String(built.ok), '1');
+    session.run(F4_CORE + '\n' + [
+      built.bitWidth + 'wire<program> prog = .calcLang:packAst("x=1;", <program>, "program")',
+      '8wire r = .calcInterp:eval(prog, <program>)',
+    ].join('\n'));
+    const err = session.out.find((l) => l.startsWith('Error:')) || '';
+    h.assert(':eval blocked', err.indexOf('push/remove') >= 0, true);
+  });
+
+  function runF4CompAddLegacy(h, session) {
+    const v = f4RunComp(h, session, 'x=1+2;');
+    h.assert('1+2=3', v, '0000000000000011');
+  }
+
+  reg(5142, 'interp', 'comp interp 1+2 push res legacy', runF4CompAddLegacy);
+  reg(5143, 'interp', 'comp interp 1+2 push res wave', runF4CompAddLegacy, { propagation: 'wave' });
+
+  function runF4CompMulLegacy(h, session) {
+    const v = f4RunComp(h, session, 'x=2*3;');
+    h.assert('2*3=6', v, '0000000000000110');
+  }
+
+  reg(5144, 'interp', 'comp interp 2*3 push res legacy', runF4CompMulLegacy);
+  reg(5145, 'interp', 'comp interp 2*3 push res wave', runF4CompMulLegacy, { propagation: 'wave' });
+
+  function runF4CompExprLegacy(h, session) {
+    const v = f4RunComp(h, session, 'x=1+2*3;');
+    h.assert('1+2*3=7', v, '0000000000000111');
+  }
+
+  reg(5146, 'interp', 'comp interp precedence legacy', runF4CompExprLegacy);
+  reg(5147, 'interp', 'comp interp precedence wave', runF4CompExprLegacy, { propagation: 'wave' });
+
+  function runF4ParseWireLegacy(h, session) {
+    const built = f4PackProgram(h, session, 'x=3+4;');
+    session.run(F4_CORE + '\n' + [
+      '16wire result = 0000000000000000',
+      '32wire limitWire = 00000000000000000000000000000000',
+      '1wire run = 1',
+      '4096wire<parseResult> pr =: .calcLang:parse("x=3+4;", <program>, "program")',
+      built.bitWidth + 'wire<program> progAst = pr:ast',
+      '.calculator:{',
+      '    ast = progAst',
+      '    limitIn = limitWire',
+      '    resOut >= result',
+      '    set = run',
+      '}',
+    ].join('\n'));
+    h.assert('3+4=7', session.getWire(session.interp, 'result'), '0000000000000111');
+  }
+
+  reg(5148, 'interp', 'comp interp parse wire legacy', runF4ParseWireLegacy);
+  reg(5149, 'interp', 'comp interp parse wire wave', runF4ParseWireLegacy, { propagation: 'wave' });
+
+  const F4_REMOVE_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + `
+inline [interp] .calcRm {
+    CallNumber(value/u8) { push res: value; remove res; return value; }
+}
+comp [interp] .calcRmComp:
+    on: 1
+    astSchema = .expr
+    .calcRm { }
+    pout res/s16 as resOut
+    :
+`;
+
+  function runF4RemoveBufferLegacy(h, session) {
+    session.run(F4_REMOVE_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, '5', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('pack', String(built.ok), '1');
+    session.run(F4_REMOVE_CORE + '\n' + [
+      '16wire result = 0000000000001111',
+      '1wire run = 1',
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("5", <expr>, "expression")',
+      '.calcRmComp:{ ast = ast resOut >= result set = run }',
+    ].join('\n'));
+    h.assert('remove keeps old wire', session.getWire(session.interp, 'result'), '0000000000001111');
+  }
+
+  reg(5150, 'interp', 'comp interp remove buffer legacy', runF4RemoveBufferLegacy);
+  reg(5151, 'interp', 'comp interp remove buffer wave', runF4RemoveBufferLegacy, { propagation: 'wave' });
+
+  reg(5152, 'interp', 'comp missing calcInterp link rejected', function(h, session) {
+    const bad = F3C_SCHEMAS + '\n' + INLINE_INTERP_F4 + '\ncomp [interp] .bad:\n    astSchema = .program\n    :';
+    h.assertThrows('missing link', function() { session.run(bad); }, 'calcInterp');
+  });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

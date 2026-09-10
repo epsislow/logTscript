@@ -5,7 +5,10 @@ const INTERP_FORBIDDEN_IDS = new Set([
   'and', 'or', 'not',
 ]);
 
-const INTERP_KEYWORDS = new Set(['if', 'else', 'for', 'while', 'break', 'continue', 'return']);
+const INTERP_KEYWORDS = new Set([
+  'if', 'else', 'for', 'while', 'break', 'continue', 'return',
+  'push', 'remove', 'removeall',
+]);
 
 const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 
@@ -368,6 +371,16 @@ class InterpParser {
     if (t.type === 'KW' && t.value === 'return') {
       return this.parseReturnStmt();
     }
+    if (t.type === 'KW' && t.value === 'push') {
+      return this.parsePushStmt();
+    }
+    if (t.type === 'KW' && t.value === 'remove') {
+      return this.parseRemoveStmt();
+    }
+    if (t.type === 'KW' && t.value === 'removeall') {
+      const lineTok = this.eat('KW', 'removeall');
+      return { kind: 'removeall', line: lineTok.line };
+    }
     if (t.type === 'ID') {
       const next = this.tokens[this.pos + 1];
       if (next && next.type === 'SYM' && next.value === '(') {
@@ -471,6 +484,30 @@ class InterpParser {
       exprs.push(this.parseExpr());
     }
     return { kind: 'return', exprs, line: lineTok.line };
+  }
+
+  parsePushStmt() {
+    const lineTok = this.eat('KW', 'push');
+    const entries = [];
+    entries.push(this.parsePushEntry());
+    while (this.match('SYM', ',')) {
+      this.eat('SYM', ',');
+      entries.push(this.parsePushEntry());
+    }
+    return { kind: 'push', entries, line: lineTok.line };
+  }
+
+  parsePushEntry() {
+    const channelTok = this.eat('ID');
+    this.eat('SYM', ':');
+    const expr = this.parseExpr();
+    return { channel: channelTok.value, expr, line: channelTok.line };
+  }
+
+  parseRemoveStmt() {
+    const lineTok = this.eat('KW', 'remove');
+    const channelTok = this.eat('ID');
+    return { kind: 'remove', channel: channelTok.value, line: lineTok.line };
   }
 
   parseDestructuringAssign() {
@@ -768,17 +805,36 @@ function validateStmtTree(stmts, program) {
       if (stmt.index) validateExprTree(stmt.index, program, stmt.line);
     } else if (stmt.kind === 'call') {
       for (const a of stmt.args || []) validateExprTree(a, program, stmt.line);
+    } else if (stmt.kind === 'push') {
+      for (const entry of stmt.entries || []) validateExprTree(entry.expr, program, stmt.line);
     }
   }
 }
 
+function interpProgramUsesCompContext(stmts) {
+  for (const stmt of stmts || []) {
+    if (stmt.kind === 'push' || stmt.kind === 'remove' || stmt.kind === 'removeall') return true;
+    if (stmt.kind === 'if') {
+      if (interpProgramUsesCompContext(stmt.then)) return true;
+      if (interpProgramUsesCompContext(stmt.else)) return true;
+    } else if (stmt.kind === 'for' || stmt.kind === 'while') {
+      if (interpProgramUsesCompContext(stmt.body)) return true;
+    }
+  }
+  return false;
+}
+
 function validateInterpProgram(program) {
   const methods = program.methods || {};
+  program.requiresCompContext = false;
   for (const name of Object.keys(methods)) {
     validateReturnArity(methods[name]);
   }
   for (const name of Object.keys(methods)) {
     validateStmtTree(methods[name].body, program);
+    if (interpProgramUsesCompContext(methods[name].body)) {
+      program.requiresCompContext = true;
+    }
   }
 }
 

@@ -170,8 +170,10 @@ function loadExtraModule(slug) {
   };
 }
 
-function runBlock(sandbox, src) {
-  const session = sandbox.LogTScriptTestSuite.createSession();
+function runBlock(sandbox, src, options) {
+  const session = sandbox.LogTScriptTestSuite.createSession({
+    propagation: (options && options.propagation) || 'legacy',
+  });
   let err = null;
   let out = [];
   try {
@@ -192,9 +194,12 @@ function runBlock(sandbox, src) {
 }
 
 function runCase(sandbox, caseDef) {
-  const { session, err, out, interp } = runBlock(sandbox, caseDef.src);
+  const { session, err, out, interp } = runBlock(sandbox, caseDef.src, caseDef);
   const text = out.join('\n');
-  let pass = !err;
+  let pass = caseDef.expectError ? !!err || /Error:/.test(text) : !err;
+  if (caseDef.expectError && pass) {
+    pass = String(text).includes(caseDef.expectError) || (err && String(err.message).includes(caseDef.expectError));
+  }
   const wireMap = caseDef.wires || caseDef.wire || null;
   if (pass && wireMap) {
     for (const [w, v] of Object.entries(wireMap)) {

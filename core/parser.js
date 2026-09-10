@@ -386,7 +386,12 @@ class Parser {
 
   parseOptionalSchemaSuffix() {
     if (this.c.type === 'SYM' && this.c.value === '<') {
-      return this.parseSchemaRef();
+      const ref = this.parseSchemaRef();
+      if (this.c.type === 'SYM' && this.c.value === '+') {
+        this.eat('SYM', '+');
+        return ref + '+';
+      }
+      return ref;
     }
     return null;
   }
@@ -2732,8 +2737,31 @@ parseBoardInstance() {
     }
 
     const expr = this.expr();
+    let schemaRef = null;
+    if (propName === 'ast') {
+      schemaRef = this.parseOptionalSchemaSuffix();
+    }
 
-    return { property: propName, expr };
+    return { property: propName, expr, schemaRef };
+  }
+
+  _parseInterpCompPinPoutFromCursor(kind) {
+    const parseDeclFn = typeof parseInterpCompPinPoutDecl === 'function'
+      ? parseInterpCompPinPoutDecl : null;
+    if (!parseDeclFn) {
+      throw Error('Interp comp assembler is not loaded');
+    }
+    const toks = [];
+    while (this.c.type !== 'EOF' && this.c.value !== '\n' && this.c.value !== ':') {
+      let type = 'SYM';
+      if (this.c.type === 'ID' || this.c.type === 'SPECIAL') type = 'ID';
+      else if (this.c.type === 'DEC' || this.c.type === 'BIN') type = 'NUM';
+      toks.push({ type, value: String(this.c.value), line: this.c.line });
+      this.eat(this.c.type);
+      this.t.skip();
+    }
+    toks.push({ type: 'EOF', value: '', line: this.c.line });
+    return parseDeclFn(kind, toks, 'comp header');
   }
 
   parsePropertyBlock(componentName) {
@@ -3759,6 +3787,19 @@ assignment() {
         throw Error(`Expected '{' after canvas renderer ref '${canvasRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
 
+      if (this.c.type === 'SYM' && this.c.value === '.' && compType === 'interp') {
+        const interpRef = this.parseDotComponentRef();
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const bodyRaw = this.parseRawBraceBlock(bracePos);
+          if (!attributes.interpPrograms) attributes.interpPrograms = [];
+          attributes.interpPrograms.push({ ref: interpRef, bodyRaw });
+          continue;
+        }
+        throw Error(`Expected '{' after interp ref '${interpRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+
       if (this.c.type === 'ID' || (this.c.type === 'KEYWORD' && this.c.value === 'MODE')) {
         const attrName = this.c.type === 'KEYWORD' ? 'mode' : this.c.value;
         const isArray = attrNamesArray.includes(attrName);
@@ -3775,6 +3816,21 @@ assignment() {
         let symbolsBlockAttrs = [];
         let plcMappingBlockAttrs = [];
         let plcGlobalsBlockAttrs = [];
+        if (compType === 'interp' && (attrName === 'pin' || attrName === 'pout')) {
+          const decl = this._parseInterpCompPinPoutFromCursor(attrName);
+          if (!attributes.interpPinPoutRaw) attributes.interpPinPoutRaw = [];
+          attributes.interpPinPoutRaw.push({ kind: attrName, decl });
+          continue;
+        }
+        if (compType === 'interp' && attrName === 'astSchema' && this.c.value === '=') {
+          this.eat('SYM', '=');
+          this.t.skip();
+          if (this.c.type !== 'SYM' || this.c.value !== '.') {
+            throw Error(`Expected schema reference after 'astSchema =' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
+          attributes.astSchema = this.parseDotComponentRef();
+          continue;
+        }
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {

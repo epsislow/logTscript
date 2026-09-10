@@ -540,6 +540,7 @@ Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` / `inline [plc
 | `doc(inline.canvas)` | canvas | [inline-canvas.md](inline-canvas.md) |
 | `doc(inline.parser)` | parser | [inline-parser.md](inline-parser.md) |
 | `doc(inline.interp)` | interp | [inline-interp.md](inline-interp.md) |
+| `doc(comp.interp)` | interp | [comp-interp.md](comp-interp.md) |
 
 ### doc(.name) — specific inline instance
 

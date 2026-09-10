@@ -2236,6 +2236,9 @@ class Interpreter {
     }
 
     if (inlineInst && inlineInst.kind === 'interp' && method === 'eval') {
+      if (inlineInst.requiresCompContext) {
+        throw new Error(`${instName}:eval cannot run inline with push/remove (use comp [interp])`);
+      }
       const evalFn = typeof evalInterpInline === 'function' ? evalInterpInline : null;
       const encFn = typeof encodeInterpResult === 'function' ? encodeInterpResult : null;
       if (!evalFn || !encFn) throw new Error('interp-engine.js is not loaded');
@@ -2487,6 +2490,7 @@ class Interpreter {
         name: inline.name,
         methods: prog.methods || {},
         bodyRaw: inline.bodyRaw,
+        requiresCompContext: !!prog.requiresCompContext,
       });
       return;
     }
@@ -10337,19 +10341,28 @@ if (this.isBuiltinDEMUX(name)) {
 
   _refreshLogicWaveRedirects() {
     if (!this.deferWirePropagation() || !this.componentRegistry) return;
-    const handler = this.componentRegistry.get('logic');
-    if (!handler || typeof handler._applyRedirects !== 'function') return;
     this._logicRedirectSyncWrite = true;
     try {
-      for (const [compName, comp] of this.components) {
-        if (comp.type !== 'logic' || !comp.queryResults) continue;
-        const redirects = comp._logicRedirectProps;
-        if (!redirects || !redirects.length) continue;
-        handler._applyRedirects(comp, compName, redirects, this);
-        if (comp._observeRemovalPulsePendingReset
-            && typeof handler._resetObserveRemovalPulses === 'function') {
-          handler._resetObserveRemovalPulses(comp, this);
-          comp._observeRemovalPulsePendingReset = false;
+      const handler = this.componentRegistry.get('logic');
+      if (handler && typeof handler._applyRedirects === 'function') {
+        for (const [compName, comp] of this.components) {
+          if (comp.type !== 'logic' || !comp.queryResults) continue;
+          const redirects = comp._logicRedirectProps;
+          if (!redirects || !redirects.length) continue;
+          handler._applyRedirects(comp, compName, redirects, this);
+          if (comp._observeRemovalPulsePendingReset
+              && typeof handler._resetObserveRemovalPulses === 'function') {
+            handler._resetObserveRemovalPulses(comp, this);
+            comp._observeRemovalPulsePendingReset = false;
+          }
+        }
+      }
+      const interpHandler = this.componentRegistry.get('interp');
+      if (interpHandler && typeof interpHandler._applyPoutWires === 'function') {
+        for (const [compName, comp] of this.components) {
+          if (comp.type !== 'interp') continue;
+          const channels = comp._interpLastCommittedPoutChannels || null;
+          interpHandler._applyPoutWires(comp, compName, this, channels);
         }
       }
     } finally {
@@ -14919,6 +14932,14 @@ if (s.assignment) {
         CanvasComponent.preparePropertyBlock(comp, properties, this, component);
       }
     }
+
+    if (comp.type === 'interp') {
+      comp._interpRedirectProps = properties.filter((p) => p.property === 'pout>');
+      if (typeof InterpComponent !== 'undefined'
+          && typeof InterpComponent.preparePropertyBlock === 'function') {
+        InterpComponent.preparePropertyBlock(comp, properties, this, component);
+      }
+    }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
     // These blocks should only execute during initial RUN(), not when re-evaluating
@@ -15058,7 +15079,8 @@ if (s.assignment) {
       
       pending[property] = {
         expr: expr,
-        value: value
+        value: value,
+        schemaRef: prop.schemaRef || null,
       };
       
       // Note: Segment properties (a, b, c, d, e, f, g, h) are NOT processed immediately here
@@ -15330,11 +15352,27 @@ if (s.assignment) {
       if (prop.property !== 'pout>') continue;
       const poutName = prop.poutName;
       const compForPout = this.components.get(component);
-      if (!compForPout || compForPout.type === 'logic') continue;
+      if (!compForPout || compForPout.type === 'logic' || compForPout.type === 'interp') continue;
       if (!this.componentRegistry || !this.componentRegistry.supportsRedirect(compForPout.type, poutName, compForPout)) {
         throw Error(`Component ${component} (type: ${compForPout.type}) does not support :${poutName} property`);
       }
       this._applyComponentWireRedirect(component, prop, poutName);
+    }
+
+    const compInterpSync = this.components.get(component);
+    if (compInterpSync && compInterpSync.type === 'interp'
+        && typeof InterpComponent !== 'undefined' && this.componentRegistry) {
+      const interpHandler = this.componentRegistry.get('interp');
+      if (interpHandler && typeof interpHandler._applyPoutWires === 'function') {
+        const useSync = typeof this.deferWirePropagation === 'function' && this.deferWirePropagation();
+        if (useSync) this._logicRedirectSyncWrite = true;
+        try {
+          const channels = compInterpSync._interpLastCommittedPoutChannels || null;
+          interpHandler._applyPoutWires(compInterpSync, component, this, channels);
+        } finally {
+          if (useSync) this._logicRedirectSyncWrite = false;
+        }
+      }
     }
     } finally {
       if (useEdgeProbe) this.probeReasonContext = 'normal';

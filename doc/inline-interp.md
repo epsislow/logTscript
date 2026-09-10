@@ -2,6 +2,8 @@
 
 `inline [interp]` defines **methods** that evaluate a **typed AST wire** produced by `inline [parser]` and semantic schemas. Each AST dispatch target (`CallAdd`, `CallNumber`, …) maps to a method whose parameters carry **`/type`** annotations for decode.
 
+Runtime wiring with **`push` / `remove` / `removeall`** and pin/pout redirects → [`comp [interp]`](comp-interp.md).
+
 > **Development feature:** `inline [parser]`, `inline [interp]`, and related AST tooling are available for experimentation in current builds. They are **not** part of the production language surface yet.
 
 ### Running examples (Load / Load & Run)

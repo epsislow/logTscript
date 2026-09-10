@@ -39,6 +39,7 @@ var CacheComponent = (typeof require !== 'undefined') ? require('./cache') : Cac
 var PlcComponent = (typeof require !== 'undefined') ? require('./plc') : PlcComponent;
 var LogicComponent = (typeof require !== 'undefined') ? require('./logic') : LogicComponent;
 var CanvasComponent = (typeof require !== 'undefined') ? require('./canvas') : CanvasComponent;
+var InterpComponent = (typeof require !== 'undefined') ? require('./interp') : InterpComponent;
 var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component') : PcbComponent;
 
 function createComponentRegistry() {
@@ -82,6 +83,7 @@ function createComponentRegistry() {
   registry.register(PlcComponent);
   registry.register(LogicComponent);
   registry.register(CanvasComponent);
+  registry.register(InterpComponent);
   registry.register(ClockDotsComponent);
   return registry;
 }
