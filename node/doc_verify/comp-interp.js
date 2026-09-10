@@ -206,3 +206,152 @@ module.exports = {
     },
   ],
 };
+
+const F4A_PING = [
+  '<F4aPing>+:',
+  '    dummy: 8',
+  ':',
+].join('\n');
+
+const F4A_U16 = F4A_PING + '\n' + `
+inline [interp] .f4aVec {
+    F4aPing(dummy/u8) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(valsIn)) {
+            total = total + valsIn[i];
+            i = i + 1;
+        }
+        push res: total;
+        return total;
+    }
+}
+comp [interp] .f4aU16Comp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aVec { }
+    pin vals[5]/u16 as valsIn
+    pout res/u16 as resOut
+    :
+`;
+
+const F4A_U16_RUN = F4A_U16 + '\n' + [
+  '8wire<F4aPing> ast = 00000000',
+  '16wire[5] valsWire = 0000000000000001 + 0000000000000010 + 0000000000000011 + 0000000000000100 + 0000000000000101',
+  '16wire result = 0000000000000000',
+  '1wire run = 1',
+  '.f4aU16Comp:{ ast = ast valsIn = valsWire resOut >= result set = run }',
+].join('\n');
+
+function f4aAsciiBits(str) {
+  let bits = '';
+  for (let i = 0; i < str.length; i++) {
+    bits += str.charCodeAt(i).toString(2).padStart(8, '0');
+  }
+  return bits;
+}
+
+const F4A_STR_BITS = f4aAsciiBits('0123456789abcdefghij');
+const F4A_NULL_BITS = f4aAsciiBits('ceva\0\0altceva');
+
+const F4A_STR = F4A_PING + '\n' + `
+inline [interp] .f4aStr {
+    F4aPing(dummy/u8) { push strOut: dataIn; return vectorLen(dataIn); }
+}
+comp [interp] .f4aStrComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aStr { }
+    pin strIn[2]10/ascii as dataIn
+    pout strOut[2]10/ascii as dataOut
+    :
+`;
+
+const F4A_STR_RUN = F4A_STR + '\n' + [
+  '8wire<F4aPing> ast = 00000000',
+  '80wire[2] dataWire = ' + F4A_STR_BITS.match(/.{1,80}/g).join(' + '),
+  '80wire[2] outWire = ' + '0'.repeat(160),
+  '1wire run = 1',
+  '.f4aStrComp:{ ast = ast dataIn = dataWire dataOut >= outWire set = run }',
+].join('\n');
+
+const F4A_NULL = F4A_PING + '\n' + `
+inline [interp] .f4aNull {
+    F4aPing(dummy/u8) {
+        push tagOut: tagsIn;
+        push res: vectorLen(tagsIn);
+        return vectorLen(tagsIn);
+    }
+}
+comp [interp] .f4aNullVarComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aNull { }
+    pin tagIn[]~/ascii as tagsIn
+    pout tagOut[]~/ascii as tagsOut
+    pout res/u16 as resOut
+    :
+`;
+
+const F4A_NULL_RUN = F4A_NULL + '\n' + [
+  '8wire<F4aPing> ast = 00000000',
+  F4A_NULL_BITS.length + 'wire tagsWire = ' + F4A_NULL_BITS,
+  F4A_NULL_BITS.length + 'wire tagsOutWire = ' + '0'.repeat(F4A_NULL_BITS.length),
+  '16wire result = 0000000000000000',
+  '1wire run = 1',
+  '.f4aNullVarComp:{ ast = ast tagsIn = tagsWire tagsOut >= tagsOutWire resOut >= result set = run }',
+].join('\n');
+
+module.exports.cases.push(
+  {
+    name: 'comp pin [5]/u16 sum legacy',
+    src: F4A_U16_RUN,
+    wires: { result: '0000000000001111' },
+  },
+  {
+    name: 'comp pin [5]/u16 sum wave',
+    propagation: 'wave',
+    src: F4A_U16_RUN,
+    wires: { result: '0000000000001111' },
+  },
+  {
+    name: 'comp [2]10/ascii round-trip legacy',
+    src: F4A_STR_RUN,
+    wires: { outWire: F4A_STR_BITS },
+  },
+  {
+    name: 'comp [2]10/ascii round-trip wave',
+    propagation: 'wave',
+    src: F4A_STR_RUN,
+    wires: { outWire: F4A_STR_BITS },
+  },
+  {
+    name: 'comp []~/ascii null delim legacy',
+    src: F4A_NULL_RUN,
+    wires: { result: '0000000000000011', tagsOutWire: F4A_NULL_BITS },
+  },
+  {
+    name: 'comp []~/ascii null delim wave',
+    propagation: 'wave',
+    src: F4A_NULL_RUN,
+    wires: { result: '0000000000000011', tagsOutWire: F4A_NULL_BITS },
+  },
+  {
+    name: 'comp pin width mismatch elaboration',
+    src: F4A_PING + '\n' + `
+inline [interp] .f4aBad { F4aPing(dummy/u8) { return 0; } }
+comp [interp] .f4aBadComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aBad { }
+    pin data[4]3/ascii as dataIn
+    :
+` + '\n' + [
+      '24wire[2] bad = ' + '0'.repeat(48),
+      '8wire<F4aPing> ast = 00000000',
+      '1wire run = 1',
+      '.f4aBadComp:{ ast = ast dataIn = bad set = run }',
+    ].join('\n'),
+    expectError: 'width mismatch',
+  },
+);

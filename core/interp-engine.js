@@ -881,6 +881,9 @@ function decodeInterpCompPinBits(bits, decl, execAlias) {
         const fixed = param.vectorFixedCount > 0 ? param.vectorFixedCount : 0;
         return interpCopyVector(interpParseNullDelimAscii(str, fixed));
       }
+      if (param.vectorFixedCount > 0) {
+        return interpCopyVector(interpDecodeFixedCountVector(raw, param));
+      }
       const elemW = interpTypeElemWidth(param);
       if (!elemW || raw.length % elemW !== 0) {
         throw new Error('wire width mismatch');
@@ -975,16 +978,23 @@ function encodeInterpCompPoutValue(value, decl, wireBits, execAlias) {
     }
     if (param.asciiNullDelim) {
       let str = '';
-      for (const el of value) {
-        const s = el == null ? '' : String(el);
-        for (let i = 0; i < s.length; i++) {
-          if (s.charCodeAt(i) > 127) {
+      for (let i = 0; i < value.length; i++) {
+        const s = value[i] == null ? '' : String(value[i]);
+        for (let j = 0; j < s.length; j++) {
+          if (s.charCodeAt(j) > 127) {
             throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
           }
         }
-        str += s + '\0';
+        if (i > 0) str += '\0';
+        str += s;
+      }
+      if (param.vectorFixedCount > 0 && value.length !== param.vectorFixedCount) {
+        throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
       }
       return interpEncodeScalarValue(str, 'ascii', targetBits, alias);
+    }
+    if (param.vectorFixedCount > 0 && value.length !== param.vectorFixedCount) {
+      throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
     }
     const elemW = interpTypeElemWidth(param);
     let bits = '';
@@ -1129,7 +1139,16 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
 
 function interpExecuteMethod(method, argValues, program, sharedEnv, options) {
   const frameEnv = Object.create(null);
-  frameEnv.env = sharedEnv;
+  const envTable = (sharedEnv && sharedEnv.env && typeof sharedEnv.env === 'object')
+    ? sharedEnv.env
+    : sharedEnv;
+  frameEnv.env = envTable;
+  if (sharedEnv && typeof sharedEnv === 'object') {
+    for (const key of Object.keys(sharedEnv)) {
+      if (key === 'env') continue;
+      frameEnv[key] = sharedEnv[key];
+    }
+  }
   for (let i = 0; i < method.params.length; i++) {
     const param = method.params[i];
     let val = argValues[i];

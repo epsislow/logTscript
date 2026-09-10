@@ -41,14 +41,15 @@ function parseInterpCompPinPoutDecl(kind, tokens, ctxLabel) {
   if (match('SYM', '[')) {
     eat('SYM', '[');
     if (match('NUM')) {
-      vectorFixedCount = eat('NUM').value;
+      vectorFixedCount = parseInt(eat('NUM').value, 10);
     }
     eat('SYM', ']');
     vector = true;
     if (match('NUM')) {
-      asciiCharsPerElem = eat('NUM').value;
-    } else if (match('SYM', '~')) {
-      eat('SYM', '~');
+      asciiCharsPerElem = parseInt(eat('NUM').value, 10);
+    } else if (match('SYM', '~') || match('ID', '~')) {
+      if (match('SYM', '~')) eat('SYM', '~');
+      else eat('ID');
       asciiNullDelim = true;
     }
   }
@@ -131,11 +132,87 @@ function interpCompPinPoutBitWidth(decl) {
   return null;
 }
 
+function interpCompElemBitWidth(decl) {
+  if (!decl) return null;
+  const tn = decl.typeName;
+  if (tn === 'ascii') {
+    const chars = decl.asciiCharsPerElem > 0 ? decl.asciiCharsPerElem : 1;
+    return chars * 8;
+  }
+  return interpCompPinPoutBitWidth(decl);
+}
+
+function interpCompExpectedBitWidth(decl) {
+  if (!decl) return null;
+  if (!decl.vector) return interpCompPinPoutBitWidth(decl);
+  if (decl.asciiNullDelim) return null;
+  const n = decl.vectorFixedCount || 0;
+  if (n <= 0) return null;
+  const elemW = interpCompElemBitWidth(decl);
+  return elemW != null ? n * elemW : null;
+}
+
+function interpCompExtractWireName(expr) {
+  if (!expr || !expr.length) return null;
+  if (expr.length === 1 && expr[0].var && !expr[0].vectorIndex && !expr[0].vectorIndexExpr
+      && !expr[0].bitRange && !expr[0].tensorSlice) {
+    return expr[0].var;
+  }
+  return null;
+}
+
+function interpCompWireBitTotal(ctx, wire) {
+  if (!wire || !ctx) return null;
+  const v = ctx.getWireVectorMeta ? ctx.getWireVectorMeta(wire) : (wire.vector || null);
+  if (v && v.elementWidth && v.elementCount) {
+    return v.elementWidth * v.elementCount;
+  }
+  return ctx.getBitWidth ? ctx.getBitWidth(wire.type) : null;
+}
+
+function validateInterpCompPinPoutWire(decl, wireName, ctx, compName, role) {
+  if (!decl || !wireName || !ctx) return;
+  const wire = ctx.wires.get(wireName);
+  if (!wire) return;
+
+  const wireVector = ctx.getWireVectorMeta ? ctx.getWireVectorMeta(wire) : (wire.vector || null);
+  const wireIsVector = !!(wireVector && wireVector.elementCount > 0);
+  const pinIsVector = !!decl.vector;
+  const label = role || 'pin/pout';
+
+  if (decl.asciiNullDelim) {
+    if (wireIsVector) {
+      throw new Error(`comp ${compName}: ${label} '${decl.execAlias}' requires scalar blob wire (got vector '${wireName}')`);
+    }
+    return;
+  }
+
+  if (pinIsVector && !wireIsVector) {
+    throw new Error(`comp ${compName}: ${label} '${decl.execAlias}' requires vector wire (got scalar '${wireName}')`);
+  }
+  if (!pinIsVector && wireIsVector) {
+    throw new Error(`comp ${compName}: ${label} '${decl.execAlias}' requires scalar wire (got vector '${wireName}')`);
+  }
+
+  const expected = interpCompExpectedBitWidth(decl);
+  if (expected == null) return;
+
+  const actual = interpCompWireBitTotal(ctx, wire);
+  if (actual != null && actual !== expected) {
+    throw new Error(
+      `comp ${compName}: ${label} '${decl.execAlias}' wire '${wireName}' width mismatch (expected ${expected} bits, got ${actual})`,
+    );
+  }
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.parseInterpCompPinPoutDecl = parseInterpCompPinPoutDecl;
   globalThis.parseInterpCompPinPoutLine = parseInterpCompPinPoutLine;
   globalThis.parseInterpCompHeaderPinPouts = parseInterpCompHeaderPinPouts;
   globalThis.interpCompPinPoutBitWidth = interpCompPinPoutBitWidth;
+  globalThis.interpCompExpectedBitWidth = interpCompExpectedBitWidth;
+  globalThis.interpCompExtractWireName = interpCompExtractWireName;
+  globalThis.validateInterpCompPinPoutWire = validateInterpCompPinPoutWire;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -144,5 +221,7 @@ if (typeof module !== 'undefined' && module.exports) {
     parseInterpCompPinPoutLine,
     parseInterpCompHeaderPinPouts,
     interpCompPinPoutBitWidth,
+    interpCompExpectedBitWidth,
+    validateInterpCompPinPoutWire,
   };
 }

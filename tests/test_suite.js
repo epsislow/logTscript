@@ -55702,6 +55702,226 @@ comp [interp] .calcRmComp:
     h.assertThrows('missing link', function() { session.run(bad); }, 'calcInterp');
   });
 
+  const F4A_PING = [
+    '<F4aPing>+:',
+    '    dummy: 8',
+    ':',
+  ].join('\n');
+
+  const F4A_U16_INTERP = `
+inline [interp] .f4aVec {
+    F4aPing(dummy/u8) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(valsIn)) {
+            total = total + valsIn[i];
+            i = i + 1;
+        }
+        push res: total;
+        return total;
+    }
+}`;
+
+  const F4A_U16_COMP = `
+comp [interp] .f4aU16Comp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aVec { }
+    pin vals[5]/u16 as valsIn
+    pout res/u16 as resOut
+    :
+`;
+
+  const F4A_STR_INTERP = `
+inline [interp] .f4aStr {
+    F4aPing(dummy/u8) {
+        push strOut: dataIn;
+        return vectorLen(dataIn);
+    }
+}`;
+
+  const F4A_STR_COMP = `
+comp [interp] .f4aStrComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aStr { }
+    pin strIn[2]10/ascii as dataIn
+    pout strOut[2]10/ascii as dataOut
+    :
+`;
+
+  const F4A_NULL_INTERP = `
+inline [interp] .f4aNull {
+    F4aPing(dummy/u8) {
+        push tagOut: tagsIn;
+        push res: vectorLen(tagsIn);
+        return vectorLen(tagsIn);
+    }
+}`;
+
+  const F4A_NULL_VAR_COMP = `
+comp [interp] .f4aNullVarComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aNull { }
+    pin tagIn[]~/ascii as tagsIn
+    pout tagOut[]~/ascii as tagsOut
+    pout res/u16 as resOut
+    :
+`;
+
+  const F4A_NULL_FIX_INTERP = `
+inline [interp] .f4aNullFix {
+    F4aPing(dummy/u8) {
+        push res: vectorLen(tagsIn);
+        return vectorLen(tagsIn);
+    }
+}`;
+
+  const F4A_NULL_FIX_COMP = `
+comp [interp] .f4aNullFixComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aNullFix { }
+    pin tagIn[3]~/ascii as tagsIn
+    pout res/u16 as resOut
+    :
+`;
+
+  const F4A_CORE_U16 = F4A_PING + '\n' + F4A_U16_INTERP + '\n' + F4A_U16_COMP;
+  const F4A_CORE_STR = F4A_PING + '\n' + F4A_STR_INTERP + '\n' + F4A_STR_COMP;
+  const F4A_CORE_NULL_VAR = F4A_PING + '\n' + F4A_NULL_INTERP + '\n' + F4A_NULL_VAR_COMP;
+  const F4A_CORE_NULL_FIX = F4A_PING + '\n' + F4A_NULL_FIX_INTERP + '\n' + F4A_NULL_FIX_COMP;
+
+  reg(5200, 'interp', 'parse comp pin [5]/u16 syntax', function(h) {
+    const decl = parseInterpCompPinPoutLine('pin', 'vals[5]/u16 as valsIn');
+    h.assert('vector', decl.vector, true);
+    h.assert('N=5', decl.vectorFixedCount, 5);
+    h.assert('u16', decl.typeName, 'u16');
+    h.assert('alias', decl.execAlias, 'valsIn');
+  });
+
+  reg(5201, 'interp', 'parse comp pin [2]10/ascii syntax', function(h) {
+    const decl = parseInterpCompPinPoutLine('pin', 'data[2]10/ascii as dataIn');
+    h.assert('N=2', decl.vectorFixedCount, 2);
+    h.assert('M=10', decl.asciiCharsPerElem, 10);
+  });
+
+  reg(5202, 'interp', 'parse comp pout []~/ascii syntax', function(h) {
+    const decl = parseInterpCompPinPoutLine('pout', 'tags[]~/ascii as tagsOut');
+    h.assert('null delim', decl.asciiNullDelim, true);
+    h.assert('no N', decl.vectorFixedCount, 0);
+  });
+
+  reg(5203, 'interp', 'parse comp pin [3]~/ascii syntax', function(h) {
+    const decl = parseInterpCompPinPoutLine('pin', 'tags[3]~/ascii as tagsIn');
+    h.assert('N=3', decl.vectorFixedCount, 3);
+    h.assert('null delim', decl.asciiNullDelim, true);
+  });
+
+  function runF4aU16PinLegacy(h, session) {
+    session.run(F4A_CORE_U16 + '\n' + [
+      '8wire<F4aPing> ast = 00000000',
+      '16wire[5] valsWire = 0000000000000001 + 0000000000000010 + 0000000000000011 + 0000000000000100 + 0000000000000101',
+      '16wire result = 0000000000000000',
+      '1wire run = 1',
+      '.f4aU16Comp:{ ast = ast valsIn = valsWire resOut >= result set = run }',
+    ].join('\n'));
+    h.assert('sum 1+2+3+4+5=15', session.getWire(session.interp, 'result'), '0000000000001111');
+  }
+
+  reg(5204, 'interp', 'comp pin [5]/u16 sum legacy', runF4aU16PinLegacy);
+  reg(5205, 'interp', 'comp pin [5]/u16 sum wave', runF4aU16PinLegacy, { propagation: 'wave' });
+
+  function runF4aStrPinLegacy(h, session) {
+    const bits = f3iAsciiBits('0123456789abcdefghij');
+    h.assert('160 bits', bits.length, 160);
+    session.run(F4A_CORE_STR + '\n' + [
+      '8wire<F4aPing> ast = 00000000',
+      '80wire[2] dataWire = ' + bits.match(/.{1,80}/g).join(' + '),
+      '80wire[2] outWire = ' + '0'.repeat(160),
+      '1wire run = 1',
+      '.f4aStrComp:{ ast = ast dataIn = dataWire dataOut >= outWire set = run }',
+    ].join('\n'));
+    h.assert('two strings round-trip', session.getWire(session.interp, 'outWire'), bits);
+  }
+
+  reg(5206, 'interp', 'comp pin [2]10/ascii len legacy', runF4aStrPinLegacy);
+  reg(5207, 'interp', 'comp pin [2]10/ascii len wave', runF4aStrPinLegacy, { propagation: 'wave' });
+
+  function runF4aStrPoutLegacy(h, session) {
+    const bits = f3iAsciiBits('0123456789abcdefghij');
+    session.run(F4A_CORE_STR + '\n' + [
+      '8wire<F4aPing> ast = 00000000',
+      '80wire[2] dataWire = ' + bits.match(/.{1,80}/g).join(' + '),
+      '80wire[2] outWire = ' + '0'.repeat(160),
+      '1wire run = 1',
+      '.f4aStrComp:{ ast = ast dataIn = dataWire dataOut >= outWire set = run }',
+    ].join('\n'));
+    h.assert('pout round-trip', session.getWire(session.interp, 'outWire'), bits);
+  }
+
+  reg(5208, 'interp', 'comp pout [2]10/ascii round-trip legacy', runF4aStrPoutLegacy);
+  reg(5209, 'interp', 'comp pout [2]10/ascii round-trip wave', runF4aStrPoutLegacy, { propagation: 'wave' });
+
+  function runF4aNullVarLegacy(h, session) {
+    session.run(F4A_CORE_NULL_VAR + '\n' + [
+      '8wire<F4aPing> ast = 00000000',
+      F3I_ASCII_CEVA.length + 'wire tagsWire = ' + F3I_ASCII_CEVA,
+      '16wire result = 0000000000000000',
+      F3I_ASCII_CEVA.length + 'wire tagsOutWire = ' + '0'.repeat(F3I_ASCII_CEVA.length),
+      '1wire run = 1',
+      '.f4aNullVarComp:{ ast = ast tagsIn = tagsWire tagsOut >= tagsOutWire resOut >= result set = run }',
+    ].join('\n'));
+    h.assert('three elements', session.getWire(session.interp, 'result'), '0000000000000011');
+    h.assert('null pout round-trip', session.getWire(session.interp, 'tagsOutWire'), F3I_ASCII_CEVA);
+  }
+
+  reg(5210, 'interp', 'comp pin []~/ascii null-delimited legacy', runF4aNullVarLegacy);
+  reg(5211, 'interp', 'comp pin []~/ascii null-delimited wave', runF4aNullVarLegacy, { propagation: 'wave' });
+
+  function runF4aNullFixLegacy(h, session) {
+    session.run(F4A_CORE_NULL_FIX + '\n' + [
+      '8wire<F4aPing> ast = 00000000',
+      F3I_ASCII_CEVA.length + 'wire tagsWire = ' + F3I_ASCII_CEVA,
+      '16wire result = 0000000000000000',
+      '1wire run = 1',
+      '.f4aNullFixComp:{ ast = ast tagsIn = tagsWire resOut >= result set = run }',
+    ].join('\n'));
+    h.assert('three fixed elements', session.getWire(session.interp, 'result'), '0000000000000011');
+  }
+
+  reg(5212, 'interp', 'comp pin [3]~/ascii fixed count legacy', runF4aNullFixLegacy);
+  reg(5213, 'interp', 'comp pin [3]~/ascii fixed count wave', runF4aNullFixLegacy, { propagation: 'wave' });
+
+  reg(5214, 'interp', 'comp pin width mismatch elaboration error', function(h, session) {
+    const bad = F4A_PING + '\n' + `
+inline [interp] .f4aBad { F4aPing(dummy/u8) { return 0; } }
+comp [interp] .f4aBadComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aBad { }
+    pin data[4]3/ascii as dataIn
+    :
+` + '\n' + [
+      '24wire[2] bad = ' + '0'.repeat(48),
+      '8wire<F4aPing> ast = 00000000',
+      '1wire run = 1',
+      '.f4aBadComp:{ ast = ast dataIn = bad set = run }',
+    ].join('\n');
+    h.assertThrows('width mismatch', function() { session.run(bad); }, 'width mismatch');
+  });
+
+  reg(5215, 'interp', 'comp pin vector scalar mismatch elaboration', function(h, session) {
+    const bad = F4A_CORE_U16 + '\n' + [
+      '16wire scalar = 0000000000000000',
+      '8wire<F4aPing> ast = 00000000',
+      '1wire run = 1',
+      '.f4aU16Comp:{ ast = ast valsIn = scalar resOut >= scalar set = run }',
+    ].join('\n');
+    h.assertThrows('vector required', function() { session.run(bad); }, 'requires vector wire');
+  });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

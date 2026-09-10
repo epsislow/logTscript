@@ -230,8 +230,30 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
     return true;
   }
 
+  static validatePropertyBlockWiring(comp, compName, properties, ctx) {
+    if (!comp || comp.type !== 'interp') return;
+    const validateFn = typeof validateInterpCompPinPoutWire === 'function'
+      ? validateInterpCompPinPoutWire : null;
+    const extractFn = typeof interpCompExtractWireName === 'function'
+      ? interpCompExtractWireName : null;
+    if (!validateFn || !extractFn) return;
+
+    for (const p of properties || []) {
+      if (p.property === 'pout>' && p.poutName && p.target && p.target.var) {
+        const decl = comp.poutByAlias && comp.poutByAlias[p.poutName];
+        if (decl) validateFn(decl, p.target.var, ctx, compName, 'pout');
+        continue;
+      }
+      const pinDecl = comp.pinByAlias && comp.pinByAlias[p.property];
+      if (!pinDecl || !p.expr) continue;
+      const wireName = extractFn(p.expr);
+      if (wireName) validateFn(pinDecl, wireName, ctx, compName, 'pin');
+    }
+  }
+
   static preparePropertyBlock(comp, properties, ctx, compName) {
     if (!comp || comp.type !== 'interp') return;
+    InterpComponent.validatePropertyBlockWiring(comp, compName, properties, ctx);
     for (const p of properties || []) {
       if (p.property !== 'ast' || !p.expr) continue;
       const schemaName = InterpComponent._resolveAstSchemaStatic(comp, p, ctx);
@@ -363,8 +385,15 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
       );
       if (redirect && redirect.target && redirect.target.var) {
         const tw = ctx.wires.get(redirect.target.var);
-        if (tw && tw.ref) {
-          wireBits = ctx.getValueFromRef(tw.ref);
+        if (tw) {
+          const w = ctx.getBitWidth(tw.type);
+          if (tw.ref) wireBits = ctx.getValueFromRef(tw.ref);
+          if (w) {
+            let bits = wireBits == null ? '' : String(wireBits);
+            if (bits.length < w) bits = bits.padStart(w, '0');
+            else if (bits.length > w) bits = bits.slice(-w);
+            wireBits = bits;
+          }
         }
       }
       poutChannelDefs[ch] = Object.assign({}, def, { wireBits });

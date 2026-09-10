@@ -190,7 +190,17 @@ show(result)
 
 Pin/pout channel names (`limit`, `res`) are used in **`push res:`** / **`remove res`**. Exec-block aliases (`limitIn`, `resOut`) wire to script nets.
 
-Vector pin/pout forms mirror `inline [interp]` (`[]/type`, `[N]/type`, `[N]M/ascii`, `[]~/ascii`).
+Vector pin/pout forms mirror `inline [interp]` (`[]/type`, `[N]/type`, `[N]M/ascii`, `[]~/ascii`). Decode on **pin** and encode on **`push`** use the same rules as [inline-interp.md](inline-interp.md) vector parameters.
+
+| Notation | Meaning |
+|----------|---------|
+| **`pin ch[]/type as alias`** | Variable-length vector (wire must be a vector net, e.g. `16wire[5]`) |
+| **`pin ch[N]/type as alias`** | Fixed **N** elements — wire width must be **N × elemWidth** when known at elaboration |
+| **`pin ch[N]M/ascii as alias`** | **N** fixed strings of **M** characters each — `\0` bytes inside a slot are **literal** (not delimiters) |
+| **`pin ch[]~/ascii as alias`** | Null-delimited ASCII blob on a **scalar** wire (`str0\0str1\0…`) |
+| **`pin ch[N]~/ascii as alias`** | Null-delimited blob; decode returns the first **N** strings |
+
+**Elaboration:** when a pin/pout is wired to a net whose width is known, fixed-count forms must match exactly (e.g. `pin data[4]3/ascii` → **96** bits on a `24wire[4]` net). Scalar/vector shape must match except **`~/ascii`**, which uses a scalar blob wire. Mismatch → elaboration error before run.
 
 ---
 
@@ -443,6 +453,156 @@ Error: .calcInterp:eval cannot run inline with push/remove (use comp [interp])
 ```
 
 Use **`comp [interp]`** for buffered side outputs.
+
+---
+
+## Vector pin / pout
+
+Extended pin/pout notation matches `inline [interp]` vector parameters. **Load** or **Load & Run** on the examples below.
+
+### Fixed `[N]/u16` pin — sum five values
+
+```logts-play
+<F4aPing>+:
+    dummy: 8
+:
+
+inline [interp] .f4aVec {
+    F4aPing(dummy/u8) {
+        total = 0;
+        i = 0;
+        while (i < vectorLen(valsIn)) {
+            total = total + valsIn[i];
+            i = i + 1;
+        }
+        push res: total;
+        return total;
+    }
+}
+
+comp [interp] .f4aU16Comp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aVec { }
+    pin vals[5]/u16 as valsIn
+    pout res/u16 as resOut
+    :
+
+8wire<F4aPing> ast = 00000000
+16wire[5] valsWire = 0000000000000001 + 0000000000000010 + 0000000000000011 + 0000000000000100 + 0000000000000101
+16wire result = 0000000000000000
+1wire run = 1
+
+.f4aU16Comp:{
+    ast = ast
+    valsIn = valsWire
+    resOut >= result
+    set = run
+}
+
+show(result)
+```
+
+Expected: **`result`** = `0000000000001111` (1+2+3+4+5 = 15). Pin **`vals[5]/u16`** requires a **vector** wire (`16wire[5]`); wire width must be **80** bits at elaboration.
+
+### `[2]10/ascii` pin → pout round-trip
+
+Each element is **exactly 10 characters** (NUL bytes inside a slot are literal, not delimiters).
+
+```logts-play
+<F4aPing>+:
+    dummy: 8
+:
+
+inline [interp] .f4aStr {
+    F4aPing(dummy/u8) {
+        push strOut: dataIn;
+        return vectorLen(dataIn);
+    }
+}
+
+comp [interp] .f4aStrComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aStr { }
+    pin strIn[2]10/ascii as dataIn
+    pout strOut[2]10/ascii as dataOut
+    :
+
+8wire<F4aPing> ast = 00000000
+80wire[2] dataWire = 00110000001100010011001000110011001101000011010100110110001101110011100000111001 + 01100001011000100110001101100100011001010110011001100111011010000110100101101010
+80wire[2] outWire = 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+1wire run = 1
+
+.f4aStrComp:{
+    ast = ast
+    dataIn = dataWire
+    dataOut >= outWire
+    set = run
+}
+
+show(outWire)
+```
+
+Expected: **`outWire`** matches **`dataWire`** (160 bits total on two 80-bit elements).
+
+### Null-delimited `[]~/ascii`
+
+Uses a **scalar** blob wire (`str0\0str1\0…`). A single trailing `\0` after the last string does not add an extra empty element.
+
+```logts-play
+<F4aPing>+:
+    dummy: 8
+:
+
+inline [interp] .f4aNull {
+    F4aPing(dummy/u8) {
+        push tagOut: tagsIn;
+        push res: vectorLen(tagsIn);
+        return vectorLen(tagsIn);
+    }
+}
+
+comp [interp] .f4aNullVarComp:
+    on: 1
+    astSchema = .F4aPing
+    .f4aNull { }
+    pin tagIn[]~/ascii as tagsIn
+    pout tagOut[]~/ascii as tagsOut
+    pout res/u16 as resOut
+    :
+
+8wire<F4aPing> ast = 00000000
+104wire tagsWire = 01100011011001010111011001100001000000000000000001100001011011000111010001100011011001010111011001100001
+104wire tagsOutWire = 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+16wire result = 0000000000000000
+1wire run = 1
+
+.f4aNullVarComp:{
+    ast = ast
+    tagsIn = tagsWire
+    tagsOut >= tagsOutWire
+    resOut >= result
+    set = run
+}
+
+show(result)
+show(tagsOutWire)
+```
+
+Expected: **`result`** = `0000000000000011` (three strings: `ceva`, empty, `altceva`); **`tagsOutWire`** equals **`tagsWire`**.
+
+### Elaboration width check
+
+```logts
+comp [interp] .f4aBadComp:
+    pin data[4]3/ascii as dataIn
+    ...
+24wire[2] bad = ...
+.f4aBadComp:{ dataIn = bad ... }
+```
+
+Elaboration error — pin needs **96** bits (`4 × 3 × 8`), wire has **48**.
 
 ---
 

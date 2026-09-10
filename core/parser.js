@@ -2754,7 +2754,8 @@ parseBoardInstance() {
     const toks = [];
     while (this.c.type !== 'EOF' && this.c.value !== '\n' && this.c.value !== ':') {
       let type = 'SYM';
-      if (this.c.type === 'ID' || this.c.type === 'SPECIAL') type = 'ID';
+      if (this.c.value === '~') type = 'SYM';
+      else if (this.c.type === 'ID' || this.c.type === 'SPECIAL') type = 'ID';
       else if (this.c.type === 'DEC' || this.c.type === 'BIN') type = 'NUM';
       toks.push({ type, value: String(this.c.value), line: this.c.line });
       this.eat(this.c.type);

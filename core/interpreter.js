@@ -11657,6 +11657,10 @@ if (this.isBuiltinDEMUX(name)) {
           LogicComponent.validateQuerySelection(compForBlock, component, properties, this);
           LogicComponent.validateQueryRedirects(compForBlock, component, properties, this);
         }
+        if (compForBlock && compForBlock.type === 'interp' && typeof InterpComponent !== 'undefined'
+            && typeof InterpComponent.validatePropertyBlockWiring === 'function') {
+          InterpComponent.validatePropertyBlockWiring(compForBlock, component, properties, this);
+        }
         const setExprComponentRefs = (typeof collectSetExprComponentRefs === 'function')
           ? collectSetExprComponentRefs(setExpr, this)
           : new Set();
