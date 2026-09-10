@@ -366,14 +366,15 @@ class InterpParser {
       return { kind: 'continue', line: lineTok.line };
     }
     if (t.type === 'KW' && t.value === 'return') {
-      const lineTok = this.eat('KW', 'return');
-      const expr = this.parseExpr();
-      return { kind: 'return', expr, line: lineTok.line };
+      return this.parseReturnStmt();
     }
     if (t.type === 'ID') {
       const next = this.tokens[this.pos + 1];
       if (next && next.type === 'SYM' && next.value === '(') {
         return { kind: 'call', ...this.parseCall() };
+      }
+      if (next && next.type === 'SYM' && next.value === ',') {
+        return this.parseDestructuringAssign();
       }
       if (next && next.type === 'SYM' && next.value === '[') {
         return this.parseVectorAssign();
@@ -458,6 +459,32 @@ class InterpParser {
       return { kind: 'binop', op, left, right };
     }
     return { kind: 'truthy', expr: left };
+  }
+
+  parseReturnStmt() {
+    const lineTok = this.eat('KW', 'return');
+    const exprs = [this.parseExpr()];
+    while (this.match('SYM', ',')) {
+      if (exprs.length >= 10) {
+        interpError('return may have at most 10 values', this.peek().line);
+      }
+      exprs.push(this.parseExpr());
+    }
+    return { kind: 'return', exprs, line: lineTok.line };
+  }
+
+  parseDestructuringAssign() {
+    const lineTok = this.eat('ID');
+    const names = [lineTok.value];
+    while (this.match('SYM', ',')) {
+      if (names.length >= 10) {
+        interpError('destructuring assignment may have at most 10 names', this.peek().line);
+      }
+      names.push(this.eat('ID').value);
+    }
+    this.eat('SYM', '=');
+    const expr = this.parseExpr();
+    return { kind: 'destructureAssign', names, expr, line: lineTok.line };
   }
 
   parseAssign() {
@@ -593,12 +620,176 @@ class InterpParser {
 
 }
 
+const INTERP_MAX_RETURN_VALUES = 10;
+
+function interpMethodIsAst(method) {
+  return (method.params || []).some((p) => p.typeName);
+}
+
+function collectReturnExprCounts(body, out) {
+  for (const stmt of body || []) {
+    if (stmt.kind === 'return') out.push(stmt.exprs.length);
+    else if (stmt.kind === 'if') {
+      collectReturnExprCounts(stmt.then, out);
+      if (stmt.else) collectReturnExprCounts(stmt.else, out);
+    } else if (stmt.kind === 'for' || stmt.kind === 'while') {
+      collectReturnExprCounts(stmt.body, out);
+    }
+  }
+}
+
+function canReachEndOfBlock(stmts) {
+  if (!stmts || !stmts.length) return true;
+  for (let i = 0; i < stmts.length; i++) {
+    const stmt = stmts[i];
+    const rest = stmts.slice(i + 1);
+    if (stmt.kind === 'return') return false;
+    if (stmt.kind === 'break' || stmt.kind === 'continue') {
+      return rest.length > 0 && canReachEndOfBlock(rest);
+    }
+    if (stmt.kind === 'if') {
+      if (stmt.else) {
+        const thenReach = canReachEndOfBlock(stmt.then);
+        const elseReach = canReachEndOfBlock(stmt.else);
+        if (rest.length > 0) {
+          if (!(thenReach || elseReach)) return false;
+          return canReachEndOfBlock(rest);
+        }
+        return thenReach && elseReach;
+      }
+      if (rest.length > 0) {
+        if (!canReachEndOfBlock(stmt.then)) {
+          return canReachEndOfBlock(rest);
+        }
+        return canReachEndOfBlock(stmt.then) || canReachEndOfBlock(rest);
+      }
+      return canReachEndOfBlock(stmt.then);
+    }
+    if (stmt.kind === 'for' || stmt.kind === 'while') {
+      if (rest.length > 0) return true;
+    }
+  }
+  return true;
+}
+
+function validateReturnArity(method) {
+  const counts = [];
+  collectReturnExprCounts(method.body, counts);
+  if (canReachEndOfBlock(method.body)) counts.push(1);
+  const unique = [...new Set(counts)];
+  if (unique.length > 1) {
+    interpError(
+      `method '${method.name}' return arity inconsistent (expected one count, got ${unique.join(', ')})`,
+      method.line,
+    );
+  }
+  const arity = unique.length ? unique[0] : 1;
+  if (arity > INTERP_MAX_RETURN_VALUES) {
+    interpError(`method '${method.name}' return may have at most ${INTERP_MAX_RETURN_VALUES} values`, method.line);
+  }
+  const isAst = interpMethodIsAst(method);
+  if (isAst && arity > 1) {
+    interpError(`AST method '${method.name}' cannot return multiple values`, method.line);
+  }
+  method.isAstMethod = isAst;
+  method.returnArity = arity;
+}
+
+function validateExprCallArity(expr, program, line, expectMulti) {
+  if (!expr || expr.kind !== 'call') return;
+  const m = program.methods[expr.name];
+  if (!m) return;
+  if (expectMulti) {
+    if (m.returnArity <= 1) {
+      interpError(`helper '${expr.name}' returns one value, use simple assignment`, line);
+    }
+    return;
+  }
+  if (m.returnArity > 1) {
+    interpError(`multi-return helper '${expr.name}' must be used with destructuring assignment`, line);
+  }
+}
+
+function validateExprTree(expr, program, line) {
+  if (!expr) return;
+  if (expr.kind === 'call') {
+    validateExprCallArity(expr, program, line, false);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+  } else if (expr.kind === 'binop') {
+    validateExprTree(expr.left, program, line);
+    validateExprTree(expr.right, program, line);
+  } else if (expr.kind === 'unary') {
+    validateExprTree(expr.expr, program, line);
+  } else if (expr.kind === 'truthy') {
+    validateExprTree(expr.expr, program, line);
+  } else if (expr.kind === 'index') {
+    validateExprTree(expr.object, program, line);
+    validateExprTree(expr.index, program, line);
+  } else if (expr.kind === 'array') {
+    for (const el of expr.elements || []) validateExprTree(el, program, line);
+  }
+}
+
+function validateStmtTree(stmts, program) {
+  for (const stmt of stmts || []) {
+    if (stmt.kind === 'destructureAssign') {
+      if (stmt.expr.kind !== 'call') {
+        interpError('destructuring assignment requires a helper call', stmt.line);
+      }
+      const m = program.methods[stmt.expr.name];
+      if (!m) {
+        interpError(`unknown method '${stmt.expr.name}'`, stmt.line);
+      }
+      if (stmt.names.length !== m.returnArity) {
+        interpError(
+          `destructuring expects ${m.returnArity} value(s) from '${stmt.expr.name}', got ${stmt.names.length}`,
+          stmt.line,
+        );
+      }
+      for (const a of stmt.expr.args || []) validateExprTree(a, program, stmt.line);
+    } else if (stmt.kind === 'assign') {
+      validateExprTree(stmt.expr, program, stmt.line);
+    } else if (stmt.kind === 'return') {
+      for (const ex of stmt.exprs) validateExprTree(ex, program, stmt.line);
+    } else if (stmt.kind === 'if') {
+      validateExprTree(stmt.cond, program, stmt.line);
+      validateStmtTree(stmt.then, program);
+      if (stmt.else) validateStmtTree(stmt.else, program);
+    } else if (stmt.kind === 'for') {
+      if (stmt.init && stmt.init.kind === 'assign') validateExprTree(stmt.init.expr, program, stmt.line);
+      if (stmt.cond) validateExprTree(stmt.cond, program, stmt.line);
+      if (stmt.step && stmt.step.kind === 'assign') validateExprTree(stmt.step.expr, program, stmt.line);
+      validateStmtTree(stmt.body, program);
+    } else if (stmt.kind === 'while') {
+      validateExprTree(stmt.cond, program, stmt.line);
+      validateStmtTree(stmt.body, program);
+    } else if (stmt.kind === 'indexAssign' || stmt.kind === 'append' || stmt.kind === 'concatAssign') {
+      validateExprTree(stmt.expr, program, stmt.line);
+      if (stmt.index) validateExprTree(stmt.index, program, stmt.line);
+    } else if (stmt.kind === 'call') {
+      for (const a of stmt.args || []) validateExprTree(a, program, stmt.line);
+    }
+  }
+}
+
+function validateInterpProgram(program) {
+  const methods = program.methods || {};
+  for (const name of Object.keys(methods)) {
+    validateReturnArity(methods[name]);
+  }
+  for (const name of Object.keys(methods)) {
+    validateStmtTree(methods[name].body, program);
+  }
+}
+
 function parseInterpBody(bodyRaw, ctxLabel) {
   const src = (bodyRaw || '').trim();
   if (!src) return { methods: {} };
   const tokens = interpTokenize(src);
   const parser = new InterpParser(tokens, ctxLabel);
-  return parser.parseProgram();
+  const program = parser.parseProgram();
+  validateInterpProgram(program);
+  return program;
 }
 
 function formatInterpTypeDoc() {

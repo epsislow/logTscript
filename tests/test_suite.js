@@ -55445,6 +55445,99 @@ inline [interp] .f3iInterp {
   reg(5128, 'interp', 'vector [5]/u16 wire eval legacy', runF3iWireEval);
   reg(5129, 'interp', 'vector [5]/u16 wire eval wave', runF3iWireEval, { propagation: 'wave' });
 
+  const INLINE_INTERP_F3G = `
+inline [interp] .calcInterp {
+    doSumDiff(a, b) {
+        if (a > b) {
+            return a + b, a - b;
+        }
+        return a + b, 0;
+    }
+    CallNumber(value/u8) {
+        return value;
+    }
+    CallAdd(left/s16, right/s16) {
+        sum, diff = doSumDiff(left, right);
+        return sum;
+    }
+    CallMul(left/s16, right/s16) {
+        return left * right;
+    }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) {
+        return env[name];
+    }
+}`;
+
+  const F3G_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + INLINE_INTERP_F3G;
+
+  function f3gPackAndEvalExpr(h, session, src) {
+    session.run(F3G_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, src, 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('pack ok', String(built.ok), '1');
+    session.run(F3G_CORE + '\n' + [
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("' + src + '", <expr>, "expression")',
+      '8wire result = .calcInterp:eval(ast, <expr>)',
+    ].join('\n'));
+    return session.getWire(session.interp, 'result');
+  }
+
+  reg(5130, 'interp', 'parse helper multi-return doSumDiff', function(h, session) {
+    session.run(F3G_CORE);
+    const m = session.interp.inlineInstances.get('.calcInterp').methods.doSumDiff;
+    h.assert('returnArity 2', m.returnArity, 2);
+    h.assert('not ast', m.isAstMethod, false);
+  });
+
+  reg(5131, 'interp', 'elaboration AST multi-return rejected', function(h, session) {
+    const bad = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\ninline [interp] .bad {\n  CallAdd(a/s16, b/s16) { return a, b; }\n}';
+    h.assertThrows('AST multi-return', function() {
+      session.run(bad);
+    }, 'multiple values');
+  });
+
+  reg(5132, 'interp', 'elaboration scalar assign multi-return rejected', function(h, session) {
+    const bad = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\ninline [interp] .bad {\n  pair(a, b) { return a, b; }\n  useIt(x) { y = pair(1, 2); return y; }\n}';
+    h.assertThrows('destructuring required', function() {
+      session.run(bad);
+    }, 'destructuring');
+  });
+
+  reg(5133, 'interp', 'elaboration destructure arity mismatch', function(h, session) {
+    const bad = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\ninline [interp] .bad {\n  pair(a, b) { return a, b; }\n  useIt() { a, b, c = pair(1, 2); return a; }\n}';
+    h.assertThrows('destructure count', function() {
+      session.run(bad);
+    }, 'destructuring expects');
+  });
+
+  function runF3gEvalAddGt(h, session) {
+    const v = f3gPackAndEvalExpr(h, session, '7+3');
+    h.assert('7+3 sum 10', v, '00001010');
+  }
+
+  reg(5134, 'interp', 'multi-return helper eval 7+3 legacy', runF3gEvalAddGt);
+  reg(5135, 'interp', 'multi-return helper eval 7+3 wave', runF3gEvalAddGt, { propagation: 'wave' });
+
+  function runF3gEvalAddLt(h, session) {
+    const v = f3gPackAndEvalExpr(h, session, '3+7');
+    h.assert('3+7 sum 10', v, '00001010');
+  }
+
+  reg(5136, 'interp', 'multi-return helper eval 3+7 legacy', runF3gEvalAddLt);
+  reg(5137, 'interp', 'multi-return helper eval 3+7 wave', runF3gEvalAddLt, { propagation: 'wave' });
+
+  function runF3gEvalMul(h, session) {
+    const v = f3gPackAndEvalExpr(h, session, '2*3');
+    h.assert('2*3=6', v, '00000110');
+  }
+
+  reg(5138, 'interp', 'multi-return helper eval 2*3 legacy', runF3gEvalMul);
+  reg(5139, 'interp', 'multi-return helper eval 2*3 wave', runF3gEvalMul, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

@@ -81,6 +81,23 @@ inline [interp] .calcInterp {
 }
 `;
 
+const INTERP_MULTI = `
+inline [interp] .calcMulti {
+    doSumDiff(a, b) {
+        if (a > b) {
+            return a + b, a - b;
+        }
+        return a + b, 0;
+    }
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        sum, diff = doSumDiff(left, right);
+        return sum;
+    }
+    CallMul(left/s16, right/s16) { return left * right; }
+}
+`;
+
 const CORE = SCHEMAS + PARSER + INTERP;
 
 const F3H_BYTE = [
@@ -148,6 +165,12 @@ function packExpr(interp, src) {
 
 function evalAst(interp, bits, schemaName) {
   const inst = interp.inlineInstances.get('.calcInterp');
+  if (!inst) return null;
+  return ie.evalInterpWire(bits, schemaName, interp.schemaRegistry, inst, {});
+}
+
+function evalMultiAst(interp, bits, schemaName) {
+  const inst = interp.inlineInstances.get('.calcMulti');
   if (!inst) return null;
   return ie.evalInterpWire(bits, schemaName, interp.schemaRegistry, inst, {});
 }
@@ -331,6 +354,32 @@ module.exports.cases.push(
       if (!inst) return false;
       const bits = f3iAsciiBits('ceva\0\0altceva\0\0bla');
       return ie.evalInterpWire(bits, 'F3iTextThree', interp.schemaRegistry, inst, { declaredWidth: 144 }) === 3;
+    },
+  },
+  {
+    name: 'multi-return helper doSumDiff arity',
+    src: SCHEMAS + PARSER + INTERP_MULTI,
+    check: (interp) => {
+      const inst = interp.inlineInstances.get('.calcMulti');
+      return inst && inst.methods.doSumDiff.returnArity === 2;
+    },
+  },
+  {
+    name: 'multi-return eval 7+3 via CallAdd',
+    src: SCHEMAS + PARSER + INTERP_MULTI,
+    check: (interp) => {
+      const packed = packExpr(interp, '7+3');
+      if (!packed || !packed.ok) return false;
+      return evalMultiAst(interp, packed.bits, 'expr') === 10;
+    },
+  },
+  {
+    name: 'multi-return eval 3+7 via CallAdd',
+    src: SCHEMAS + PARSER + INTERP_MULTI,
+    check: (interp) => {
+      const packed = packExpr(interp, '3+7');
+      if (!packed || !packed.ok) return false;
+      return evalMultiAst(interp, packed.bits, 'expr') === 10;
     },
   },
 );

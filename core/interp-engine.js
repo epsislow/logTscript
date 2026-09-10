@@ -831,11 +831,35 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
   }
 }
 
+function interpExecuteDestructuringAssign(stmt, env, locals, program, callMethodFn, sharedEnv, options) {
+  if (stmt.expr.kind !== 'call') {
+    interpError(`destructuring assignment requires a helper call${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+  }
+  const m = program.methods[stmt.expr.name];
+  if (!m) {
+    interpError(`unknown method '${stmt.expr.name}'${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+  }
+  const vals = (stmt.expr.args || []).map((a) => interpEvalExpr(a, env, callMethodFn, stmt.line));
+  const result = interpExecuteMethod(m, vals, program, sharedEnv, options);
+  const values = m.returnArity > 1 ? result : [result];
+  if (!Array.isArray(values) || values.length !== stmt.names.length) {
+    interpError(
+      `return arity mismatch: expected ${stmt.names.length}, got ${Array.isArray(values) ? values.length : 1}${stmt.line != null ? ` (line ${stmt.line})` : ''}`,
+    );
+  }
+  for (let i = 0; i < stmt.names.length; i++) {
+    env[stmt.names[i]] = values[i];
+    locals.add(stmt.names[i]);
+  }
+}
+
 function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, sharedEnv, options) {
   for (const stmt of stmts || []) {
     if (stmt.kind === 'assign') {
       env[stmt.name] = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
       locals.add(stmt.name);
+    } else if (stmt.kind === 'destructureAssign') {
+      interpExecuteDestructuringAssign(stmt, env, locals, program, callMethodFn, sharedEnv, options);
     } else if (stmt.kind === 'indexAssign') {
       const idx = interpEvalExpr(stmt.index, env, callMethodFn, stmt.line);
       const val = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
@@ -853,8 +877,8 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
         arr[i] = val;
       }
     } else if (stmt.kind === 'return') {
-      const val = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
-      throw { interpFlow: 'return', value: val };
+      const values = (stmt.exprs || []).map((ex) => interpEvalExpr(ex, env, callMethodFn, stmt.line));
+      throw { interpFlow: 'return', values };
     } else if (stmt.kind === 'call') {
       const vals = (stmt.args || []).map((a) => evalArg(a));
       const m = program.methods[stmt.name];
@@ -937,7 +961,14 @@ function interpExecuteMethod(method, argValues, program, sharedEnv, options) {
     interpExecuteStmts(method.body, frameEnv, locals, program, callMethodFn, evalArg, sharedEnv, options);
   } catch (err) {
     if (err && err.interpFlow === 'return') {
-      return err.value;
+      const values = err.values || (err.value != null ? [err.value] : [0]);
+      if (method.returnArity > 1) {
+        if (values.length !== method.returnArity) {
+          interpError(`return arity mismatch in '${method.name}'`);
+        }
+        return values;
+      }
+      return values[0];
     }
     throw err;
   }

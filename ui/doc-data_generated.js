@@ -22419,6 +22419,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Syntax** | \`CallAdd(left/s16, right/s16) { return left + right; }\` |
 | **\`/type\`** | Required on every parameter of methods invoked from AST (\`CallNumber\`, \`CallAdd\`, …) |
 | **Helpers** | Internal methods may omit \`/type\` — called only from other interp methods |
+| **Multi-return** | Helpers may \`return a, b, …\` (max **10**); use \`x, y = helper()\` — not on AST methods |
 | **Vectors** | \`param[]/type\`, \`[N]/type\`, \`[N]M/ascii\`, \`[]~/ascii\`, \`[N]~/ascii\` — see [Vector parameters](#vector-parameters) |
 | **Runtime API** | \`.myInterp:eval(astWire, <schema>)\` → numeric wire (width from assignment LHS) |
 | **Env** | \`env[name]\` inside method bodies for \`CallAssign\` / \`CallVariable\` programs |
@@ -22480,6 +22481,41 @@ inline [interp] .calcInterp {
 \`\`\`
 
 Helpers are **not** valid AST dispatch targets — if the parser emits \`-> addPair\`, the method must still expose \`/type\` on every parameter.
+
+### Multi-return helpers
+
+Internal helpers (parameters **without** \`/type\`) may return **multiple values** with comma-separated \`return\`:
+
+\`\`\`logts-play
+inline [interp] .calcInterp {
+    doSumDiff(a, b) {
+        if (a > b) {
+            return a + b, a - b;
+        }
+        return a + b, 0;
+    }
+    CallAdd(left/s16, right/s16) {
+        sum, diff = doSumDiff(left, right);
+        return sum;
+    }
+    CallNumber(value/u8) {
+        return value;
+    }
+}
+\`\`\`
+
+Rules:
+
+| Rule | Detail |
+|------|--------|
+| **AST methods** | **\`return expr\` only** — \`return a, b\` on a typed AST method is an **elaboration error** |
+| **Max values** | **10** per \`return\` |
+| **Fixed arity** | Every \`return\` in a helper must return the **same count**; implicit fall-through end = **\`return 0\`** (one value) |
+| **Destructuring** | **\`sum, diff = doSumDiff(left, right);\`** — name count must match helper return count |
+| **Scalar assign** | **\`x = pair(1, 2)\`** when \`pair\` returns two values → **elaboration error** |
+| **Expression use** | Multi-return helpers cannot appear inside larger expressions — only destructuring assignment |
+
+Use **Load** / **Load & Run** on the block above, then evaluate an AST (for example wire \`7+3\` through your parser + \`.calcInterp:eval\`) to confirm \`CallAdd\` returns **10** via \`doSumDiff\`.
 
 ### Supported \`/type\` annotations
 
