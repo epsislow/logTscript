@@ -98,7 +98,8 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
     for (const pin of pins) {
       const bitWFn = typeof interpCompPinPoutBitWidth === 'function' ? interpCompPinPoutBitWidth : null;
       const bitW = pin.vector ? 8 : (bitWFn ? bitWFn(pin) : 8);
-      const storageIdx = ctx.storeValue('0'.repeat(bitW));
+      const initBits = (pin.vector && !pin.vectorFixedCount) ? '' : '0'.repeat(bitW);
+      const storageIdx = ctx.storeValue(initBits);
       pinByAlias[pin.execAlias] = pin;
       pinStorage[pin.execAlias] = {
         ref: `&${storageIdx}`,
@@ -113,7 +114,8 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
     for (const pout of pouts) {
       const bitWFn = typeof interpCompPinPoutBitWidth === 'function' ? interpCompPinPoutBitWidth : null;
       const bitW = pout.vector ? 8 : (bitWFn ? bitWFn(pout) : 8);
-      const storageIdx = ctx.storeValue('0'.repeat(bitW));
+      const initBits = (pout.vector && !pout.vectorFixedCount) ? '' : '0'.repeat(bitW);
+      const storageIdx = ctx.storeValue(initBits);
       poutChannelDefs[pout.channel] = Object.assign({}, pout, { wireBits: null });
       poutByAlias[pout.execAlias] = pout;
       poutStorage[pout.execAlias] = {
@@ -320,7 +322,16 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
       if (pending && pending[alias]) {
         bits = this.reEvalPendingValue(pending, alias, reEvaluate, ctx);
       } else {
-        bits = ctx.getValueFromRef(pin.ref) || '0'.repeat(pin.bits);
+        const wired = ctx.getValueFromRef(pin.ref);
+        if (wired != null && wired !== '') {
+          bits = wired;
+        } else if (pin.decl.vector && pin.decl.asciiNullDelim && !pin.decl.vectorFixedCount) {
+          bits = '';
+        } else if (pin.decl.vector && !pin.decl.asciiNullDelim && !pin.decl.vectorFixedCount) {
+          bits = '';
+        } else {
+          bits = '0'.repeat(pin.bits);
+        }
       }
       env[alias] = decodeFn(bits, pin.decl, alias);
     }

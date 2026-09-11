@@ -164,13 +164,17 @@ const DOC_SECTIONS = [
       { file: 'builtin-MSLICE.md', label: 'MSLICE (matrix slice)', searchPrimary: 'MSLICE' },
       { file: 'builtin-NFORMAT.md', label: 'NFORMAT', searchPrimary: 'NFORMAT' },
       { file: 'builtin-NORM.md', label: 'NORM (L2² norm)', searchPrimary: 'NORM' },
+      { file: 'builtin-NUM2T.md', label: 'NUM2T (number → ASCII text)', searchPrimary: 'NUM2T' },
       { file: 'builtin-OUTER.md', label: 'OUTER (outer product)', searchPrimary: 'OUTER' },
       { file: 'builtin-SORT.md', label: 'SORT', searchPrimary: 'SORT' },
+      { file: 'builtin-T2NUM.md', label: 'T2NUM (ASCII text → number)', searchPrimary: 'T2NUM' },
+      { file: 'builtin-TISNUM.md', label: 'TISNUM (is ASCII text a valid T2NUM input?)', searchPrimary: 'TISNUM' },
       { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)', searchPrimary: 'TRACE' },
       { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)', searchPrimary: 'TRIL' },
       { file: 'builtin-TRIMT.md', label: 'TRIMT (ASCII text trim)', searchPrimary: 'TRIMT' },
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)', searchPrimary: 'TRIU' },
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
+      { file: 'calc-parser-interp-e2e.md', label: 'Calculator REPL — parser + interpreter E2E' },
       { file: 'chip-board-execution.md', label: 'Chip and board execution' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
       { file: 'logic-dcg.md', label: 'Logic DCG — definite clause grammars' },
@@ -184,7 +188,7 @@ const DOC_SECTIONS = [
       { file: 'servo.md', label: 'Servo component' },
       { file: 'signal-trace.md', label: 'Signal Trace (UI panel)' },
       { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' },
-      { file: 'text-functions.md', label: 'Text functions (ASCII)', searchPrimary: 'ASCII EQT TRIMT' }
+      { file: 'text-functions.md', label: 'Text functions (ASCII)', searchPrimary: 'ASCII EQT TRIMT NUM2T T2NUM' }
     ],
   }
 ];
@@ -357,12 +361,21 @@ const DOC_SEARCH_ONLY = [
     { file: 'builtin-NORM.md', label: 'NORM', section: 'Tensor / matrix',
       searchPrimary:
         'NORM' },
+    { file: 'builtin-NUM2T.md', label: 'NUM2T', section: 'Built-in',
+      searchPrimary:
+        'NUM2T' },
     { file: 'builtin-OUTER.md', label: 'OUTER', section: 'Tensor / matrix',
       searchPrimary:
         'OUTER' },
     { file: 'builtin-SORT.md', label: 'SORT', section: 'Tensor / matrix',
       searchPrimary:
         'SORT' },
+    { file: 'builtin-T2NUM.md', label: 'T2NUM', section: 'Built-in',
+      searchPrimary:
+        'T2NUM' },
+    { file: 'builtin-TISNUM.md', label: 'TISNUM', section: 'Built-in',
+      searchPrimary:
+        'TISNUM' },
     { file: 'builtin-TRACE.md', label: 'TRACE', section: 'Tensor / matrix',
       searchPrimary:
         'TRACE' },

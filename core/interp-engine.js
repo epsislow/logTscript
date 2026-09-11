@@ -198,7 +198,8 @@ function interpDecodeNumeric(bits, typeName) {
     return interpSignedBitsToInt(slice);
   }
   if (/^q\d+p\d+$/.test(tn) || tn === 'f32' || tn === 'f64' || tn === 'fp16' || tn === 'bf16') {
-    const nf = typeof decodeToFloat === 'function' ? decodeToFloat : null;
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    const nf = NF && typeof NF.decodeToFloat === 'function' ? NF.decodeToFloat : null;
     const nfmt = typeof decodeNformatValue === 'function' ? decodeNformatValue : null;
     if (tn === 'f32' || tn === 'f64' || tn === 'fp16' || tn === 'bf16') {
       if (!nf) interpError('numeric-formats.js is not loaded');
@@ -463,6 +464,9 @@ function interpDecodeAsciiElem(bits, charCount) {
     const code = parseInt(byte, 2);
     if (code > 127) interpError('non-ASCII byte in /ascii field');
     s += String.fromCharCode(code);
+  }
+  while (s.length > 0 && s.charCodeAt(s.length - 1) === 0) {
+    s = s.slice(0, -1);
   }
   return s;
 }
@@ -970,6 +974,7 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
           if (r === 0) interpError(`division by zero${line != null ? ` (line ${line})` : ''}`);
           return l / r;
         }
+        case '^': return Math.pow(l, r);
         default: interpError(`unknown operator '${expr.op}'`);
       }
     }
@@ -1104,11 +1109,12 @@ function interpEncodeScalarValue(value, typeName, targetBits, alias) {
   }
   if (typeName === 'f32' || typeName === 'f64' || typeName === 'fp16' || typeName === 'bf16' || /^q\d+p\d+$/.test(typeName)) {
     const encFn = typeof encodeNformatValue === 'function' ? encodeNformatValue : null;
-    const nf = typeof encodeFromFloat === 'function' ? encodeFromFloat : null;
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    const nf = NF && typeof NF.encodeFromFloat === 'function' ? NF.encodeFromFloat : null;
     const w = targetBits && targetBits > 0 ? targetBits : interpCompDeclBitWidth({ typeName });
     if (!w) fail(value);
     if ((typeName === 'f32' || typeName === 'f64' || typeName === 'fp16' || typeName === 'bf16') && nf) {
-      const bits = nf(Number(value), typeName, w);
+      const bits = nf(Number(value), typeName);
       if (!bits || bits.length !== w) fail(value);
       return bits;
     }
@@ -1214,10 +1220,14 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
           interpError(`not a vector${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
         }
         const i = Number(idx);
-        if (!Number.isFinite(i) || i < 0 || i >= arr.length) {
+        if (!Number.isFinite(i) || i < 0 || i > arr.length) {
           interpError(`vector index out of range${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
         }
-        arr[i] = val;
+        if (i === arr.length) {
+          arr.push(val);
+        } else {
+          arr[i] = val;
+        }
       }
     } else if (stmt.kind === 'return') {
       const values = (stmt.exprs || []).map((ex) => interpEvalExpr(ex, env, callMethodFn, stmt.line));

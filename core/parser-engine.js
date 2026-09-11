@@ -108,12 +108,19 @@ class ParserInput {
 }
 
 function detectLeftRecPattern(rule) {
-  if (!rule || !rule.alternatives || rule.alternatives.length !== 2) return null;
-  const rec = rule.alternatives[0];
-  const base = rule.alternatives[1];
-  if (!rec.items.length || rec.items[0].kind !== 'ref' || rec.items[0].name !== rule.name) return null;
+  if (!rule || !rule.alternatives || rule.alternatives.length < 2) return null;
+  const base = rule.alternatives[rule.alternatives.length - 1];
   if (base.items.length && base.items[0].kind === 'ref' && base.items[0].name === rule.name) return null;
-  return { tailItems: rec.items.slice(1), call: rec.call, baseAlt: base };
+  const recAlts = [];
+  for (let i = 0; i < rule.alternatives.length - 1; i++) {
+    const rec = rule.alternatives[i];
+    if (!rec.items.length || rec.items[0].kind !== 'ref' || rec.items[0].name !== rule.name) return null;
+    recAlts.push({ tailItems: rec.items.slice(1), call: rec.call });
+  }
+  if (recAlts.length === 1) {
+    return { tailItems: recAlts[0].tailItems, call: recAlts[0].call, baseAlt: base };
+  }
+  return { recAlts, baseAlt: base };
 }
 
 function stripQuant(item) {
@@ -294,22 +301,28 @@ function createParserEngine(grammar, src, options) {
     const base = parseAlternative(lr.baseAlt);
     if (base === null) return null;
     let acc = base;
+    const recAlts = lr.recAlts || [{ tailItems: lr.tailItems, call: lr.call }];
     while (true) {
       const cp = input.save();
-      const tail = parseSequenceItems(lr.tailItems);
-      if (tail === null) {
+      let matched = false;
+      for (const rec of recAlts) {
+        const tail = parseSequenceItems(rec.tailItems);
+        if (tail !== null) {
+          matched = true;
+          if (rec.call) {
+            acc = {
+              kind: 'call',
+              call: rec.call,
+              children: { left: acc, right: tail.lastValue },
+            };
+          } else {
+            acc = tail.lastValue;
+          }
+          break;
+        }
         input.restore(cp);
-        break;
       }
-      if (lr.call) {
-        acc = {
-          kind: 'call',
-          call: lr.call,
-          children: { left: acc, right: tail.lastValue },
-        };
-      } else {
-        acc = tail.lastValue;
-      }
+      if (!matched) break;
     }
     return acc;
   }

@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp.md, inline-logic.md, inline-parser.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp.md, inline-logic.md, inline-parser.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -6645,8 +6645,8 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`ABS\`, \`NFORMAT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · **\`; matrix\`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
 | **Tensor / matrix** | \`SHAPE\`, \`RANK\`, \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) · [builtin-FILL.md](builtin-FILL.md) (matrix + bit pattern) |
-| **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
-| **Text (ASCII)** | \`EQT\`, \`TRIMT\` | [text-functions.md](text-functions.md) · [builtin-EQT.md](builtin-EQT.md) · [builtin-TRIMT.md](builtin-TRIMT.md) |
+| **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\`, \`NUM2T\`, \`T2NUM\`, \`TISNUM\` | [number-conversion.md](number-conversion.md) · [builtin-NUM2T.md](builtin-NUM2T.md) · [builtin-T2NUM.md](builtin-T2NUM.md) · [builtin-TISNUM.md](builtin-TISNUM.md) |
+| **Text (ASCII)** | \`EQT\`, \`TRIMT\`, \`NUM2T\`, \`T2NUM\`, \`TISNUM\` | [text-functions.md](text-functions.md) · [builtin-EQT.md](builtin-EQT.md) · [builtin-TRIMT.md](builtin-TRIMT.md) · [builtin-NUM2T.md](builtin-NUM2T.md) · [builtin-T2NUM.md](builtin-T2NUM.md) · [builtin-TISNUM.md](builtin-TISNUM.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`PARITYEVEN\`, \`PARITYODD\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\`, \`WWIDTH\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) · UART parity: [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · **\`; matrix\`**: [matrix-reduction.md](matrix-reduction.md) |
@@ -8173,6 +8173,137 @@ show(d)
 
 [L2](builtin-L2.md) · [DOT](builtin-DOT.md)
 `,
+    'builtin-NUM2T.md': `# NUM2T (number → ASCII text)
+
+Index: [Number conversion](number-conversion.md) · [Text functions](text-functions.md) · [builtin-functions.md](builtin-functions.md)
+
+Encode a **numeric wire** as human-readable **ASCII text** on a wire (8-bit cells). Inverse direction: [T2NUM](builtin-T2NUM.md) · [TISNUM](builtin-TISNUM.md).
+
+Used by the calc REPL to print \`replResult\` on a terminal: \`NUM2T(replResult, digits3; f64)\`.
+
+## Signatures
+
+\`\`\`
+NUM2T(Wbit value, Nbit digits) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; q4p4) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; q8p8) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; qXpY) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; fp16) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; bf16) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; f32) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; f64) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; u8) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; u16) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; u32) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; s8) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; s16) -> Wbit text
+NUM2T(Wbit value, Nbit digits ; s32) -> Wbit text
+\`\`\`
+
+Use \`doc(NUM2T)\` for the live list from \`Interpreter.BUILTIN_DOC\`.
+
+## Arguments
+
+| Arg | Meaning |
+|-----|---------|
+| **value** | Operand wire — width must match the format tag (e.g. **8** for \`; q4p4\`, **32** for \`; f32\`, **8** for \`; u8\`). |
+| **digits** | **Binary** wire holding an unsigned integer: max **decimal places after the dot** for floats and Q formats (truncation toward zero, trailing zeros stripped). For integer formats (\`u8\`, \`s16\`, …) the text is always integer — \`digits\` is still required but only affects float/Q paths. |
+
+**Format tag (required):** exactly one tag after \`;\` — same family as [NFORMAT](builtin-NFORMAT.md) / tagged arithmetic (\`q4p4\`, \`f32\`, \`u8\`, \`s16\`, …). Omitting the tag → runtime error *Number format not specified*.
+
+**Not supported:** \`; vector\`, \`; matrix\`.
+
+Operands must be strict binary (\`0\`/\`1\`) in \`MODE ZSTATE\`.
+
+## Result
+
+- Output is **ASCII bytes** on a wire — **minimal width** = \`8 × character_count\` (no NUL terminator unless the formatted text includes one).
+- Inspect with \`show(t; ascii)\` or append to a terminal component.
+- Assign to a wider wire with \`:=\` / \`=:\` if needed.
+
+## Format behaviour
+
+| Tag | Operand width | Text shape |
+|-----|---------------|------------|
+| \`q4p4\`, \`q8p8\`, \`qXpY\` | Q width | Decimal string; fractional digits capped by **digits** |
+| \`fp16\`, \`bf16\`, \`f32\`, \`f64\` | 16 / 16 / 32 / 64 | Decimal string; fractional digits capped by **digits** |
+| \`u8\`, \`u16\`, \`u32\` | 8 / 16 / 32 | Decimal integer (\`10\` → \`"10"\`) |
+| \`s8\`, \`s16\`, \`s32\` | 8 / 16 / 32 | Signed decimal integer (\`-4\` → \`"-4"\`) |
+
+Special float text: \`nan\`, \`inf\`, \`-inf\`; \`-0\` may appear as \`-0\` or trimmed per digit count.
+
+## Examples
+
+### Q4.4 — one fractional digit
+
+\`\`\`logts-play
+8wire q = 00100000
+8wire t = NUM2T(q, 1; q4p4)
+show(t; ascii)
+\`\`\`
+
+**Load & Run:** \`"2"\` (Q4.4 value 2.0).
+
+### Q4.4 — three fractional digits (truncate)
+
+\`\`\`logts-play
+8wire q = 00011000
+24wire t = NUM2T(q, 11; q4p4)
+show(t; ascii)
+\`\`\`
+
+**Load & Run:** \`"1.5"\`.
+
+### IEEE \`f32\`
+
+\`\`\`logts-play
+32wire v = 00111111110000000000000000000000
+24wire t = NUM2T(v, 11; f32)
+show(t; ascii)
+\`\`\`
+
+**Load & Run:** \`"1.5"\`.
+
+### Unsigned / signed integers
+
+\`\`\`logts-play
+8wire n = 00001010
+16wire t = NUM2T(n, 1; u8)
+show(t; ascii)
+\`\`\`
+
+\`\`\`logts-play
+8wire n = 11111100
+16wire t = NUM2T(n, 1; s8)
+show(t; ascii)
+\`\`\`
+
+**Load & Run:** \`"10"\` and \`"-4"\`.
+
+### REPL result line (wave)
+
+\`\`\`logts
+64wire replResult = …
+11wire digits3 = \\3;11
+8wire resultText = NUM2T(replResult, digits3; f64)
+\`\`\`
+
+Wire \`digits3\` holds binary \`11\` (= 3 decimal places). See [calc-parser-interp-e2e.md](calc-parser-interp-e2e.md).
+
+## doc()
+
+\`\`\`
+doc(NUM2T)
+\`\`\`
+
+## Inverse: T2NUM / TISNUM
+
+See [builtin-T2NUM.md](builtin-T2NUM.md) (ASCII wire → numeric wire, saturate) and [builtin-TISNUM.md](builtin-TISNUM.md) (predicate, no throw).
+
+## See also
+
+[number-conversion.md](number-conversion.md) · [builtin-NFORMAT.md](builtin-NFORMAT.md) · [text-functions.md](text-functions.md) · [arithmetic.md](arithmetic.md)
+`,
     'builtin-OUTER.md': `# OUTER (outer product)
 
 Index: [2D tensors](wire-vectors.md) · [DOT](builtin-DOT.md)
@@ -9332,6 +9463,123 @@ Row sums: \`3\`, \`12\` → \`00111100\`. Column sums: \`5\`, \`10\` → \`01011
 
 [DOT](builtin-DOT.md) · [ADD](builtin-ADD.md)
 `,
+    'builtin-T2NUM.md': `# T2NUM (ASCII text → number)
+
+Index: [Number conversion](number-conversion.md) · [Text functions](text-functions.md) · [builtin-functions.md](builtin-functions.md)
+
+Decode **ASCII text** on a wire into a **numeric wire** using the same format tags as [NUM2T](builtin-NUM2T.md). Inverse of \`NUM2T\` — no **digits** argument; precision comes from the text.
+
+## Signatures
+
+\`\`\`
+T2NUM(Wbit asciiText) -> Wbit value
+T2NUM(Wbit asciiText ; q4p4) -> Wbit value
+T2NUM(Wbit asciiText ; q8p8) -> Wbit value
+T2NUM(Wbit asciiText ; qXpY) -> Wbit value
+T2NUM(Wbit asciiText ; fp16) -> Wbit value
+T2NUM(Wbit asciiText ; bf16) -> Wbit value
+T2NUM(Wbit asciiText ; f32) -> Wbit value
+T2NUM(Wbit asciiText ; f64) -> Wbit value
+T2NUM(Wbit asciiText ; u8) -> Wbit value
+T2NUM(Wbit asciiText ; u16) -> Wbit value
+T2NUM(Wbit asciiText ; u32) -> Wbit value
+T2NUM(Wbit asciiText ; s8) -> Wbit value
+T2NUM(Wbit asciiText ; s16) -> Wbit value
+T2NUM(Wbit asciiText ; s32) -> Wbit value
+T2NUM(Wbit asciiText ; u8 exact) -> Wbit value
+T2NUM(Wbit asciiText ; f64 exact) -> Wbit value
+\`\`\`
+
+Use \`doc(T2NUM)\` for the live list from \`Interpreter.BUILTIN_DOC\`.
+
+## Arguments
+
+| Arg | Meaning |
+|-----|---------|
+| **asciiText** | Wire of ASCII bytes (\`0\`/\`1\`, length **multiple of 8**). Trailing \`\\0\` ignored (same rule as parser wire decode). String literals allowed (\`"10"\`, \`"1.5"\`, \`"-4"\`). |
+
+**Format tag (required):** exactly one tag after \`;\` — same set as \`NUM2T\` (\`q4p4\`, \`f32\`, \`f64\`, \`u8\`, \`s16\`, …). Optional second tag: **\`exact\`**.
+
+| Tag | Meaning |
+|-----|---------|
+| *(default)* | **Saturate** out-of-range values to the format min/max; **round** inexact values to the nearest representable encoding. |
+| **\`exact\`** | Runtime error if conversion would **overflow** (before saturate) or be **inexact** (text has more precision than the format allows). |
+
+**Not supported:** \`; vector\`, \`; matrix\`.
+
+Operands must be strict binary (\`0\`/\`1\`) in \`MODE ZSTATE\`.
+
+## Result
+
+- Output width is fixed by the format tag (e.g. **8** for \`; u8\`, **32** for \`; f32\`).
+- Inspect with \`show(v; u8)\` or tagged \`show(v; q4p4)\`.
+
+## Parse and encode rules
+
+| Rule | Behaviour |
+|------|-----------|
+| Valid text | Decimal integer or float (\`10\`, \`1.5\`, \`-4\`, \`.5\`, optional exponent). |
+| Rejected text | \`nan\`, \`inf\`, \`-inf\`, non-numeric → *invalid numeric text*. |
+| Out of range | Default: **saturate** (e.g. \`"999"\` + \`; u8\` → **255**). |
+| Inexact | Default: round to nearest representable (e.g. \`"2.44543"\` + \`; q4p4\`). |
+| **\`exact\`** | Error *cannot decode input value: overflow* or *… inexact*. |
+
+Round-trip: \`T2NUM(NUM2T(x, d; fmt), fmt)\` ≈ \`x\` when the text matches what \`NUM2T\` would emit.
+
+## Examples
+
+### Unsigned integer
+
+\`\`\`logts-play
+16wire text = "10"
+8wire v = T2NUM(text; u8)
+show(v; u8)
+\`\`\`
+
+**Load & Run:** \`10\`.
+
+### Saturate vs exact
+
+\`\`\`logts-play
+24wire text = "999"
+8wire v = T2NUM(text; u8)
+show(v; u8)
+\`\`\`
+
+**Load & Run:** \`255\` (saturate, not wrap).
+
+With \`; u8 exact\` → runtime error (*cannot decode input value: overflow*).
+
+### Q4.4
+
+\`\`\`logts-play
+24wire text = "1.5"
+8wire v = T2NUM(text; q4p4)
+show(v; q4p4)
+\`\`\`
+
+**Load & Run:** \`1.5\`.
+
+### Signed integer
+
+\`\`\`logts-play
+16wire text = "-4"
+8wire v = T2NUM(text; s8)
+show(v; s8)
+\`\`\`
+
+**Load & Run:** \`-4\`.
+
+## doc()
+
+\`\`\`
+doc(T2NUM)
+\`\`\`
+
+## See also
+
+[TISNUM](builtin-TISNUM.md) · [builtin-NUM2T.md](builtin-NUM2T.md) · [number-conversion.md](number-conversion.md) · [text-functions.md](text-functions.md)
+`,
     'builtin-tagged-index.md': `# Built-in functions with call tags
 
 Canonical reference for built-ins that accept **\`; signed\`**, **\`; q4p4\`**, **\`; q8p8\`**, **\`; fp16\`**, **\`; bf16\`**, **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, **\`; col\`**, and/or **\`; index\`**. Scalar behaviour and tag semantics live on each function page — not duplicated here.
@@ -9380,6 +9628,81 @@ Use \`doc(NAME)\` in scripts for live signatures from \`Interpreter.BUILTIN_DOC\
 **Note:** **\`; signed\`**, **\`; q4p4\`**, **\`; q8p8\`**, **\`; fp16\`**, and **\`; bf16\`** are **mutually exclusive** (at most one numeric-format tag per call). **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, and **\`; col\`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **\`; matrix\`** (but support **\`; row\`** / **\`; col\`**). **SORT** uses **\`col=k\`** / **\`row=k\`** (numeric axis index) and optional **\`desc\`** — see [builtin-SORT.md](builtin-SORT.md).
 
 **Rank-1** (\`[N]\`, \`[1,N]\`, \`[N,1]\`) = vector for **\`; vector\`**; only **\`[R,C]\` with R>1 and C>1** is a matrix for **\`; matrix\`**. See [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
+`,
+    'builtin-TISNUM.md': `# TISNUM (is ASCII text a valid T2NUM input?)
+
+Index: [Number conversion](number-conversion.md) · [Text functions](text-functions.md) · [builtin-functions.md](builtin-functions.md)
+
+Predicate companion to [T2NUM](builtin-T2NUM.md): same decode/encode checks, **never throws** on conversion failure — returns **\`1\`** or **\`0\`**.
+
+## Signatures
+
+\`\`\`
+TISNUM(Wbit asciiText ; q4p4) -> 1bit
+TISNUM(Wbit asciiText ; f32) -> 1bit
+TISNUM(Wbit asciiText ; f64) -> 1bit
+TISNUM(Wbit asciiText ; u8) -> 1bit
+TISNUM(Wbit asciiText ; s8) -> 1bit
+TISNUM(Wbit asciiText ; u8 exact) -> 1bit
+TISNUM(Wbit asciiText ; f64 exact) -> 1bit
+\`\`\`
+
+Use \`doc(TISNUM)\` for the live list from \`Interpreter.BUILTIN_DOC\`.
+
+## Arguments
+
+Same as [T2NUM](builtin-T2NUM.md):
+
+| Arg | Meaning |
+|-----|---------|
+| **asciiText** | ASCII wire (length **multiple of 8**; trailing \`\\0\` ignored) or string literal. |
+
+**Format tag (required):** one format tag after \`;\`. Optional **\`exact\`** — same semantics as \`T2NUM\`.
+
+## Result
+
+| Value | Meaning |
+|-------|---------|
+| **\`1\`** | \`T2NUM\` with the **same tags** would succeed. |
+| **\`0\`** | \`T2NUM\` would fail (invalid text, \`nan\`/\`inf\`, wire length ≢ 0 mod 8, or \`exact\` violation). |
+
+Never throws on parse/overflow/inexact — only on \`MODE ZSTATE\` non-binary operands (same as other built-ins).
+
+## Examples
+
+\`\`\`logts-play
+16wire text = "10"
+1wire ok = TISNUM(text; u8)
+show(ok)
+\`\`\`
+
+**Load & Run:** \`1\`.
+
+\`\`\`logts-play
+24wire text = "999"
+1wire ok = TISNUM(text; u8 exact)
+show(ok)
+\`\`\`
+
+**Load & Run:** \`0\` (\`T2NUM\` would overflow under \`exact\`).
+
+\`\`\`logts-play
+24wire text = "abc"
+1wire ok = TISNUM(text; u8)
+show(ok)
+\`\`\`
+
+**Load & Run:** \`0\`.
+
+## doc()
+
+\`\`\`
+doc(TISNUM)
+\`\`\`
+
+## See also
+
+[builtin-T2NUM.md](builtin-T2NUM.md) · [builtin-NUM2T.md](builtin-NUM2T.md) · [number-conversion.md](number-conversion.md)
 `,
     'builtin-TRACE.md': `# TRACE (matrix trace)
 
@@ -10208,6 +10531,415 @@ doc(.l1)
 | Sibling coherence on backing write | Automatic L1 invalidation on L2 backing write |
 
 See [future-component-ideas.md](future-component-ideas.md) for roadmap items.
+`,
+    'calc-parser-interp-e2e.md': `# Calculator REPL — parser + interpreter E2E
+
+End-to-end **floating-point** REPL: \`inline [parser] .replLang\` → \`comp [interp] .replCalc\` → [terminal.md](terminal.md) output. Variables (\`x=3\`, then \`x+4\`) persist in \`keysStore\` / \`valsStore\` (16 slots, 5-character ASCII names).
+
+**Wave propagation** (\`logts-play wave\`): keyboard echo, Enter evaluation, and **R** reset use **property blocks** + \`comp [osc] .poll\` deferred \`on:1\` steps (same pattern as [network-chat.md](network-chat.md)).
+
+**Suite tests:** **5311–5312** (assign persist), **5313–5314** (precedence), **5315–5316** (power \`^\`), **5317** (keyboard + terminal), **5318** (reset key + variable clear).
+
+---
+
+## Pipeline
+
+| Stage | Piece |
+|-------|--------|
+| Lex/parse | [inline-parser.md](inline-parser.md) — \`.replLang:packAst(src, <replLine>, "line")\` |
+| AST | Semantic schemas \`<replLine>\`, \`<expr>\`, \`CallAdd\`, … |
+| Eval | [comp-interp.md](comp-interp.md) — \`.replCalc\` pins \`varsLen\`, vector \`keysIn\` / \`valsIn\` |
+| Format | \`NUM2T(replResult, digits3; f64)\` — see [number-conversion.md](number-conversion.md) |
+| UI | [keyboard.md](keyboard.md) + [sock.md](sock.md) \`lineBuf\` + [terminal.md](terminal.md) |
+
+**Grammar highlights:** \`+\`, \`-\`, \`*\`, \`/\`, \`^\` (power via interpreter \`^\` → \`Math.pow\`), parentheses, \`-\` unary, assign \`name=expr\`, variables up to 5 letters.
+
+---
+
+## Wave control flow
+
+1. **Type** — \`.term\` echoes printable keys; \`lineBuf << .kbd\` accumulates bytes ([network-chat.md](network-chat.md) input buffer pattern).
+2. **Enter** — \`.evalLatch\` property block (not \`on:raise\`) latches \`wantEval\`.
+3. **Osc poll** — \`on:1 { AND(.poll:get, wantEval), … packAst … runRepl }\` then \`.replCalc\`, then \`NUM2T\` + terminal append on later poll ticks.
+4. **Reset R** — property blocks clear terminal / latch; \`.resetPending\` survives until \`.poll:get\` clears stores (\`resetDone\` defers pending clear so \`on:1\` reset body runs first).
+
+---
+
+## Runnable demo (complete script)
+
+Focus **REPL** keyboard, type \`2+3\`, press **Enter**, see \`5\` on the terminal. **R** clears variables and screen.
+
+\`\`\`logts-play wave
+<byte>:
+    value: 8
+:
+<CallNumber>:
+    value: 64
+:
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+<CallSub>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+<CallDiv>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+<CallPow>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+<CallNeg>:
+    value: bound <expr>
+:
+<CallVariable>:
+    name: 40
+:
+<CallAssign>:
+    name: 40
+    value: bound <expr>
+:
+<CallExprWrap>:
+    value: bound <expr>
+:
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallNeg?:      bound <CallNeg>
+    CallAdd?:      bound <CallAdd>
+    CallSub?:      bound <CallSub>
+    CallMul?:      bound <CallMul>
+    CallDiv?:      bound <CallDiv>
+    CallPow?:      bound <CallPow>
+:
+<replLine>+:
+    CallAssign?:    bound <CallAssign>
+    CallExprWrap?:  bound <CallExprWrap>
+:
+
+inline [parser] .replLang:
+    token NUMBER = [0-9]+([.][0-9]*)?;
+    token ID = [a-zA-Z][a-zA-Z0-9]*;
+
+    rule line = assign | exprWrap;
+    rule assign = $name:ID "=" $value:expression -> CallAssign;
+    rule exprWrap = expression -> CallExprWrap;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+
+    rule term
+        = term "*" power -> CallMul
+        | term "/" power -> CallDiv
+        | power;
+
+    rule power
+        = factor "^" power -> CallPow
+        | factor;
+
+    rule factor
+        = "-" factor -> CallNeg
+        | "(" expression ")"
+        | $text:NUMBER -> CallNumber
+        | $name:ID -> CallVariable;
+:
+
+inline [interp] .replInterp {
+    lookupVar(name/ascii) {
+        i = 0;
+        while (i < varsLen) {
+            if (keysIn[i] == name) {
+                return valsIn[i];
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    hasVar(name/ascii) {
+        i = 0;
+        while (i < varsLen) {
+            if (keysIn[i] == name) {
+                return 1;
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    setVar(name/ascii, val/f64) {
+        i = 0;
+        while (i < varsLen) {
+            if (keysIn[i] == name) {
+                valsIn[i] = val;
+                push varsLenOut: varsLen;
+                push varKeysOut: keysIn;
+                push varValsOut: valsIn;
+                push isAssign: 1;
+                push assignName: name;
+                push result: val;
+                return val;
+            }
+            i = i + 1;
+        }
+        if (varsLen >= 16) {
+            z = 1 / 0;
+        }
+        keysIn[varsLen] = name;
+        valsIn[varsLen] = val;
+        varsLen = varsLen + 1;
+        push varsLenOut: varsLen;
+        push varKeysOut: keysIn;
+        push varValsOut: valsIn;
+        push isAssign: 1;
+        push assignName: name;
+        push result: val;
+        return val;
+    }
+    finishExpr(val/f64) {
+        push isAssign: 0;
+        push assignName: "";
+        push result: val;
+        return val;
+    }
+    CallNumber(value/f64) {
+        return finishExpr(value);
+    }
+    CallVariable(name/ascii) {
+        if (hasVar(name) == 0) {
+            z = 1 / 0;
+        }
+        return finishExpr(lookupVar(name));
+    }
+    CallNeg(value/f64) {
+        return finishExpr(0 - value);
+    }
+    CallAdd(left/f64, right/f64) {
+        return finishExpr(left + right);
+    }
+    CallSub(left/f64, right/f64) {
+        return finishExpr(left - right);
+    }
+    CallMul(left/f64, right/f64) {
+        return finishExpr(left * right);
+    }
+    CallDiv(left/f64, right/f64) {
+        return finishExpr(left / right);
+    }
+    CallPow(left/f64, right/f64) {
+        return finishExpr(left ^ right);
+    }
+    CallAssign(name/ascii, value/f64) {
+        return setVar(name, value);
+    }
+    CallExprWrap(value/f64) {
+        return finishExpr(value);
+    }
+}
+
+comp [interp] .replCalc:
+    on: 1
+    astSchema = .replLine
+    .replInterp { }
+    pin varsLenIn/u8 as varsLen
+    pin varKeys[16]5/ascii as keysIn
+    pin varVals[16]/f64 as valsIn
+    pout varsLenOut/u8 as varsLenOut
+    pout varKeysOut[16]5/ascii as keysOut
+    pout varValsOut[16]/f64 as valsOut
+    pout result/f64 as resultOut
+    pout isAssign/u1 as isAssignOut
+    pout assignName/ascii as assignNameOut
+    :
+
+MODE WIREWRITE
+
+comp [keyboard] .kbd:
+  label: 'REPL'
+  allowEnter
+  allowBackspace
+  on: 1
+  :
+
+comp [key] .reset:
+  label: 'R'
+  type: 0
+  on: 1
+  nl
+  :
+
+comp [terminal] .term:
+  rows: 16
+  columns: 48
+  cursorStyle: 1
+  color: ^0f0
+  on: 1
+  nl
+  :
+
+comp [reg] .evalLatch:
+  depth: 1
+  on: 1
+  :
+
+comp [reg] .resetPending:
+  depth: 1
+  on: 1
+  :
+
+comp [osc] .poll:
+  on: 1
+  :
+
+sock lineBuf
+
+1wire isEnter = EQ(.kbd:get, ^0a)
+1wire isBack = EQ(.kbd:get, ^08)
+1wire kbdChar = AND(.kbd:valid, NOT(isEnter))
+
+.term:{
+  append = .kbd:get
+  set = kbdChar
+}
+
+on:1 {
+  kbdChar,
+  lineBuf << .kbd
+}
+
+.term:{
+  backDelete = \\1
+  set = AND(.kbd:valid, isBack)
+}
+
+8wire varsLenStore := 0
+40wire[16] keysStore = \\0;640
+64wire[16] valsStore = \\0;1024
+
+64wire replResult := 0
+1wire replIsAssign := 0
+40wire replAssignName := 0
+11wire digits3 = \\3;11
+4096wire<replLine> prog = \\0;4096
+512wire lineSrc
+512wire lineTrim
+8wire resultText := 0
+1wire runRepl := 0
+1wire showResult := 0
+1wire showDone := 0
+1wire evalDone := 0
+1wire wantEval = .evalLatch:get
+1wire resetDone := 0
+
+.evalLatch:{
+  data = 1
+  set = AND(.kbd:valid, isEnter, GT(BITSIZE(lineBuf), 0))
+}
+
+.evalLatch:{
+  data = 0
+  set = .reset
+}
+
+.resetPending:{
+  data = 1
+  set = .reset
+}
+
+.term:{
+  newline = 1
+  set = AND(.kbd:valid, isEnter, GT(BITSIZE(lineBuf), 0))
+}
+
+.term:{
+  clear = 1
+  set = .reset
+}
+
+on:1 {
+  AND(.poll:get, .resetPending:get),
+  varsLenStore =: 0,
+  keysStore = \\0;640,
+  valsStore = \\0;1024,
+  lineBuf << clear,
+  resetDone = 1
+}
+
+.resetPending:{
+  data = 0
+  set = resetDone
+}
+
+on:1 {
+  resetDone,
+  resetDone = 0
+}
+
+on:1 {
+  AND(.poll:get, wantEval, GT(BITSIZE(lineBuf), 0)),
+  lineSrc =: lineBuf./(BITSIZE(lineBuf)),
+  lineTrim = TRIMT(lineSrc, " " ; any),
+  prog =: .replLang:packAst(lineTrim, <replLine>, "line"),
+  runRepl = 1,
+  lineBuf << clear,
+  evalDone = 1
+}
+
+.evalLatch:{
+  data = 0
+  set = evalDone
+}
+
+on:1 {
+  evalDone,
+  evalDone = 0
+}
+
+.replCalc:{
+  ast = prog
+  varsLen = varsLenStore
+  keysIn = keysStore
+  valsIn = valsStore
+  varsLenOut >= varsLenStore
+  keysOut >= keysStore
+  valsOut >= valsStore
+  resultOut >= replResult
+  isAssignOut >= replIsAssign
+  assignNameOut >= replAssignName
+  set = runRepl
+}
+
+on:1 {
+  AND(.poll:get, runRepl),
+  runRepl = 0,
+  showResult = 1
+}
+
+on:1 {
+  AND(.poll:get, showResult),
+  resultText = NUM2T(replResult, digits3; f64),
+  showResult = 0,
+  showDone = 1
+}
+
+.term:{
+  append = resultText
+  newline = 1
+  set = showDone
+}
+
+on:1 {
+  showDone,
+  showDone = 0
+}
+\`\`\`
 `,
     'canvas-builtins.md': `# Canvas draw built-ins
 
@@ -13131,6 +13863,121 @@ sequenceDiagram
 | 4 | **Trigger** | Active **\`set\`** runs one eval pass |
 | 5 | **Buffer** | \`push\` encodes pout values; \`remove\` drops pending channel without writing |
 | 6 | **Redirect** | Committed pout channels write to \`poutAlias >= wire\` targets |
+
+---
+
+## Multiple frontends, one interpreter
+
+\`comp [interp]\` accepts any wire that matches \`astSchema\`. It does **not** track whether AST bits came from a parser, a schema literal, another component, or a stored wire — only that the bits are valid for the schema.
+
+\`\`\`text
+Text parser (.calcLang:packAst) ──┐
+                                  │
+Schema literal { … }<program> ────┼──> wire<program> ──> comp [interp] .calculator
+                                  │
+Copy / logic / protocol / … ──────┘
+\`\`\`
+
+| Source | Example |
+|--------|---------|
+| **\`inline [parser]\`** | \`prog = .calcLang:packAst("x=1+2;", <program>, "program")\` |
+| **Schema literal** | \`{ … }<program>\` — see [semantic-schemas.md](semantic-schemas.md) |
+| **Wire copy / storage** | \`prog = savedProg\` |
+| **Another parser** | \`.otherLang:packAst(…)\` — output schema must match |
+| **Logic / protocol** | Any component that writes a compatible wire |
+
+### Example — text parse vs wire copy
+
+Uses the same schemas and component as [Declaration](#declaration) below. **Frontend A** parses source text; **Frontend B** supplies the same wire bits from another net (for example manual build, a second parser, or logic output). Either wire can drive \`.calculator\`.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallAdd?:      bound <CallAdd>
+    CallMul?:      bound <CallMul>
+    CallVariable?: bound <CallVariable>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement = $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression = expression "+" term -> CallAdd | term;
+    rule term = term "*" factor -> CallMul | factor;
+    rule factor = "(" expression ")" | INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .calcInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) { push res: left + right; return left + right; }
+    CallMul(left/s16, right/s16) { push res: left * right; return left * right; }
+    CallAssign(name/ascii, value/s16) { env[name] = value; return value; }
+    CallVariable(name/ascii) { return env[name]; }
+}
+
+comp [interp] .calculator:
+    on: 1
+    astSchema = .program
+    .calcInterp { }
+    pin limit/s32 as limitIn
+    pout res/s16 as resOut
+    :
+
+165wire<program> fromText = .calcLang:packAst("x=1+2;", <program>, "program")
+165wire<program> fromCopy = fromText
+16wire resultText = 0000000000000000
+16wire resultCopy = 0000000000000000
+32wire limitWire = 00000000000000000000000000000000
+1wire run = 1
+
+.calculator:{ ast = fromText, limitIn = limitWire, resOut >= resultText, set = run }
+.calculator:{ ast = fromCopy, limitIn = limitWire, resOut >= resultCopy, set = run }
+
+show(resultText)
+show(resultCopy)
+\`\`\`
+
+**Load & Run** → both **\`resultText\`** and **\`resultCopy\`** = \`0000000000000011\` (3). The interpreter validates and evaluates wire bits only; the producer does not matter.
 
 ---
 
@@ -26416,6 +27263,8 @@ inline [parser] .calcLang          (definition — tokens + rules)
   rule program = statement+;
   ...
 \`\`\`
+
+One grammar is one **text frontend** among several possible producers of the same AST schema. \`comp [interp]\` accepts any compatible wire — parser, schema literal, copy, or another component — without tracking the source. See [comp-interp.md — Multiple frontends, one interpreter](comp-interp.md#multiple-frontends-one-interpreter).
 
 The assembler validates the grammar at load time: unique names, token/rule name disjointness, regex subset for tokens, and symbol references inside rules.
 
@@ -44165,7 +45014,15 @@ Ordering and selection (\`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\`, \`MAC\`): [
 |----------|--------|
 | \`ISDIGIT\` | \`1bit\` — \`1\` if unsigned value is 0…9 |
 
-All functions above are **unsigned** only and require binary operands (runtime error on \`Z\` / \`X\` in \`MODE ZSTATE\`).
+### ASCII text ↔ numeric wire
+
+| Function | Direction | Detail |
+|----------|-----------|--------|
+| \`NUM2T\` | number → ASCII text | [builtin-NUM2T.md](builtin-NUM2T.md) |
+| \`T2NUM\` | ASCII text → number (saturate) | [builtin-T2NUM.md](builtin-T2NUM.md) |
+| \`TISNUM\` | ASCII text valid for T2NUM? | [builtin-TISNUM.md](builtin-TISNUM.md) |
+
+All functions above are **unsigned** only and require binary operands (runtime error on \`Z\` / \`X\` in \`MODE ZSTATE\`), except **\`NUM2T\`** / **\`T2NUM\`** / **\`TISNUM\`** which also accept signed width tags (\`s8\`, \`s16\`, …) and IEEE / Q formats.
 
 ---
 
@@ -44305,6 +45162,81 @@ show(y10)
 
 ---
 
+## NUM2T
+
+\`\`\`
+NUM2T(Wbit value, Nbit digits ; <format>) -> Wbit text
+\`\`\`
+
+Encodes a numeric wire as **ASCII decimal text** (8 bits per character). Requires a **format tag** (\`q4p4\`, \`f32\`, \`f64\`, \`u32\`, \`s8\`, … — same set as tagged builtins). Second argument **digits** is a binary wire: maximum fractional decimal places for floats and Q formats.
+
+\`\`\`logts-play
+8wire q = 00100000
+8wire t = NUM2T(q, 1; q4p4)
+show(t; ascii)
+\`\`\`
+
+Full reference: [builtin-NUM2T.md](builtin-NUM2T.md).
+
+---
+
+## T2NUM
+
+Inverse of [NUM2T](builtin-NUM2T.md). Full reference: [builtin-T2NUM.md](builtin-T2NUM.md).
+
+\`\`\`
+T2NUM(Wbit asciiText ; <format>) -> Wbit value
+T2NUM(Wbit asciiText ; <format> exact) -> Wbit value
+\`\`\`
+
+| Aspect | Rule |
+|--------|------|
+| **Input** | Wire of ASCII bytes (\`0/1\`, length **multiple of 8**). Trailing \`\\0\` ignored. String literals allowed. |
+| **Format tag** | Same set as \`NUM2T\` (\`q4p4\`, \`f32\`, \`f64\`, \`u8\`, \`s16\`, …). No **digits** argument. |
+| **Output width** | Fixed by tag (e.g. **64** for \`; f64\`, **8** for \`; u8\`). |
+| **Parse** | Text → real number; reject \`nan\`, \`inf\`, \`-inf\` and non-numeric text → *invalid numeric text*. |
+| **Default encode** | **Saturate** to the format range (stay inside min…max). Example: \`"999"\` + \`; u8\` → **255**, not wrap/modulo. |
+| **Inexact** | Values with more precision than the format allows (e.g. \`"2.44543"\` + \`; q4p4\`) are **rounded** to the nearest representable value. |
+| **\`exact\` tag** | Error if conversion would require **overflow** (out of range before saturate) or **inexact** rounding — e.g. \`"999"\` + \`; u8 exact\` → *cannot decode input value: overflow*. |
+
+**Asymmetry vs \`NUM2T\`:** precision comes from the text, not a \`digits\` wire. Round-trip: \`T2NUM(NUM2T(x, d; fmt), fmt)\` ≈ \`x\` when the text matches what \`NUM2T\` would emit.
+
+\`\`\`logts-play
+24wire text = "999"
+8wire v = T2NUM(text; u8)
+show(v; u8)
+\`\`\`
+
+**Load & Run:** \`255\` (saturate). With \`; u8 exact\` → runtime error.
+
+---
+
+## TISNUM
+
+Predicate companion to \`T2NUM\`. Full reference: [builtin-TISNUM.md](builtin-TISNUM.md).
+
+\`\`\`
+TISNUM(Wbit asciiText ; <format>) -> 1bit
+TISNUM(Wbit asciiText ; <format> exact) -> 1bit
+\`\`\`
+
+| Result | Meaning |
+|--------|---------|
+| \`1\` | \`T2NUM\` with the **same tags** would succeed |
+| \`0\` | \`T2NUM\` would fail (invalid text, \`nan\`/\`inf\`, or \`exact\` violation) |
+
+Never throws on conversion failure.
+
+\`\`\`logts-play
+24wire text = "999"
+1wire ok = TISNUM(text; u8 exact)
+show(ok)
+\`\`\`
+
+**Load & Run:** \`0\`.
+
+---
+
 ## doc()
 
 \`\`\`
@@ -44315,6 +45247,9 @@ doc(CNTN16S)
 doc(N2N16S)
 doc(N16S2N)
 doc(ISDIGIT)
+doc(NUM2T)
+doc(T2NUM)
+doc(TISNUM)
 \`\`\`
 
 ---
@@ -57458,6 +58393,9 @@ Index: [builtin-functions.md](builtin-functions.md)
 |----------|------|
 | [EQT](builtin-EQT.md) | Compare two text blobs; \`\\0\` ignored per call tags → \`1bit\` |
 | [TRIMT](builtin-TRIMT.md) | Remove trim-set characters from a text wire → same width |
+| [NUM2T](builtin-NUM2T.md) | Numeric wire → ASCII text (\`; f32\`, \`; u8\`, …) |
+| [T2NUM](builtin-T2NUM.md) | ASCII text → numeric wire (saturate) |
+| [TISNUM](builtin-TISNUM.md) | \`1\` if \`T2NUM\` would succeed |
 
 Operands use **8-bit ASCII cells** — wire string literals, **whole wires** (\`EQT(a, b)\`, \`TRIMT(src, " ")\`), grouped \`\\65 \\66;ascii\`, or assigned wires.
 
@@ -57494,6 +58432,40 @@ show(t; ascii)
 \`\`\`
 
 See [builtin-TRIMT.md](builtin-TRIMT.md).
+
+---
+
+## NUM2T — quick reference
+
+\`\`\`
+NUM2T(value, digits ; f64) -> Wbit   # e.g. 64-bit float → "5" or "1.5"
+NUM2T(value, digits ; u8) -> Wbit    # integer → "10"
+\`\`\`
+
+\`\`\`logts-play
+32wire v = 00111111110000000000000000000000
+24wire t = NUM2T(v, 11; f32)
+show(t; ascii)
+\`\`\`
+
+See [builtin-NUM2T.md](builtin-NUM2T.md) · [number-conversion.md](number-conversion.md).
+
+---
+
+## T2NUM — quick reference
+
+\`\`\`
+T2NUM(text ; u8) -> Wbit        # "10" → 8-bit value 10
+T2NUM(text ; u8 exact) -> Wbit  # error on overflow/inexact
+\`\`\`
+
+\`\`\`logts-play
+24wire text = "999"
+8wire v = T2NUM(text; u8)
+show(v; u8)
+\`\`\`
+
+See [builtin-T2NUM.md](builtin-T2NUM.md) · [builtin-TISNUM.md](builtin-TISNUM.md).
 
 ---
 

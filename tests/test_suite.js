@@ -56402,5 +56402,817 @@ inline [interp] .calcAbort {
     h.assert('no nul pad before hello', out.indexOf('\u25E6Hello') < 0, true);
   });
 
+  /* ----- F4c REPL calculator E2E (calc-parser-interp-e2e) ----- */
+
+  const F4C_CALL_NUMBER = [
+    '<CallNumber>:',
+    '    value: 64',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_SUB = [
+    '<CallSub>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_DIV = [
+    '<CallDiv>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_POW = [
+    '<CallPow>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_NEG = [
+    '<CallNeg>:',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_EXPR_WRAP = [
+    '<CallExprWrap>:',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_VARIABLE = [
+    '<CallVariable>:',
+    '    name: 40',
+    ':',
+  ].join('\n');
+
+  const F4C_CALL_ASSIGN = [
+    '<CallAssign>:',
+    '    name: 40',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F4C_EXPR = [
+    '<expr>+:',
+    '    CallNumber?:   <CallNumber>',
+    '    CallVariable?: bound <CallVariable>',
+    '    CallNeg?:      bound <CallNeg>',
+    '    CallAdd?:      bound <CallAdd>',
+    '    CallSub?:      bound <CallSub>',
+    '    CallMul?:      bound <CallMul>',
+    '    CallDiv?:      bound <CallDiv>',
+    '    CallPow?:      bound <CallPow>',
+    ':',
+  ].join('\n');
+
+  const F4C_REPL_LINE = [
+    '<replLine>+:',
+    '    CallAssign?:    bound <CallAssign>',
+    '    CallExprWrap?:  bound <CallExprWrap>',
+    ':',
+  ].join('\n');
+
+  const F4C_PARSER = `
+inline [parser] .replLang:
+    token NUMBER = [0-9]+([.][0-9]*)?;
+    token ID = [a-zA-Z][a-zA-Z0-9]*;
+
+    rule line = assign | exprWrap;
+    rule assign = $name:ID "=" $value:expression -> CallAssign;
+    rule exprWrap = expression -> CallExprWrap;
+
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+
+    rule term
+        = term "*" power -> CallMul
+        | term "/" power -> CallDiv
+        | power;
+
+    rule power
+        = factor "^" power -> CallPow
+        | factor;
+
+    rule factor
+        = "-" factor -> CallNeg
+        | "(" expression ")"
+        | $text:NUMBER -> CallNumber
+        | $name:ID -> CallVariable;
+:`;
+
+  const F4C_VAR_SLOTS = 16;
+  const F4C_NAME_CHARS = 5;
+  const F4C_KEYS_BITS = F4C_VAR_SLOTS * F4C_NAME_CHARS * 8;
+  const F4C_VALS_BITS = F4C_VAR_SLOTS * 64;
+
+  const F4C_INTERP = `
+inline [interp] .replInterp {
+    lookupVar(name/ascii) {
+        i = 0;
+        while (i < varsLen) {
+            if (keysIn[i] == name) {
+                return valsIn[i];
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    hasVar(name/ascii) {
+        i = 0;
+        while (i < varsLen) {
+            if (keysIn[i] == name) {
+                return 1;
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    setVar(name/ascii, val/f64) {
+        i = 0;
+        while (i < varsLen) {
+            if (keysIn[i] == name) {
+                valsIn[i] = val;
+                push varsLenOut: varsLen;
+                push varKeysOut: keysIn;
+                push varValsOut: valsIn;
+                push isAssign: 1;
+                push assignName: name;
+                push result: val;
+                return val;
+            }
+            i = i + 1;
+        }
+        if (varsLen >= ` + F4C_VAR_SLOTS + `) {
+            z = 1 / 0;
+        }
+        keysIn[varsLen] = name;
+        valsIn[varsLen] = val;
+        varsLen = varsLen + 1;
+        push varsLenOut: varsLen;
+        push varKeysOut: keysIn;
+        push varValsOut: valsIn;
+        push isAssign: 1;
+        push assignName: name;
+        push result: val;
+        return val;
+    }
+    finishExpr(val/f64) {
+        push isAssign: 0;
+        push assignName: "";
+        push result: val;
+        return val;
+    }
+    CallNumber(value/f64) {
+        return finishExpr(value);
+    }
+    CallVariable(name/ascii) {
+        if (hasVar(name) == 0) {
+            z = 1 / 0;
+        }
+        return finishExpr(lookupVar(name));
+    }
+    CallNeg(value/f64) {
+        return finishExpr(0 - value);
+    }
+    CallAdd(left/f64, right/f64) {
+        return finishExpr(left + right);
+    }
+    CallSub(left/f64, right/f64) {
+        return finishExpr(left - right);
+    }
+    CallMul(left/f64, right/f64) {
+        return finishExpr(left * right);
+    }
+    CallDiv(left/f64, right/f64) {
+        return finishExpr(left / right);
+    }
+    CallPow(left/f64, right/f64) {
+        return finishExpr(left ^ right);
+    }
+    CallAssign(name/ascii, value/f64) {
+        return setVar(name, value);
+    }
+    CallExprWrap(value/f64) {
+        return finishExpr(value);
+    }
+}`;
+
+  const F4C_COMP = `
+comp [interp] .replCalc:
+    on: 1
+    astSchema = .replLine
+    .replInterp { }
+    pin varsLenIn/u8 as varsLen
+    pin varKeys[` + F4C_VAR_SLOTS + `]` + F4C_NAME_CHARS + `/ascii as keysIn
+    pin varVals[` + F4C_VAR_SLOTS + `]/f64 as valsIn
+    pout varsLenOut/u8 as varsLenOut
+    pout varKeysOut[` + F4C_VAR_SLOTS + `]` + F4C_NAME_CHARS + `/ascii as keysOut
+    pout varValsOut[` + F4C_VAR_SLOTS + `]/f64 as valsOut
+    pout result/f64 as resultOut
+    pout isAssign/u1 as isAssignOut
+    pout assignName/ascii as assignNameOut
+    :
+`;
+
+  const F4C_SCHEMAS = [
+    F2C_BYTE,
+    F4C_CALL_NUMBER,
+    F2C_CALL_ADD,
+    F2C_CALL_MUL,
+    F4C_CALL_SUB,
+    F4C_CALL_DIV,
+    F4C_CALL_POW,
+    F4C_CALL_NEG,
+    F4C_CALL_VARIABLE,
+    F4C_CALL_ASSIGN,
+    F4C_CALL_EXPR_WRAP,
+    F4C_EXPR,
+    F4C_REPL_LINE,
+  ].join('\n');
+
+  const F4C_CORE = F4C_SCHEMAS + '\n' + F4C_PARSER + '\n' + F4C_INTERP + '\n' + F4C_COMP;
+
+  function f4cKeysWireExpr(bits) {
+    const empty = '0'.repeat(F4C_KEYS_BITS);
+    const b = bits != null ? String(bits) : empty;
+    if (b === empty) return '\\0;' + F4C_KEYS_BITS;
+    return b.match(new RegExp('.{1,' + (F4C_NAME_CHARS * 8) + '}', 'g')).join(' + ');
+  }
+
+  function f4cValsWireExpr(bits) {
+    const empty = '0'.repeat(F4C_VALS_BITS);
+    const b = bits != null ? String(bits) : empty;
+    if (b === empty) return '\\0;' + F4C_VALS_BITS;
+    return b.match(/.{1,64}/g).join(' + ');
+  }
+
+  const F4C_REPL_WAVE = F4C_CORE + '\n' + [
+    'MODE WIREWRITE',
+    '',
+    'comp [keyboard] .kbd:',
+    '  label: \'REPL\'',
+    '  allowEnter',
+    '  allowBackspace',
+    '  on: 1',
+    '  :',
+    '',
+    'comp [key] .reset:',
+    '  label: \'R\'',
+    '  type: 0',
+    '  on: 1',
+    '  nl',
+    '  :',
+    '',
+    'comp [terminal] .term:',
+    '  rows: 16',
+    '  columns: 48',
+    '  cursorStyle: 1',
+    '  color: ^0f0',
+    '  on: 1',
+    '  nl',
+    '  :',
+    '',
+    'comp [reg] .evalLatch:',
+    '  depth: 1',
+    '  on: 1',
+    '  :',
+    '',
+    'comp [reg] .resetPending:',
+    '  depth: 1',
+    '  on: 1',
+    '  :',
+    '',
+    'comp [osc] .poll:',
+    '  on: 1',
+    '  :',
+    '',
+    'sock lineBuf',
+    '',
+    '1wire isEnter = EQ(.kbd:get, ^0a)',
+    '1wire isBack = EQ(.kbd:get, ^08)',
+    '1wire kbdChar = AND(.kbd:valid, NOT(isEnter))',
+    '',
+    '.term:{',
+    '  append = .kbd:get',
+    '  set = kbdChar',
+    '}',
+    '',
+    'on:1 {',
+    '  kbdChar,',
+    '  lineBuf << .kbd',
+    '}',
+    '',
+    '.term:{',
+    '  backDelete = \\1',
+    '  set = AND(.kbd:valid, isBack)',
+    '}',
+    '',
+    '8wire varsLenStore := 0',
+    (F4C_NAME_CHARS * 8) + 'wire[' + F4C_VAR_SLOTS + '] keysStore = \\0;' + F4C_KEYS_BITS,
+    '64wire[' + F4C_VAR_SLOTS + '] valsStore = \\0;' + F4C_VALS_BITS,
+    '',
+    '64wire replResult := 0',
+    '1wire replIsAssign := 0',
+    (F4C_NAME_CHARS * 8) + 'wire replAssignName := 0',
+    '11wire digits3 = \\3;11',
+    '4096wire<replLine> prog = \\0;4096',
+    '512wire lineSrc',
+    '512wire lineTrim',
+    '8wire resultText := 0',
+    '1wire runRepl := 0',
+    '1wire showResult := 0',
+    '1wire showDone := 0',
+    '1wire evalDone := 0',
+    '1wire wantEval = .evalLatch:get',
+    '1wire resetDone := 0',
+    '',
+    '.evalLatch:{',
+    '  data = 1',
+    '  set = AND(.kbd:valid, isEnter, GT(BITSIZE(lineBuf), 0))',
+    '}',
+    '',
+    '.evalLatch:{',
+    '  data = 0',
+    '  set = .reset',
+    '}',
+    '',
+    '.resetPending:{',
+    '  data = 1',
+    '  set = .reset',
+    '}',
+    '',
+    '.term:{',
+    '  newline = 1',
+    '  set = AND(.kbd:valid, isEnter, GT(BITSIZE(lineBuf), 0))',
+    '}',
+    '',
+    '.term:{',
+    '  clear = 1',
+    '  set = .reset',
+    '}',
+    '',
+    'on:1 {',
+    '  AND(.poll:get, .resetPending:get),',
+    '  varsLenStore =: 0,',
+    '  keysStore = \\0;' + F4C_KEYS_BITS + ',',
+    '  valsStore = \\0;' + F4C_VALS_BITS + ',',
+    '  lineBuf << clear,',
+    '  resetDone = 1',
+    '}',
+    '',
+    '.resetPending:{',
+    '  data = 0',
+    '  set = resetDone',
+    '}',
+    '',
+    'on:1 {',
+    '  resetDone,',
+    '  resetDone = 0',
+    '}',
+    '',
+    'on:1 {',
+    '  AND(.poll:get, wantEval, GT(BITSIZE(lineBuf), 0)),',
+    '  lineSrc =: lineBuf./(BITSIZE(lineBuf)),',
+    '  lineTrim = TRIMT(lineSrc, " " ; any),',
+    '  prog =: .replLang:packAst(lineTrim, <replLine>, "line"),',
+    '  runRepl = 1,',
+    '  lineBuf << clear,',
+    '  evalDone = 1',
+    '}',
+    '',
+    '.evalLatch:{',
+    '  data = 0',
+    '  set = evalDone',
+    '}',
+    '',
+    'on:1 {',
+    '  evalDone,',
+    '  evalDone = 0',
+    '}',
+    '',
+    '.replCalc:{',
+    '  ast = prog',
+    '  varsLen = varsLenStore',
+    '  keysIn = keysStore',
+    '  valsIn = valsStore',
+    '  varsLenOut >= varsLenStore',
+    '  keysOut >= keysStore',
+    '  valsOut >= valsStore',
+    '  resultOut >= replResult',
+    '  isAssignOut >= replIsAssign',
+    '  assignNameOut >= replAssignName',
+    '  set = runRepl',
+    '}',
+    '',
+    'on:1 {',
+    '  AND(.poll:get, runRepl),',
+    '  runRepl = 0,',
+    '  showResult = 1',
+    '}',
+    '',
+    'on:1 {',
+    '  AND(.poll:get, showResult),',
+    '  resultText = NUM2T(replResult, digits3; f64),',
+    '  showResult = 0,',
+    '  showDone = 1',
+    '}',
+    '',
+    '.term:{',
+    '  append = resultText',
+    '  newline = 1',
+    '  set = showDone',
+    '}',
+    '',
+    'on:1 {',
+    '  showDone,',
+    '  showDone = 0',
+    '}',
+  ].join('\n');
+
+  function f4cGrammar(session) {
+    const inst = session.interp.inlineInstances.get('.replLang');
+    return { tokens: inst.tokens, rules: inst.rules };
+  }
+
+  function f4cBuildLineAst(h, session, src) {
+    const r = parseGrammar(f4cGrammar(session), src, { startRule: 'line' });
+    h.assert('parse ok ' + src, String(r.ok), '1');
+    return buildAstWire(r.tree, 'replLine', session.interp.schemaRegistry, { replTruncSymbol5: true });
+  }
+
+  function f4cPackLine(h, session, src) {
+    session.run(F4C_CORE);
+    return f4cBuildLineAst(h, session, src);
+  }
+
+  function f4cSockToAscii(bits) {
+    const b = String(bits || '');
+    let out = '';
+    for (let i = 0; i + 8 <= b.length; i += 8) {
+      const code = parseInt(b.slice(i, i + 8), 2);
+      if (code === 0) break;
+      out += String.fromCharCode(code);
+    }
+    return out.replace(/\s+/g, '');
+  }
+
+  function f4cWaveEvalReplCalc(session, interp, astBits) {
+    const comp = interp.components.get('.replCalc');
+    const inst = interp.inlineInstances.get('.replInterp');
+    const decodeFn = typeof decodeInterpCompPinBits === 'function' ? decodeInterpCompPinBits : null;
+    const execFn = typeof evalInterpCompExec === 'function' ? evalInterpCompExec : null;
+    if (!comp || !inst || !decodeFn || !execFn) {
+      throw new Error('F4c replCalc runtime unavailable');
+    }
+    const pinWireMap = {
+      varsLen: 'varsLenStore',
+      keysIn: 'keysStore',
+      valsIn: 'valsStore',
+    };
+    const pinEnv = {};
+    for (const alias of Object.keys(comp.pinStorage || {})) {
+      const pin = comp.pinStorage[alias];
+      const wireName = pinWireMap[alias];
+      let bits = wireName ? session.getWire(interp, wireName) : interp.getValueFromRef(pin.ref);
+      if (bits == null || bits === '') bits = '0'.repeat(pin.bits);
+      pinEnv[alias] = decodeFn(bits, pin.decl, alias);
+    }
+    const poutChannelDefs = {};
+    for (const ch of Object.keys(comp.poutChannelDefs || {})) {
+      const def = comp.poutChannelDefs[ch];
+      let wireBits = null;
+      const redirect = (comp._interpRedirectProps || []).find(function(p) {
+        return p.property === 'pout>' && p.poutName === def.execAlias;
+      });
+      if (redirect && redirect.target && redirect.target.var) {
+        const tw = interp.wires.get(redirect.target.var);
+        if (tw && tw.ref) wireBits = interp.getValueFromRef(tw.ref);
+        const w = tw ? interp.getBitWidth(tw.type) : null;
+        if (wireBits != null && w) {
+          if (wireBits.length < w) wireBits = wireBits.padStart(w, '0');
+          else if (wireBits.length > w) wireBits = wireBits.slice(-w);
+        }
+      }
+      poutChannelDefs[ch] = Object.assign({}, def, { wireBits: wireBits });
+    }
+    const buffer = execFn(astBits, 'replLine', interp.schemaRegistry, inst, pinEnv, {
+      poutBuffer: {},
+      poutChannelDefs: poutChannelDefs,
+      compName: '.replCalc',
+    });
+    const poutWireMap = {
+      varsLenOut: 'varsLenStore',
+      keysOut: 'keysStore',
+      valsOut: 'valsStore',
+      resultOut: 'replResult',
+      isAssignOut: 'replIsAssign',
+      assignNameOut: 'replAssignName',
+    };
+    for (const channel of Object.keys(buffer || {})) {
+      const def = comp.poutChannelDefs[channel];
+      if (!def) continue;
+      const wireName = poutWireMap[def.execAlias];
+      if (wireName) session.setWire(interp, wireName, buffer[channel]);
+    }
+  }
+
+  function f4cDecodeF64(bits) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    const df = NF && typeof NF.decodeToFloat === 'function' ? NF.decodeToFloat : null;
+    if (!df) return NaN;
+    const b = bits == null ? '' : String(bits);
+    const slice = b.length > 64 ? b.substring(b.length - 64) : b.padStart(64, '0');
+    return df(slice, 'f64', 64);
+  }
+
+  function f4cRunLine(h, session, src, state) {
+    const built = f4cPackLine(h, session, src);
+    const st = state || {};
+    const varsLenBits = st.varsLen != null ? String(st.varsLen) : '00000000';
+    const elemKeys = F4C_NAME_CHARS * 8;
+    const namePad = F4C_NAME_CHARS * 8;
+    session.run(F4C_CORE + '\n' + [
+      '8wire varsLenStore = ' + varsLenBits,
+      elemKeys + 'wire[' + F4C_VAR_SLOTS + '] keysStore = ' + f4cKeysWireExpr(st.keysWire),
+      '64wire[' + F4C_VAR_SLOTS + '] valsStore = ' + f4cValsWireExpr(st.valsWire),
+      '64wire replResult := 0',
+      '1wire replIsAssign := 0',
+      namePad + 'wire replAssignName := 0',
+      built.bitWidth + 'wire<replLine> prog = .replLang:packAst("' + src.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '", <replLine>, "line")',
+      '1wire run = 1',
+      '.replCalc:{',
+      '    ast = prog',
+      '    varsLen = varsLenStore',
+      '    keysIn = keysStore',
+      '    valsIn = valsStore',
+      '    varsLenOut >= varsLenStore',
+      '    keysOut >= keysStore',
+      '    valsOut >= valsStore',
+      '    resultOut >= replResult',
+      '    isAssignOut >= replIsAssign',
+      '    assignNameOut >= replAssignName',
+      '    set = run',
+      '}',
+    ].join('\n'));
+    return {
+      result: f4cDecodeF64(session.getWire(session.interp, 'replResult')),
+      isAssign: session.getWire(session.interp, 'replIsAssign'),
+      assignName: session.getWire(session.interp, 'replAssignName'),
+      varsLen: session.getWire(session.interp, 'varsLenStore'),
+      keysWire: session.getWire(session.interp, 'keysStore'),
+      valsWire: session.getWire(session.interp, 'valsStore'),
+    };
+  }
+
+  function runF4cExpr23(h, session) {
+    const out = f4cRunLine(h, session, '2+3');
+    h.assert('2+3=5', String(Math.abs(out.result - 5) < 0.0001), 'true');
+    h.assert('not assign', out.isAssign, '0');
+  }
+
+  reg(5300, 'interp', 'F4c repl parse 2+3 legacy', runF4cExpr23);
+  reg(5301, 'interp', 'F4c repl parse 2+3 wave', runF4cExpr23, { propagation: 'wave' });
+
+  function f4cTypeReplLine(session, interp, text) {
+    for (let i = 0; i < text.length; i++) {
+      session.triggerKeyboardKey(interp, '.kbd', { key: text[i] });
+    }
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' });
+  }
+
+  function f4cWaveEvalFromBuf(h, session, interp) {
+    const src = f4cSockToAscii(session.getSockBits(interp, 'lineBuf'));
+    h.assert('line nonempty', String(src.length > 0), 'true');
+    const built = f4cBuildLineAst(h, session, src);
+    f4cWaveEvalReplCalc(session, interp, built.bits);
+    session.execStmts(interp, [
+      '8wire resultText = NUM2T(replResult, digits3; f64)',
+      '.term:{ append = resultText\n  newline = 1\n  set = 1 }',
+      'lineBuf << clear',
+      '.evalLatch:{ data = 0\n  set = 1 }',
+    ].join('\n'));
+  }
+
+  function runF4cAssignPersist(h, session) {
+    let st = f4cRunLine(h, session, 'x=3');
+    h.assert('assign flag', st.isAssign, '1');
+    h.assert('x=3', String(Math.abs(st.result - 3) < 0.0001), 'true');
+    h.assert('varsLen 1', st.varsLen, '00000001');
+    st = f4cRunLine(h, session, 'x+4', st);
+    h.assert('x+4=7', String(Math.abs(st.result - 7) < 0.0001), 'true');
+    h.assert('varsLen still 1', st.varsLen, '00000001');
+  }
+
+  reg(5311, 'interp', 'F4c repl assign persist legacy', runF4cAssignPersist);
+  reg(5312, 'interp', 'F4c repl assign persist wave', runF4cAssignPersist, { propagation: 'wave' });
+
+  function runF4cPrecedence(h, session) {
+    const out = f4cRunLine(h, session, '1+2*3');
+    h.assert('1+2*3=7', String(Math.abs(out.result - 7) < 0.0001), 'true');
+  }
+
+  reg(5313, 'interp', 'F4c repl precedence legacy', runF4cPrecedence);
+  reg(5314, 'interp', 'F4c repl precedence wave', runF4cPrecedence, { propagation: 'wave' });
+
+  function runF4cPow(h, session) {
+    const out = f4cRunLine(h, session, '2^3');
+    h.assert('2^3=8', String(Math.abs(out.result - 8) < 0.0001), 'true');
+  }
+
+  reg(5315, 'interp', 'F4c repl power legacy', runF4cPow);
+  reg(5316, 'interp', 'F4c repl power wave', runF4cPow, { propagation: 'wave' });
+
+  function runF4cWaveRepl23(h, session) {
+    const { interp } = session.run(F4C_REPL_WAVE);
+    for (let i = 0; i < '2+3'.length; i++) {
+      session.triggerKeyboardKey(interp, '.kbd', { key: '2+3'[i] });
+    }
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' });
+    h.assert('eval latched', session.getCompProperty(interp, '.evalLatch', 'get'), '1');
+    f4cWaveEvalFromBuf(h, session, interp);
+    const replVal = f4cDecodeF64(session.getWire(interp, 'replResult'));
+    h.assert('repl 5', String(Math.abs(replVal - 5) < 0.0001), 'true');
+    const text = getTerminalText(_termId(interp, '.term'));
+    h.assert('typed line', text.indexOf('2+3') >= 0, 'true');
+    h.assert('result 5', text.indexOf('5') >= 0, 'true');
+  }
+
+  reg(5317, 'interp', 'F4c repl wave keyboard 2+3', runF4cWaveRepl23, { propagation: 'wave' });
+
+  function runF4cWaveReset(h, session) {
+    const { interp } = session.run(F4C_REPL_WAVE);
+    for (let i = 0; i < 'x=2'.length; i++) {
+      session.triggerKeyboardKey(interp, '.kbd', { key: 'x=2'[i] });
+    }
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' });
+    f4cWaveEvalFromBuf(h, session, interp);
+    h.assert('varsLen after assign', session.getWire(interp, 'varsLenStore'), '00000001');
+    _pressKey(session, interp, '.reset');
+    oscPulse(session, interp, '.poll');
+    h.assert('varsLen cleared', session.getWire(interp, 'varsLenStore'), '00000000');
+    h.assert('terminal cleared', getTerminalText(_termId(interp, '.term')), '');
+  }
+
+  reg(5318, 'interp', 'F4c repl wave reset key', runF4cWaveReset, { propagation: 'wave' });
+
+  reg(5319, 'parser', 'F4c packAst wire ascii sock lineTrim', function(h, session) {
+    session.run(F4C_CORE + '\nMODE WIREWRITE\n' + [
+      'sock lineBuf',
+      '512wire lineSrc',
+      '512wire lineTrim',
+      'lineBuf << ^32',
+      'lineBuf << ^2b',
+      'lineBuf << ^33',
+      'lineSrc =: lineBuf./(BITSIZE(lineBuf))',
+      'lineTrim = TRIMT(lineSrc, " " ; any)',
+      '4096wire<replLine> prog =: .replLang:packAst(lineTrim, <replLine>, "line")',
+    ].join('\n'));
+    h.assert('prog width', String(session.getWire(session.interp, 'prog').length), '4096');
+  });
+
+  function f4cAsciiBits(str) {
+    let bits = '';
+    for (let i = 0; i < str.length; i++) {
+      bits += str.charCodeAt(i).toString(2).padStart(8, '0');
+    }
+    return bits;
+  }
+
+  reg(5302, 'builtin-numeric-formats', 'NUM2T q4p4 two point zero one digit', function(h, session) {
+    session.run('8wire t = NUM2T(00100000, 1; q4p4)');
+    h.assert('2.0 -> 2', session.getWire(session.interp, 't'), f4cAsciiBits('2'));
+  });
+
+  reg(5303, 'builtin-numeric-formats', 'NUM2T q4p4 three digits truncates', function(h, session) {
+    session.run('24wire t = NUM2T(00011000, 11; q4p4)');
+    h.assert('1.5 text', session.getWire(session.interp, 't'), f4cAsciiBits('1.5'));
+  });
+
+  reg(5304, 'builtin-numeric-formats', 'NUM2T f32 three digits', function(h, session) {
+    const F32_1_5 = '00111111110000000000000000000000';
+    session.run('24wire t = NUM2T(' + F32_1_5 + ', 11; f32)');
+    h.assert('1.5', session.getWire(session.interp, 't'), f4cAsciiBits('1.5'));
+  });
+
+  reg(5305, 'builtin-numeric-formats', 'NUM2T missing format error', function(h, session) {
+    const r = session.run('8wire t = NUM2T(00100000, 1)');
+    const err = r.out.find(function(l) { return l.indexOf('Number format not specified') >= 0; }) || '';
+    h.assert('no format', String(err.length > 0), 'true');
+  });
+
+  reg(5306, 'builtin-numeric-formats', 'NUM2T u32 integer text', function(h, session) {
+    session.run('16wire t = NUM2T(00000000000000000000000000001010, 1; u32)');
+    h.assert('10', session.getWire(session.interp, 't'), f4cAsciiBits('10'));
+  });
+
+  reg(5307, 'builtin-numeric-formats', 'NUM2T u8 integer text', function(h, session) {
+    session.run('16wire t = NUM2T(00001010, 1; u8)');
+    h.assert('10', session.getWire(session.interp, 't'), f4cAsciiBits('10'));
+  });
+
+  reg(5308, 'builtin-numeric-formats', 'NUM2T u16 integer text', function(h, session) {
+    session.run('8wire t = NUM2T(0000000000000101, 1; u16)');
+    h.assert('5', session.getWire(session.interp, 't'), f4cAsciiBits('5'));
+  });
+
+  reg(5309, 'builtin-numeric-formats', 'NUM2T s8 negative integer text', function(h, session) {
+    session.run('16wire t = NUM2T(11111100, 1; s8)');
+    h.assert('-4', session.getWire(session.interp, 't'), f4cAsciiBits('-4'));
+  });
+
+  reg(5310, 'builtin-numeric-formats', 'NUM2T s16 negative integer text', function(h, session) {
+    session.run('16wire t = NUM2T(1111111111111010, 1; s16)');
+    h.assert('-6', session.getWire(session.interp, 't'), f4cAsciiBits('-6'));
+  });
+
+  reg(5320, 'builtin-numeric-formats', 'T2NUM u8 ten from ascii', function(h, session) {
+    session.run('8wire v = T2NUM("10"; u8)');
+    h.assert('10 u8', session.getWire(session.interp, 'v'), '00001010');
+  });
+
+  reg(5321, 'builtin-numeric-formats', 'T2NUM u8 nine-nine-nine saturates to 255', function(h, session) {
+    session.run('8wire v = T2NUM("999"; u8)');
+    h.assert('255 saturate', session.getWire(session.interp, 'v'), '11111111');
+  });
+
+  reg(5322, 'builtin-numeric-formats', 'T2NUM u8 exact overflow error', function(h, session) {
+    const r = session.run('8wire v = T2NUM("999"; u8 exact)');
+    const err = r.out.find(function(l) { return l.indexOf('cannot decode input value') >= 0; }) || '';
+    h.assert('exact overflow', String(err.length > 0), 'true');
+  });
+
+  reg(5323, 'builtin-numeric-formats', 'T2NUM rejects nan text', function(h, session) {
+    const r = session.run('32wire v = T2NUM("nan"; f32)');
+    const err = r.out.find(function(l) { return l.indexOf('invalid numeric text') >= 0; }) || '';
+    h.assert('nan rejected', String(err.length > 0), 'true');
+  });
+
+  reg(5324, 'builtin-numeric-formats', 'T2NUM rejects abc text', function(h, session) {
+    const r = session.run('8wire v = T2NUM("abc"; u8)');
+    const err = r.out.find(function(l) { return l.indexOf('invalid numeric text') >= 0; }) || '';
+    h.assert('abc rejected', String(err.length > 0), 'true');
+  });
+
+  reg(5325, 'builtin-numeric-formats', 'T2NUM q4p4 one point five', function(h, session) {
+    session.run('8wire v = T2NUM("1.5"; q4p4)');
+    h.assert('1.5 q4p4', session.getWire(session.interp, 'v'), '00011000');
+  });
+
+  reg(5326, 'builtin-numeric-formats', 'T2NUM q4p4 rounds inexact', function(h, session) {
+    session.run('8wire v = T2NUM("2.44543"; q4p4)');
+    h.assert('2.44543 rounded', session.getWire(session.interp, 'v'), '00100111');
+  });
+
+  reg(5327, 'builtin-numeric-formats', 'T2NUM q4p4 exact inexact error', function(h, session) {
+    const r = session.run('8wire v = T2NUM("2.44543"; q4p4 exact)');
+    const err = r.out.find(function(l) { return l.indexOf('cannot decode input value') >= 0; }) || '';
+    h.assert('exact inexact', String(err.length > 0), 'true');
+  });
+
+  reg(5328, 'builtin-numeric-formats', 'TISNUM u8 valid text', function(h, session) {
+    session.run('1wire ok = TISNUM("10"; u8)');
+    h.assert('tisnum ok', session.getWire(session.interp, 'ok'), '1');
+  });
+
+  reg(5329, 'builtin-numeric-formats', 'TISNUM u8 exact overflow is zero', function(h, session) {
+    session.run('1wire ok = TISNUM("999"; u8 exact)');
+    h.assert('tisnum exact fail', session.getWire(session.interp, 'ok'), '0');
+  });
+
+  reg(5330, 'builtin-numeric-formats', 'TISNUM invalid text is zero', function(h, session) {
+    session.run('1wire ok = TISNUM("abc"; u8)');
+    h.assert('tisnum abc', session.getWire(session.interp, 'ok'), '0');
+  });
+
+  reg(5331, 'builtin-numeric-formats', 'T2NUM round-trip NUM2T u8', function(h, session) {
+    session.run([
+      '8wire n = 00001010',
+      '16wire t = NUM2T(n, 1; u8)',
+      '8wire back = T2NUM(t; u8)',
+    ].join('\n'));
+    h.assert('round-trip', session.getWire(session.interp, 'back'), '00001010');
+  });
+
+  reg(5332, 'builtin-numeric-formats', 'T2NUM s8 negative four', function(h, session) {
+    session.run('8wire v = T2NUM("-4"; s8)');
+    h.assert('-4 s8', session.getWire(session.interp, 'v'), '11111100');
+  });
+
+  reg(5333, 'doc', 'doc(T2NUM) and doc(TISNUM) signatures', function(h) {
+    const t2 = Interpreter.getDocLines('T2NUM', new Map());
+    h.assert('T2NUM doc present', String(t2.length > 0), 'true');
+    h.assert('T2NUM u8 line', String(t2.some(function(l) { return l.indexOf('; u8') >= 0; })), 'true');
+    h.assert('T2NUM exact line', String(t2.some(function(l) { return l.indexOf('exact') >= 0; })), 'true');
+    const ti = Interpreter.getDocLines('TISNUM', new Map());
+    h.assert('TISNUM doc present', String(ti.length > 0), 'true');
+    h.assert('TISNUM 1bit', String(ti.some(function(l) { return l.indexOf('1bit') >= 0; })), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

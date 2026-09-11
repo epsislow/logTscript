@@ -160,6 +160,33 @@
     return num;
   }
 
+  function replTruncSymbolText(text) {
+    const s = text == null ? '' : String(text);
+    return s.length > 5 ? s.substring(0, 5) : s;
+  }
+
+  function parseF64LiteralText(text, label) {
+    if (text == null || text === '') {
+      throw new Error(`Field '${label}': missing numeric text`);
+    }
+    const num = parseFloat(String(text));
+    if (!Number.isFinite(num)) {
+      throw new Error(`Field '${label}': invalid numeric text '${text}'`);
+    }
+    return num;
+  }
+
+  function encodeF64Leaf(value, label) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    const nf = NF && typeof NF.encodeFromFloat === 'function' ? NF.encodeFromFloat : null;
+    if (!nf) throw new Error(`Field '${label}': float encode is not available`);
+    const bits = nf(Number(value), 'f64');
+    if (!bits || bits.length !== 64) {
+      throw new Error(`Field '${label}': f64 encode failed`);
+    }
+    return bits;
+  }
+
   function numericFromTree(tree, label) {
     let text = null;
     if (tree && tree.kind === 'token') text = tree.text;
@@ -216,10 +243,13 @@
     return intToBits(num, leafNode.width);
   }
 
-  function packBvaTextFromCapture(text, schema, fieldName, parentSchemaName, registry) {
+  function packBvaTextFromCapture(text, schema, fieldName, parentSchemaName, registry, packOpts) {
     const SS = ss();
     const SB = sb();
     schema = canonicalSchema(schema, registry);
+    if (packOpts && packOpts.replTruncSymbol5 && fieldName === 'name') {
+      text = replTruncSymbolText(text);
+    }
     validateAsciiText(text, fieldName);
     const bvaNode = findBvaBytesField(schema);
     if (!bvaNode) {
@@ -240,7 +270,7 @@
     return buildSchemaLiteralBitsChecked(schema, { [bvaNode.name]: bytesPayload });
   }
 
-  function packCaptureIntoSchema(cap, subSchema, fieldName, parentSchemaName, registry) {
+  function packCaptureIntoSchema(cap, subSchema, fieldName, parentSchemaName, registry, packOpts) {
     subSchema = canonicalSchema(subSchema, registry);
     const reportSchema = parentSchemaName || subSchema.name;
 
@@ -254,7 +284,8 @@
         subSchema,
         fieldName,
         reportSchema,
-        registry
+        registry,
+        packOpts
       );
     }
 
@@ -274,21 +305,41 @@
   function resolveCallFieldSource(tree, fieldName) {
     const child = tree.children && tree.children[fieldName];
     if (child != null) return child;
+    if (tree.children) {
+      if (fieldName === 'left' && tree.children.name != null) return tree.children.name;
+      if (fieldName === 'right' && tree.children.arg != null) return tree.children.arg;
+    }
     const cap = tree.captures && tree.captures[fieldName];
     if (cap == null) return null;
     if (cap.kind === 'token') return cap;
     return cap;
   }
 
-  function packCallPayload(tree, schema, registry) {
+  function packCallPayload(tree, schema, registry, packOpts) {
     schema = canonicalSchema(schema, registry);
     const fieldValues = {};
+    const callName = tree && tree.call ? tree.call : '';
+
+    if (callName === 'CallNumber') {
+      const cap = tree.captures && tree.captures.text;
+      const text = cap && cap.kind === 'token' ? cap.text : null;
+      if (text != null) {
+        const num = parseF64LiteralText(text, 'value');
+        fieldValues.value = encodeF64Leaf(num, 'value');
+        return buildSchemaLiteralBitsChecked(schema, fieldValues);
+      }
+    }
 
     for (const node of schema.structure) {
       if (node.kind === 'leaf') {
         const src = resolveCallFieldSource(tree, node.name);
         if (src != null && src.kind === 'token') {
-          fieldValues[node.name] = packTokenToLeafBits(src, node, schema.name, node.name);
+          if (node.width === 64 && callName === 'CallNumber') {
+            const num = parseF64LiteralText(src.text, node.name);
+            fieldValues[node.name] = encodeF64Leaf(num, node.name);
+          } else {
+            fieldValues[node.name] = packTokenToLeafBits(src, node, schema.name, node.name);
+          }
         } else {
           fieldValues[node.name] = packLeafNumeric(tree, node, node.name, schema.name);
         }
@@ -297,11 +348,11 @@
         const src = resolveCallFieldSource(tree, node.name);
         const subSchema = canonicalSchema(node.schema, registry);
         if (src != null && src.kind === 'call') {
-          packed = packTree(src, subSchema, registry);
+          packed = packTree(src, subSchema, registry, packOpts);
         } else if (src != null && src.kind === 'repeat') {
-          packed = packTree(src, subSchema, registry);
+          packed = packTree(src, subSchema, registry, packOpts);
         } else if (src != null && src.kind === 'token') {
-          packed = packCaptureIntoSchema(src, subSchema, node.name, schema.name, registry);
+          packed = packCaptureIntoSchema(src, subSchema, node.name, schema.name, registry, packOpts);
         }
         if (packed == null) {
           throw new Error(`Missing field '${node.name}' for call '${tree.call}' in schema '${schema.name}'`);
@@ -317,7 +368,7 @@
     return buildSchemaLiteralBitsChecked(schema, fieldValues);
   }
 
-  function packTree(tree, schema, registry) {
+  function packTree(tree, schema, registry, packOpts) {
     const SB = sb();
     schema = canonicalSchema(schema, registry);
 
@@ -340,7 +391,7 @@
       let payload = '';
       const elemSchema = canonicalSchema(bvaNode.schema, registry);
       for (const item of tree.items) {
-        payload += SB.packBoundPayload(packTree(item, elemSchema, registry));
+        payload += SB.packBoundPayload(packTree(item, elemSchema, registry, packOpts));
       }
       return buildSchemaLiteralBitsChecked(schema, { [bvaNode.name]: payload });
     }
@@ -353,14 +404,14 @@
         if (!optNode) {
           throw new Error(`Schema '${schema.name}' has no optional field for call '${callName}'`);
         }
-        const innerBits = packCallPayload(tree, optNode.schema, registry);
+        const innerBits = packCallPayload(tree, optNode.schema, registry, packOpts);
         const fieldValues = {};
         fieldValues[callName] = innerBits;
         return buildSchemaLiteralBitsChecked(schema, fieldValues);
       }
 
       if (schema.name === callName || schema.structure.length) {
-        return packCallPayload(tree, schema, registry);
+        return packCallPayload(tree, schema, registry, packOpts);
       }
       throw new Error(`Cannot map call '${callName}' to schema '${schema.name}'`);
     }
@@ -377,11 +428,12 @@
     throw new Error(`Cannot pack tree kind '${tree.kind}' into schema '${schema.name}'`);
   }
 
-  function buildAstWire(tree, schemaName, registry) {
+  function buildAstWire(tree, schemaName, registry, options) {
     if (!registry) throw new Error('Schema registry required for buildAstWire');
     const name = String(schemaName || '').replace(/\+$/, '');
     const schema = validateAstSchemaHasPlus(name, registry);
-    const bits = packTree(tree, schema, registry);
+    const packOpts = options && options.replTruncSymbol5 ? { replTruncSymbol5: true } : null;
+    const bits = packTree(tree, schema, registry, packOpts);
     return { ok: 1, bits, schemaName: schema.name, bitWidth: bits.length };
   }
 

@@ -71,6 +71,121 @@ sequenceDiagram
 
 ---
 
+## Multiple frontends, one interpreter
+
+`comp [interp]` accepts any wire that matches `astSchema`. It does **not** track whether AST bits came from a parser, a schema literal, another component, or a stored wire — only that the bits are valid for the schema.
+
+```text
+Text parser (.calcLang:packAst) ──┐
+                                  │
+Schema literal { … }<program> ────┼──> wire<program> ──> comp [interp] .calculator
+                                  │
+Copy / logic / protocol / … ──────┘
+```
+
+| Source | Example |
+|--------|---------|
+| **`inline [parser]`** | `prog = .calcLang:packAst("x=1+2;", <program>, "program")` |
+| **Schema literal** | `{ … }<program>` — see [semantic-schemas.md](semantic-schemas.md) |
+| **Wire copy / storage** | `prog = savedProg` |
+| **Another parser** | `.otherLang:packAst(…)` — output schema must match |
+| **Logic / protocol** | Any component that writes a compatible wire |
+
+### Example — text parse vs wire copy
+
+Uses the same schemas and component as [Declaration](#declaration) below. **Frontend A** parses source text; **Frontend B** supplies the same wire bits from another net (for example manual build, a second parser, or logic output). Either wire can drive `.calculator`.
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallAdd?:      bound <CallAdd>
+    CallMul?:      bound <CallMul>
+    CallVariable?: bound <CallVariable>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .calcLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement = $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression = expression "+" term -> CallAdd | term;
+    rule term = term "*" factor -> CallMul | factor;
+    rule factor = "(" expression ")" | INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .calcInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) { push res: left + right; return left + right; }
+    CallMul(left/s16, right/s16) { push res: left * right; return left * right; }
+    CallAssign(name/ascii, value/s16) { env[name] = value; return value; }
+    CallVariable(name/ascii) { return env[name]; }
+}
+
+comp [interp] .calculator:
+    on: 1
+    astSchema = .program
+    .calcInterp { }
+    pin limit/s32 as limitIn
+    pout res/s16 as resOut
+    :
+
+165wire<program> fromText = .calcLang:packAst("x=1+2;", <program>, "program")
+165wire<program> fromCopy = fromText
+16wire resultText = 0000000000000000
+16wire resultCopy = 0000000000000000
+32wire limitWire = 00000000000000000000000000000000
+1wire run = 1
+
+.calculator:{ ast = fromText, limitIn = limitWire, resOut >= resultText, set = run }
+.calculator:{ ast = fromCopy, limitIn = limitWire, resOut >= resultCopy, set = run }
+
+show(resultText)
+show(resultCopy)
+```
+
+**Load & Run** → both **`resultText`** and **`resultCopy`** = `0000000000000011` (3). The interpreter validates and evaluates wire bits only; the producer does not matter.
+
+---
+
 ## Declaration
 
 ```logts-play

@@ -125,7 +125,7 @@ function interpTokenize(src) {
       i += 2;
       continue;
     }
-    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === ':' || ch === '[' || ch === ']' || ch === '~') {
+    if (ch === '*' || ch === '/' || ch === '+' || ch === '-' || ch === '^' || ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === ',' || ch === ';' || ch === ':' || ch === '[' || ch === ']' || ch === '~') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
       continue;
@@ -631,11 +631,20 @@ class InterpParser {
   }
 
   parseMul() {
-    let left = this.parseUnary();
+    let left = this.parsePow();
     while (this.match('SYM', '*') || this.match('SYM', '/')) {
       const op = this.tokens[this.pos - 1].value;
-      const right = this.parseUnary();
+      const right = this.parsePow();
       left = { kind: 'binop', op, left, right };
+    }
+    return left;
+  }
+
+  parsePow() {
+    let left = this.parseUnary();
+    if (this.match('SYM', '^')) {
+      const right = this.parsePow();
+      left = { kind: 'binop', op: '^', left, right };
     }
     return left;
   }

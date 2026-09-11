@@ -36,7 +36,15 @@ Ordering and selection (`GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MAC`): [arithmetic.m
 |----------|--------|
 | `ISDIGIT` | `1bit` — `1` if unsigned value is 0…9 |
 
-All functions above are **unsigned** only and require binary operands (runtime error on `Z` / `X` in `MODE ZSTATE`).
+### ASCII text ↔ numeric wire
+
+| Function | Direction | Detail |
+|----------|-----------|--------|
+| `NUM2T` | number → ASCII text | [builtin-NUM2T.md](builtin-NUM2T.md) |
+| `T2NUM` | ASCII text → number (saturate) | [builtin-T2NUM.md](builtin-T2NUM.md) |
+| `TISNUM` | ASCII text valid for T2NUM? | [builtin-TISNUM.md](builtin-TISNUM.md) |
+
+All functions above are **unsigned** only and require binary operands (runtime error on `Z` / `X` in `MODE ZSTATE`), except **`NUM2T`** / **`T2NUM`** / **`TISNUM`** which also accept signed width tags (`s8`, `s16`, …) and IEEE / Q formats.
 
 ---
 
@@ -176,6 +184,81 @@ show(y10)
 
 ---
 
+## NUM2T
+
+```
+NUM2T(Wbit value, Nbit digits ; <format>) -> Wbit text
+```
+
+Encodes a numeric wire as **ASCII decimal text** (8 bits per character). Requires a **format tag** (`q4p4`, `f32`, `f64`, `u32`, `s8`, … — same set as tagged builtins). Second argument **digits** is a binary wire: maximum fractional decimal places for floats and Q formats.
+
+```logts-play
+8wire q = 00100000
+8wire t = NUM2T(q, 1; q4p4)
+show(t; ascii)
+```
+
+Full reference: [builtin-NUM2T.md](builtin-NUM2T.md).
+
+---
+
+## T2NUM
+
+Inverse of [NUM2T](builtin-NUM2T.md). Full reference: [builtin-T2NUM.md](builtin-T2NUM.md).
+
+```
+T2NUM(Wbit asciiText ; <format>) -> Wbit value
+T2NUM(Wbit asciiText ; <format> exact) -> Wbit value
+```
+
+| Aspect | Rule |
+|--------|------|
+| **Input** | Wire of ASCII bytes (`0/1`, length **multiple of 8**). Trailing `\0` ignored. String literals allowed. |
+| **Format tag** | Same set as `NUM2T` (`q4p4`, `f32`, `f64`, `u8`, `s16`, …). No **digits** argument. |
+| **Output width** | Fixed by tag (e.g. **64** for `; f64`, **8** for `; u8`). |
+| **Parse** | Text → real number; reject `nan`, `inf`, `-inf` and non-numeric text → *invalid numeric text*. |
+| **Default encode** | **Saturate** to the format range (stay inside min…max). Example: `"999"` + `; u8` → **255**, not wrap/modulo. |
+| **Inexact** | Values with more precision than the format allows (e.g. `"2.44543"` + `; q4p4`) are **rounded** to the nearest representable value. |
+| **`exact` tag** | Error if conversion would require **overflow** (out of range before saturate) or **inexact** rounding — e.g. `"999"` + `; u8 exact` → *cannot decode input value: overflow*. |
+
+**Asymmetry vs `NUM2T`:** precision comes from the text, not a `digits` wire. Round-trip: `T2NUM(NUM2T(x, d; fmt), fmt)` ≈ `x` when the text matches what `NUM2T` would emit.
+
+```logts-play
+24wire text = "999"
+8wire v = T2NUM(text; u8)
+show(v; u8)
+```
+
+**Load & Run:** `255` (saturate). With `; u8 exact` → runtime error.
+
+---
+
+## TISNUM
+
+Predicate companion to `T2NUM`. Full reference: [builtin-TISNUM.md](builtin-TISNUM.md).
+
+```
+TISNUM(Wbit asciiText ; <format>) -> 1bit
+TISNUM(Wbit asciiText ; <format> exact) -> 1bit
+```
+
+| Result | Meaning |
+|--------|---------|
+| `1` | `T2NUM` with the **same tags** would succeed |
+| `0` | `T2NUM` would fail (invalid text, `nan`/`inf`, or `exact` violation) |
+
+Never throws on conversion failure.
+
+```logts-play
+24wire text = "999"
+1wire ok = TISNUM(text; u8 exact)
+show(ok)
+```
+
+**Load & Run:** `0`.
+
+---
+
 ## doc()
 
 ```
@@ -186,6 +269,9 @@ doc(CNTN16S)
 doc(N2N16S)
 doc(N16S2N)
 doc(ISDIGIT)
+doc(NUM2T)
+doc(T2NUM)
+doc(TISNUM)
 ```
 
 ---

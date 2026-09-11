@@ -1935,6 +1935,27 @@ class Interpreter {
     return { kind: 'scalar', ew };
   }
 
+  _wireBitsToAsciiText(bits) {
+    const b = bits == null ? '' : String(bits);
+    if (!b || !/^[01]+$/.test(b) || b.length < 8 || (b.length % 8) !== 0) return b;
+    const TB = typeof LogTScriptTextBuiltin !== 'undefined' ? LogTScriptTextBuiltin : null;
+    if (TB && typeof TB.binToBytes === 'function') {
+      const bytes = TB.binToBytes(b);
+      let end = bytes.length;
+      while (end > 0 && bytes[end - 1] === 0) end--;
+      let out = '';
+      for (let i = 0; i < end; i++) out += String.fromCharCode(bytes[i] & 0xff);
+      return out;
+    }
+    let out = '';
+    for (let i = 0; i + 8 <= b.length; i += 8) {
+      const code = parseInt(b.slice(i, i + 8), 2);
+      if (code === 0) break;
+      out += String.fromCharCode(code);
+    }
+    return out;
+  }
+
   _exprWireStringArg(expr) {
     if (!expr || !Array.isArray(expr) || !expr.length) return '';
     const a = expr[0];
@@ -1951,6 +1972,10 @@ class Interpreter {
       else if (part.value != null && part.value !== '-') out += String(part.value);
     }
     return out;
+  }
+
+  _parserSourceTextFromExpr(expr) {
+    return this._wireBitsToAsciiText(this._exprWireStringArg(expr));
   }
 
   _exprWireBitsArg(expr, label) {
@@ -2006,11 +2031,11 @@ class Interpreter {
         + 'for schema-based parsing use :parse(src, <schema> [, startRule]) or :packAst(src, <schema> [, startRule])'
       );
     }
-    const srcText = this._exprWireStringArg(args[0]);
+    const srcText = this._parserSourceTextFromExpr(args[0]);
     if (args.length < 2 || args[1] == null) {
       return { srcText, startRule: undefined };
     }
-    const startRule = this._exprWireStringArg(args[1]);
+    const startRule = this._parserSourceTextFromExpr(args[1]);
     if (!startRule) {
       throw new Error(`${label}:parseText start rule must be a non-empty string (e.g. "program")`);
     }
@@ -2031,12 +2056,12 @@ class Interpreter {
     if (!args || !args.length) {
       throw new Error(`${methodName} requires source text as first argument`);
     }
-    const srcText = this._exprWireStringArg(args[0]);
+    const srcText = this._parserSourceTextFromExpr(args[0]);
     if (args.length < 2 || !args[1]) {
       throw new Error(`${methodName} requires schema reference as second argument (e.g. <expr>)`);
     }
     const schemaName = this._exprSchemaRefArg(args[1], methodName);
-    const startRule = args[2] != null ? this._exprWireStringArg(args[2]) : undefined;
+    const startRule = args[2] != null ? this._parserSourceTextFromExpr(args[2]) : undefined;
     return { srcText, schemaName, startRule };
   }
 
@@ -5155,7 +5180,11 @@ class Interpreter {
     if (name === 'WWIDTH' && args && args.length === 1) {
       return this._inferExprStaticBitWidth(args[0]);
     }
-    if (name === 'EQT') return 1;
+    if (name === 'EQT' || name === 'TISNUM') return 1;
+    if (name === 'NUM2T' && args && args.length >= 2) {
+      const dW = this._inferExprStaticBitWidth(args[1]);
+      return Math.max(64, dW * 8 + 80);
+    }
     if (name === 'TRIMT' && args && args.length >= 1) {
       return this._inferExprStaticBitWidth(args[0]);
     }
@@ -6352,7 +6381,10 @@ class Interpreter {
     }
     const { start, end } = this.resolveBitRange(atom.bitRange);
     const n = end - start + 1;
-    if (start < 0 || start > end || n > bits.length) {
+    if (n <= 0 || start > end) {
+      return '';
+    }
+    if (start < 0 || n > bits.length) {
       throw Error(`sock underflow: need ${n} bits but only ${bits.length} remain in ${name}`);
     }
     return bits.substring(start, end + 1);
@@ -6447,7 +6479,16 @@ class Interpreter {
     if (a.bitRange) {
       const { start, end } = this.resolveBitRange(a.bitRange);
       const n = end - start + 1;
-      if (start < 0 || start > end || n > val.length) {
+      if (n <= 0 || start > end) {
+        return {
+          value: '',
+          ref: null,
+          varName: this._formatSockSliceLabel(a.var, a.bitRange, 0),
+          bitWidth: 0,
+          isSock: true,
+        };
+      }
+      if (start < 0 || n > val.length) {
         throw Error(`sock underflow: need ${n} bits but only ${val.length} remain in ${a.var}`);
       }
       val = val.substring(start, end + 1);
@@ -6599,7 +6640,7 @@ class Interpreter {
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'NFORMAT', 'ISDIGIT',
-         'EQT', 'TRIMT',
+         'EQT', 'TRIMT', 'NUM2T', 'T2NUM', 'TISNUM',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
          'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA', 'SHAPE', 'RANK',
@@ -7793,6 +7834,7 @@ const idx = parseInt(
   let nformatSpec = null;
   let sortOpts = null;
   let textTrimMode = 'any';
+  let t2numExact = false;
   if (name === 'SORT') {
     sortOpts = { desc: false, col: null, row: null };
     if (callTags && callTags.length) {
@@ -7806,6 +7848,11 @@ const idx = parseInt(
     if (callTags && callTags.length) {
       textTrimMode = TB.parseTextTrimCallTags(callTags, name, (msg) => fail(msg));
     }
+  } else if (name === 'T2NUM' || name === 'TISNUM') {
+    if (!NF) fail(`${name}: internal error (numeric-formats not loaded)`);
+    const spec = NF.parseT2numCallTags(callTags || [], name, (msg) => fail(msg));
+    numericMode = spec.numericMode;
+    t2numExact = spec.exact;
   } else if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
     if (name === 'NFORMAT') {
@@ -10178,6 +10225,69 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length !== 1) fail('ISDIGIT expects 1 argument');
     this._zstateRequireBinary(argValues, 'ISDIGIT', ['value']);
     const v = isDecimalDigitBin(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'NUM2T') {
+    if (argValues.length !== 2) fail('NUM2T expects 2 arguments');
+    if (!NF) fail('NUM2T: internal error (numeric-formats not loaded)');
+    if (vectorMode || matrixMode) fail('NUM2T: does not accept tag \'vector\' or \'matrix\'');
+    if (!NF.isNumericFormatMode(numericMode)) fail('Number format not specified.');
+    this._zstateRequireBinary(argValues, 'NUM2T', ['value', 'digits']);
+    const valBits = argValues[0];
+    const digitBits = argValues[1];
+    const width = valBits.length;
+    assertFixedWidthMode(width, 'NUM2T');
+    let text;
+    try {
+      text = NF.formatNum2tText(valBits, width, numericMode, digitBits);
+    } catch (e) {
+      fail(e.message);
+    }
+    const TB = typeof LogTScriptTextBuiltin !== 'undefined' ? LogTScriptTextBuiltin : null;
+    if (!TB) fail('NUM2T: internal error (text-builtin not loaded)');
+    const bytes = [];
+    for (let i = 0; i < text.length; i++) bytes.push(text.charCodeAt(i));
+    const v = TB.bytesToBin(bytes, null);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'T2NUM') {
+    if (argValues.length !== 1) fail('T2NUM expects 1 argument');
+    if (!NF) fail('T2NUM: internal error (numeric-formats not loaded)');
+    if (vectorMode || matrixMode) fail('T2NUM: does not accept tag \'vector\' or \'matrix\'');
+    if (!NF.isNumericFormatMode(numericMode)) fail('Number format not specified.');
+    this._zstateRequireBinary(argValues, 'T2NUM', ['asciiText']);
+    const textBits = argValues[0];
+    if (textBits.length % 8 !== 0) {
+      fail('T2NUM: ascii text wire length must be a multiple of 8');
+    }
+    const text = this._wireBitsToAsciiText(textBits);
+    const r = NF.tryT2numFromAsciiText(text, numericMode, { exact: t2numExact });
+    if (!r.ok) fail(r.error);
+    const v = r.bits;
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'TISNUM') {
+    if (argValues.length !== 1) fail('TISNUM expects 1 argument');
+    if (!NF) fail('TISNUM: internal error (numeric-formats not loaded)');
+    if (vectorMode || matrixMode) fail('TISNUM: does not accept tag \'vector\' or \'matrix\'');
+    if (!NF.isNumericFormatMode(numericMode)) fail('Number format not specified.');
+    this._zstateRequireBinary(argValues, 'TISNUM', ['asciiText']);
+    const textBits = argValues[0];
+    let v = '0';
+    if (textBits.length % 8 === 0) {
+      const text = this._wireBitsToAsciiText(textBits);
+      const r = NF.tryT2numFromAsciiText(text, numericMode, { exact: t2numExact });
+      if (r.ok) v = '1';
+    }
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -18703,6 +18813,39 @@ Interpreter.BUILTIN_DOC = {
     'TRIMT(Wbit text, Wbit trimChars ; right) -> Wbit',
     'TRIMT(Wbit text, Wbit trimChars ; left right) -> Wbit',
     'TRIMT(Wbit text, Wbit trimChars ; any) -> Wbit',
+  ],
+  NUM2T:    [
+    'NUM2T(Wbit value, Nbit digits) -> Wbit text',
+    'NUM2T(8bit value, Nbit digits ; q4p4) -> Wbit text',
+    'NUM2T(32bit value, Nbit digits ; f32) -> Wbit text',
+    'NUM2T(64bit value, Nbit digits ; f64) -> Wbit text',
+    'NUM2T(32bit value, Nbit digits ; u32) -> Wbit text',
+    'NUM2T(32bit value, Nbit digits ; s32) -> Wbit text',
+    'NUM2T(8bit value, Nbit digits ; u8) -> Wbit text',
+    'NUM2T(16bit value, Nbit digits ; u16) -> Wbit text',
+    'NUM2T(8bit value, Nbit digits ; s8) -> Wbit text',
+    'NUM2T(16bit value, Nbit digits ; s16) -> Wbit text',
+  ],
+  T2NUM:    [
+    'T2NUM(Wbit asciiText) -> Wbit value',
+    'T2NUM(Wbit asciiText ; q4p4) -> 8bit value',
+    'T2NUM(Wbit asciiText ; f32) -> 32bit value',
+    'T2NUM(Wbit asciiText ; f64) -> 64bit value',
+    'T2NUM(Wbit asciiText ; u8) -> 8bit value',
+    'T2NUM(Wbit asciiText ; u16) -> 16bit value',
+    'T2NUM(Wbit asciiText ; u32) -> 32bit value',
+    'T2NUM(Wbit asciiText ; s8) -> 8bit value',
+    'T2NUM(Wbit asciiText ; s16) -> 16bit value',
+    'T2NUM(Wbit asciiText ; s32) -> 32bit value',
+    'T2NUM(Wbit asciiText ; u8 exact) -> 8bit value',
+    'T2NUM(Wbit asciiText ; f64 exact) -> 64bit value',
+  ],
+  TISNUM:   [
+    'TISNUM(Wbit asciiText ; q4p4) -> 1bit',
+    'TISNUM(Wbit asciiText ; f32) -> 1bit',
+    'TISNUM(Wbit asciiText ; u8) -> 1bit',
+    'TISNUM(Wbit asciiText ; u8 exact) -> 1bit',
+    'TISNUM(Wbit asciiText ; f64 exact) -> 1bit',
   ],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],

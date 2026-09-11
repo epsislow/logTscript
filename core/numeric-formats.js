@@ -7,7 +7,7 @@
   const BUILTIN_FORMAT_TAG_FUNCS = new Set([
     'ADD', 'SUBTRACT', 'SUM', 'MIN', 'MAX',
     'GT', 'LT', 'CLAMP', 'MULTIPLY', 'MAC', 'DOT', 'DIVIDE', 'ABS', 'RSHIFT',
-    'ARGMAX', 'ARGMIN',
+    'ARGMAX', 'ARGMIN', 'NUM2T', 'T2NUM', 'TISNUM',
   ]);
 
   const FORMAT_TAG_NAMES = new Set(['q4p4', 'q8p8', 'bf16', 'fp16', 'f32', 'f64']);
@@ -900,6 +900,266 @@
     return String(f);
   }
 
+  function num2tDigitsFromBits(bits) {
+    const b = bits == null ? '' : String(bits);
+    if (!b.length) return 0;
+    return parseInt(b, 2);
+  }
+
+  function num2tTrimTrailingZeros(text) {
+    const s = String(text);
+    const dot = s.indexOf('.');
+    if (dot < 0) return s;
+    let end = s.length;
+    while (end > dot + 1 && s.charAt(end - 1) === '0') end--;
+    if (end === dot + 1) return s.substring(0, dot);
+    return s.substring(0, end);
+  }
+
+  function num2tFormatDecimalNumber(num, digits) {
+    const d = Math.max(0, Math.floor(Number(digits) || 0));
+    if (Number.isNaN(num)) return 'nan';
+    if (num === Infinity) return 'inf';
+    if (num === -Infinity) return '-inf';
+    if (Object.is(num, -0)) return d > 0 ? num2tTrimTrailingZeros((-0).toFixed(d)) : '-0';
+    if (d === 0) return String(Math.trunc(num));
+    const factor = Math.pow(10, d);
+    const truncated = Math.trunc(num * factor) / factor;
+    return num2tTrimTrailingZeros(String(truncated));
+  }
+
+  function parseT2numAsciiText(text) {
+    const s = String(text == null ? '' : text).trim();
+    if (!s.length) {
+      return { ok: false, error: 'invalid numeric text' };
+    }
+    const lower = s.toLowerCase();
+    if (lower === 'nan' || lower === 'inf' || lower === '+inf' || lower === '-inf'
+        || lower === 'infinity' || lower === '+infinity' || lower === '-infinity') {
+      return { ok: false, error: 'invalid numeric text' };
+    }
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(s)) {
+      return { ok: false, error: 'invalid numeric text' };
+    }
+    const num = Number(s);
+    if (!Number.isFinite(num)) {
+      return { ok: false, error: 'invalid numeric text' };
+    }
+    return { ok: true, value: num };
+  }
+
+  function floatFiniteLimits(mode) {
+    const fw = getFormatModeWidth(mode);
+    if (mode === 'f32') {
+      return {
+        max: decodeToFloat('01111111011111111111111111111111', mode, fw),
+        min: decodeToFloat('11111111011111111111111111111111', mode, fw),
+      };
+    }
+    if (mode === 'f64') {
+      return {
+        max: decodeToFloat('0111111111101111111111111111111111111111111111111111111111111111', mode, fw),
+        min: decodeToFloat('1111111111101111111111111111111111111111111111111111111111111111', mode, fw),
+      };
+    }
+    if (mode === 'fp16') {
+      return {
+        max: decodeToFloat('0111110111111111', mode, fw),
+        min: decodeToFloat('1111110111111111', mode, fw),
+      };
+    }
+    if (mode === 'bf16') {
+      return {
+        max: decodeToFloat('0111111111111111', mode, fw),
+        min: decodeToFloat('1111111111111111', mode, fw),
+      };
+    }
+    throw new Error(`Unknown float format: ${mode}`);
+  }
+
+  function encodeT2numSaturated(realValue, mode) {
+    if (isUnsignedWidthMode(mode)) {
+      const w = unsignedWidthFromMode(mode);
+      const max = Number((BigInt(1) << BigInt(w)) - BigInt(1));
+      let v = Math.round(realValue);
+      if (v < 0) v = 0;
+      else if (v > max) v = max;
+      return unsignedBigIntToBin(BigInt(v), w);
+    }
+    if (isSignedWidthMode(mode)) {
+      const w = signedWidthFromMode(mode);
+      const min = Number(-(BigInt(1) << BigInt(w - 1)));
+      const max = Number((BigInt(1) << BigInt(w - 1)) - BigInt(1));
+      let v = Math.round(realValue);
+      if (v < min) v = min;
+      else if (v > max) v = max;
+      return signedBigIntToBin(BigInt(v), w);
+    }
+    if (qModeSpec(mode)) {
+      const { min, max } = fixedMinMax(mode);
+      let v = realValue;
+      if (v < min) v = min;
+      else if (v > max) v = max;
+      return fixedNumberToRaw(v, mode);
+    }
+    if (isIeeeFloatMode(mode)) {
+      const { min, max } = floatFiniteLimits(mode);
+      let v = realValue;
+      if (v > max) v = max;
+      else if (v < min) v = min;
+      if (mode === 'f32') v = Math.fround(v);
+      return encodeFromFloat(v, mode);
+    }
+    throw new Error(`T2NUM: unsupported format '${mode}'`);
+  }
+
+  function t2numEncodeStatus(realValue, rawResult, mode) {
+    const width = getFormatModeWidth(mode);
+    if (isUnsignedWidthMode(mode)) {
+      return unsignedConvertStatus(realValue, rawResult, width);
+    }
+    if (isSignedWidthMode(mode)) {
+      return signedConvertStatus(realValue, rawResult, width);
+    }
+    if (qModeSpec(mode)) {
+      return fixedStatusForMath(mode, realValue, rawResult);
+    }
+    if (isIeeeFloatMode(mode)) {
+      const st = floatConvertStatus(realValue, rawResult, mode);
+      const { min, max } = floatFiniteLimits(mode);
+      if (realValue > max || realValue < min) {
+        return buildStatus({
+          overflow: true,
+          inexact: st.charAt(2) === '1',
+        });
+      }
+      return st;
+    }
+    return buildStatus({});
+  }
+
+  function parseT2numCallTags(callTags, fnName, fail) {
+    let numericMode = 'unsigned';
+    let exact = false;
+    const tags = callTags || [];
+    if (!tags.length) {
+      fail('Number format not specified.');
+    }
+    for (const t of tags) {
+      if (t.name === 'exact') {
+        if (t.value !== 1) {
+          fail(`${fnName}: tag 'exact' must be enabled (use '; exact' or '; exact=1')`);
+        }
+        exact = true;
+        continue;
+      }
+      if (t.name === 'vector' || t.name === 'matrix') {
+        fail(`${fnName}: does not accept tag '${t.name}'`);
+      }
+      if (/^u(\d+)$/.test(t.name)) {
+        if (t.value !== 1) fail(`${fnName}: tag '${t.name}' must be enabled`);
+        const w = parseInt(t.name.slice(1), 10);
+        if (w < 1 || w > MAX_FORMAT_WIDTH) {
+          fail(`${fnName}: tag '${t.name}' requires unsigned width 1..${MAX_FORMAT_WIDTH}`);
+        }
+        parseLiteralTag(t.name);
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode}'`);
+        }
+        numericMode = t.name;
+        continue;
+      }
+      if (/^s(\d+)$/.test(t.name)) {
+        if (t.value !== 1) fail(`${fnName}: tag '${t.name}' must be enabled`);
+        const w = parseInt(t.name.slice(1), 10);
+        if (w < 1 || w > MAX_FORMAT_WIDTH) {
+          fail(`${fnName}: tag '${t.name}' requires signed width 1..${MAX_FORMAT_WIDTH}`);
+        }
+        parseLiteralTag(t.name);
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode}'`);
+        }
+        numericMode = t.name;
+        continue;
+      }
+      if (/^q(\d+)p(\d+)$/.test(t.name)) {
+        if (t.value !== 1) fail(`${fnName}: tag '${t.name}' must be enabled`);
+        parseBuiltinFormatTag(t.name);
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode}'`);
+        }
+        numericMode = t.name;
+        continue;
+      }
+      if (FORMAT_TAG_NAMES.has(t.name)) {
+        if (t.value !== 1) fail(`${fnName}: tag '${t.name}' must be enabled`);
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode}'`);
+        }
+        numericMode = t.name;
+        continue;
+      }
+      fail(`${fnName}: unknown tag '${t.name}'`);
+    }
+    if (numericMode === 'unsigned') {
+      fail('Number format not specified.');
+    }
+    return { numericMode, exact };
+  }
+
+  function tryT2numFromAsciiText(text, mode, options) {
+    const exact = !!(options && options.exact);
+    const parsed = parseT2numAsciiText(text);
+    if (!parsed.ok) {
+      return { ok: false, error: parsed.error };
+    }
+    if (!isNumericFormatMode(mode)) {
+      return { ok: false, error: `T2NUM: unsupported format '${mode}'` };
+    }
+    const realValue = parsed.value;
+    let rawResult;
+    try {
+      rawResult = encodeT2numSaturated(realValue, mode);
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+    const status = t2numEncodeStatus(realValue, rawResult, mode);
+    const overflow = status.charAt(0) === '1';
+    const inexact = status.charAt(2) === '1';
+    if (exact && (overflow || inexact)) {
+      if (overflow) {
+        return { ok: false, error: 'cannot decode input value: overflow' };
+      }
+      return { ok: false, error: 'cannot decode input value: inexact' };
+    }
+    return { ok: true, bits: rawResult };
+  }
+
+  function formatNum2tText(valBits, bitWidth, mode, digitsBits) {
+    const width = bitWidth > 0 ? bitWidth : String(valBits == null ? '' : valBits).length;
+    const padded = String(valBits == null ? '' : valBits).padStart(width, '0');
+    const digits = num2tDigitsFromBits(digitsBits);
+    if (isUnsignedWidthMode(mode) || isSignedWidthMode(mode)) {
+      const n = decodeNformatValue(padded, width, mode);
+      return String(Math.trunc(n));
+    }
+    if (mode === 'signed') {
+      return String(decodeNformatValue(padded, width, mode));
+    }
+    if (qModeSpec(mode)) {
+      assertFormatWidth(mode, width, 'NUM2T');
+      const n = fixedRawToNumber(padded, mode);
+      return num2tFormatDecimalNumber(n, digits);
+    }
+    if (isIeeeFloatMode(mode)) {
+      assertFormatWidth(mode, width, 'NUM2T');
+      const fw = getFormatModeWidth(mode);
+      const f = decodeToFloat(padded, mode, fw);
+      return num2tFormatDecimalNumber(f, digits);
+    }
+    throw new Error(`NUM2T: unsupported format '${mode}'`);
+  }
+
   function formatForShow(binStr, bitWidth, mode) {
     if (qModeSpec(mode)) {
       assertFormatWidth(mode, bitWidth || String(binStr).length, 'show');
@@ -1126,6 +1386,10 @@
     clampAtWidth,
     absAtWidth,
     formatForShow,
+    formatNum2tText,
+    parseT2numCallTags,
+    tryT2numFromAsciiText,
+    num2tDigitsFromBits,
     parseLiteralTag,
     getFormatModeWidth,
     genericFixedNumberToRaw,

@@ -41,6 +41,8 @@ inline [parser] .calcLang          (definition — tokens + rules)
   ...
 ```
 
+One grammar is one **text frontend** among several possible producers of the same AST schema. `comp [interp]` accepts any compatible wire — parser, schema literal, copy, or another component — without tracking the source. See [comp-interp.md — Multiple frontends, one interpreter](comp-interp.md#multiple-frontends-one-interpreter).
+
 The assembler validates the grammar at load time: unique names, token/rule name disjointness, regex subset for tokens, and symbol references inside rules.
 
 ---
