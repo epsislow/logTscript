@@ -57295,5 +57295,163 @@ inline [interp] .calcInterp {
     }, 'at least 1');
   });
 
+  /* ----- F5 rule-level lookahead & {n} quantifiers ----- */
+
+  const F5_VALUE_GRAMMAR = [
+    'token INT = [0-9]+;',
+    'token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+    'rule callSuffix = "(" INT ")" -> CallSuffix;',
+    'rule value',
+    '    = $name:ID &(callSuffix) callSuffix -> CallFunction',
+    '    | $name:ID -> CallVariable;',
+    'rule expression = value | INT -> CallNumber;',
+  ].join('\n');
+
+  function f5ValueGrammar() {
+    return parseParserBody(F5_VALUE_GRAMMAR);
+  }
+
+  reg(5340, 'parser', 'F5 elab reject capture inside lookahead', function(h) {
+    h.assertThrows('cap in la', function() {
+      parseParserBody('token ID = [a-z]+; rule r = &($x:ID) ID;');
+    }, 'capture not allowed');
+  });
+
+  reg(5341, 'parser', 'F5 elab reject quant on lookahead atom', function(h) {
+    h.assertThrows('quant atom', function() {
+      parseParserBody('token ID = [a-z]+; rule r = &("=")+ ID;');
+    }, 'quantifier not allowed on lookahead');
+  });
+
+  reg(5342, 'parser', 'F5 regex lookahead still rejected', function(h) {
+    h.assertThrows('regex la', function() {
+      parseParserBody('token BAD = (?=a);');
+    }, 'lookahead');
+  });
+
+  reg(5343, 'parser', 'F5 positive lookahead assign probe', function(h) {
+    const g = parseParserBody('token ID = [a-z]+; token INT = [0-9]+; rule s = ID &("=") "=" INT -> CallAssign;');
+    const ok = parseGrammar(g, 'x=1', { startRule: 's' });
+    h.assert('ok', String(ok.ok), '1');
+    h.assert('call', ok.tree.call, 'CallAssign');
+  });
+
+  reg(5344, 'parser', 'F5 positive lookahead probe fail', function(h) {
+    const g = parseParserBody('token ID = [a-z]+; rule s = ID &("=") "=" ID;');
+    const bad = parseGrammar(g, 'x', { startRule: 's' });
+    h.assert('fail', String(bad.ok), '0');
+  });
+
+  reg(5345, 'parser', 'F5 negative lookahead variable', function(h) {
+    const g = parseParserBody('token ID = [a-z]+; rule s = ID !("=") -> CallVar;');
+    const ok = parseGrammar(g, 'x', { startRule: 's' });
+    h.assert('ok', String(ok.ok), '1');
+    h.assert('call', ok.tree.call, 'CallVar');
+  });
+
+  reg(5346, 'parser', 'F5 negative lookahead rejects assign shape', function(h) {
+    const g = parseParserBody('token ID = [a-z]+; token INT = [0-9]+; rule s = ID !("=") -> CallVar;');
+    const bad = parseGrammar(g, 'x=1', { startRule: 's' });
+    h.assert('fail', String(bad.ok), '0');
+  });
+
+  reg(5347, 'parser', 'F5 parseText omits lookahead nodes', function(h) {
+    const g = parseParserBody('token ID = [a-z]+; token INT = [0-9]+; rule s = ID &("=") "=" INT -> CallAssign;');
+    const r = parseGrammar(g, 'a=9', { startRule: 's' });
+    const txt = formatParseTree(r.tree);
+    h.assert('no lookahead word', txt.indexOf('lookahead'), -1);
+    h.assert('has call', txt.indexOf('CallAssign') >= 0, true);
+  });
+
+  reg(5348, 'parser', 'F5 rule ref probe with arrow ignored', function(h) {
+    const g = f5ValueGrammar();
+    const fn = parseGrammar(g, 'foo(1)', { startRule: 'expression' });
+    const id = parseGrammar(g, 'bar', { startRule: 'expression' });
+    h.assert('fn ok', String(fn.ok), '1');
+    h.assert('id ok', String(id.ok), '1');
+    h.assert('CallFunction', fn.tree.call, 'CallFunction');
+    h.assert('CallVariable', id.tree.call, 'CallVariable');
+  });
+
+  reg(5349, 'parser', 'F5 literal exact count {3}', function(h) {
+    const g = parseParserBody('rule eq = "="{3};');
+    const ok = parseGrammar(g, '===', { startRule: 'eq' });
+    const bad = parseGrammar(g, '==', { startRule: 'eq' });
+    h.assert('ok', String(ok.ok), '1');
+    h.assert('fail', String(bad.ok), '0');
+    h.assert('repeat', ok.tree.quant.n, 3);
+  });
+
+  reg(5350, 'parser', 'F5 literal range count {1,3}', function(h) {
+    const g = parseParserBody('rule pad = "="{1,3} "x";');
+    h.assert('one', String(parseGrammar(g, '= x', { startRule: 'pad' }).ok), '1');
+    h.assert('three', String(parseGrammar(g, '=== x', { startRule: 'pad' }).ok), '1');
+    h.assert('zero fail', String(parseGrammar(g, 'x', { startRule: 'pad' }).ok), '0');
+  });
+
+  reg(5351, 'parser', 'F5 elab reject nested lookahead', function(h) {
+    h.assertThrows('nested', function() {
+      parseParserBody('token ID = [a-z]+; rule r = !( &(ID) );');
+    }, 'nested lookahead');
+  });
+
+  reg(5352, 'parser', 'F5 elab reject double quant', function(h) {
+    h.assertThrows('double quant', function() {
+      parseParserBody('rule r = "="{3}+;');
+    });
+  });
+
+  reg(5353, 'parser', 'F5 elab reject bare self ref rule', function(h) {
+    h.assertThrows('self ref', function() {
+      parseParserBody('rule test = test;');
+    }, 'references itself');
+  });
+
+  reg(5354, 'parser', 'F5 elab reject self lookahead rule', function(h) {
+    h.assertThrows('self la', function() {
+      parseParserBody('token A = [a]; rule test = !(test);');
+    }, 'must not reference');
+  });
+
+  reg(5355, 'parser', 'F5 elab reject lookahead ref cycle', function(h) {
+    h.assertThrows('cycle', function() {
+      parseParserBody([
+        'token A = [a];',
+        'rule altceva = !(test);',
+        'rule test = !(altceva);',
+      ].join('\n'));
+    }, 'circular lookahead');
+  });
+
+  reg(5356, 'parser', 'F5 calcLang backtrack unchanged regression', function(h) {
+    const g = parserCalcGrammar();
+    const a = parseGrammar(g, 'a=1;', { startRule: 'program' });
+    h.assert('ok', String(a.ok), '1');
+    h.assert('CallAssign', a.tree.items[0].call, 'CallAssign');
+  });
+
+  const F5_PACK_CORE = [
+    '<CallAssign>:',
+    '    name: 40',
+    '    value: 8',
+    ':',
+    '<stmt>+:',
+    '    CallAssign?: bound <CallAssign>',
+    ':',
+    'inline [parser] .f5Lang:',
+    '    token INT = [0-9]+;',
+    '    token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+    '    rule stmt = $name:ID &("=") "=" $value:INT -> CallAssign;',
+    ':',
+  ].join('\n');
+
+  function runF5PackAst(h, session) {
+    session.run(F5_PACK_CORE + '\n64wire<stmt> ast =: .f5Lang:packAst("k=4", <stmt>, "stmt")');
+    h.assert('width', String(session.getWire(session.interp, 'ast').length), '64');
+  }
+
+  reg(5357, 'parser', 'F5 packAst lookahead grammar legacy', runF5PackAst);
+  reg(5358, 'parser', 'F5 packAst lookahead grammar wave', runF5PackAst, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

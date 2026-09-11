@@ -500,6 +500,10 @@ show(s2; ascii)
 
 Both succeed. The first matches **`assignStmt`**; the second tries **`assignStmt`**, fails at `"="`, backtracks to **`exprStmt`**.
 
+### Complex rules — lookahead & counts
+
+Rule-level **`& ( … )`** / **`! ( … )`** probes and **`{n}`** / **`{n,m}`** repetition on pattern items are documented in **[inline-parser-complex-rules.md](inline-parser-complex-rules.md)** (examples with **Load / Load & Run**).
+
 ### Quantifiers — `program = statement+`
 
 ```logts-play

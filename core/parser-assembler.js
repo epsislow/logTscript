@@ -168,9 +168,19 @@ function parserTokenizePattern(src) {
       continue;
     }
     if (ch === '|' || ch === '+' || ch === '*' || ch === '?' || ch === '=' || ch === ';' || ch === ':' ||
-        ch === '(' || ch === ')') {
+        ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === '&' || ch === '!' || ch === ',') {
       tokens.push({ type: 'SYM', value: ch, line });
       i++;
+      continue;
+    }
+    if (/[0-9]/.test(ch)) {
+      let num = '';
+      const startLine = line;
+      while (i < src.length && /[0-9]/.test(src[i])) {
+        num += src[i];
+        i++;
+      }
+      tokens.push({ type: 'NUM', value: parseInt(num, 10), line: startLine });
       continue;
     }
     if (parserIsIdentStart(ch)) {
@@ -250,15 +260,57 @@ class PatternParser {
 
   parseSequenceItem() {
     const line = this.peek().line;
+    if (this.match('SYM', '&') || this.match('SYM', '!')) {
+      const op = this.tokens[this.pos - 1].value;
+      const kind = op === '&' ? 'lookaheadPos' : 'lookaheadNeg';
+      this.eat('SYM', '(');
+      const inner = this.parseLookaheadBody();
+      this.eat('SYM', ')');
+      this._rejectQuantOnLookaheadAtom(line);
+      return { kind, items: inner, line };
+    }
+    return this._applyQuantifier(this.parseCoreSequenceItem(line));
+  }
+
+  parseLookaheadBody() {
+    const line = this.peek().line;
+    const items = [];
+    while (true) {
+      if (this.match('SYM', ')')) {
+        this.pos--;
+        break;
+      }
+      if (this.match('SYM', '|') || this.match('SYM', ';') || this.match('EOF')) {
+        this.pos--;
+        break;
+      }
+      items.push(this._applyQuantifier(this.parseLookaheadSequenceItem()));
+    }
+    if (!items.length) parserError('empty lookahead body', line);
+    return items;
+  }
+
+  parseLookaheadSequenceItem() {
+    const line = this.peek().line;
+    if (this.match('SYM', '&') || this.match('SYM', '!')) {
+      parserError('nested lookahead is not allowed', line);
+    }
+    if (this.match('SYM', '$')) {
+      parserError('capture not allowed inside lookahead', line);
+    }
+    return this.parseCoreSequenceItem(line);
+  }
+
+  parseCoreSequenceItem(line) {
     if (this.match('SYM', '$')) {
       const capName = this.eat('ID');
       this.eat('SYM', ':');
       const refName = this.eat('ID');
-      return this._applyQuantifier({ kind: 'capture', name: capName.value, refName: refName.value, line });
+      return { kind: 'capture', name: capName.value, refName: refName.value, line };
     }
     if (this.match('STR')) {
       const lit = this.tokens[this.pos - 1];
-      return this._applyQuantifier({ kind: 'literal', value: lit.value, line: lit.line });
+      return { kind: 'literal', value: lit.value, line: lit.line };
     }
     if (this.match('SYM', '(')) {
       const inner = [];
@@ -266,19 +318,59 @@ class PatternParser {
         if (this.match('EOF')) parserError('unclosed ( in rule pattern', line);
         inner.push(this.parseSequenceItem());
       }
-      return this._applyQuantifier({ kind: 'group', items: inner, line });
+      return { kind: 'group', items: inner, line };
     }
     if (this.peek().type === 'ID') {
       const refTok = this.eat('ID');
-      return this._applyQuantifier({ kind: 'ref', name: refTok.value, line: refTok.line });
+      return { kind: 'ref', name: refTok.value, line: refTok.line };
     }
     parserError('expected pattern element', line);
   }
 
+  _rejectQuantOnLookaheadAtom(line) {
+    if (this.match('SYM', '+') || this.match('SYM', '*') || this.match('SYM', '?') || this.match('SYM', '{')) {
+      parserError('quantifier not allowed on lookahead atom', line);
+    }
+  }
+
   _applyQuantifier(item) {
-    if (this.match('SYM', '+')) item.quant = '+';
-    else if (this.match('SYM', '*')) item.quant = '*';
-    else if (this.match('SYM', '?')) item.quant = '?';
+    if (this.match('SYM', '+')) {
+      if (item.quant) parserError('multiple quantifiers on pattern item', item.line);
+      item.quant = '+';
+      return item;
+    }
+    if (this.match('SYM', '*')) {
+      if (item.quant) parserError('multiple quantifiers on pattern item', item.line);
+      item.quant = '*';
+      return item;
+    }
+    if (this.match('SYM', '?')) {
+      if (item.quant) parserError('multiple quantifiers on pattern item', item.line);
+      item.quant = '?';
+      return item;
+    }
+    if (this.match('SYM', '{')) {
+      if (item.quant) parserError('multiple quantifiers on pattern item', item.line);
+      const n1Tok = this.peek();
+      if (n1Tok.type !== 'NUM') parserError('expected number in {n} quantifier', n1Tok.line);
+      const n1 = this.eat('NUM').value;
+      if (this.match('SYM', ',')) {
+        if (this.match('SYM', '}')) {
+          item.quant = { kind: 'min', min: n1 };
+          return item;
+        }
+        const n2Tok = this.peek();
+        if (n2Tok.type !== 'NUM') parserError('expected number in {n,m} quantifier', n2Tok.line);
+        const n2 = this.eat('NUM').value;
+        this.eat('SYM', '}');
+        if (n1 > n2) parserError('{n,m} quantifier requires n <= m', item.line);
+        item.quant = { kind: 'range', min: n1, max: n2 };
+        return item;
+      }
+      this.eat('SYM', '}');
+      item.quant = { kind: 'fixed', n: n1 };
+      return item;
+    }
     return item;
   }
 }
@@ -318,6 +410,10 @@ function readIdent(src, i, line) {
 }
 
 function validateItemRefs(item, ruleName, tokensByName, rulesByName) {
+  if (item.kind === 'lookaheadPos' || item.kind === 'lookaheadNeg') {
+    for (const inner of item.items) validateItemRefs(inner, ruleName, tokensByName, rulesByName);
+    return;
+  }
   if (item.kind === 'ref') {
     if (!tokensByName.has(item.name) && !rulesByName.has(item.name)) {
       parserError(`unknown symbol '${item.name}' in rule '${ruleName}'`, item.line);
@@ -333,6 +429,110 @@ function validateItemRefs(item, ruleName, tokensByName, rulesByName) {
   if (item.kind === 'group') {
     for (const inner of item.items) validateItemRefs(inner, ruleName, tokensByName, rulesByName);
   }
+}
+
+function itemHasConsumingTokenOrLiteral(item) {
+  if (item.kind === 'literal') return true;
+  if (item.kind === 'ref') return true;
+  if (item.kind === 'capture') return true;
+  if (item.kind === 'group') return item.items.some(itemHasConsumingTokenOrLiteral);
+  if (item.kind === 'lookaheadPos' || item.kind === 'lookaheadNeg') return false;
+  return false;
+}
+
+function collectLookaheadRuleRefs(item, rulesByName, out) {
+  if (item.kind === 'lookaheadPos' || item.kind === 'lookaheadNeg') {
+    for (const inner of item.items) collectLookaheadRuleRefsFromBody(inner, rulesByName, out);
+    return;
+  }
+  if (item.kind === 'group') {
+    for (const inner of item.items) collectLookaheadRuleRefs(inner, rulesByName, out);
+  }
+}
+
+function collectLookaheadRuleRefsFromBody(item, rulesByName, out) {
+  if (item.kind === 'ref' && rulesByName.has(item.name)) {
+    out.add(item.name);
+    return;
+  }
+  if (item.kind === 'group') {
+    for (const inner of item.items) collectLookaheadRuleRefsFromBody(inner, rulesByName, out);
+  }
+}
+
+function ruleRefsSelfInLookahead(item, ruleName) {
+  if (item.kind === 'lookaheadPos' || item.kind === 'lookaheadNeg') {
+    for (const inner of item.items) {
+      if (lookaheadBodyRefsRule(inner, ruleName)) return true;
+    }
+  }
+  if (item.kind === 'group') {
+    for (const inner of item.items) {
+      if (ruleRefsSelfInLookahead(inner, ruleName)) return true;
+    }
+  }
+  return false;
+}
+
+function lookaheadBodyRefsRule(item, ruleName) {
+  if (item.kind === 'ref' && item.name === ruleName) return true;
+  if (item.kind === 'group') {
+    for (const inner of item.items) {
+      if (lookaheadBodyRefsRule(inner, ruleName)) return true;
+    }
+  }
+  return false;
+}
+
+function isBareSelfRefAlternative(alt, ruleName) {
+  if (alt.items.length !== 1) return false;
+  const it = alt.items[0];
+  return it.kind === 'ref' && it.name === ruleName && !it.quant;
+}
+
+function validateF5RuleSemantics(rulesByName) {
+  const lookaheadEdges = new Map();
+
+  for (const rule of rulesByName.values()) {
+    for (const alt of rule.alternatives) {
+      if (isBareSelfRefAlternative(alt, rule.name)) {
+        parserError(`rule '${rule.name}' references itself without progress`, alt.line || rule.line);
+      }
+      for (const item of alt.items) {
+        if (ruleRefsSelfInLookahead(item, rule.name)) {
+          parserError(`lookahead in rule '${rule.name}' must not reference '${rule.name}'`, item.line);
+        }
+        const refs = new Set();
+        collectLookaheadRuleRefs(item, rulesByName, refs);
+        if (!lookaheadEdges.has(rule.name)) lookaheadEdges.set(rule.name, new Set());
+        for (const ref of refs) lookaheadEdges.get(rule.name).add(ref);
+      }
+    }
+  }
+
+  const visiting = new Set();
+  const visited = new Set();
+  const stack = [];
+
+  function dfs(node) {
+    if (visiting.has(node)) {
+      const cycleStart = stack.indexOf(node);
+      const cycle = stack.slice(cycleStart).concat(node);
+      parserError(`circular lookahead rule reference: ${cycle.join(' → ')}`, rulesByName.get(node).line);
+    }
+    if (visited.has(node)) return;
+    visiting.add(node);
+    stack.push(node);
+    const next = lookaheadEdges.get(node);
+    if (next) {
+      for (const n of next) dfs(n);
+    }
+    stack.pop();
+    visiting.delete(node);
+    visited.add(node);
+  }
+
+  for (const name of rulesByName.keys()) dfs(name);
 }
 
 function parseParserBody(bodyRaw, ctxLabel) {
@@ -418,6 +618,8 @@ function parseParserBody(bodyRaw, ctxLabel) {
       }
     }
   }
+
+  validateF5RuleSemantics(rulesByName);
 
   return {
     tokens: [...tokensByName.values()],

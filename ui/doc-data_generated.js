@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp.md, inline-logic.md, inline-parser.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -24277,6 +24277,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Vectors** | \`param[]/type\`, \`[N]/type\`, \`[N]M/ascii\`, \`[]~/ascii\`, \`[N]~/ascii\` — see [Vector parameters](#vector-parameters) |
 | **Runtime API** | \`.myInterp:eval(astWire, <schema>)\` → numeric wire (width from assignment LHS) |
 | **Env** | \`env[name]\` inside method bodies for \`CallAssign\` / \`CallVariable\` programs |
+| **Debug** | \`show(a, b)\` and \`showx(Style, …)\` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
 | **Doc** | \`doc(inline.interp)\`, \`doc(.myInterp)\` |
 
 ---
@@ -24660,6 +24661,27 @@ inline [interp] .ops {
     }
 }
 \`\`\`
+
+---
+
+## Debug output: \`show\` / \`showx\`
+
+Statement builtins (not methods) — same Output panel behaviour as **\`show/N\`** and **\`showx/N\`** in [inline logic](inline-logic.md). See [logic-builtins.md — show/showx](logic-builtins.md#shown).
+
+\`\`\`logts
+CallAdd(left/s16, right/s16) {
+    show(left, "+", right);
+    showx("ff0000", "eval", left, right);
+    return left + right;
+}
+\`\`\`
+
+| Builtin | Role |
+|---------|------|
+| **\`show(a, b, …)\`** | Print decoded values (numbers, strings, vectors) as one space-separated line |
+| **\`showx(Style, a, …)\`** | Optional hex/\`x\`/\`xfff\` **Style** (clear + color) — first arg is Style, rest is content |
+
+Rules: **statements only** (not expressions); names **\`show\`** / **\`showx\`** cannot be user method names. Works in **\`.myInterp:eval(...)\`** and **\`comp [interp]\`** when the script Output panel is active.
 
 ---
 
@@ -27221,6 +27243,227 @@ doc(.character)
 - Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
 - Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)
 `,
+    'inline-parser-complex-rules.md': `# Inline parser — complex rules (lookahead & counts)
+
+Advanced **\`inline [parser]\`** patterns: **rule-level lookahead** (\`&\` / \`!\`) and **exact/range repetition** (\`{n}\`, \`{n,m}\`) on pattern items. These extend the baseline grammar features in [inline-parser.md](inline-parser.md).
+
+> **Development feature:** \`inline [parser]\` is available for experimentation. It is not part of the production language surface yet.
+
+### Running examples (Load / Load & Run)
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor without running it. Press toolbar **RUN** when ready. |
+| **Load & Run** | Copies the script and runs it immediately — check the **Output** panel for \`show\` results. |
+
+---
+
+## \`&\` is not logical AND
+
+| Symbol | Meaning |
+|--------|---------|
+| **\`& ( seq )\`** | Unary **guard** — the inner sequence must match at the current position (**zero-width**, input is restored after the probe). |
+| **\`&&\` in logic/interp** | Boolean AND on values — **not** used in \`rule\` patterns. |
+| **Combining conditions** | **Sequence** — \`A B C\` in one alternative means every step must succeed. |
+
+Regex lookahead in \`token\` patterns (e.g. \`(?=…)\`) remains **forbidden** — use rule-level \`&\` / \`!\` instead.
+
+---
+
+## Positive lookahead \`& ( … )\`
+
+Probe that the next input matches without consuming it (then continue the sequence).
+
+\`\`\`logts-play
+inline [parser] .assignLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule stmt
+        = $name:ID &("=") "=" $value:INT -> CallAssign;
+
+:
+
+400wire t1 =: .assignLang:parseText("x=9", "stmt")
+400wire t2 =: .assignLang:parseText("x", "stmt")
+show(t1; ascii)
+show(t2; ascii)
+\`\`\`
+
+After **Load & Run**: **\`t1\`** shows **\`CallAssign\`** with captures; **\`t2\`** fails (probe \`&("=")\` fails on bare \`x\`).
+
+Lookahead nodes are **omitted** from \`:parseText\` output — only consumed tokens and \`Call*\` nodes appear.
+
+---
+
+## Negative lookahead \`! ( … )\`
+
+Reject an alternative when the inner sequence **would** match from the current position.
+
+\`\`\`logts-play
+inline [parser] .varLang:
+
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule stmt = $name:ID !("=") -> CallVariable;
+
+:
+
+400wire ok =: .varLang:parseText("count", "stmt")
+400wire bad =: .varLang:parseText("count=1", "stmt")
+show(ok; ascii)
+show(bad; ascii)
+\`\`\`
+
+After **Load & Run**: **\`ok\`** parses **\`CallVariable\`**; **\`bad\`** fails (\`!\` rejects when \`=\` follows the identifier).
+
+---
+
+## Exact and range counts \`{n}\` / \`{n,m}\`
+
+Postfix counts on literals, token refs, groups, or rule refs (one quantifier per item).
+
+\`\`\`logts-play
+inline [parser] .eqLang:
+
+    rule header = "="{3} "title";
+    rule pad    = "="{1,3} "x";
+
+:
+
+400wire h =: .eqLang:parseText("===title", "header")
+400wire p =: .eqLang:parseText("==x", "pad")
+400wire nf =: .eqLang:parseText("x", "pad")
+show(h; ascii)
+show(p; ascii)
+show(nf; ascii)
+\`\`\`
+
+After **Load & Run**: **\`h\`** and **\`p\`** succeed; **\`nf\`** fails (no leading \`=\` run before \`x\`).
+
+---
+
+## Rule reference probes \`&(rule)\` / \`!(rule)\`
+
+Complex probes use a **named helper rule**. The same rule may include **\`-> Call*\`** and captures — those are **ignored during the probe** and apply only when the rule is parsed for real afterward.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallSuffix>:
+    value: bound <CallNumber>
+:
+
+<CallFunction>:
+    name: 40
+    arg: bound <CallNumber>
+:
+
+<CallVariable>:
+    name: 40
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallFunction?: bound <CallFunction>
+    CallVariable?: bound <CallVariable>
+:
+
+inline [parser] .callLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule callSuffix = "(" INT ")" -> CallSuffix;
+
+    rule value
+        = $name:ID &(callSuffix) callSuffix -> CallFunction
+        | $name:ID -> CallVariable;
+
+    rule expression = value | INT -> CallNumber;
+
+:
+
+4096wire<parseResult> prFn =: .callLang:parse("foo(7)", <expr>, "expression")
+4096wire<parseResult> prId =: .callLang:parse("bar", <expr>, "expression")
+show(prFn; <parseResult>)
+show(prId; <parseResult>)
+\`\`\`
+
+After **Load & Run**: **\`prFn\`** envelope **\`ok = 1\`** with **\`CallFunction\`**; **\`prId\`** with **\`CallVariable\`**.
+
+Pattern **\`ID &(callSuffix) callSuffix\`**: consume the identifier, probe that a parenthesized argument list follows, then parse **\`callSuffix\`** for the AST.
+
+---
+
+## \`:packAst\` and wire AST
+
+Lookahead probes do **not** appear in packed AST wires — only consumed structure is serialized.
+
+\`\`\`logts-play
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<stmt>+:
+    CallAssign?: bound <CallAssign>
+:
+
+inline [parser] .packLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule stmt = $name:ID &("=") "=" $value:INT -> CallAssign;
+
+:
+
+64wire<stmt> ast =: .packLang:packAst("k=4", <stmt>, "stmt")
+show(ast; <stmt> ascii)
+\`\`\`
+
+After **Load & Run**: **\`64wire<stmt>\`** is populated; show expands the packed **\`CallAssign\`** tree (probe \`&("=")\` is not stored in the wire).
+
+---
+
+## Invalid patterns (elaboration errors)
+
+The assembler rejects:
+
+| Pattern | Reason |
+|---------|--------|
+| \`rule test = test;\` | Self-reference without progress |
+| \`rule test = !(test);\` | Lookahead referencing the same rule |
+| \`!( &(…))\` | Nested lookahead |
+| \`& ( $x:ID )\` | Capture inside lookahead parentheses |
+| \`&("=")+\` | Quantifier on the lookahead atom |
+| \`"="{3}+\` | Multiple quantifiers on one item |
+| \`test = !(a); a = !(test);\` | Circular **lookahead-ref** graph |
+
+Use **ordered choice + backtrack** (documented in [inline-parser.md](inline-parser.md)) when it already expresses the grammar — for example existing **\`.calcLang\`** and REPL **\`.replLang\`** grammars keep their backtrack-based disambiguation.
+
+---
+
+## Quick reference
+
+| Feature | Syntax | Consumes input? |
+|---------|--------|----------------|
+| Positive lookahead | \`& ( … )\` | No (probe only) |
+| Negative lookahead | \`! ( … )\` | No (probe only) |
+| Exact repeat | \`"="{20}\`, \`ID{2}\` | Yes (when not in probe) |
+| Range repeat | \`"="{1,3}\` | Yes (greedy max→min) |
+| Rule probe | \`&(helperRule)\` | No (probe only) |
+
+See also: [inline-parser.md](inline-parser.md) · [semantic-schemas.md](semantic-schemas.md)
+`,
     'inline-parser.md': `# Inline parser — \`inline [parser]\`
 
 \`inline [parser]\` defines a **grammar** for a custom language: lexical **tokens** and syntactic **rules**. The grammar is stored at load time, inspected with \`doc()\`, and used at runtime by **\`:parse\`**, **\`:packAst\`**, and **\`:parseText\`**.
@@ -27722,6 +27965,10 @@ show(s2; ascii)
 \`\`\`
 
 Both succeed. The first matches **\`assignStmt\`**; the second tries **\`assignStmt\`**, fails at \`"="\`, backtracks to **\`exprStmt\`**.
+
+### Complex rules — lookahead & counts
+
+Rule-level **\`& ( … )\`** / **\`! ( … )\`** probes and **\`{n}\`** / **\`{n,m}\`** repetition on pattern items are documented in **[inline-parser-complex-rules.md](inline-parser-complex-rules.md)** (examples with **Load / Load & Run**).
 
 ### Quantifiers — \`program = statement+\`
 

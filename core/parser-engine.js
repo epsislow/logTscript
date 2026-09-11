@@ -132,12 +132,22 @@ function stripQuant(item) {
   return copy;
 }
 
+function formatQuantLabel(quant) {
+  if (quant == null) return '';
+  if (typeof quant === 'string') return quant;
+  if (quant.kind === 'fixed') return '{' + quant.n + '}';
+  if (quant.kind === 'range') return '{' + quant.min + ',' + quant.max + '}';
+  if (quant.kind === 'min') return '{' + quant.min + ',}';
+  return String(quant);
+}
+
 function formatParseTree(node, indent) {
   indent = indent || 0;
   const pad = '  '.repeat(indent);
   if (!node) return pad + '(null)';
   if (node.kind === 'repeat') {
-    const lines = [pad + 'repeat(' + node.quant + '):'];
+    const q = formatQuantLabel(node.quant);
+    const lines = [pad + 'repeat(' + q + '):'];
     for (const it of node.items) lines.push(formatParseTree(it, indent + 1));
     return lines.join('\n');
   }
@@ -178,6 +188,7 @@ function createParserEngine(grammar, src, options) {
   const rulesByName = new Map(rules.map((r) => [r.name, r]));
   const input = new ParserInput(src, tokens, compileRegex);
   const startRule = (options && options.startRule) || (rules[0] && rules[0].name);
+  let probeMode = 0;
 
   function parseSequenceItems(items) {
     const cp = input.save();
@@ -195,15 +206,82 @@ function createParserEngine(grammar, src, options) {
     return { captures, lastValue };
   }
 
+  function parseCountedRepeat(core, count) {
+    const items = [];
+    for (let i = 0; i < count; i++) {
+      const v = parseItemCore(core);
+      if (v === null) return null;
+      items.push(v);
+    }
+    return { kind: 'repeat', quant: { kind: 'fixed', n: count }, items };
+  }
+
   function parseItem(item) {
     const quant = item.quant;
     const core = stripQuant(item);
 
-    if (quant === '+') {
+    if (quant && typeof quant === 'object' && quant.kind === 'fixed') {
+      if (probeMode) {
+        for (let i = 0; i < quant.n; i++) {
+          if (parseItemCore(core) === null) return null;
+        }
+        return true;
+      }
+      return parseCountedRepeat(core, quant.n);
+    }
+
+    if (quant && typeof quant === 'object' && quant.kind === 'range') {
+      for (let count = quant.max; count >= quant.min; count--) {
+        const cp = input.save();
+        let ok = true;
+        const items = [];
+        for (let i = 0; i < count; i++) {
+          const v = parseItemCore(core);
+          if (v === null) {
+            ok = false;
+            break;
+          }
+          items.push(v);
+        }
+        if (ok) {
+          if (probeMode) return true;
+          return { kind: 'repeat', quant, items };
+        }
+        input.restore(cp);
+      }
+      return null;
+    }
+
+    if (quant && typeof quant === 'object' && quant.kind === 'min') {
       const items = [];
+      while (true) {
+        const cp = input.save();
+        const v = parseItemCore(core);
+        if (v === null) {
+          input.restore(cp);
+          break;
+        }
+        items.push(v);
+      }
+      if (items.length < quant.min) return null;
+      if (probeMode) return true;
+      return { kind: 'repeat', quant, items };
+    }
+
+    if (quant === '+') {
       const first = parseItemCore(core);
       if (first === null) return null;
-      items.push(first);
+      if (probeMode) {
+        while (true) {
+          const cp = input.save();
+          if (parseItemCore(core) === null) {
+            input.restore(cp);
+            break;
+          }
+        }
+        return true;
+      }
+      const items = [first];
       while (true) {
         const cp = input.save();
         const next = parseItemCore(core);
@@ -217,6 +295,16 @@ function createParserEngine(grammar, src, options) {
     }
 
     if (quant === '*') {
+      if (probeMode) {
+        while (true) {
+          const cp = input.save();
+          if (parseItemCore(core) === null) {
+            input.restore(cp);
+            break;
+          }
+        }
+        return true;
+      }
       const items = [];
       while (true) {
         const cp = input.save();
@@ -235,15 +323,33 @@ function createParserEngine(grammar, src, options) {
       const v = parseItemCore(core);
       if (v === null) {
         input.restore(cp);
+        if (probeMode) return true;
         return { kind: 'optional', present: false };
       }
+      if (probeMode) return true;
       return { kind: 'optional', present: true, value: v };
     }
 
     return parseItemCore(item);
   }
 
+  function parseLookaheadBody(items) {
+    const cp = input.save();
+    const prev = probeMode;
+    probeMode++;
+    const seq = parseSequenceItems(items);
+    probeMode = prev;
+    input.restore(cp);
+    return seq !== null;
+  }
+
   function parseItemCore(item) {
+    if (item.kind === 'lookaheadPos') {
+      return parseLookaheadBody(item.items) ? true : null;
+    }
+    if (item.kind === 'lookaheadNeg') {
+      return parseLookaheadBody(item.items) ? null : true;
+    }
     if (item.kind === 'literal') {
       return input.matchLiteral(item.value) ? true : null;
     }
@@ -267,6 +373,10 @@ function createParserEngine(grammar, src, options) {
     return null;
   }
 
+  function isTreeNode(v) {
+    return v != null && typeof v === 'object' && v !== true;
+  }
+
   function parseAlternative(alt) {
     const cp = input.save();
     const captures = {};
@@ -280,7 +390,19 @@ function createParserEngine(grammar, src, options) {
       }
       if (item.kind === 'capture') captures[item.name] = v;
       else if (item.kind === 'ref') childRefs.push(v);
-      else if (item.kind !== 'literal') lastValue = v;
+      else if (item.kind === 'lookaheadPos' || item.kind === 'lookaheadNeg') {
+        /* zero-width probe — never contributes to rule tree */
+      } else if (item.kind === 'literal' && v === true) {
+        /* bare literal marker — prefer ref/call tree nodes for lastValue */
+      } else if (isTreeNode(v)) {
+        lastValue = v;
+      } else if (item.kind !== 'literal') {
+        lastValue = v;
+      }
+    }
+    if (probeMode) {
+      if (alt.call) return true;
+      return lastValue != null ? lastValue : (childRefs.length ? childRefs[childRefs.length - 1] : true);
     }
     if (alt.call) {
       const node = { kind: 'call', call: alt.call };
@@ -360,10 +482,6 @@ function parseGrammar(grammar, src, options) {
   }
   const engine = createParserEngine(grammar, src, options);
   const startRule = engine.startRule;
-  if (!engine.input.tokenSpecs.length && src.trim().length) {
-    return parseEngineError('lex', 'no tokens defined in grammar', engine.input);
-  }
-
   try {
     const tree = engine.parseRuleName(startRule);
     if (tree === null) {
