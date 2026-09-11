@@ -13,6 +13,28 @@ function parseEngineError(kind, message, input) {
   };
 }
 
+class FatalParserError extends Error {
+  constructor(input) {
+    super('syntax error');
+    this.name = 'FatalParserError';
+    this.input = input;
+  }
+
+  toErrorStruct() {
+    return {
+      kind: 'syntax',
+      message: 'syntax error',
+      offset: this.input.pos,
+      line: this.input.line,
+      col: this.input.col,
+    };
+  }
+}
+
+function isFatalParserError(e) {
+  return e instanceof FatalParserError || (e && e.name === 'FatalParserError');
+}
+
 class ParserInput {
   constructor(src, tokenSpecs, compileRegex) {
     this.src = String(src == null ? '' : src);
@@ -190,44 +212,64 @@ function createParserEngine(grammar, src, options) {
   const startRule = (options && options.startRule) || (rules[0] && rules[0].name);
   let probeMode = 0;
 
-  function parseSequenceItems(items) {
+  function failIfCommitted(commitState) {
+    if (commitState && commitState.committed) {
+      throw new FatalParserError(input);
+    }
+  }
+
+  function parseSequenceItems(items, commitState) {
+    const cs = commitState || { committed: false };
     const cp = input.save();
     const captures = {};
     let lastValue = null;
     for (const item of items) {
-      const v = parseItem(item);
+      if (item.kind === 'commit') {
+        cs.committed = true;
+        continue;
+      }
+      const v = parseItem(item, cs);
       if (v === null) {
+        failIfCommitted(cs);
         input.restore(cp);
         return null;
       }
       if (item.kind === 'capture') captures[item.name] = v;
-      else if (item.kind !== 'literal') lastValue = v;
+      else if (item.kind === 'lookaheadPos' || item.kind === 'lookaheadNeg') {
+        /* zero-width */
+      } else if (item.kind === 'literal' && v === true) {
+        /* bare literal */
+      } else if (isTreeNode(v)) {
+        lastValue = v;
+      } else if (item.kind !== 'literal') {
+        lastValue = v;
+      }
     }
     return { captures, lastValue };
   }
 
-  function parseCountedRepeat(core, count) {
+  function parseCountedRepeat(core, count, commitState) {
     const items = [];
     for (let i = 0; i < count; i++) {
-      const v = parseItemCore(core);
+      const v = parseItemCore(core, commitState);
       if (v === null) return null;
       items.push(v);
     }
     return { kind: 'repeat', quant: { kind: 'fixed', n: count }, items };
   }
 
-  function parseItem(item) {
+  function parseItem(item, commitState) {
     const quant = item.quant;
     const core = stripQuant(item);
 
     if (quant && typeof quant === 'object' && quant.kind === 'fixed') {
       if (probeMode) {
         for (let i = 0; i < quant.n; i++) {
-          if (parseItemCore(core) === null) return null;
+          if (parseItemCore(core, commitState) === null) return null;
         }
         return true;
       }
-      return parseCountedRepeat(core, quant.n);
+      return parseCountedRepeat(core, quant.n, commitState);
     }
 
     if (quant && typeof quant === 'object' && quant.kind === 'range') {
@@ -236,7 +278,7 @@ function createParserEngine(grammar, src, options) {
         let ok = true;
         const items = [];
         for (let i = 0; i < count; i++) {
-          const v = parseItemCore(core);
+          const v = parseItemCore(core, commitState);
           if (v === null) {
             ok = false;
             break;
@@ -256,7 +298,7 @@ function createParserEngine(grammar, src, options) {
       const items = [];
       while (true) {
         const cp = input.save();
-        const v = parseItemCore(core);
+        const v = parseItemCore(core, commitState);
         if (v === null) {
           input.restore(cp);
           break;
@@ -269,12 +311,12 @@ function createParserEngine(grammar, src, options) {
     }
 
     if (quant === '+') {
-      const first = parseItemCore(core);
+      const first = parseItemCore(core, commitState);
       if (first === null) return null;
       if (probeMode) {
         while (true) {
           const cp = input.save();
-          if (parseItemCore(core) === null) {
+          if (parseItemCore(core, commitState) === null) {
             input.restore(cp);
             break;
           }
@@ -284,7 +326,7 @@ function createParserEngine(grammar, src, options) {
       const items = [first];
       while (true) {
         const cp = input.save();
-        const next = parseItemCore(core);
+        const next = parseItemCore(core, commitState);
         if (next === null) {
           input.restore(cp);
           break;
@@ -298,7 +340,7 @@ function createParserEngine(grammar, src, options) {
       if (probeMode) {
         while (true) {
           const cp = input.save();
-          if (parseItemCore(core) === null) {
+          if (parseItemCore(core, commitState) === null) {
             input.restore(cp);
             break;
           }
@@ -308,7 +350,7 @@ function createParserEngine(grammar, src, options) {
       const items = [];
       while (true) {
         const cp = input.save();
-        const next = parseItemCore(core);
+        const next = parseItemCore(core, commitState);
         if (next === null) {
           input.restore(cp);
           break;
@@ -320,7 +362,7 @@ function createParserEngine(grammar, src, options) {
 
     if (quant === '?') {
       const cp = input.save();
-      const v = parseItemCore(core);
+      const v = parseItemCore(core, commitState);
       if (v === null) {
         input.restore(cp);
         if (probeMode) return true;
@@ -330,7 +372,7 @@ function createParserEngine(grammar, src, options) {
       return { kind: 'optional', present: true, value: v };
     }
 
-    return parseItemCore(item);
+    return parseItemCore(item, commitState);
   }
 
   function parseLookaheadBody(items) {
@@ -343,7 +385,11 @@ function createParserEngine(grammar, src, options) {
     return seq !== null;
   }
 
-  function parseItemCore(item) {
+  function parseItemCore(item, commitState) {
+    if (item.kind === 'commit') {
+      if (commitState) commitState.committed = true;
+      return true;
+    }
     if (item.kind === 'lookaheadPos') {
       return parseLookaheadBody(item.items) ? true : null;
     }
@@ -358,16 +404,16 @@ function createParserEngine(grammar, src, options) {
         return input.lexToken(item.name);
       }
       if (rulesByName.has(item.name)) {
-        return parseRuleName(item.name);
+        return parseRuleName(item.name, commitState);
       }
       return null;
     }
     if (item.kind === 'capture') {
       const inner = { kind: 'ref', name: item.refName, line: item.line };
-      return parseItemCore(inner);
+      return parseItemCore(inner, commitState);
     }
     if (item.kind === 'group') {
-      const seq = parseSequenceItems(item.items);
+      const seq = parseSequenceItems(item.items, commitState);
       return seq ? seq.lastValue : null;
     }
     return null;
@@ -377,15 +423,21 @@ function createParserEngine(grammar, src, options) {
     return v != null && typeof v === 'object' && v !== true;
   }
 
-  function parseAlternative(alt) {
-    const cp = input.save();
+  function parseAlternative(alt, commitState) {
+    const cs = commitState || { committed: false };
+    const cpAlt = input.save();
     const captures = {};
     const childRefs = [];
     let lastValue = null;
     for (const item of alt.items) {
-      const v = parseItem(item);
+      if (item.kind === 'commit') {
+        cs.committed = true;
+        continue;
+      }
+      const v = parseItem(item, cs);
       if (v === null) {
-        input.restore(cp);
+        failIfCommitted(cs);
+        input.restore(cpAlt);
         return null;
       }
       if (item.kind === 'capture') captures[item.name] = v;
@@ -416,11 +468,14 @@ function createParserEngine(grammar, src, options) {
       }
       return node;
     }
-    return lastValue != null ? lastValue : (childRefs.length ? childRefs[childRefs.length - 1] : null);
+    if (lastValue != null) return lastValue;
+    if (childRefs.length) return childRefs[childRefs.length - 1];
+    return true;
   }
 
-  function parseLeftRecRule(rule, lr) {
-    const base = parseAlternative(lr.baseAlt);
+  function parseLeftRecRule(rule, lr, commitState) {
+    const cs = commitState || { committed: false };
+    const base = parseAlternative(lr.baseAlt, cs);
     if (base === null) return null;
     let acc = base;
     const recAlts = lr.recAlts || [{ tailItems: lr.tailItems, call: lr.call }];
@@ -428,19 +483,24 @@ function createParserEngine(grammar, src, options) {
       const cp = input.save();
       let matched = false;
       for (const rec of recAlts) {
-        const tail = parseSequenceItems(rec.tailItems);
-        if (tail !== null) {
-          matched = true;
-          if (rec.call) {
-            acc = {
-              kind: 'call',
-              call: rec.call,
-              children: { left: acc, right: tail.lastValue },
-            };
-          } else {
-            acc = tail.lastValue;
+        try {
+          const tail = parseSequenceItems(rec.tailItems, cs);
+          if (tail !== null) {
+            matched = true;
+            if (rec.call) {
+              acc = {
+                kind: 'call',
+                call: rec.call,
+                children: { left: acc, right: tail.lastValue },
+              };
+            } else {
+              acc = tail.lastValue;
+            }
+            break;
           }
-          break;
+        } catch (e) {
+          if (isFatalParserError(e)) throw e;
+          throw e;
         }
         input.restore(cp);
       }
@@ -449,17 +509,23 @@ function createParserEngine(grammar, src, options) {
     return acc;
   }
 
-  function parseRuleName(name) {
+  function parseRuleName(name, commitState) {
     const rule = rulesByName.get(name);
     if (!rule) return null;
     const lr = detectLeftRecPattern(rule);
-    if (lr) return parseLeftRecRule(rule, lr);
+    if (lr) return parseLeftRecRule(rule, lr, commitState);
 
     for (const alt of rule.alternatives) {
       const cp = input.save();
-      const result = parseAlternative(alt);
-      if (result !== null) {
-        return result;
+      const altCommit = commitState || { committed: false };
+      try {
+        const result = parseAlternative(alt, altCommit);
+        if (result !== null) {
+          return result;
+        }
+      } catch (e) {
+        if (isFatalParserError(e)) throw e;
+        throw e;
       }
       input.restore(cp);
     }
@@ -505,6 +571,9 @@ function parseGrammar(grammar, src, options) {
     }
     return { ok: 1, tree };
   } catch (e) {
+    if (isFatalParserError(e)) {
+      return { ok: 0, error: e.toErrorStruct() };
+    }
     return {
       ok: 0,
       error: {
@@ -522,6 +591,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.parseGrammar = parseGrammar;
   globalThis.formatParseTree = formatParseTree;
   globalThis.detectLeftRecPattern = detectLeftRecPattern;
+  globalThis.FatalParserError = FatalParserError;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -530,5 +600,6 @@ if (typeof module !== 'undefined' && module.exports) {
     formatParseTree,
     detectLeftRecPattern,
     createParserEngine,
+    FatalParserError,
   };
 }

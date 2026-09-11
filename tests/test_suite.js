@@ -57453,5 +57453,147 @@ inline [interp] .calcInterp {
   reg(5357, 'parser', 'F5 packAst lookahead grammar legacy', runF5PackAst);
   reg(5358, 'parser', 'F5 packAst lookahead grammar wave', runF5PackAst, { propagation: 'wave' });
 
+  function f5aCommitGrammar() {
+    return parseParserBody([
+      'token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+      'token INT = [0-9]+;',
+      'rule expr = ID | INT;',
+      'rule assignment = ID "=" expr ";";',
+      'rule statement',
+      '    = "while" "(" $$ expr ")" ";" -> CallWhile',
+      '    | assignment -> CallAssign;',
+    ].join('\n'));
+  }
+
+  reg(5359, 'parser', 'F5a elab reject double $$ commit', function(h) {
+    h.assertThrows('double commit', function() {
+      parseParserBody('rule r = "a" $$ $$ "b";');
+    }, 'multiple $$ commit');
+  });
+
+  reg(5360, 'parser', 'F5a elab reject $$ inside lookahead', function(h) {
+    h.assertThrows('commit in la', function() {
+      parseParserBody('token ID = [a-z]+; rule r = &( $$ ID );');
+    }, 'commit not allowed inside lookahead');
+  });
+
+  reg(5361, 'parser', 'F5a while with commit parses', function(h) {
+    const g = f5aCommitGrammar();
+    const r = parseGrammar(g, 'while ( x ) ;', { startRule: 'statement' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('call', r.tree.call, 'CallWhile');
+  });
+
+  reg(5362, 'parser', 'F5a commit marker only -> Call', function(h) {
+    const g = parseParserBody('rule marker = $$ -> CallMarker;');
+    const r = parseGrammar(g, '', { startRule: 'marker' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('call', r.tree.call, 'CallMarker');
+  });
+
+  reg(5363, 'parser', 'F5a post-commit fail no sibling backtrack', function(h) {
+    const g = parseParserBody([
+      'token INT = [0-9]+;',
+      'rule stmt = "X" $$ INT ";" -> CallX | INT ";" -> CallY;',
+    ].join('\n'));
+    const bad = parseGrammar(g, 'X = 1;', { startRule: 'stmt' });
+    const good = parseGrammar(g, 'X 9;', { startRule: 'stmt' });
+    h.assert('bad fail', String(bad.ok), '0');
+    h.assert('good ok', String(good.ok), '1');
+    h.assert('CallX', good.tree.call, 'CallX');
+  });
+
+  reg(5364, 'parser', 'F5a post-commit error at failure offset', function(h) {
+    const g = f5aCommitGrammar();
+    const r = parseGrammar(g, 'while ( x {', { startRule: 'statement' });
+    h.assert('fail', String(r.ok), '0');
+    h.assert('offset at brace', r.error && r.error.offset >= 0, true);
+    h.assert('syntax', r.error && r.error.message, 'syntax error');
+  });
+
+  reg(5365, 'parser', 'F5a pre-commit fail allows sibling backtrack', function(h) {
+    const g = f5aCommitGrammar();
+    const r = parseGrammar(g, 'count = 5;', { startRule: 'statement' });
+    h.assert('ok', String(r.ok), '1');
+    h.assert('CallAssign', r.tree.call, 'CallAssign');
+  });
+
+  reg(5366, 'parser', 'F5a whileHead helper propagates commit', function(h) {
+    const g = parseParserBody([
+      'token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+      'token INT = [0-9]+;',
+      'rule whileHead = "while" "(" $$ ;',
+      'rule stmt = whileHead INT ")" ";" -> CallWhile | ID "=" INT ";" -> CallAssign;',
+    ].join('\n'));
+    const bad = parseGrammar(g, 'while ( x {', { startRule: 'stmt' });
+    const ok = parseGrammar(g, 'while ( 3 ) ;', { startRule: 'stmt' });
+    h.assert('bad fail', String(bad.ok), '0');
+    h.assert('ok', String(ok.ok), '1');
+    h.assert('CallWhile', ok.tree.call, 'CallWhile');
+  });
+
+  reg(5367, 'parser', 'F5a parseText omits commit marker', function(h) {
+    const g = parseParserBody([
+      'token INT = [0-9]+;',
+      'rule stmt = "X" $$ INT ";" -> CallX;',
+    ].join('\n'));
+    const r = parseGrammar(g, 'X 4;', { startRule: 'stmt' });
+    const txt = formatParseTree(r.tree);
+    h.assert('no commit word', txt.indexOf('commit'), -1);
+    h.assert('CallX', txt.indexOf('CallX') >= 0, true);
+  });
+
+  const F5A_PACK_CORE = [
+    '<CallWhile>:',
+    '    value: 8',
+    ':',
+    '<CallAssign>:',
+    '    name: 40',
+    '    value: 8',
+    ':',
+    '<stmt>+:',
+    '    CallWhile?: bound <CallWhile>',
+    '    CallAssign?: bound <CallAssign>',
+    ':',
+    'inline [parser] .f5aLang:',
+    '    token INT = [0-9]+;',
+    '    token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+    '    rule stmt = "while" "(" $$ INT ")" ";" -> CallWhile',
+    '        | $name:ID &("=") "=" $value:INT ";" -> CallAssign;',
+    ':',
+  ].join('\n');
+
+  function runF5aPackAst(h, session) {
+    session.run(F5A_PACK_CORE + '\n64wire<stmt> ast =: .f5aLang:packAst("while (2);", <stmt>, "stmt")');
+    h.assert('width', String(session.getWire(session.interp, 'ast').length), '64');
+  }
+
+  reg(5368, 'parser', 'F5a packAst while commit legacy', runF5aPackAst);
+  reg(5369, 'parser', 'F5a packAst while commit wave', runF5aPackAst, { propagation: 'wave' });
+
+  reg(5370, 'parser', 'F5a FatalParserError propagates from program', function(h) {
+    const g = parseParserBody([
+      'token INT = [0-9]+;',
+      'rule statement = "X" $$ INT ";" -> CallX | INT ";" -> CallY;',
+      'rule program = statement+;',
+    ].join('\n'));
+    const r = parseGrammar(g, 'X = 1;', { startRule: 'program' });
+    h.assert('fail', String(r.ok), '0');
+  });
+
+  reg(5371, 'parser', 'F5a left-rec term commit no factor fallback', function(h) {
+    const g = parseParserBody([
+      'token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+      'token INT = [0-9]+;',
+      'rule factor = INT -> CallNum;',
+      'rule term = "while" "(" $$ ID | factor;',
+      'rule expr = term;',
+    ].join('\n'));
+    const bad = parseGrammar(g, 'while ( {', { startRule: 'expr' });
+    const ok = parseGrammar(g, '7', { startRule: 'expr' });
+    h.assert('bad fail', String(bad.ok), '0');
+    h.assert('factor ok', String(ok.ok), '1');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

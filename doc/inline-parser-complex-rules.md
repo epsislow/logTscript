@@ -1,6 +1,6 @@
-# Inline parser — complex rules (lookahead & counts)
+# Inline parser — complex rules (lookahead, counts & commit)
 
-Advanced **`inline [parser]`** patterns: **rule-level lookahead** (`&` / `!`) and **exact/range repetition** (`{n}`, `{n,m}`) on pattern items. These extend the baseline grammar features in [inline-parser.md](inline-parser.md).
+Advanced **`inline [parser]`** patterns: **rule-level lookahead** (`&` / `!`), **exact/range repetition** (`{n}`, `{n,m}`), and **alternative commit** (`$$`). These extend the baseline grammar features in [inline-parser.md](inline-parser.md).
 
 > **Development feature:** `inline [parser]` is available for experimentation. It is not part of the production language surface yet.
 
@@ -189,6 +189,164 @@ After **Load & Run**: **`64wire<stmt>`** is populated; show expands the packed *
 
 ---
 
+## Alternative commit `$$`
+
+After **`$$`**, the current **`|`** alternative is **frozen**: a later failure does **not** backtrack to sibling alternatives. The input cursor stays at the failure point (prefix already consumed).
+
+| Phase | Backtrack on `\|` siblings? |
+|-------|----------------------------|
+| Before **`$$`** | Yes — normal ordered choice (**D1110**) |
+| After **`$$`** | **No** — fatal error at current offset |
+
+**`$$`** is **zero-width** (like lookahead) and is **omitted** from `:parseText` / packed AST.
+
+### While vs assignment (no absurd backtrack)
+
+```logts-play
+<CallWhile>:
+    cond: 40
+:
+
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<stmt>+:
+    CallWhile?: bound <CallWhile>
+    CallAssign?: bound <CallAssign>
+:
+
+inline [parser] .stmtLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule expr = ID | INT;
+
+    rule assignment
+        = $name:ID "=" $value:expr ";" -> CallAssign;
+
+    rule statement
+        = "while" "(" $$ expr ")" ";" -> CallWhile
+        | assignment;
+
+:
+
+4096wire<parseResult> prOk =: .stmtLang:parse("count = 5;", <stmt>, "statement")
+4096wire<parseResult> prBad =: .stmtLang:parse("while ( x {", <stmt>, "statement")
+show(prOk; <parseResult>)
+show(prBad; <parseResult>)
+```
+
+After **Load & Run**: **`prOk`** is **`CallAssign`**; **`prBad`** is **`ok = 0`** with error at **`{`** — the **`assignment`** branch is **not** attempted after commit.
+
+### Commit blocks misleading `|` retry
+
+```logts-play
+<CallX>:
+    value: 8
+:
+
+<CallY>:
+    value: 8
+:
+
+<stmt>+:
+    CallX?: <CallX>
+    CallY?: <CallY>
+:
+
+inline [parser] .xLang:
+
+    token INT = [0-9]+;
+
+    rule stmt
+        = "X" $$ INT ";" -> CallX
+        | INT ";" -> CallY;
+
+:
+
+4096wire<parseResult> prGood =: .xLang:parse("X 9;", <stmt>, "stmt")
+4096wire<parseResult> prBad =: .xLang:parse("X = 1;", <stmt>, "stmt")
+show(prGood; <parseResult>)
+show(prBad; <parseResult>)
+```
+
+After **Load & Run**: **`X 9;`** → **`CallX`**; **`X = 1;`** → **`ok = 0`** (would match **`CallY`** without **`$$`**, but commit forbids that).
+
+### Helper rule with embedded `$$`
+
+Commit in a **referenced** rule applies to the **caller’s** alternative:
+
+```logts-play
+<CallWhile>:
+    value: 8
+:
+
+<CallOther>:
+    value: 8
+:
+
+<stmt>+:
+    CallWhile?: bound <CallWhile>
+    CallOther?: <CallOther>
+:
+
+inline [parser] .headLang:
+
+    token INT = [0-9]+;
+
+    rule whileHead = "while" "(" $$ ;
+
+    rule stmt
+        = whileHead INT ")" ";" -> CallWhile
+        | INT ";" -> CallOther;
+
+:
+
+4096wire<parseResult> pr =: .headLang:parse("while ( 2 ) ;", <stmt>, "stmt")
+4096wire<parseResult> prFail =: .headLang:parse("while ( {", <stmt>, "stmt")
+show(pr; <parseResult>)
+show(prFail; <parseResult>)
+```
+
+### `:packAst` with commit
+
+```logts-play
+<CallWhile>:
+    value: 8
+:
+
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<stmt>+:
+    CallWhile?: bound <CallWhile>
+    CallAssign?: bound <CallAssign>
+:
+
+inline [parser] .packWhileLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule stmt
+        = "while" "(" $$ INT ")" ";" -> CallWhile
+        | $name:ID &("=") "=" $value:INT ";" -> CallAssign;
+
+:
+
+64wire<stmt> ast =: .packWhileLang:packAst("while (3);", <stmt>, "stmt")
+show(ast; <stmt> ascii)
+```
+
+After **Load & Run**: wire populated with packed **`CallWhile`**; **`$$`** is not stored in the wire.
+
+---
+
 ## Invalid patterns (elaboration errors)
 
 The assembler rejects:
@@ -202,6 +360,8 @@ The assembler rejects:
 | `&("=")+` | Quantifier on the lookahead atom |
 | `"="{3}+` | Multiple quantifiers on one item |
 | `test = !(a); a = !(test);` | Circular **lookahead-ref** graph |
+| `"a" $$ $$ "b"` | Multiple **`$$`** in one alternative |
+| `&( $$ ID )` | **`$$`** inside lookahead |
 
 Use **ordered choice + backtrack** (documented in [inline-parser.md](inline-parser.md)) when it already expresses the grammar — for example existing **`.calcLang`** and REPL **`.replLang`** grammars keep their backtrack-based disambiguation.
 
@@ -216,5 +376,6 @@ Use **ordered choice + backtrack** (documented in [inline-parser.md](inline-pars
 | Exact repeat | `"="{20}`, `ID{2}` | Yes (when not in probe) |
 | Range repeat | `"="{1,3}` | Yes (greedy max→min) |
 | Rule probe | `&(helperRule)` | No (probe only) |
+| Alternative commit | `$$` | No (marker only) |
 
 See also: [inline-parser.md](inline-parser.md) · [semantic-schemas.md](semantic-schemas.md)

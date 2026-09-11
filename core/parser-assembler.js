@@ -157,6 +157,11 @@ function parserTokenizePattern(src) {
       tokens.push({ type: 'STR', value: str, line: startLine });
       continue;
     }
+    if (i + 1 < src.length && src[i] === '$' && src[i + 1] === '$') {
+      tokens.push({ type: 'SYM', value: '$$', line });
+      i += 2;
+      continue;
+    }
     if (ch === '$') {
       tokens.push({ type: 'SYM', value: '$', line });
       i++;
@@ -260,6 +265,9 @@ class PatternParser {
 
   parseSequenceItem() {
     const line = this.peek().line;
+    if (this.match('SYM', '$$')) {
+      return { kind: 'commit', line: this.tokens[this.pos - 1].line };
+    }
     if (this.match('SYM', '&') || this.match('SYM', '!')) {
       const op = this.tokens[this.pos - 1].value;
       const kind = op === '&' ? 'lookaheadPos' : 'lookaheadNeg';
@@ -292,6 +300,9 @@ class PatternParser {
 
   parseLookaheadSequenceItem() {
     const line = this.peek().line;
+    if (this.match('SYM', '$$')) {
+      parserError('commit not allowed inside lookahead', line);
+    }
     if (this.match('SYM', '&') || this.match('SYM', '!')) {
       parserError('nested lookahead is not allowed', line);
     }
@@ -334,6 +345,12 @@ class PatternParser {
   }
 
   _applyQuantifier(item) {
+    if (item.kind === 'commit') {
+      if (this.match('SYM', '+') || this.match('SYM', '*') || this.match('SYM', '?') || this.match('SYM', '{')) {
+        parserError('quantifier not allowed on commit atom', item.line);
+      }
+      return item;
+    }
     if (this.match('SYM', '+')) {
       if (item.quant) parserError('multiple quantifiers on pattern item', item.line);
       item.quant = '+';
@@ -535,6 +552,20 @@ function validateF5RuleSemantics(rulesByName) {
   for (const name of rulesByName.keys()) dfs(name);
 }
 
+function validateF5aCommitSemantics(rulesByName) {
+  for (const rule of rulesByName.values()) {
+    for (const alt of rule.alternatives) {
+      let commitCount = 0;
+      for (const item of alt.items) {
+        if (item.kind === 'commit') commitCount++;
+      }
+      if (commitCount > 1) {
+        parserError(`multiple $$ commit markers in rule '${rule.name}' alternative`, alt.line || rule.line);
+      }
+    }
+  }
+}
+
 function parseParserBody(bodyRaw, ctxLabel) {
   const src = bodyRaw == null ? '' : String(bodyRaw);
   const tokensByName = new Map();
@@ -620,6 +651,7 @@ function parseParserBody(bodyRaw, ctxLabel) {
   }
 
   validateF5RuleSemantics(rulesByName);
+  validateF5aCommitSemantics(rulesByName);
 
   return {
     tokens: [...tokensByName.values()],

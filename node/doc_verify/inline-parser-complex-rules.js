@@ -88,5 +88,38 @@ inline [parser] .eqLang:
           id && id.ok === 1 && id.tree.call === 'CallVariable';
       },
     },
+    {
+      name: 'commit while post-fail no assign backtrack',
+      src: `
+inline [parser] .stmtLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+    rule expr = ID | INT;
+    rule assignment = $name:ID "=" $value:expr ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+:
+`,
+      check: (interp) => {
+        const ok = parseLang(interp, '.stmtLang', 'count = 5;', 'statement');
+        const bad = parseLang(interp, '.stmtLang', 'while ( x {', 'statement');
+        return ok && ok.ok === 1 && ok.tree.call === 'CallAssign' &&
+          bad && bad.ok === 0;
+      },
+    },
+    {
+      name: 'commit X prefix blocks Y sibling',
+      src: `
+inline [parser] .xLang:
+    token INT = [0-9]+;
+    rule stmt = "X" $$ INT ";" -> CallX | INT ";" -> CallY;
+:
+`,
+      check: (interp) => {
+        const good = parseLang(interp, '.xLang', 'X 9;', 'stmt');
+        const bad = parseLang(interp, '.xLang', 'X = 1;', 'stmt');
+        return good && good.ok === 1 && good.tree.call === 'CallX' &&
+          bad && bad.ok === 0;
+      },
+    },
   ],
 };
