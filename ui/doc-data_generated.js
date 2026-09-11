@@ -18364,6 +18364,8 @@ For **source literals** in assignments (\`\\255\`, \`\\-3;8\`, \`"Hello"\`), see
 
 For **named bit fields** on wires (schema declaration, field access, structured literals), see **[semantic-schemas.md](semantic-schemas.md)** and the array sub-pages ([fixed arrays](schema-field-arrays.md), [variable 1D](schema-variable-arrays.md), [variable 2D matrix](schema-variable-matrix.md)). Wires with an attached schema get automatic multi-line breakdown in \`show\` / \`peek\` / \`probe\`; combine with numeric tags (\`s8\`, \`dec\`, …) per field.
 
+For **\`bound\`**, **\`bound <schema>[min-max]\`**, and **\`field?: bound <schema>\`** field paths (\`show(wire:payload)\`, \`show(wire:list)\`, \`show(wire:list:0)\`, bounded text with \`ascii\`), see **[semantic-schemas.md — Show on bound field paths](semantic-schemas.md#show-on-bound-field-paths)**.
+
 ---
 
 ## Quick comparison
@@ -28651,7 +28653,7 @@ Use **\`show(pr; <parseResult>)\`** without the **\`ascii\`** tag on the root en
 | Error message text only | \`show(pr:error:message)\` or \`show(pr:error:message; <asciiText256> ascii)\` |
 | Numeric error fields | \`show(pr:error:offset; dec)\` (or \`hex\`) |
 
-Bound **\`message\`** payloads store only the actual text length (no 2048-bit padding). **\`show\`** trims bound text to the payload, so you should see **\`text = "syntax error"\`** rather than a long run of null characters.
+Bound **\`message\`** payloads store only the actual text length (no 2048-bit padding). **\`show\`** trims bound text to the payload, so you should see **\`text = "syntax error"\`** rather than a long run of null characters. General rules for **\`show(wire:boundField)\`**, bounded lists, and bounded text apply to all schemas — see [semantic-schemas.md — Show on bound field paths](semantic-schemas.md#show-on-bound-field-paths).
 
 ### Schema argument is required
 
@@ -54714,6 +54716,57 @@ Use grouped literals \`{ { code=\\16 }{ code=\\32 }<country> }\` for list elemen
 | \`bound\` prefix | 16-bit unsigned bit length before each bounded payload |
 | Field access | Full path, e.g. \`tree:add:left:number:value\` |
 | \`show(wire; <schema>)\` | Indented tree; only present optional branches are shown |
+
+### Show on \`bound\` field paths
+
+These rules apply to **any** schema that uses \`bound\`, \`field?: bound <schema>\`, or \`bound <schema>[min-max]\` — not only built-in envelopes such as \`<parseResult>\`.
+
+On the wire, each bounded value is **\`16-bit unsigned length\` + payload bits**. Field-path \`show\` / \`peek\` / \`probe\` always slice **payload bits only** (the length prefix is never included in the displayed slice).
+
+| Path | What is shown |
+|------|----------------|
+| \`show(wire)\` | Full schema tree; each \`bound\` field expanded in place |
+| \`show(wire:field)\` | One **\`bound\`** instance — nested breakdown of the payload |
+| \`show(wire:field; <SubSchema>)\` | Same slice; optional explicit sub-schema display tag |
+| \`show(wire:list)\` | Whole **\`bound <T>[min-max]\`** list — every element + \`has length [N]\` |
+| \`show(wire:list:i)\` | Element **\`i\`** only (0-based index; required in the path) |
+
+**Width check on bounded payloads:** the sliced bit length must not exceed the referenced schema's maximum. Shorter payloads are valid — variable-width substreams are normal.
+
+**Packing bounded text:** when a \`bound\` field references a text-shaped sub-schema (e.g. a wide \`text:\` leaf), put **only the character bits** in the bound payload. Do not pad to the leaf's maximum width before the 16-bit length prefix. The length prefix carries the actual byte count.
+
+**\`ascii\` on bounded text:** apply \`ascii\` on the **text sub-path** (or on the text sub-schema tag), not on a parent that also contains numeric leaves. Bound text leaves are formatted using **payload length**, not the schema leaf maximum — so you get \`text = "Hello"\`, not a run of null characters.
+
+\`\`\`logts-play
+<number>:
+    value: 8
+:
+
+<add>:
+    left: bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    number?: <number>
+    add?: bound <add>
+:
+
+70wire<expr> tree = {
+    add={
+        left={ number={ value=\\2 }<number> }<expr>
+        right={ number={ value=\\3 }<number> }<expr>
+    }<add>
+}<expr>
+show(tree:add)
+show(tree:add:left)
+\`\`\`
+
+After **Load & Run**: \`show(tree:add)\` prints the \`<add>\` subtree (\`left\` / \`right\` bound children). \`show(tree:add:left)\` drills into the left \`<expr>\` payload only.
+
+Optional **\`field?: bound <schema>\`** on \`<name>+:\` schemas follow the same path rules when the field is present. Full \`show(wire)\` skips absent optionals (mask bit \`0\`).
+
+See also [debug.md — display tags](debug.md#show) for combining \`dec\`, \`hex\`, \`s8\`, and \`ascii\` on individual sub-paths.
 
 Wave and legacy propagation produce the same packing, field reads, and \`show\` output for these schemas.
 

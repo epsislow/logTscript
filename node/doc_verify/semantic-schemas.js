@@ -79,6 +79,37 @@ module.exports = {
       },
     },
     {
+      name: 'show terminal bound field path',
+      src: `<number>:
+    value: 8
+:
+
+<add>:
+    left: bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    number?: <number>
+    add?: bound <add>
+:
+
+70wire<expr> tree = {
+    add={
+        left={ number={ value=\\2 }<number> }<expr>
+        right={ number={ value=\\3 }<number> }<expr>
+    }<add>
+}<expr>
+show(tree:add)
+show(tree:add:left)`,
+      check: (interp) => {
+        const out = interp.out.join('\n');
+        return out.indexOf('tree:add') >= 0
+          && out.indexOf('left') >= 0
+          && out.indexOf('width incompatible') < 0;
+      },
+    },
+    {
       name: 'inline sugar same width as separate blocks',
       src: `<number>:
     value: 8

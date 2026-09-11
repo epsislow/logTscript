@@ -788,7 +788,7 @@ Use **`show(pr; <parseResult>)`** without the **`ascii`** tag on the root envelo
 | Error message text only | `show(pr:error:message)` or `show(pr:error:message; <asciiText256> ascii)` |
 | Numeric error fields | `show(pr:error:offset; dec)` (or `hex`) |
 
-Bound **`message`** payloads store only the actual text length (no 2048-bit padding). **`show`** trims bound text to the payload, so you should see **`text = "syntax error"`** rather than a long run of null characters.
+Bound **`message`** payloads store only the actual text length (no 2048-bit padding). **`show`** trims bound text to the payload, so you should see **`text = "syntax error"`** rather than a long run of null characters. General rules for **`show(wire:boundField)`**, bounded lists, and bounded text apply to all schemas — see [semantic-schemas.md — Show on bound field paths](semantic-schemas.md#show-on-bound-field-paths).
 
 ### Schema argument is required
 

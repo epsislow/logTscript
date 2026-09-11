@@ -10,6 +10,8 @@ For **source literals** in assignments (`\255`, `\-3;8`, `"Hello"`), see **[wire
 
 For **named bit fields** on wires (schema declaration, field access, structured literals), see **[semantic-schemas.md](semantic-schemas.md)** and the array sub-pages ([fixed arrays](schema-field-arrays.md), [variable 1D](schema-variable-arrays.md), [variable 2D matrix](schema-variable-matrix.md)). Wires with an attached schema get automatic multi-line breakdown in `show` / `peek` / `probe`; combine with numeric tags (`s8`, `dec`, …) per field.
 
+For **`bound`**, **`bound <schema>[min-max]`**, and **`field?: bound <schema>`** field paths (`show(wire:payload)`, `show(wire:list)`, `show(wire:list:0)`, bounded text with `ascii`), see **[semantic-schemas.md — Show on bound field paths](semantic-schemas.md#show-on-bound-field-paths)**.
+
 ---
 
 ## Quick comparison
