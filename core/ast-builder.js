@@ -359,7 +359,18 @@
         }
         fieldValues[node.name] = packed;
       } else if (node.kind === 'bound_var_array') {
-        throw new Error(`Unexpected bound_var_array '${node.name}' inside call schema '${schema.name}'`);
+        const src = resolveCallFieldSource(tree, node.name);
+        if (src != null && src.kind === 'repeat') {
+          const elemSchema = canonicalSchema(node.schema, registry);
+          const SB = sb();
+          let payload = '';
+          for (const item of src.items) {
+            payload += SB.packBoundPayload(packTree(item, elemSchema, registry, packOpts));
+          }
+          fieldValues[node.name] = payload;
+        } else {
+          throw new Error(`Missing field '${node.name}' for call '${tree.call}' in schema '${schema.name}'`);
+        }
       } else if (node.kind === 'nested') {
         throw new Error(`Nested field '${node.name}' without bound is not supported in ast-builder for '${schema.name}'`);
       }

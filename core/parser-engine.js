@@ -618,24 +618,32 @@ function createParserEngine(grammar, src, options) {
   function parseRuleName(name, commitState) {
     const rule = rulesByName.get(name);
     if (!rule) return null;
+    /* Sub-rules use a local commit flag so a failed first alternative (e.g. INT
+       before ID in factor) does not abort the whole parse when an ancestor
+       alternative already committed ($$). Propagate commit upward only on success. */
+    const localCs = { committed: false };
     const lr = detectLeftRecPattern(rule);
-    if (lr) return parseLeftRecRule(rule, lr, commitState);
-
-    for (const alt of rule.alternatives) {
-      const cp = input.save();
-      const altCommit = commitState || { committed: false };
-      try {
-        const result = parseAlternative(alt, altCommit);
-        if (result !== null) {
-          return result;
+    let result = null;
+    if (lr) {
+      result = parseLeftRecRule(rule, lr, localCs);
+    } else {
+      for (const alt of rule.alternatives) {
+        const cp = input.save();
+        try {
+          result = parseAlternative(alt, localCs);
+          if (result !== null) break;
+        } catch (e) {
+          if (isFatalParserError(e)) throw e;
+          throw e;
         }
-      } catch (e) {
-        if (isFatalParserError(e)) throw e;
-        throw e;
+        input.restore(cp);
+        result = null;
       }
-      input.restore(cp);
     }
-    return null;
+    if (result !== null && commitState && localCs.committed) {
+      commitState.committed = true;
+    }
+    return result;
   }
 
   return {

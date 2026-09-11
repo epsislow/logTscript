@@ -2639,6 +2639,15 @@
             throw new Error(`Missing bound field '${node.name}' in schema '${schema.name}'`);
           }
           bits += SB.packBoundPayload(String(payload));
+        } else if (node.kind === 'bound_var_array') {
+          const payload = fieldValues[node.name];
+          if (payload == null || payload === '') {
+            if ((node.minCount || 0) > 0) {
+              throw new Error(`Missing bound array field '${node.name}' in schema '${schema.name}'`);
+            }
+            continue;
+          }
+          bits += String(payload);
         } else if (node.kind === 'leaf') {
           const val = fieldValues[node.name];
           if (val == null) {

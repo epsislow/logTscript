@@ -733,6 +733,9 @@ function interpExtractFieldBits(payloadBits, payloadSchema, fieldName) {
       const w = node.width || 0;
       return bits.substring(offset, offset + w);
     }
+    if (node.kind === 'bound_var_array' || node.isBoundVarArray) {
+      return bits.substring(offset);
+    }
     interpError(`unsupported field shape for '${fieldName}' in schema '${payloadSchema.name}'`);
   }
   interpError(`schema '${payloadSchema.name}' has no field '${fieldName}'`);
