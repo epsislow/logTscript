@@ -5679,7 +5679,8 @@ class Interpreter {
     } catch (err) {
       return null;
     }
-    if (!view || (view.kind !== 'nested' && view.kind !== 'array' && view.kind !== 'array_row' && view.kind !== 'array_col')) return null;
+    if (!view || (view.kind !== 'nested' && view.kind !== 'array' && view.kind !== 'array_row'
+        && view.kind !== 'array_col' && view.kind !== 'bound_var_array')) return null;
     let valueStr = part.value != null ? part.value : '-';
     if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
     if (valueStr === '-') return null;
@@ -5693,6 +5694,18 @@ class Interpreter {
       resolveSchemaRef: (name) => this._resolveSchema(name),
     });
     if (wire.parseAstSchemaRef) showOpts.parseAstSchemaRef = wire.parseAstSchemaRef;
+    if (view.kind === 'bound_var_array') {
+      const typeLabel = `${displayName} (${view.width}wire)`;
+      const lines = SS.formatBoundVarArrayFieldShow(
+        valueStr,
+        view.bvaNode,
+        showOpts,
+        (bits, w) => this.formatValue(bits, w)
+      );
+      if (lines.length) lines.unshift(typeLabel);
+      else return [typeLabel];
+      return lines;
+    }
     if (view.kind === 'nested') {
       let nestedSchema = view.schema;
       if (opts && opts.schemaRef) {
@@ -5700,7 +5713,7 @@ class Interpreter {
       } else if (wire.parseAstSchemaRef && view.name === 'ast') {
         nestedSchema = this._resolveSchema(wire.parseAstSchemaRef);
       }
-      SS.validateSchemaWidthForShow(nestedSchema, valueStr.length);
+      SS.validateSchemaWidthForShow(nestedSchema, valueStr.length, view.isBoundPayload ? { boundPayload: true } : null);
       const typeLabel = `${displayName} (${view.width}wire<${nestedSchema.name}>)`;
       const lines = SS.formatSchemaShowTree(
         valueStr,

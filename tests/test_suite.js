@@ -57764,5 +57764,65 @@ inline [interp] .calcInterp {
   reg(5392, 'parser', 'F5b nested word recover local legacy', runF5bNestedInnerRecover);
   reg(5393, 'parser', 'F5b nested word recover local wave', runF5bNestedInnerRecover, { propagation: 'wave' });
 
+  const F5B_SYNC_RULE_LANG = [
+    '<CallAssign>:',
+    '    name: 40',
+    '    value: 8',
+    ':',
+    '<program>+:',
+    '    statements: bound <CallAssign>[1-]',
+    ':',
+    'inline [parser] .syncRuleLang:',
+    '    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;',
+    '    token INT = [0-9]+;',
+    '    rule expr = ID | INT;',
+    '    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;',
+    '    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;',
+    '    rule program = statement+ recover skip2(statement);',
+    ':',
+  ].join('\n');
+
+  function runParseErrorMessageShow(h, session) {
+    const src = F5B_SKETCH_INPUT;
+    session.run(
+      F5B_SYNC_RULE_LANG +
+      '\n8192wire<parseResult> pr =: .syncRuleLang:parse("' + src + '", <program>, "program")' +
+      '\nshow(pr; <parseResult>)' +
+      '\nshow(pr:error:message)' +
+      '\nshow(pr:error:message; <asciiText256> ascii)'
+    );
+    const out = session.interp.out.join('\n');
+    h.assert('syntax error text', out.indexOf('"syntax error"') >= 0, true);
+    h.assert('no nul pad before syntax', out.indexOf('\u25E6syntax error') < 0, true);
+    h.assert('message path show', out.indexOf('pr:error:message') >= 0, true);
+    h.assert('no width incompatible', out.indexOf('width incompatible') < 0, true);
+  }
+
+  reg(5394, 'parser', 'parseError message bound payload show legacy', runParseErrorMessageShow);
+  reg(5395, 'parser', 'parseError message bound payload show wave', runParseErrorMessageShow, { propagation: 'wave' });
+
+  function runParseResultErrorPaths(h, session) {
+    const src = F5B_SKETCH_INPUT;
+    session.run(
+      F5B_SYNC_RULE_LANG +
+      '\n8192wire<parseResult> pr =: .syncRuleLang:parse("' + src + '", <program>, "program")' +
+      '\nshow(pr:error)' +
+      '\nshow(pr:errors)' +
+      '\nshow(pr:errors:0)'
+    );
+    const out = session.interp.out.join('\n');
+    h.assert('error path show', out.indexOf('pr:error (212wire<parseError>)') >= 0, true);
+    h.assert('error kind', out.indexOf('kind    = 0001') >= 0, true);
+    h.assert('error message hex', out.indexOf('7379 6E74 6178 2065 7272 6F72') >= 0, true);
+    h.assert('errors array show', out.indexOf('pr:errors (228wire)') >= 0, true);
+    h.assert('errors length', out.indexOf('errors has length [1]') >= 0, true);
+    h.assert('errors index show', out.indexOf('pr:errors:0 (212wire<parseError>)') >= 0, true);
+    h.assert('no width incompatible', out.indexOf('width incompatible') < 0, true);
+    h.assert('no empty path error', out.indexOf('Empty schema field path') < 0, true);
+  }
+
+  reg(5396, 'parser', 'parseResult error and errors path show legacy', runParseResultErrorPaths);
+  reg(5397, 'parser', 'parseResult error and errors path show wave', runParseResultErrorPaths, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

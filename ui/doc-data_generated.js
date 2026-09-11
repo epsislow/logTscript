@@ -27689,6 +27689,8 @@ show(pr; <parseResult>)
 
 After **Load & Run**: same partial result as the literal form — two **\`CallAssign\`** entries and one syntax error.
 
+**Display tip:** use **\`show(pr; <parseResult>)\`** without a global **\`ascii\`** tag. Numeric fields (\`kind\`, \`offset\`, \`line\`, \`column\`, \`ok\`) are not text. For the error string alone, use **\`show(pr:error:message)\`** — the bound payload shows **\`text = "syntax error"\`** without null padding.
+
 ### Without \`recover\` — total failure (regression)
 
 \`\`\`logts-play
@@ -28636,6 +28638,20 @@ show(badPack; <parseResult>)
 \`\`\`
 
 Each **\`show\`** prints **\`ok = 0\`** and an **\`error\`** block (kind, offset, line, column, message).
+
+### Displaying \`<parseResult>\` — avoid global \`ascii\`
+
+Use **\`show(pr; <parseResult>)\`** without the **\`ascii\`** tag on the root envelope. The built-in fields **\`kind\`**, **\`offset\`**, **\`line\`**, **\`column\`**, and **\`ok\`** are numeric; applying **\`ascii\`** to the whole tree turns them into unreadable characters.
+
+| Goal | Command |
+|------|---------|
+| Full envelope (recommended) | \`show(pr; <parseResult>)\` |
+| Primary error block | \`show(pr:error)\` |
+| All recover errors | \`show(pr:errors)\` or \`show(pr:errors:0)\` for one entry |
+| Error message text only | \`show(pr:error:message)\` or \`show(pr:error:message; <asciiText256> ascii)\` |
+| Numeric error fields | \`show(pr:error:offset; dec)\` (or \`hex\`) |
+
+Bound **\`message\`** payloads store only the actual text length (no 2048-bit padding). **\`show\`** trims bound text to the payload, so you should see **\`text = "syntax error"\`** rather than a long run of null characters.
 
 ### Schema argument is required
 

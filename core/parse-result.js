@@ -84,14 +84,6 @@
     ], { hasPresenceMask: true, allowReserved: true });
   }
 
-  function buildAsciiText256WireBits(text, registry) {
-    const SS = ss();
-    const msg = String(text == null ? '' : text).slice(0, 256);
-    const textBits = wireStringToBin(msg);
-    const asciiSchema = SS.resolveSchema(registry, 'asciiText256');
-    return SS.buildSchemaLiteralBits(asciiSchema, { text: textBits }).bits;
-  }
-
   function parseErrorKindCode(kind) {
     const map = { lex: 0, syntax: 1, pack: 2 };
     if (kind != null && map[kind] != null) return map[kind];
@@ -102,7 +94,8 @@
   function buildParseErrorBits(error, registry) {
     const SS = ss();
     const err = error || {};
-    const messagePayload = buildAsciiText256WireBits(err.message || '', registry);
+    const msg = String(err.message == null ? '' : err.message).slice(0, 256);
+    const messagePayload = wireStringToBin(msg);
     const errSchema = SS.resolveSchema(registry, 'parseError');
     return SS.buildSchemaLiteralBits(errSchema, {
       kind: intToBits(parseErrorKindCode(err.kind), 4),

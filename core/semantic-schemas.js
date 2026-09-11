@@ -1487,9 +1487,21 @@
     }
   }
 
-  function validateSchemaWidthForShow(schema, wireWidth) {
+  function validateSchemaWidthForShow(schema, wireWidth, opts) {
     if (!schema) return;
     ensureSchemaShape(schema);
+    if (opts && opts.boundPayload) {
+      let maxW = schema.maxWidth;
+      if (maxW == null && !schema.hasDynamicWidth) {
+        maxW = schema.totalWidth;
+      }
+      if (maxW != null && wireWidth > maxW) {
+        throw new Error(
+          `${schema.name} (max ${maxW}bit) width incompatible with wire (${wireWidth}bit)`
+        );
+      }
+      return;
+    }
     if (schema.hasVarArray || schema.hasDynamicWidth) {
       if (wireWidth < schema.minWidth) {
         throw new Error(
@@ -1503,6 +1515,39 @@
         `${schema.name} (${schema.totalWidth}bit) width incompatible with wire (${wireWidth}bit)`
       );
     }
+  }
+
+  function boundVarArrayWireSpan(wireBits, startOff, maxCount) {
+    const SB = schemaBoundModule();
+    const bits = wireBits == null ? '' : String(wireBits);
+    let elemOff = startOff || 0;
+    const start = elemOff;
+    let end = start;
+    let count = 0;
+    while (elemOff < bits.length) {
+      const sub = SB.readBoundSubstream(bits, elemOff);
+      if (sub.len === 0 && count > 0) break;
+      end = elemOff + sub.totalWidth - 1;
+      elemOff += sub.totalWidth;
+      count++;
+      if (maxCount != null && count >= maxCount) break;
+    }
+    return { start, end, width: end >= start ? end - start + 1 : 0, count };
+  }
+
+  function terminalBoundNestedView(boundNode, sub, fieldAbsStart, pathPrefix, opts) {
+    const SB = schemaBoundModule();
+    const payloadStart = fieldAbsStart + SB.BOUND_LEN_BITS;
+    return {
+      kind: 'nested',
+      name: boundNode.name,
+      width: sub.len,
+      bitStart: payloadStart,
+      bitEnd: payloadStart + sub.len - 1,
+      schema: schemaFromRef(boundNode, opts),
+      isBoundPayload: true,
+      path: pathPrefix,
+    };
   }
 
   function getField(schema, fieldName) {
@@ -1850,22 +1895,52 @@
           let payloadBits = '';
           let payloadAbs = absBase + nodeOff;
           if (optNode.isBoundVarArray) {
+            if (i === path.length - 1) {
+              const span = boundVarArrayWireSpan(currentBits, nodeOff, optNode.maxCount);
+              return {
+                kind: 'bound_var_array',
+                name: seg,
+                width: span.width,
+                bitStart: absBase + span.start,
+                bitEnd: absBase + span.end,
+                schema: schemaFromRef(optNode, opts),
+                bvaNode: optNode,
+                path: path.slice(0, i + 1),
+              };
+            }
             const idx = segmentAsIndex(path[i + 1]);
             if (idx == null) {
               throw new Error(`Bound variable array '${seg}' requires numeric index`);
             }
             let elemOff = nodeOff;
             let elemPayload = '';
+            let elemStart = nodeOff;
             for (let e = 0; e <= idx; e++) {
               const sub = SB.readBoundSubstream(currentBits, elemOff);
-              if (e === idx) elemPayload = sub.payloadBits;
+              if (e === idx) {
+                elemPayload = sub.payloadBits;
+                elemStart = elemOff;
+              }
               elemOff += sub.totalWidth;
             }
-            return resolveSchemaView(optNode.schema, path.slice(i + 2), {
+            const elemPayloadStart = absBase + elemStart + SB.BOUND_LEN_BITS;
+            if (i + 1 === path.length - 1) {
+              return {
+                kind: 'nested',
+                name: seg,
+                width: elemPayload.length,
+                bitStart: elemPayloadStart,
+                bitEnd: elemPayloadStart + elemPayload.length - 1,
+                schema: schemaFromRef(optNode, opts),
+                isBoundPayload: true,
+                path: path.slice(0, i + 2),
+              };
+            }
+            return resolveSchemaView(schemaFromRef(optNode, opts) || optNode.schema, path.slice(i + 2), {
               ...opts,
               wireVar,
               wireBits: elemPayload,
-              absBitOffset: payloadAbs + SB.BOUND_LEN_BITS,
+              absBitOffset: elemPayloadStart,
             });
           }
           if (optNode.isBound) {
@@ -1885,6 +1960,7 @@
               bitStart: sliceStart,
               bitEnd: sliceStart + payloadBits.length - 1,
               schema: resolvedSchema,
+              isBoundPayload: !!optNode.isBound,
               path: path.slice(0, i + 1),
             };
           }
@@ -1898,6 +1974,19 @@
         const bvaNode = currentSchema.structure.find((n) => n.kind === 'bound_var_array' && n.name === seg);
         if (bvaNode) {
           const nodeOff = seqOffsets.get(seg);
+          if (i === path.length - 1) {
+            const span = boundVarArrayWireSpan(currentBits, nodeOff, bvaNode.maxCount);
+            return {
+              kind: 'bound_var_array',
+              name: seg,
+              width: span.width,
+              bitStart: absBase + span.start,
+              bitEnd: absBase + span.end,
+              schema: schemaFromRef(bvaNode, opts),
+              bvaNode,
+              path: path.slice(0, i + 1),
+            };
+          }
           const idx = segmentAsIndex(path[i + 1]);
           if (idx == null) {
             throw new Error(`Bound variable array '${seg}' requires numeric index`);
@@ -1913,11 +2002,24 @@
             }
             elemOff += sub.totalWidth;
           }
-          return resolveSchemaView(bvaNode.schema, path.slice(i + 2), {
+          const elemPayloadStart = absBase + elemStart + SB.BOUND_LEN_BITS;
+          if (i + 1 === path.length - 1) {
+            return {
+              kind: 'nested',
+              name: seg,
+              width: elemPayload.length,
+              bitStart: elemPayloadStart,
+              bitEnd: elemPayloadStart + elemPayload.length - 1,
+              schema: schemaFromRef(bvaNode, opts),
+              isBoundPayload: true,
+              path: path.slice(0, i + 2),
+            };
+          }
+          return resolveSchemaView(schemaFromRef(bvaNode, opts) || bvaNode.schema, path.slice(i + 2), {
             ...opts,
             wireVar,
             wireBits: elemPayload,
-            absBitOffset: absBase + elemStart + SB.BOUND_LEN_BITS,
+            absBitOffset: elemPayloadStart,
           });
         }
         const boundNode = currentSchema.structure.find((n) => n.kind === 'bound' && n.name === seg);
@@ -1926,15 +2028,7 @@
           const sub = SB.readBoundSubstream(currentBits, nodeOff);
           const fieldAbsStart = absBase + nodeOff;
           if (i === path.length - 1) {
-            return {
-              kind: 'nested',
-              name: seg,
-              width: sub.totalWidth,
-              bitStart: fieldAbsStart,
-              bitEnd: fieldAbsStart + sub.totalWidth - 1,
-              schema: boundNode.schema,
-              path: path.slice(0, i + 1),
-            };
+            return terminalBoundNestedView(boundNode, sub, fieldAbsStart, path.slice(0, i + 1), opts);
           }
           return resolveSchemaView(schemaFromRef(boundNode, opts), path.slice(i + 1), {
             ...opts,
@@ -2010,15 +2104,7 @@
           const sub = SB.readBoundSubstream(currentBits, offset);
           const fieldAbsStart = absBase + offset;
           if (i === path.length - 1) {
-            return {
-              kind: 'nested',
-              name: seg,
-              width: sub.totalWidth,
-              bitStart: fieldAbsStart,
-              bitEnd: fieldAbsStart + sub.totalWidth - 1,
-              schema: boundNode.schema,
-              path: path.slice(0, i + 1),
-            };
+            return terminalBoundNestedView(boundNode, sub, fieldAbsStart, path.slice(0, i + 1), opts);
           }
           const inner = resolveSchemaView(schemaFromRef(boundNode, opts), path.slice(i + 1), {
             ...opts,
@@ -2891,6 +2977,12 @@
     return lines;
   }
 
+  function formatBoundVarArrayFieldShow(bits, bvaNode, opts, formatValueFn) {
+    const lines = [];
+    appendBoundVarArrayShowLines(lines, bits, bvaNode, 0, opts, formatValueFn, 0);
+    return lines;
+  }
+
   function formatSchemaShowLines(bits, schema, opts, formatValueFn, wireTypeLabel) {
     ensureSchemaShape(schema);
     if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array' || n.kind === 'var_array' || n.kind === 'bound' || n.kind === 'optional_field')
@@ -3182,6 +3274,7 @@
     formatSchemaFieldValue,
     formatSchemaShowLines,
     formatSchemaShowTree,
+    formatBoundVarArrayFieldShow,
     formatSchemaArraySliceShow,
     formatSchemaArrayRowSliceShow,
     formatSchemaArrayColSliceShow,

@@ -776,6 +776,20 @@ show(badPack; <parseResult>)
 
 Each **`show`** prints **`ok = 0`** and an **`error`** block (kind, offset, line, column, message).
 
+### Displaying `<parseResult>` — avoid global `ascii`
+
+Use **`show(pr; <parseResult>)`** without the **`ascii`** tag on the root envelope. The built-in fields **`kind`**, **`offset`**, **`line`**, **`column`**, and **`ok`** are numeric; applying **`ascii`** to the whole tree turns them into unreadable characters.
+
+| Goal | Command |
+|------|---------|
+| Full envelope (recommended) | `show(pr; <parseResult>)` |
+| Primary error block | `show(pr:error)` |
+| All recover errors | `show(pr:errors)` or `show(pr:errors:0)` for one entry |
+| Error message text only | `show(pr:error:message)` or `show(pr:error:message; <asciiText256> ascii)` |
+| Numeric error fields | `show(pr:error:offset; dec)` (or `hex`) |
+
+Bound **`message`** payloads store only the actual text length (no 2048-bit padding). **`show`** trims bound text to the payload, so you should see **`text = "syntax error"`** rather than a long run of null characters.
+
 ### Schema argument is required
 
 **`:parse`** requires the schema reference as the **second** argument:

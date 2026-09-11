@@ -444,6 +444,8 @@ show(pr; <parseResult>)
 
 After **Load & Run**: same partial result as the literal form — two **`CallAssign`** entries and one syntax error.
 
+**Display tip:** use **`show(pr; <parseResult>)`** without a global **`ascii`** tag. Numeric fields (`kind`, `offset`, `line`, `column`, `ok`) are not text. For the error string alone, use **`show(pr:error:message)`** — the bound payload shows **`text = "syntax error"`** without null padding.
+
 ### Without `recover` — total failure (regression)
 
 ```logts-play
