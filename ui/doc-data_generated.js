@@ -27447,6 +27447,61 @@ After **\`$$\`**, the current **\`|\`** alternative is **frozen**: a later failu
 
 **\`$$\`** is **zero-width** (like lookahead) and is **omitted** from \`:parseText\` / packed AST.
 
+### Commit scope and referenced rules
+
+**\`$$\`** freezes ordered choice only **inside the rule where it appears** — sibling **\`|\`** alternatives at that level are not retried after commit.
+
+A **referenced sub-rule** (e.g. \`$cond:condition\` after **\`$$\`**) parses with a **local commit scope**. Ordered choice **inside** that sub-rule (and in rules it calls) behaves normally: the parser tries each **\`|\`** alternative until one succeeds or all fail.
+
+| Location | After **\`$$\`** |
+|----------|----------------|
+| Same rule, sibling **\`\\|\`** | Frozen — no retry |
+| Referenced sub-rule | Fresh scope — all **\`\\|\`** alternatives in the sub-rule are tried |
+| Caller | Inherits commit from a sub-rule **only when that reference succeeds** |
+
+### Referenced rule with multiple alternatives after commit
+
+\`\`\`logts-play
+<WhileLoop>:
+    value: 8
+:
+
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<stmt>+:
+    WhileLoop?: bound <WhileLoop>
+    CallAssign?: bound <CallAssign>
+:
+
+inline [parser] .condLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule condition = INT | ID;
+
+    rule assignment
+        = $name:ID "=" $value:INT ";" -> CallAssign;
+
+    rule statement
+        = "while" "(" $$ condition ")" ";" -> WhileLoop
+        | assignment;
+
+:
+
+4096wire<parseResult> prId =: .condLang:parse("while ( n ) ;", <stmt>, "statement")
+4096wire<parseResult> prNum =: .condLang:parse("while ( 2 ) ;", <stmt>, "statement")
+4096wire<parseResult> prBad =: .condLang:parse("while ( n", <stmt>, "statement")
+show(prId; <parseResult>)
+show(prNum; <parseResult>)
+show(prBad; <parseResult>)
+\`\`\`
+
+After **Load & Run**: **\`while ( n ) ;\`** and **\`while ( 2 ) ;\`** both match **\`WhileLoop\`** — **\`condition\`** tries **\`INT\`**, then **\`ID\`**. **\`prBad\`** is **\`ok = 0\`**; the **\`assignment\`** branch is not attempted after commit.
+
 ### While vs assignment (no absurd backtrack)
 
 \`\`\`logts-play
@@ -27524,7 +27579,7 @@ After **Load & Run**: **\`X 9;\`** → **\`CallX\`**; **\`X = 1;\`** → **\`ok 
 
 ### Helper rule with embedded \`$$\`
 
-Commit in a **referenced** rule applies to the **caller’s** alternative:
+When **\`$$\`** lives in a **referenced** helper rule, commit propagates to the **caller’s** alternative **once the helper succeeds**:
 
 \`\`\`logts-play
 <CallWhile>:
@@ -28674,10 +28729,12 @@ After parsing, **\`:packAst\`** builds a **typed semantic wire** from source tex
 
 | Grammar | Schema |
 |---------|--------|
+| \`-> TargetName\` on a rule | \`TargetName?: …\` on a **\`<name>+:\`** union schema (same identifier as the **\`->\`** target) |
 | \`-> CallAdd\` on a rule | \`CallAdd?: bound <CallAdd>\` on \`<expr>+\` |
 | \`-> CallNumber\` | \`CallNumber?: <CallNumber>\` |
 | \`$name:ID\` capture | maps to \`name:\` — shape decides packing (BVA bytes, fixed ASCII, …) |
-| \`rule+\` (e.g. \`statement+\`) | \`bound <CallStatement>[1-]\` list on \`<program>+\` |
+| \`rule+\` at program level (e.g. \`statement+\`) | \`bound <CallStatement>[1-]\` on \`<program>+\` |
+| \`$field:rule+\` on a **\`->\` target** | \`field: bound <ElementSchema>[min-max]\` on **\`<TargetName>:\`** (plain struct) |
 | Recursive subtree | \`left:\` / \`right:\` as **\`bound <expr>\`** |
 
 See [semantic-schemas.md — Grammar ↔ schema mapping](semantic-schemas.md#grammar--schema-mapping-calclang) for the full \`.calcLang\` table.
@@ -54692,6 +54749,54 @@ show(empty; <twoNumbers>)
 
 Use grouped literals \`{ { code=\\16 }{ code=\\32 }<country> }\` for list elements. Each element is length-prefixed on the wire.
 
+### Bound lists on plain struct schemas (\`<name>:\`)
+
+A **plain struct** (no **\`+\`**, no presence mask) may mix fixed fields, **\`bound <schema>\`**, and **\`bound <schema>[min-max]\`** in declaration order. On the wire, each bounded value and each list element is prefixed with a **16-bit unsigned bit length**; fixed-width fields follow with no prefix.
+
+This layout is used when a grammar **\`->\` target** maps to a struct with both a single subtree and a repeated capture (e.g. \`$body:step+\` → \`body: bound <Step>[1-]\` on **\`<WhileLoop>:\`**). **\`:packAst\`** packs **\`repeat\`** captures into the matching BVA field on that node.
+
+\`\`\`logts-play
+<Step>:
+    value: 8
+:
+
+<WhileLoop>:
+    cond: 8
+    body: bound <Step>[1-]
+:
+
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<stmt>+:
+    WhileLoop?: bound <WhileLoop>
+    CallAssign?: bound <CallAssign>
+:
+
+inline [parser] .loopLang:
+
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule step = INT ";" -> Step;
+
+    rule assignment
+        = $name:ID "=" $value:INT ";" -> CallAssign;
+
+    rule statement
+        = "while" "(" $$ $cond:INT ")" "{" $body:step+ "}" -> WhileLoop
+        | assignment;
+
+:
+
+90wire<stmt> ast =: .loopLang:packAst("while (1) { 2; 3; }", <stmt>, "statement")
+show(ast; <stmt> ascii)
+\`\`\`
+
+After **Load & Run**: wire shows **\`WhileLoop\`** with **\`cond\`** and a two-element **\`body\`** list. See [inline-parser.md — AST wire packing](inline-parser.md#ast-wire-packing-packast) for the full grammar ↔ schema table.
+
 ### Optional bound lists
 
 \`\`\`logts
@@ -54774,7 +54879,7 @@ Wave and legacy propagation produce the same packing, field reads, and \`show\` 
 
 ### Grammar ↔ schema mapping (\`.calcLang\`)
 
-When **\`inline [parser]\`** and **\`:packAst\`** / **\`:parse\`** are used together, grammar rules and AST schemas must agree. The **\`-> CallName\`** target on a rule alternative maps **1:1** to an optional field **\`CallName?:\`** on a **\`<name>+:\`** schema (same spelling, including the \`Call\` prefix).
+When **\`inline [parser]\`** and **\`:packAst\`** / **\`:parse\`** are used together, grammar rules and AST schemas must agree. The **\`-> TargetName\`** on a rule alternative maps **1:1** to a schema field with the **same identifier** — typically **\`TargetName?: …\`** on a **\`<name>+:\`** union schema, or a **\`<TargetName>:\`** struct when the node carries multiple named captures (including **\`bound <T>[min-max]\`** list fields).
 
 | Grammar (\`.calcLang\`) | AST schema | Wire shape |
 |-----------------------|------------|------------|

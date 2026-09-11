@@ -200,6 +200,61 @@ After **`$$`**, the current **`|`** alternative is **frozen**: a later failure d
 
 **`$$`** is **zero-width** (like lookahead) and is **omitted** from `:parseText` / packed AST.
 
+### Commit scope and referenced rules
+
+**`$$`** freezes ordered choice only **inside the rule where it appears** — sibling **`|`** alternatives at that level are not retried after commit.
+
+A **referenced sub-rule** (e.g. `$cond:condition` after **`$$`**) parses with a **local commit scope**. Ordered choice **inside** that sub-rule (and in rules it calls) behaves normally: the parser tries each **`|`** alternative until one succeeds or all fail.
+
+| Location | After **`$$`** |
+|----------|----------------|
+| Same rule, sibling **`\|`** | Frozen — no retry |
+| Referenced sub-rule | Fresh scope — all **`\|`** alternatives in the sub-rule are tried |
+| Caller | Inherits commit from a sub-rule **only when that reference succeeds** |
+
+### Referenced rule with multiple alternatives after commit
+
+```logts-play
+<WhileLoop>:
+    value: 8
+:
+
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<stmt>+:
+    WhileLoop?: bound <WhileLoop>
+    CallAssign?: bound <CallAssign>
+:
+
+inline [parser] .condLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule condition = INT | ID;
+
+    rule assignment
+        = $name:ID "=" $value:INT ";" -> CallAssign;
+
+    rule statement
+        = "while" "(" $$ condition ")" ";" -> WhileLoop
+        | assignment;
+
+:
+
+4096wire<parseResult> prId =: .condLang:parse("while ( n ) ;", <stmt>, "statement")
+4096wire<parseResult> prNum =: .condLang:parse("while ( 2 ) ;", <stmt>, "statement")
+4096wire<parseResult> prBad =: .condLang:parse("while ( n", <stmt>, "statement")
+show(prId; <parseResult>)
+show(prNum; <parseResult>)
+show(prBad; <parseResult>)
+```
+
+After **Load & Run**: **`while ( n ) ;`** and **`while ( 2 ) ;`** both match **`WhileLoop`** — **`condition`** tries **`INT`**, then **`ID`**. **`prBad`** is **`ok = 0`**; the **`assignment`** branch is not attempted after commit.
+
 ### While vs assignment (no absurd backtrack)
 
 ```logts-play
@@ -277,7 +332,7 @@ After **Load & Run**: **`X 9;`** → **`CallX`**; **`X = 1;`** → **`ok = 0`** 
 
 ### Helper rule with embedded `$$`
 
-Commit in a **referenced** rule applies to the **caller’s** alternative:
+When **`$$`** lives in a **referenced** helper rule, commit propagates to the **caller’s** alternative **once the helper succeeds**:
 
 ```logts-play
 <CallWhile>:

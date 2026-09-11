@@ -89,6 +89,24 @@ inline [parser] .eqLang:
       },
     },
     {
+      name: 'commit sub-rule tries pipe alternatives',
+      src: `
+inline [parser] .condLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+    rule condition = INT | ID;
+    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;
+    rule statement = "while" "(" $$ condition ")" ";" -> WhileLoop | assignment;
+:
+`,
+      check: (interp) => {
+        const id = parseLang(interp, '.condLang', 'while ( n ) ;', 'statement');
+        const num = parseLang(interp, '.condLang', 'while ( 2 ) ;', 'statement');
+        return id && id.ok === 1 && id.tree.call === 'WhileLoop' &&
+          num && num.ok === 1 && num.tree.call === 'WhileLoop';
+      },
+    },
+    {
       name: 'commit while post-fail no assign backtrack',
       src: `
 inline [parser] .stmtLang:

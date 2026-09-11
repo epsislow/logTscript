@@ -809,10 +809,12 @@ After parsing, **`:packAst`** builds a **typed semantic wire** from source text 
 
 | Grammar | Schema |
 |---------|--------|
+| `-> TargetName` on a rule | `TargetName?: …` on a **`<name>+:`** union schema (same identifier as the **`->`** target) |
 | `-> CallAdd` on a rule | `CallAdd?: bound <CallAdd>` on `<expr>+` |
 | `-> CallNumber` | `CallNumber?: <CallNumber>` |
 | `$name:ID` capture | maps to `name:` — shape decides packing (BVA bytes, fixed ASCII, …) |
-| `rule+` (e.g. `statement+`) | `bound <CallStatement>[1-]` list on `<program>+` |
+| `rule+` at program level (e.g. `statement+`) | `bound <CallStatement>[1-]` on `<program>+` |
+| `$field:rule+` on a **`->` target** | `field: bound <ElementSchema>[min-max]` on **`<TargetName>:`** (plain struct) |
 | Recursive subtree | `left:` / `right:` as **`bound <expr>`** |
 
 See [semantic-schemas.md — Grammar ↔ schema mapping](semantic-schemas.md#grammar--schema-mapping-calclang) for the full `.calcLang` table.
