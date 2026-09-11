@@ -151,10 +151,10 @@ inline [parser] .rules:
 | Token / rule ref | `INT`, `expression` | Match named token or rule |
 | String literal | `"+"`, `";"` | Match exact text |
 | Capture | `$name:ID` | Bind matched `ID` as `name` |
-| Group | `( A B )` | Group sub-sequence |
-| Quantifier | `statement+`, `item*`, `opt?` | Repeat previous element |
+| Group | `( A B )` | Group sub-sequence — may take a quantifier |
+| Quantifier | `statement+`, `item*`, `opt?`, `( "," item )*` | Repeat the **previous** element (token, literal, ref, or group) |
 
-Sequences are written by **juxtaposition** (no comma separator): `ID "=" expression ";"`.
+Sequences are written by **juxtaposition**: `ID "=" expression ";"` — pattern elements are adjacent, not separated by commas in the rule syntax itself.
 
 ---
 
@@ -535,6 +535,45 @@ show(progDbg; ascii)
 ```
 
 Root is **`repeat(+)`** with **two** `CallAssign` items.
+
+### Separated lists — group + quantifier
+
+To parse **one or more items separated by a fixed delimiter** (comma, semicolon, etc.), write the first item, then a **grouped** `( separator item )` with **`+`**, **`*`**, or a **count** **`{n}`** / **`{n,m}`** on the group:
+
+```logts
+rule argList = item ( "," item )* ;
+```
+
+| Pattern | Meaning |
+|---------|---------|
+| `item ( "," item )*` | One or more items — first **`item`**, then zero or more **`, item`** pairs |
+| `item ( "," item )+` | At least two items (comma required between them) |
+| `item ( ";" item ){2}` | Exactly three items separated by **`;`** |
+| `item ( "," item ){1,3}` | Two to four items total (one leading **`item`**, then 1–3 comma-separated repeats) |
+
+The separator is an ordinary **string literal** in the group — any literal or token ref you can match in a sequence works the same way.
+
+```logts-play
+inline [parser] .argsLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule atom = ID | INT;
+
+    rule argList = atom ( "," atom )*;
+
+:
+
+400wire many =: .argsLang:parseText("x, y, 42", "argList")
+400wire one  =: .argsLang:parseText("hello", "argList")
+show(many; ascii)
+show(one; ascii)
+```
+
+After **Load & Run**: **`many`** shows a **`repeat(+)`** root with **three** child matches; **`one`** shows a single **`atom`** with no comma groups ( **`*`** matched zero times).
+
+For **exact/range counts** and other advanced repetition on groups, see **[inline-parser-complex-rules.md](inline-parser-complex-rules.md)**.
 
 ### Parse errors
 

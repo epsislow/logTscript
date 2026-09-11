@@ -322,5 +322,24 @@ inline [parser] .mini:
           pack.bitWidth === 135 && parse.parseAstSchemaRef === 'expr' && parse.bitWidth > pack.bitWidth;
       },
     },
+    {
+      name: 'separated list group star comma',
+      src: `
+inline [parser] .argsLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+    rule atom = ID | INT;
+    rule argList = atom ( "," atom )*;
+:
+`,
+      check: (interp) => {
+        const inst = interp.inlineInstances.get('.argsLang');
+        if (!inst) return false;
+        const g = { tokens: inst.tokens, rules: inst.rules };
+        const many = pe.parseGrammar(g, 'x, y, 42', { startRule: 'argList' });
+        const one = pe.parseGrammar(g, 'hello', { startRule: 'argList' });
+        return many && many.ok === 1 && one && one.ok === 1;
+      },
+    },
   ],
 };
