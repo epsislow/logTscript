@@ -2286,6 +2286,23 @@ class Interpreter {
         }
       }
       if (evalOpts.declaredWidth == null && wireBits) evalOpts.declaredWidth = wireBits.length;
+      if (this.out) {
+        const bindFn = typeof logicCreateOnShowLineHandler === 'function'
+          ? logicCreateOnShowLineHandler
+          : null;
+        evalOpts.onShowLine = bindFn
+          ? bindFn(this)
+          : (line, meta) => {
+            const style = meta && meta.style ? meta.style : null;
+            if (style && style.clear) {
+              this.out.length = 0;
+              if (this.outBlocks) this.outBlocks.length = 0;
+              if (this.logicShowMeta) this.logicShowMeta.length = 0;
+            }
+            if (style && style.clearOnly) return;
+            if (line != null) this.out.push(line);
+          };
+      }
       const numResult = evalFn(inlineInst, wireBits, schemaName, this.schemaRegistry, evalOpts);
       const bits = encFn(numResult, null);
       return this._inlineParserWireReturn(bits, bits.length, computeRefs);

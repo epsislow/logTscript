@@ -1172,6 +1172,75 @@ function encodeInterpCompPoutValue(value, decl, wireBits, execAlias) {
   return interpEncodeScalarValue(value, decl.typeName, targetBits, alias);
 }
 
+function interpFormatShowValue(value) {
+  if (value == null) return '?';
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return 'nan';
+    if (value === Infinity) return 'inf';
+    if (value === -Infinity) return '-inf';
+    if (Object.is(value, -0)) return '-0';
+    const s = String(value);
+    if (s.indexOf('.') >= 0 || s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
+    return Number.isInteger(value) ? s : `${s}.0`;
+  }
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const parts = value.map((el) => interpFormatShowValue(el));
+    return `[${parts.join(', ')}]`;
+  }
+  return String(value);
+}
+
+function interpParseShowxStyleFromValue(styleVal) {
+  const parseFn = typeof logicParseShowxStyleString === 'function'
+    ? logicParseShowxStyleString
+    : null;
+  if (!parseFn) return null;
+  if (styleVal == null) return null;
+  return parseFn(String(styleVal));
+}
+
+function interpEmitShowLine(options, line, styleMeta) {
+  const onShowLine = options && typeof options.onShowLine === 'function' ? options.onShowLine : null;
+  if (!onShowLine) return;
+  if (styleMeta && (styleMeta.clear || styleMeta.color)) {
+    const style = {};
+    if (styleMeta.clear) style.clear = true;
+    if (styleMeta.color) style.color = styleMeta.color;
+    onShowLine(line, { style });
+    return;
+  }
+  onShowLine(line);
+}
+
+function interpRunShowBuiltin(name, args, env, callMethodFn, options, line) {
+  const evalArg = (a) => interpEvalExpr(a, env, callMethodFn, line);
+  const values = (args || []).map((a) => evalArg(a));
+  if (name === 'show') {
+    const text = values.map((v) => interpFormatShowValue(v)).join(' ');
+    interpEmitShowLine(options, text, null);
+    return;
+  }
+  if (name === 'showx') {
+    const styleVal = values[0];
+    const contentVals = values.slice(1);
+    const parsed = interpParseShowxStyleFromValue(styleVal);
+    if (!contentVals.length) {
+      if (parsed && parsed.clear) {
+        interpEmitShowLine(options, null, { clear: true, clearOnly: true });
+      }
+      return;
+    }
+    const text = contentVals.map((v) => interpFormatShowValue(v)).join(' ');
+    if (parsed && (parsed.clear || parsed.color)) {
+      interpEmitShowLine(options, text, parsed);
+    } else {
+      interpEmitShowLine(options, text, null);
+    }
+  }
+}
+
 function interpExecutePush(stmt, env, callMethodFn, options) {
   const buffer = options && options.poutBuffer;
   const defs = options && options.poutChannelDefs;
@@ -1233,15 +1302,19 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
       const values = (stmt.exprs || []).map((ex) => interpEvalExpr(ex, env, callMethodFn, stmt.line));
       throw { interpFlow: 'return', values };
     } else if (stmt.kind === 'call') {
-      const vals = (stmt.args || []).map((a) => evalArg(a));
-      const m = program.methods[stmt.name];
-      if (!m) interpError(`unknown method '${stmt.name}'${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
-      interpExecuteMethod(m, vals, program, sharedEnv || env, options);
+      if (stmt.name === 'show' || stmt.name === 'showx') {
+        interpRunShowBuiltin(stmt.name, stmt.args, env, callMethodFn, options, stmt.line);
+      } else {
+        const vals = (stmt.args || []).map((a) => evalArg(a));
+        const m = program.methods[stmt.name];
+        if (!m) interpError(`unknown method '${stmt.name}'${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+        interpExecuteMethod(m, vals, program, sharedEnv || env, options);
+      }
     } else if (stmt.kind === 'if') {
       if (interpEvalCond(stmt.cond, env, callMethodFn, stmt.line)) {
-        interpExecuteStmts(stmt.then, env, locals, program, callMethodFn, evalArg, sharedEnv);
+        interpExecuteStmts(stmt.then, env, locals, program, callMethodFn, evalArg, sharedEnv, options);
       } else if (stmt.else) {
-        interpExecuteStmts(stmt.else, env, locals, program, callMethodFn, evalArg, sharedEnv);
+        interpExecuteStmts(stmt.else, env, locals, program, callMethodFn, evalArg, sharedEnv, options);
       }
     } else if (stmt.kind === 'for') {
       if (stmt.init && stmt.init.kind === 'assign') {

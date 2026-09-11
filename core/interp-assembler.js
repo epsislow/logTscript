@@ -12,6 +12,12 @@ const INTERP_KEYWORDS = new Set([
 
 const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 
+const INTERP_BUILTINS = new Set(['show', 'showx']);
+
+const INTERP_SHOW_MAX_ARGS = 32;
+const INTERP_SHOWX_MAX_ARGS = 32;
+const INTERP_SHOWX_MIN_ARGS = 1;
+
 const INTERP_TYPE_RE = /^(u\d+|s\d+|ascii|bool|u1|f32|f64|fp16|bf16|q\d+p\d+)$/;
 
 function interpError(msg, line) {
@@ -298,6 +304,9 @@ class InterpParser {
 
   parseMethod() {
     const nameTok = this.eat('ID');
+    if (INTERP_BUILTINS.has(nameTok.value)) {
+      interpError(`'${nameTok.value}' is reserved — use as statement builtin, not method name`, nameTok.line);
+    }
     this.eat('SYM', '(');
     const params = [];
     if (!this.match('SYM', ')')) {
@@ -789,8 +798,30 @@ function validateReturnArity(method) {
   method.returnArity = arity;
 }
 
+function interpValidateShowBuiltinCall(name, args, line) {
+  const n = (args || []).length;
+  if (name === 'show') {
+    if (n === 0) interpError('show requires at least 1 argument', line);
+    if (n > INTERP_SHOW_MAX_ARGS) {
+      interpError(`show accepts at most ${INTERP_SHOW_MAX_ARGS} arguments`, line);
+    }
+    return;
+  }
+  if (name === 'showx') {
+    if (n < INTERP_SHOWX_MIN_ARGS) {
+      interpError('showx requires at least 1 argument (Style)', line);
+    }
+    if (n > INTERP_SHOWX_MAX_ARGS) {
+      interpError(`showx accepts at most ${INTERP_SHOWX_MAX_ARGS} arguments`, line);
+    }
+  }
+}
+
 function validateExprCallArity(expr, program, line, expectMulti) {
   if (!expr || expr.kind !== 'call') return;
+  if (INTERP_BUILTINS.has(expr.name)) {
+    interpError(`'${expr.name}' cannot be used as expression — use as statement`, line);
+  }
   const m = program.methods[expr.name];
   if (!m) return;
   if (expectMulti) {
@@ -861,6 +892,9 @@ function validateStmtTree(stmts, program) {
       validateExprTree(stmt.expr, program, stmt.line);
       if (stmt.index) validateExprTree(stmt.index, program, stmt.line);
     } else if (stmt.kind === 'call') {
+      if (INTERP_BUILTINS.has(stmt.name)) {
+        interpValidateShowBuiltinCall(stmt.name, stmt.args, stmt.line);
+      }
       for (const a of stmt.args || []) validateExprTree(a, program, stmt.line);
     } else if (stmt.kind === 'push') {
       for (const entry of stmt.entries || []) validateExprTree(entry.expr, program, stmt.line);
@@ -946,6 +980,8 @@ function formatInterpTypeDoc() {
     'doc(inline.interp)  doc(.myInterp)',
     '',
     'Runtime:  .myInterp:eval(astWire, <schema>)  — evaluate typed AST wire',
+    '',
+    'Debug:  show(a, b)  showx(fff, msg)  — Output panel (same as inline [logic] show/showx)',
   ];
 }
 
@@ -986,5 +1022,6 @@ if (typeof module !== 'undefined' && module.exports) {
     formatInterpInstanceDoc,
     interpTokenize,
     INTERP_TYPE_RE,
+    INTERP_BUILTINS,
   };
 }

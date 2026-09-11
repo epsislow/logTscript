@@ -424,13 +424,32 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
     const execFn = typeof evalInterpCompExec === 'function' ? evalInterpCompExec : null;
     if (!execFn) throw Error('Interp engine is not loaded');
 
+    const compOptions = {
+      poutBuffer: {},
+      poutChannelDefs,
+      compName,
+    };
+    if (ctx.out) {
+      const bindFn = typeof logicCreateOnShowLineHandler === 'function'
+        ? logicCreateOnShowLineHandler
+        : null;
+      compOptions.onShowLine = bindFn
+        ? bindFn(ctx)
+        : (line, meta) => {
+          const style = meta && meta.style ? meta.style : null;
+          if (style && style.clear) {
+            ctx.out.length = 0;
+            if (ctx.outBlocks) ctx.outBlocks.length = 0;
+            if (ctx.logicShowMeta) ctx.logicShowMeta.length = 0;
+          }
+          if (style && style.clearOnly) return;
+          if (line != null) ctx.out.push(line);
+        };
+    }
+
     let buffer;
     try {
-      buffer = execFn(astBits, schemaName, ctx.schemaRegistry, programInst, pinEnv, {
-        poutBuffer: {},
-        poutChannelDefs,
-        compName,
-      });
+      buffer = execFn(astBits, schemaName, ctx.schemaRegistry, programInst, pinEnv, compOptions);
     } catch (err) {
       const normFn = typeof normalizeInterpAbort === 'function' ? normalizeInterpAbort : null;
       const abortErr = normFn ? normFn(err) : err;

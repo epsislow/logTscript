@@ -29,6 +29,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Vectors** | `param[]/type`, `[N]/type`, `[N]M/ascii`, `[]~/ascii`, `[N]~/ascii` — see [Vector parameters](#vector-parameters) |
 | **Runtime API** | `.myInterp:eval(astWire, <schema>)` → numeric wire (width from assignment LHS) |
 | **Env** | `env[name]` inside method bodies for `CallAssign` / `CallVariable` programs |
+| **Debug** | `show(a, b)` and `showx(Style, …)` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
 | **Doc** | `doc(inline.interp)`, `doc(.myInterp)` |
 
 ---
@@ -412,6 +413,27 @@ inline [interp] .ops {
     }
 }
 ```
+
+---
+
+## Debug output: `show` / `showx`
+
+Statement builtins (not methods) — same Output panel behaviour as **`show/N`** and **`showx/N`** in [inline logic](inline-logic.md). See [logic-builtins.md — show/showx](logic-builtins.md#shown).
+
+```logts
+CallAdd(left/s16, right/s16) {
+    show(left, "+", right);
+    showx("ff0000", "eval", left, right);
+    return left + right;
+}
+```
+
+| Builtin | Role |
+|---------|------|
+| **`show(a, b, …)`** | Print decoded values (numbers, strings, vectors) as one space-separated line |
+| **`showx(Style, a, …)`** | Optional hex/`x`/`xfff` **Style** (clear + color) — first arg is Style, rest is content |
+
+Rules: **statements only** (not expressions); names **`show`** / **`showx`** cannot be user method names. Works in **`.myInterp:eval(...)`** and **`comp [interp]`** when the script Output panel is active.
 
 ---
 

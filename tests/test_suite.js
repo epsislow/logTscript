@@ -57214,5 +57214,86 @@ comp [interp] .replCalc:
     h.assert('TISNUM 1bit', String(ti.some(function(l) { return l.indexOf('1bit') >= 0; })), 'true');
   });
 
+  const INLINE_INTERP_SHOW = `
+inline [interp] .calcInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        show(left, "+", right);
+        return left + right;
+    }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) { return env[name]; }
+}`;
+
+  const F3_SHOW_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + INLINE_INTERP_SHOW;
+
+  function f3ShowPackAndEval(h, session, src) {
+    session.run(F3_SHOW_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, src, 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('pack ok', String(built.ok), '1');
+    const { interp } = session.run(F3_SHOW_CORE + '\n' + [
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("' + src + '", <expr>, "expression")',
+      '8wire result = .calcInterp:eval(ast, <expr>)',
+    ].join('\n'));
+    return interp;
+  }
+
+  function runInterpShowInAdd(h, session) {
+    const interp = f3ShowPackAndEval(h, session, '3+5');
+    h.assert('sum 8', session.getWire(session.interp, 'result'), '00001000');
+    h.assert('show line', String(session.outIncludes(interp, '3 + 5')), 'true');
+  }
+
+  reg(5334, 'interp', 'show in CallAdd prints terms legacy', runInterpShowInAdd);
+  reg(5335, 'interp', 'show in CallAdd prints terms wave', runInterpShowInAdd, { propagation: 'wave' });
+
+  function runInterpShowxColor(h, session) {
+    const INTERP = `
+inline [interp] .calcInterp {
+    CallNumber(value/u8) {
+        showx("ff0000", "num", value);
+        return value;
+    }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) { env[name] = value; return value; }
+    CallVariable(name/ascii) { return env[name]; }
+}`;
+    const core = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + INTERP;
+    session.run(core);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, '7', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('pack ok', String(built.ok), '1');
+    const { interp } = session.run(core + '\n' + [
+      built.bitWidth + 'wire<expr> ast = .calcLang:packAst("7", <expr>, "expression")',
+      '8wire result = .calcInterp:eval(ast, <expr>)',
+    ].join('\n'));
+    h.assert('num line', String(session.outIncludes(interp, 'num 7')), 'true');
+    const meta = (interp && interp.logicShowMeta) ? interp.logicShowMeta : [];
+    const colored = meta.filter(function(m) { return m.style && m.style.color === '#ff0000'; });
+    h.assert('styled meta', String(colored.length >= 1), 'true');
+    h.assert('color ff0000', colored[0].style.color, '#ff0000');
+  }
+
+  reg(5336, 'interp', 'showx colors output legacy', runInterpShowxColor);
+  reg(5337, 'interp', 'showx colors output wave', runInterpShowxColor, { propagation: 'wave' });
+
+  reg(5338, 'interp', 'show reserved as method name', function(h) {
+    h.assertThrows('reserved show method', function() {
+      parseInterpBody('show(x) { return 0; }');
+    }, 'reserved');
+  });
+
+  reg(5339, 'interp', 'show requires at least one argument', function(h) {
+    h.assertThrows('show arity', function() {
+      parseInterpBody('CallNumber(value/u8) { show(); return value; }');
+    }, 'at least 1');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
