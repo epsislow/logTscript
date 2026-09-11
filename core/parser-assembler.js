@@ -354,6 +354,7 @@ class PatternParser {
     if (this.match('SYM', '+')) {
       if (item.quant) parserError('multiple quantifiers on pattern item', item.line);
       item.quant = '+';
+      item.recover = this._parseRecoverSkip2Optional(item.line);
       return item;
     }
     if (this.match('SYM', '*')) {
@@ -389,6 +390,29 @@ class PatternParser {
       return item;
     }
     return item;
+  }
+
+  _parseRecoverSkip2Optional(line) {
+    const save = this.pos;
+    if (!this.match('ID', 'recover')) {
+      this.pos = save;
+      return null;
+    }
+    if (!this.match('ID', 'skip2')) {
+      parserError("expected 'skip2' after recover", this.peek().line);
+    }
+    this.eat('SYM', '(');
+    if (this.match('STR')) {
+      const lit = this.tokens[this.pos - 1].value;
+      this.eat('SYM', ')');
+      return { kind: 'literal', value: lit, line };
+    }
+    if (this.peek().type === 'ID') {
+      const ruleName = this.eat('ID').value;
+      this.eat('SYM', ')');
+      return { kind: 'rule', name: ruleName, line };
+    }
+    parserError('expected string literal or rule name in skip2(...)', line);
   }
 }
 
@@ -552,6 +576,46 @@ function validateF5RuleSemantics(rulesByName) {
   for (const name of rulesByName.keys()) dfs(name);
 }
 
+function getDetectLeftRecPattern() {
+  if (typeof detectLeftRecPattern === 'function') return detectLeftRecPattern;
+  if (typeof globalThis !== 'undefined' && typeof globalThis.detectLeftRecPattern === 'function') {
+    return globalThis.detectLeftRecPattern;
+  }
+  try {
+    const pe = require('./parser-engine.js');
+    if (pe && typeof pe.detectLeftRecPattern === 'function') return pe.detectLeftRecPattern;
+  } catch (e) { /* browser bundle */ }
+  return null;
+}
+
+function validateF5bRecoverSemantics(rulesByName) {
+  const detectLR = getDetectLeftRecPattern();
+  for (const rule of rulesByName.values()) {
+    if (detectLR && detectLR(rule)) {
+      for (const alt of rule.alternatives) {
+        for (const item of alt.items) {
+          if (item.recover) {
+            parserError(
+              `recover skip2 is not allowed on left-recursive rule '${rule.name}'`,
+              item.recover.line || item.line || rule.line
+            );
+          }
+        }
+      }
+    }
+    for (const alt of rule.alternatives) {
+      for (const item of alt.items) {
+        if (item.recover && item.quant !== '+') {
+          parserError('recover skip2 requires + repetition on the same item', item.recover.line || item.line);
+        }
+        if (item.recover && item.recover.kind === 'rule' && !rulesByName.has(item.recover.name)) {
+          parserError(`unknown rule '${item.recover.name}' in recover skip2(...)`, item.recover.line || item.line);
+        }
+      }
+    }
+  }
+}
+
 function validateF5aCommitSemantics(rulesByName) {
   for (const rule of rulesByName.values()) {
     for (const alt of rule.alternatives) {
@@ -580,8 +644,11 @@ function parseParserBody(bodyRaw, ctxLabel) {
     const kw = readWord(src, i);
     if (!kw) parserError('expected token or rule declaration', declLine);
 
-    if (kw.word === 'error' || kw.word === 'recover') {
-      parserError(`'${kw.word}' is not supported yet in inline [parser] body`, declLine);
+    if (kw.word === 'error') {
+      parserError("'error' is not supported yet in inline [parser] body", declLine);
+    }
+    if (kw.word === 'recover') {
+      parserError("'recover' must appear in a rule pattern after '+' (recover skip2(...))", declLine);
     }
     if (kw.word !== 'token' && kw.word !== 'rule') {
       parserError(`expected 'token' or 'rule' declaration, got '${kw.word}'`, declLine);
@@ -652,6 +719,7 @@ function parseParserBody(bodyRaw, ctxLabel) {
 
   validateF5RuleSemantics(rulesByName);
   validateF5aCommitSemantics(rulesByName);
+  validateF5bRecoverSemantics(rulesByName);
 
   return {
     tokens: [...tokensByName.values()],

@@ -121,5 +121,65 @@ inline [parser] .xLang:
           bad && bad.ok === 0;
       },
     },
+    {
+      name: 'recover skip2 semicolon partial three-line sketch',
+      src: `
+inline [parser] .sketchLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+    rule expr = ID | INT;
+    rule assignment = ID "=" expr ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+ recover skip2(";");
+:
+`,
+      check: (interp) => {
+        const r = parseLang(interp, '.sketchLang', 'x = 1; while ( x { ; y = 2;', 'program');
+        if (!r || r.ok !== 0 || !r.tree || !r.errors || r.errors.length !== 1) return false;
+        let assigns = 0;
+        if (r.tree.kind === 'repeat' && r.tree.items) {
+          for (const it of r.tree.items) {
+            if (it.kind === 'call' && it.call === 'CallAssign') assigns++;
+          }
+        }
+        return assigns === 2;
+      },
+    },
+    {
+      name: 'recover skip2 statement rule sync',
+      src: `
+inline [parser] .syncRuleLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+    rule expr = ID | INT;
+    rule assignment = ID "=" expr ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+ recover skip2(statement);
+:
+`,
+      check: (interp) => {
+        const r = parseLang(interp, '.syncRuleLang', 'x = 1; while ( x { ; y = 2;', 'program');
+        if (!r || r.ok !== 0 || !r.tree || !r.errors || r.errors.length !== 1) return false;
+        return r.tree.kind === 'repeat' && r.tree.items && r.tree.items.length === 2;
+      },
+    },
+    {
+      name: 'recover EOF append recover failed',
+      src: `
+inline [parser] .eofRecoverLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+    rule expr = ID | INT;
+    rule assignment = ID "=" expr ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+ recover skip2(";");
+:
+`,
+      check: (interp) => {
+        const r = parseLang(interp, '.eofRecoverLang', 'x = 1; while ( x {', 'program');
+        return r && r.ok === 0 && r.tree && r.errors && r.errors.length === 2 &&
+          r.errors[1].message === 'recover failed';
+      },
+    },
   ],
 };

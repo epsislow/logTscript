@@ -2254,6 +2254,9 @@ class Interpreter {
         validateMapping: false,
       });
       if (!result.ok) {
+        if (result.bits) {
+          return this._inlineParserWireReturn(result.bits, result.bitWidth, computeRefs);
+        }
         const err = result.error || {};
         throw new Error('packAst error (' + (err.kind || 'pack') + '): ' + (err.message || ''));
       }

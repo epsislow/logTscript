@@ -57595,5 +57595,174 @@ inline [interp] .calcInterp {
     h.assert('factor ok', String(ok.ok), '1');
   });
 
+  function f5bStmtGrammar(recoverSpec) {
+    const lines = [
+      'token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+      'token INT = [0-9]+;',
+      'rule expr = ID | INT;',
+      'rule assignment = ID "=" expr ";" -> CallAssign;',
+      'rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;',
+    ];
+    if (recoverSpec === null) {
+      lines.push('rule program = statement+;');
+    } else if (recoverSpec === 'statement') {
+      lines.push('rule program = statement+ recover skip2(statement);');
+    } else {
+      lines.push('rule program = statement+ recover skip2(";");');
+    }
+    return parseParserBody(lines.join('\n'));
+  }
+
+  const F5B_SKETCH_INPUT = 'x = 1; while ( x { ; y = 2;';
+
+  function countCallsInTree(node, callName) {
+    if (!node || typeof node !== 'object') return 0;
+    let n = node.kind === 'call' && node.call === callName ? 1 : 0;
+    if (node.kind === 'repeat' && node.items) {
+      for (const it of node.items) n += countCallsInTree(it, callName);
+    }
+    if (node.kind === 'call' && node.children) {
+      for (const k of Object.keys(node.children)) n += countCallsInTree(node.children[k], callName);
+    }
+    if (node.kind === 'optional' && node.present) n += countCallsInTree(node.value, callName);
+    return n;
+  }
+
+  reg(5379, 'parser', 'F5b elab reject recover skip2 without plus', function(h) {
+    h.assertThrows('recover no plus', function() {
+      parseParserBody('token ID = [a-z]+; rule item = ID; rule program = item recover skip2(";");');
+    }, "unknown symbol 'recover'");
+  });
+
+  reg(5380, 'parser', 'F5b elab reject recover as top-level keyword', function(h) {
+    h.assertThrows('recover keyword', function() {
+      parseParserBody('token ID = [a-z]+; recover skip2(";"); rule program = ID+;');
+    }, "must appear in a rule pattern after '+'");
+  });
+
+  function runF5bSketchSemicolon(h) {
+    const g = f5bStmtGrammar(';');
+    const r = parseGrammar(g, F5B_SKETCH_INPUT, { startRule: 'program' });
+    h.assert('partial ok=0', String(r.ok), '0');
+    h.assert('tree present', r.tree != null, true);
+    h.assert('two CallAssign', countCallsInTree(r.tree, 'CallAssign'), 2);
+    h.assert('errors length 1', r.errors && r.errors.length, 1);
+    h.assert('syntax error msg', r.errors[0].message, 'syntax error');
+    h.assert('offset at brace', r.errors[0].offset, F5B_SKETCH_INPUT.indexOf('{'));
+  }
+
+  reg(5381, 'parser', 'F5b sketch skip2 semicolon partial legacy', runF5bSketchSemicolon);
+  reg(5382, 'parser', 'F5b sketch skip2 semicolon partial wave', runF5bSketchSemicolon, { propagation: 'wave' });
+
+  function runF5bSketchRuleSync(h) {
+    const g = f5bStmtGrammar('statement');
+    const r = parseGrammar(g, F5B_SKETCH_INPUT, { startRule: 'program' });
+    h.assert('partial ok=0', String(r.ok), '0');
+    h.assert('two CallAssign', countCallsInTree(r.tree, 'CallAssign'), 2);
+    h.assert('errors length 1', r.errors && r.errors.length, 1);
+  }
+
+  reg(5383, 'parser', 'F5b sketch skip2 statement rule partial legacy', runF5bSketchRuleSync);
+  reg(5384, 'parser', 'F5b sketch skip2 statement rule partial wave', runF5bSketchRuleSync, { propagation: 'wave' });
+
+  function runF5bNoRecoverFail(h) {
+    const g = f5bStmtGrammar(null);
+    const r = parseGrammar(g, F5B_SKETCH_INPUT, { startRule: 'program' });
+    h.assert('fail ok=0', String(r.ok), '0');
+    h.assert('no tree', r.tree == null, true);
+    h.assert('single error', r.error && r.error.message, 'syntax error');
+  }
+
+  reg(5385, 'parser', 'F5b without recover total fail legacy', runF5bNoRecoverFail);
+  reg(5386, 'parser', 'F5b without recover total fail wave', runF5bNoRecoverFail, { propagation: 'wave' });
+
+  function runF5bRecoverEof(h) {
+    const g = f5bStmtGrammar(';');
+    const src = 'x = 1; while ( x {';
+    const r = parseGrammar(g, src, { startRule: 'program' });
+    h.assert('partial ok=0', String(r.ok), '0');
+    h.assert('tree present', r.tree != null, true);
+    h.assert('one CallAssign', countCallsInTree(r.tree, 'CallAssign'), 1);
+    h.assert('errors length 2', r.errors && r.errors.length, 2);
+    h.assert('primary syntax', r.errors[0].message, 'syntax error');
+    h.assert('secondary recover failed', r.errors[1].message, 'recover failed');
+  }
+
+  reg(5387, 'parser', 'F5b skip2 EOF two errors legacy', runF5bRecoverEof);
+  reg(5388, 'parser', 'F5b skip2 EOF two errors wave', runF5bRecoverEof, { propagation: 'wave' });
+
+  const F5B_PARSE_CORE = [
+    '<CallAssign>:',
+    '    name: 40',
+    '    value: 8',
+    ':',
+    '<program>+:',
+    '    statements: bound <CallAssign>[1-]',
+    ':',
+    'inline [parser] .recoverLang:',
+    '    token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+    '    token INT = [0-9]+;',
+    '    rule expr = ID | INT;',
+    '    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;',
+    '    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;',
+    '    rule program = statement+ recover skip2(";");',
+    ':',
+  ].join('\n');
+
+  function runF5bParseEnvelope(h, session) {
+    const src = F5B_SKETCH_INPUT;
+    session.run(
+      F5B_PARSE_CORE +
+      '\n8192wire<parseResult> pr =: .recoverLang:parse("' + src + '", <program>, "program")' +
+      '\nshow(pr; <parseResult>)'
+    );
+    const out = session.interp.out.join('\n');
+    h.assert('ok=0', f2dOutHasOk(out, 0), true);
+    h.assert('two statements', out.indexOf('statements has length [2]') >= 0, true);
+    h.assert('errors array', out.indexOf('errors has length [1]') >= 0, true);
+    h.assert('has ast block', out.indexOf('  ast') >= 0, true);
+    const g = f5bStmtGrammar(';');
+    const r = parseGrammar(g, src, { startRule: 'program' });
+    h.assert('offset at brace', r.errors[0].offset, src.indexOf('{'));
+  }
+
+  reg(5389, 'parser', 'F5b parse envelope errors legacy', runF5bParseEnvelope);
+  reg(5390, 'parser', 'F5b parse envelope errors wave', runF5bParseEnvelope, { propagation: 'wave' });
+
+  reg(5391, 'parser', 'F5b elab reject recover on left-rec rule', function(h) {
+    h.assertThrows('left rec recover', function() {
+      parseParserBody([
+        'token ID = [a-z]+;',
+        'rule expr = expr "+" ID | ID+ recover skip2(";");',
+      ].join('\n'));
+    }, 'recover skip2 is not allowed on left-recursive rule');
+  });
+
+  function f5bNestedGrammar(innerRecover) {
+    const wordRule = innerRecover
+      ? 'rule words = word+ recover skip2(";");'
+      : 'rule words = word+;';
+    return parseParserBody([
+      'token ID = [a-zA-Z_][a-zA-Z0-9_]*;',
+      'rule word = ID $$ ";" -> CallWord;',
+      wordRule,
+      'rule line = "#" words -> CallLine;',
+      'rule program = line+;',
+    ].join('\n'));
+  }
+
+  const F5B_NESTED_INPUT = '# a ; x { ; y ; # d ; e ;';
+
+  function runF5bNestedInnerRecover(h) {
+    const withRecover = parseGrammar(f5bNestedGrammar(true), F5B_NESTED_INPUT, { startRule: 'program' });
+    const withoutRecover = parseGrammar(f5bNestedGrammar(false), F5B_NESTED_INPUT, { startRule: 'program' });
+    h.assert('inner recover two lines', withRecover.tree.items.length, 2);
+    h.assert('no inner recover no tree', withoutRecover.tree == null, true);
+    h.assert('inner errors local', withRecover.errors && withRecover.errors.length, 1);
+  }
+
+  reg(5392, 'parser', 'F5b nested word recover local legacy', runF5bNestedInnerRecover);
+  reg(5393, 'parser', 'F5b nested word recover local wave', runF5bNestedInnerRecover, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

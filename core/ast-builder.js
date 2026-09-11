@@ -460,12 +460,23 @@
     validateAstSchemaHasPlus(rootName, registry);
     const startRule = options && options.startRule;
     const parsed = parseFn(grammar, src, startRule ? { startRule } : undefined);
-    if (!parsed.ok) {
+    if (!parsed.ok && !parsed.tree) {
       return { ok: 0, error: parsed.error };
+    }
+    if (!parsed.tree) {
+      return { ok: 0, error: parsed.error || { kind: 'syntax', message: 'parse failed' } };
     }
     try {
       const built = buildAstWire(parsed.tree, rootName, registry);
-      return { ok: 1, bits: built.bits, bitWidth: built.bitWidth, tree: parsed.tree };
+      const out = {
+        ok: parsed.ok ? 1 : 0,
+        bits: built.bits,
+        bitWidth: built.bitWidth,
+        tree: parsed.tree,
+      };
+      if (parsed.errors && parsed.errors.length) out.errors = parsed.errors;
+      if (!parsed.ok && parsed.error) out.error = parsed.error;
+      return out;
     } catch (err) {
       return { ok: 0, error: { kind: 'pack', message: String(err.message || err) } };
     }

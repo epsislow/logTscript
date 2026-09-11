@@ -79,6 +79,7 @@
     SS.buildSchemaDefIntoRegistry(registry, 'parseResult', [
       { kind: 'bound', name: 'ast', ref: 'parseAstOpaque', optional: true },
       { kind: 'bound', name: 'error', ref: 'parseError', optional: true },
+      { kind: 'bound_var_array', name: 'errors', ref: 'parseError', optional: true, minCount: 1 },
       { kind: 'leaf', name: 'ok', width: 1 },
     ], { hasPresenceMask: true, allowReserved: true });
   }
@@ -141,6 +142,35 @@
     return { ok: 0, bits: packed.bits, bitWidth: packed.bitWidth };
   }
 
+  function packBoundVarArrayPayload(errorList, registry) {
+    const SB = sb();
+    let payload = '';
+    for (const err of errorList || []) {
+      payload += SB.packBoundPayload(buildParseErrorBits(err, registry));
+    }
+    return payload;
+  }
+
+  function packParsePartialSuccess(astBits, astSchemaName, errors, registry) {
+    const errList = errors && errors.length ? errors : [];
+    const primary = errList[0] || { kind: 'syntax', message: 'syntax error' };
+    const fields = {
+      ok: '0',
+      ast: astBits,
+      error: buildParseErrorBits(primary, registry),
+    };
+    if (errList.length) {
+      fields.errors = packBoundVarArrayPayload(errList, registry);
+    }
+    const packed = packParseResultEnvelope(fields, registry);
+    return {
+      ok: 0,
+      bits: packed.bits,
+      bitWidth: packed.bitWidth,
+      parseAstSchemaRef: String(astSchemaName || '').replace(/\+$/, ''),
+    };
+  }
+
   function buildParseResultFromCall(grammar, src, astSchemaName, registry, options) {
     registerParseBuiltinSchemas(registry);
     const rootName = String(astSchemaName || '').replace(/\+$/, '');
@@ -149,15 +179,36 @@
     const { buildAstFromParse } = ab();
     const built = buildAstFromParse(grammar, src, rootName, registry, options || {});
     if (!built.ok) {
+      if (built.bits) {
+        return packParsePartialSuccess(built.bits, rootName, built.errors || (built.error ? [built.error] : []), registry);
+      }
       return packParseFailure(built.error, registry);
     }
     return packParseSuccess(built.bits, rootName, registry);
   }
 
   function formatParseTextOutput(result, formatTreeFn) {
+    const fmt = typeof formatTreeFn === 'function' ? formatTreeFn : null;
+    const formatTree = fmt || (typeof formatParseTree === 'function' ? formatParseTree : null);
+    if (result.tree != null) {
+      let text = formatTree ? formatTree(result.tree) : JSON.stringify(result.tree);
+      const errs = result.errors && result.errors.length
+        ? result.errors
+        : (!result.ok && result.error ? [result.error] : []);
+      if (errs.length) {
+        text += '\n--- errors (' + errs.length + ') ---\n';
+        for (let i = 0; i < errs.length; i++) {
+          const err = errs[i];
+          const kind = err.kind || 'syntax';
+          const line = err.line != null ? err.line : 0;
+          const col = err.col != null ? err.col : (err.column != null ? err.column : 0);
+          text += '[' + i + '] ' + kind + ' at ' + line + ':' + col + ': ' + (err.message || '') + '\n';
+        }
+      }
+      return text.replace(/\n$/, '');
+    }
     if (result.ok) {
-      const fmt = typeof formatTreeFn === 'function' ? formatTreeFn : null;
-      return fmt ? fmt(result.tree) : JSON.stringify(result.tree);
+      return formatTree ? formatTree(result.tree) : JSON.stringify(result.tree);
     }
     const err = result.error || {};
     const kind = err.kind || 'syntax';

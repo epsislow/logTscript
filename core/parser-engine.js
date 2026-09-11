@@ -171,6 +171,14 @@ function formatParseTree(node, indent) {
     const q = formatQuantLabel(node.quant);
     const lines = [pad + 'repeat(' + q + '):'];
     for (const it of node.items) lines.push(formatParseTree(it, indent + 1));
+    if (node.errors && node.errors.length) {
+      lines.push(pad + '  errors(' + node.errors.length + '):');
+      for (let ei = 0; ei < node.errors.length; ei++) {
+        const er = node.errors[ei];
+        lines.push(pad + '    [' + ei + '] ' + (er.kind || 'syntax') + ' at ' +
+          (er.line != null ? er.line : 0) + ':' + (er.col != null ? er.col : 0) + ': ' + (er.message || ''));
+      }
+    }
     return lines.join('\n');
   }
   if (node.kind === 'optional') {
@@ -197,6 +205,29 @@ function formatParseTree(node, indent) {
     return lines.join('\n');
   }
   return pad + JSON.stringify(node);
+}
+
+function collectParseErrors(node, out) {
+  if (!node || typeof node !== 'object') return;
+  if (node.kind === 'repeat') {
+    if (node.errors && node.errors.length) {
+      for (const e of node.errors) out.push(e);
+    }
+    for (const it of node.items) collectParseErrors(it, out);
+    return;
+  }
+  if (node.kind === 'optional') {
+    if (node.present) collectParseErrors(node.value, out);
+    return;
+  }
+  if (node.kind === 'call') {
+    if (node.children) {
+      for (const k of Object.keys(node.children)) collectParseErrors(node.children[k], out);
+    }
+    if (node.captures) {
+      for (const k of Object.keys(node.captures)) collectParseErrors(node.captures[k], out);
+    }
+  }
 }
 
 function createParserEngine(grammar, src, options) {
@@ -246,6 +277,91 @@ function createParserEngine(grammar, src, options) {
       }
     }
     return { captures, lastValue };
+  }
+
+  function appendRecoverFailedError(errors) {
+    errors.push({
+      kind: 'syntax',
+      message: 'recover failed',
+      offset: input.pos,
+      line: input.line,
+      col: input.col,
+    });
+  }
+
+  function runSkip2Literal(value, errors) {
+    while (!input.atEnd()) {
+      if (input.matchLiteral(value)) return true;
+      input._advance(1);
+    }
+    appendRecoverFailedError(errors);
+    return false;
+  }
+
+  function runSkip2Rule(ruleName, errors) {
+    while (!input.atEnd()) {
+      input.skipWs();
+      const cp = input.save();
+      const prevProbe = probeMode;
+      probeMode = true;
+      let ok = false;
+      try {
+        ok = parseRuleName(ruleName, null) !== null;
+      } finally {
+        probeMode = prevProbe;
+        input.restore(cp);
+      }
+      if (ok) return true;
+      input.skipWs();
+      const cp2 = input.save();
+      const tok = input.lexAnyToken();
+      if (tok) continue;
+      input.restore(cp2);
+      input._advance(1);
+    }
+    appendRecoverFailedError(errors);
+    return false;
+  }
+
+  function runSkip2(recoverSpec, errors) {
+    if (!recoverSpec) return false;
+    if (recoverSpec.kind === 'literal') return runSkip2Literal(recoverSpec.value, errors);
+    if (recoverSpec.kind === 'rule') return runSkip2Rule(recoverSpec.name, errors);
+    return false;
+  }
+
+  function parseRepeatPlus(core, recoverSpec, commitState) {
+    const items = [];
+    const errors = [];
+    while (true) {
+      if (commitState) commitState.committed = false;
+      const cp = input.save();
+      try {
+        const v = parseItemCore(core, commitState);
+        if (v === null) {
+          input.restore(cp);
+          break;
+        }
+        items.push(v);
+      } catch (e) {
+        if (isFatalParserError(e) && recoverSpec) {
+          errors.push(e.toErrorStruct());
+          if (commitState) commitState.committed = false;
+          const posBeforeSkip = input.pos;
+          runSkip2(recoverSpec, errors);
+          if (input.pos === posBeforeSkip) {
+            if (input.atEnd()) break;
+            input._advance(1);
+          }
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (!items.length && !errors.length) return null;
+    const node = { kind: 'repeat', quant: '+', items };
+    if (errors.length) node.errors = errors;
+    return node;
   }
 
   function parseCountedRepeat(core, count, commitState) {
@@ -311,9 +427,9 @@ function createParserEngine(grammar, src, options) {
     }
 
     if (quant === '+') {
-      const first = parseItemCore(core, commitState);
-      if (first === null) return null;
       if (probeMode) {
+        const first = parseItemCore(core, commitState);
+        if (first === null) return null;
         while (true) {
           const cp = input.save();
           if (parseItemCore(core, commitState) === null) {
@@ -323,17 +439,7 @@ function createParserEngine(grammar, src, options) {
         }
         return true;
       }
-      const items = [first];
-      while (true) {
-        const cp = input.save();
-        const next = parseItemCore(core, commitState);
-        if (next === null) {
-          input.restore(cp);
-          break;
-        }
-        items.push(next);
-      }
-      return { kind: 'repeat', quant: '+', items };
+      return parseRepeatPlus(core, item.recover || null, commitState);
     }
 
     if (quant === '*') {
@@ -550,6 +656,8 @@ function parseGrammar(grammar, src, options) {
   const startRule = engine.startRule;
   try {
     const tree = engine.parseRuleName(startRule);
+    const errors = [];
+    collectParseErrors(tree, errors);
     if (tree === null) {
       const errPos = engine.input.save();
       engine.input.skipWs();
@@ -566,6 +674,9 @@ function parseGrammar(grammar, src, options) {
       return parseEngineError('syntax', 'syntax error', engine.input);
     }
     engine.input.skipWs();
+    if (errors.length) {
+      return { ok: 0, tree, errors, error: errors[0] };
+    }
     if (!engine.input.atEnd()) {
       return parseEngineError('syntax', 'unexpected trailing input', engine.input);
     }

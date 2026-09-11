@@ -27592,6 +27592,235 @@ After **Load & Run**: wire populated with packed **\`CallWhile\`**; **\`$$\`** i
 
 ---
 
+## FailOver and \`recover skip2(...)\` on \`+\`
+
+When a **\`+\`** repetition uses **\`recover skip2(...)\`**, a post-commit failure (**\`FatalParserError\`** from **\`$$\`**) is **absorbed** inside the **\`+\`** loop: the parser runs **\`skip2\`**, then continues with the next item. Grammars **without** **\`recover\`** still fail entirely on the first post-commit error (**F5a**).
+
+| Form | Meaning |
+|------|---------|
+| **\`item+ recover skip2(";")\`** | After FailOver, scan forward until a literal **\`";"\`** is consumed |
+| **\`item+ recover skip2(ruleName)\`** | Scan with **\`ruleName\`** probes; stop when a probe succeeds **without consuming** the sync match |
+| **No \`recover\`** | Post-commit failure propagates — **\`ok = 0\`**, no partial tree |
+
+**FailOver trigger:** only **\`FatalParserError\`** (post-**\`$$\`**). A normal “no match” (\`null\`) on the next **\`+\`** item ends the list — no **\`skip2\`**, no **\`errors[]\`**.
+
+### \`:parse()\` wire width for partial envelopes
+
+A partial **\`<parseResult>\`** ( **\`ok = 0\`** with recover) packs more than a simple failure: optional **\`ast\`**, **\`error\`**, and **\`errors\`** (variable array). For the three-line sketch below, the natural packed width is on the order of **4500+ bits**.
+
+| Declared wire | Partial recover result |
+|---------------|------------------------|
+| **\`4096wire<parseResult>\`** | **Too narrow** — the frame truncates the tail of the envelope. Fields at the end (including **\`ok\`**) may be missing; **\`pr:ok\`** can fail and **\`show(pr; <parseResult>)\`** may show an empty **\`ok\`**. |
+| **\`8192wire<parseResult>\`** (or wider) | **Recommended** when you expect **\`ast\`** + **\`errors[]\`** on failure. |
+
+Simple **success-only** parses (small AST, no **\`errors\`**) often fit **\`4096wire\`** or less — see [inline-parser.md](inline-parser.md). When using **recover**, size the wire for the **partial** case, not only the happy path.
+
+**\`:parseText\`** returns a plain text wire and is not affected by this — only **\`:parse()\`** into a fixed-width **\`<parseResult>\`** frame.
+
+### Three-line sketch — partial success with \`skip2(";")\`
+
+\`\`\`logts-play
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<program>+:
+    statements: bound <CallAssign>[1-]
+:
+
+inline [parser] .sketchLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule expr = ID | INT;
+
+    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;
+
+    rule statement
+        = "while" "(" $$ expr ")" ";" -> CallWhile
+        | assignment;
+
+    rule program = statement+ recover skip2(";");
+
+:
+
+8192wire<parseResult> pr =: .sketchLang:parse("x = 1; while ( x { ; y = 2;", <program>, "program")
+400wire txt =: .sketchLang:parseText("x = 1; while ( x { ; y = 2;", "program")
+show(pr; <parseResult>)
+show(txt; ascii)
+\`\`\`
+
+After **Load & Run**:
+
+- **\`pr\`**: **\`ok = 0\`**, AST holds **two** **\`CallAssign\`** nodes (\`x = 1\` and \`y = 2\`), **\`errors\`** length **1** (syntax error at **\`{\`**).
+- **\`txt\`**: formatted tree plus footer **\`--- errors (1) ---\`**.
+
+The broken **\`while\`** is skipped after **\`skip2(";")\`**; parsing resumes at **\`y = 2;\`**.
+
+### Same input — \`skip2(statement)\` rule sync
+
+\`\`\`logts-play
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<program>+:
+    statements: bound <CallAssign>[1-]
+:
+
+inline [parser] .syncRuleLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule expr = ID | INT;
+    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+ recover skip2(statement);
+
+:
+
+8192wire<parseResult> pr =: .syncRuleLang:parse("x = 1; while ( x { ; y = 2;", <program>, "program")
+show(pr; <parseResult>)
+\`\`\`
+
+After **Load & Run**: same partial result as the literal form — two **\`CallAssign\`** entries and one syntax error.
+
+### Without \`recover\` — total failure (regression)
+
+\`\`\`logts-play
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<program>+:
+    statements: bound <CallAssign>[1-]
+:
+
+inline [parser] .noRecoverLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule expr = ID | INT;
+    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+;
+
+:
+
+8192wire<parseResult> pr =: .noRecoverLang:parse("x = 1; while ( x { ; y = 2;", <program>, "program")
+show(pr; <parseResult>)
+\`\`\`
+
+After **Load & Run**: **\`ok = 0\`**, **no** AST — only **\`error\`** (post-commit failure on the **\`while\`**).
+
+### EOF without sync — two errors
+
+When **\`skip2\`** reaches EOF without finding a sync point, a second error **\`recover failed\`** is appended.
+
+\`\`\`logts-play
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<program>+:
+    statements: bound <CallAssign>[1-]
+:
+
+inline [parser] .eofRecoverLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule expr = ID | INT;
+    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+ recover skip2(";");
+
+:
+
+8192wire<parseResult> pr =: .eofRecoverLang:parse("x = 1; while ( x {", <program>, "program")
+show(pr; <parseResult>)
+\`\`\`
+
+After **Load & Run**: **\`ok = 0\`**, one **\`CallAssign\`**, **\`errors\`** length **2** — primary **\`syntax error\`**, secondary **\`recover failed\`**.
+
+### \`:packAst\` on partial parse
+
+When a tree is present, **\`:packAst\`** packs the wire even at **\`ok = 0\`**. Gate execution with **\`:parse\`** + **\`pr:ok\`** when you need strict success.
+
+\`\`\`logts-play
+<CallAssign>:
+    name: 40
+    value: 8
+:
+
+<program>+:
+    statements: bound <CallAssign>[1-]
+:
+
+inline [parser] .packRecoverLang:
+
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    token INT = [0-9]+;
+
+    rule expr = ID | INT;
+    rule assignment = $name:ID "=" $value:INT ";" -> CallAssign;
+    rule statement = "while" "(" $$ expr ")" ";" -> CallWhile | assignment;
+    rule program = statement+ recover skip2(";");
+
+:
+
+8192wire<parseResult> pr =: .packRecoverLang:parse("x = 1; while ( x { ; y = 2;", <program>, "program")
+128wire<program> ast =: .packRecoverLang:packAst("x = 1; while ( x { ; y = 2;", <program>, "program")
+show(pr:ok)
+show(ast; <program> ascii)
+\`\`\`
+
+After **Load & Run**: **\`pr:ok\`** is **\`0\`**, but **\`ast\`** holds packed partial **\`program\`** (two assignments).
+
+### Nested \`+ recover\` — local absorption
+
+A sub-rule with its own **\`+ recover\`** handles FailOver locally; the parent **\`+\`** continues.
+
+\`\`\`logts-play
+<CallWord>:
+    name: 40
+:
+
+<CallLine>:
+    words: bound <CallWord>[1-]
+:
+
+<program>+:
+    lines: bound <CallLine>[1-]
+:
+
+inline [parser] .nestedRecoverLang:
+
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+
+    rule word = ID $$ ";" -> CallWord;
+    rule words = word+ recover skip2(";");
+    rule line = "#" words -> CallLine;
+    rule program = line+;
+
+:
+
+8192wire<parseResult> pr =: .nestedRecoverLang:parse("# a ; x { ; y ; # d ; e ;", <program>, "program")
+show(pr; <parseResult>)
+\`\`\`
+
+After **Load & Run**: **two** **\`CallLine\`** nodes — the first line recovers inside **\`words+\`** after **\`x {\`**, the second line parses normally.
+
+---
+
 ## Invalid patterns (elaboration errors)
 
 The assembler rejects:
@@ -27607,6 +27836,8 @@ The assembler rejects:
 | \`test = !(a); a = !(test);\` | Circular **lookahead-ref** graph |
 | \`"a" $$ $$ "b"\` | Multiple **\`$$\`** in one alternative |
 | \`&( $$ ID )\` | **\`$$\`** inside lookahead |
+| \`statement recover skip2(";")\` | **\`recover\`** must follow **\`+\`** on the same item |
+| \`expr+ recover skip2(";")\` on left-rec **\`expr\`** | **\`recover skip2\`** forbidden on left-recursive rules |
 
 Use **ordered choice + backtrack** (documented in [inline-parser.md](inline-parser.md)) when it already expresses the grammar — for example existing **\`.calcLang\`** and REPL **\`.replLang\`** grammars keep their backtrack-based disambiguation.
 
@@ -27622,6 +27853,9 @@ Use **ordered choice + backtrack** (documented in [inline-parser.md](inline-pars
 | Range repeat | \`"="{1,3}\` | Yes (greedy max→min) |
 | Rule probe | \`&(helperRule)\` | No (probe only) |
 | Alternative commit | \`$$\` | No (marker only) |
+| FailOver recover | \`item+ recover skip2(X)\` | **\`skip2\`** consumes; rule probe does not |
+| Partial parse | \`errors[]\` on wire / tree footer | N/A |
+| Partial \`:parse()\` frame | **\`8192wire<parseResult>\`** or wider | N/A (declared width) |
 
 See also: [inline-parser.md](inline-parser.md) · [semantic-schemas.md](semantic-schemas.md)
 `,
