@@ -55922,6 +55922,236 @@ comp [interp] .f4aBadComp:
     h.assertThrows('vector required', function() { session.run(bad); }, 'requires vector wire');
   });
 
+  const F4B_ONABORT_INTERP = `
+inline [interp] .calcAbort {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        push res: left + right;
+        return left + right;
+    }
+    CallMul(left/s16, right/s16) {
+        push res: left * right;
+        return left * right;
+    }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) {
+        return env[name];
+    }
+    onabort setErr(msg, info) {
+        push errCode: info["kindCode"];
+    }
+}`;
+
+  const F4B_ONABORT_INTERP_CHAIN = `
+inline [interp] .calcAbort {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        push res: left + right;
+        return left + right;
+    }
+    CallMul(left/s16, right/s16) {
+        push res: left * right;
+        return left * right;
+    }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) {
+        return env[name];
+    }
+    onabort setErr(msg, info) {
+        push errCode: info["kindCode"];
+    }
+    onabort bump(msg) {
+        push errCode: 99;
+    }
+}`;
+
+  const F4B_ONABORT_COMP = `
+comp [interp] .calcAbortComp:
+    on: 1
+    astSchema = .program
+    .calcAbort { }
+    pout res/s16 as resOut
+    pout errCode/u16 as errOut
+    :
+`;
+
+  const F4B_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + F4B_ONABORT_INTERP + '\n' + F4B_ONABORT_COMP;
+
+  function f4bRunCompAbort(h, session, src, core) {
+    const base = core || F4B_CORE;
+    session.run(base);
+    const built = buildAstFromParse(f2cGrammar(session), src, 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack ok', String(built.ok), '1');
+    try {
+      session.run(base + '\n' + [
+        '16wire result = 0000000000000000',
+        '16wire errWire = 0000000000000000',
+        built.bitWidth + 'wire<program> prog = .calcLang:packAst("' + src + '", <program>, "program")',
+        '1wire run = 1',
+        '.calcAbortComp:{ ast = prog resOut >= result errOut >= errWire set = run }',
+      ].join('\n'));
+    } catch (e) {
+      /* expected abort after onabort handlers */
+    }
+    return { result: session.getWire(session.interp, 'result'), errWire: session.getWire(session.interp, 'errWire') };
+  }
+
+  reg(5220, 'interp', 'parse onabort handler arity 0/1/2', function(h) {
+    const p0 = parseInterpBody('onabort noop() { return; }');
+    h.assert('0 params', p0.onabortHandlers[0].params.length, 0);
+    const p1 = parseInterpBody('onabort one(msg) { return; }');
+    h.assert('1 param', p1.onabortHandlers[0].params.length, 1);
+    const p2 = parseInterpBody('onabort two(msg, info) { return; }');
+    h.assert('2 params', p2.onabortHandlers[0].params.length, 2);
+    h.assert('requiresCompContext', p2.requiresCompContext, true);
+  });
+
+  reg(5221, 'interp', 'onabort 3 params elaboration error', function(h) {
+    h.assertThrows('3 params', function() {
+      parseInterpBody('onabort bad(a, b, c) { return; }');
+    }, 'at most 2 params');
+  });
+
+  reg(5222, 'interp', 'onabort return expr elaboration error', function(h) {
+    h.assertThrows('return expr', function() {
+      parseInterpBody('onabort bad(msg) { return 1; }');
+    }, 'cannot return a value');
+  });
+
+  reg(5223, 'interp', 'onabort blocks :eval', function(h, session) {
+    session.run(F4B_CORE);
+    const g = f2cGrammar(session);
+    const built = buildAstFromParse(g, 'x=1;', 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    session.run(F4B_CORE + '\n' + [
+      built.bitWidth + 'wire<program> prog = .calcLang:packAst("x=1;", <program>, "program")',
+      '8wire r = .calcAbort:eval(prog, <program>)',
+    ].join('\n'));
+    const err = session.out.find((l) => l.startsWith('Error:')) || '';
+    h.assert(':eval blocked', err.indexOf('onabort') >= 0, true);
+  });
+
+  function runF4bUndefLegacy(h, session) {
+    session.run(F4B_CORE);
+    const wires = f4bRunCompAbort(h, session, 'x=z;');
+    h.assert('errCode 5 undefinedVariable', wires.errWire, '0000000000000101');
+    const kindLine = session.out.find((l) => l.startsWith('kind:')) || '';
+    h.assert('kind name', kindLine, 'kind: undefinedVariable');
+  }
+
+  reg(5224, 'interp', 'onabort undefined variable kindCode legacy', runF4bUndefLegacy);
+  reg(5225, 'interp', 'onabort undefined variable kindCode wave', runF4bUndefLegacy, { propagation: 'wave' });
+
+  const F4B_CHAIN_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + F4B_ONABORT_INTERP_CHAIN + '\n' + F4B_ONABORT_COMP;
+
+  function runF4bHandlerOrderLegacy(h, session) {
+    const wires = f4bRunCompAbort(h, session, 'x=z;', F4B_CHAIN_CORE);
+    h.assert('second handler overwrites errCode', wires.errWire, '0000000001100011');
+  }
+
+  reg(5226, 'interp', 'onabort handler chain order legacy', runF4bHandlerOrderLegacy);
+  reg(5227, 'interp', 'onabort handler chain order wave', runF4bHandlerOrderLegacy, { propagation: 'wave' });
+
+  const F4B_ONABORT_INTERP_FAIL = `
+inline [interp] .calcAbort {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        push res: left + right;
+        return left + right;
+    }
+    CallMul(left/s16, right/s16) {
+        push res: left * right;
+        return left * right;
+    }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallVariable(name/ascii) {
+        return env[name];
+    }
+    onabort failAfterPush(msg, info) {
+        push errCode: info["kindCode"];
+        x = missingVar;
+    }
+}`;
+
+  const F4B_FAIL_CORE = F3C_SCHEMAS + '\n' + F3_INLINE_PARSER_CALC + '\n' + F4B_ONABORT_INTERP_FAIL + '\n' + F4B_ONABORT_COMP;
+
+  function f4bRunCompAbortNoCommit(h, session, src) {
+    const base = F4B_FAIL_CORE;
+    session.run(base);
+    const built = buildAstFromParse(f2cGrammar(session), src, 'program', session.interp.schemaRegistry, { startRule: 'program' });
+    h.assert('pack ok', String(built.ok), '1');
+    session.run(base);
+    try {
+      session.run(base + '\n' + [
+        '16wire result = 0000000000001010',
+        '16wire errWire = 0000000000001100',
+        built.bitWidth + 'wire<program> prog = .calcLang:packAst("' + src + '", <program>, "program")',
+        '1wire run = 1',
+        '.calcAbortComp:{ ast = prog resOut >= result errOut >= errWire set = run }',
+      ].join('\n'));
+    } catch (e) {
+      /* expected handler abort */
+    }
+  }
+
+  function runF4bNoCommitInHandlerLegacy(h, session) {
+    f4bRunCompAbortNoCommit(h, session, 'x=z;');
+    const res = session.getWire(session.interp, 'result');
+    const err = session.getWire(session.interp, 'errWire');
+    if (session.propagation === 'wave') {
+      h.assert('wave no err commit', err, '0000000000000000');
+      h.assert('wave no res commit', res, '0000000000000000');
+    } else {
+      h.assert('no commit result', res, '0000000000001010');
+      h.assert('no commit errWire', err, '0000000000001100');
+    }
+    h.assert('no kindCode 5 commit', err !== '0000000000000101', true);
+    const callLine = session.out.find((l) => l.startsWith('call:')) || '';
+    h.assert('handler abort call', callLine, 'call: onabort');
+  }
+
+  reg(5228, 'interp', 'onabort error in handler no commit legacy', runF4bNoCommitInHandlerLegacy);
+  reg(5229, 'interp', 'onabort error in handler no commit wave', runF4bNoCommitInHandlerLegacy, { propagation: 'wave' });
+
+  reg(5230, 'interp', 'D1127f display fields present', function(h, session) {
+    session.run(F4B_CORE);
+    f4bRunCompAbort(h, session, 'x=z;');
+    h.assert('kindCode line', session.out.some((l) => l.startsWith('kindCode:')), true);
+    h.assert('compName line', session.out.some((l) => l.startsWith('compName:')), true);
+    h.assert('nodeText line', session.out.some((l) => l.startsWith('nodeText:')), true);
+  });
+
+  reg(5231, 'interp', 'ast validation error kind astValidationError', function(h) {
+    const c = classifyInterpAbortKind('ast binary is invalid for schema program: wire has 4 bits, schema needs 10');
+    h.assert('code 2', c.code, 2);
+    h.assert('kind', c.kind, 'astValidationError');
+  });
+
+  function runF4bValidateAstWireKind(h, session) {
+    session.run(F4B_CORE);
+    let detail = '';
+    try {
+      validateInterpAstWire('0000', 'CallNumber', session.interp.schemaRegistry);
+    } catch (e) {
+      detail = e && e.message ? e.message : String(e);
+    }
+    h.assert('too short', detail.indexOf('wire has') >= 0 || detail.indexOf('needs') >= 0, true);
+    const msg = 'ast binary is invalid for schema CallNumber: ' + detail;
+    const info = buildInterpErrorInfo(msg, { options: { compName: '.calcAbortComp' } });
+    h.assert('astValidationError', info.kind, 'astValidationError');
+  }
+
+  reg(5232, 'interp', 'validateInterpAstWire kind mapping legacy', runF4bValidateAstWireKind);
+  reg(5233, 'interp', 'validateInterpAstWire kind mapping wave', runF4bValidateAstWireKind, { propagation: 'wave' });
+
   const F2A_NUMBER = [
     '<number>:',
     '    value: 8',

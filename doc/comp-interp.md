@@ -620,6 +620,7 @@ Elaboration error — **`calcInterp`** link required (e.g. **`.calcInterp { }`**
 
 ## Related pages
 
+- [comp-interp-onabort.md](comp-interp-onabort.md) — **`onabort`** handlers, **`errorInfo`**, abort display, pout commit on error
 - [inline-interp.md](inline-interp.md) — method syntax, `/type`, vectors, `:eval`
 - [inline-parser.md](inline-parser.md) — `packAst`, `parse`, `parseResult`
 - [semantic-schemas.md](semantic-schemas.md) — schema layout and union tags

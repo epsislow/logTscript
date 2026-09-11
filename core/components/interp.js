@@ -65,7 +65,10 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
     if (!inst.methods) {
       const parseFn = typeof parseInterpBody === 'function' ? parseInterpBody : null;
       if (!parseFn) throw Error('Interp assembler is not loaded');
-      inst.methods = parseFn(inst.bodyRaw, `inline ${comp.programRef}`).methods;
+      const prog = parseFn(inst.bodyRaw, `inline ${comp.programRef}`);
+      inst.methods = prog.methods;
+      inst.onabortHandlers = prog.onabortHandlers || [];
+      inst.requiresCompContext = !!prog.requiresCompContext;
     }
     return inst;
   }
@@ -272,7 +275,15 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
           validateFn(bits, schemaName, ctx.schemaRegistry);
         } catch (err) {
           const detail = err && err.message ? err.message : String(err);
-          throw Error(`ast binary is invalid for schema ${schemaName}: ${detail}`);
+          const msg = `ast binary is invalid for schema ${schemaName}: ${detail}`;
+          const buildFn = typeof buildInterpErrorInfo === 'function' ? buildInterpErrorInfo : null;
+          const wrap = new Error(msg);
+          if (buildFn) {
+            wrap.errorInfo = buildFn(msg, { options: { compName } });
+            wrap.interpAbort = true;
+          }
+          if (typeof ctx.reportRuntimeError === 'function') ctx.reportRuntimeError(wrap);
+          throw wrap;
         }
       }
       comp._interpAstBits = bits;
@@ -407,13 +418,22 @@ var InterpComponent = class InterpComponent extends BuiltinComponent {
       buffer = execFn(astBits, schemaName, ctx.schemaRegistry, programInst, pinEnv, {
         poutBuffer: {},
         poutChannelDefs,
+        compName,
       });
     } catch (err) {
-      const msg = err && err.message ? err.message : String(err);
-      if (typeof ctx.reportRuntimeError === 'function') {
-        ctx.reportRuntimeError(msg);
+      const normFn = typeof normalizeInterpAbort === 'function' ? normalizeInterpAbort : null;
+      const abortErr = normFn ? normFn(err) : err;
+      if (abortErr.commitBuffer) {
+        this._commitPoutBuffer(comp, abortErr.commitBuffer, ctx, compName, pending, reEvaluate);
+        comp._interpLastCommittedPoutChannels = Object.keys(abortErr.commitBuffer || {});
+        this._applyPoutWires(comp, compName, ctx, comp._interpLastCommittedPoutChannels);
+        comp._interpAstBits = null;
+        comp._interpAstSchema = null;
       }
-      throw err;
+      if (typeof ctx.reportRuntimeError === 'function') {
+        ctx.reportRuntimeError(abortErr);
+      }
+      throw abortErr;
     }
 
     this._commitPoutBuffer(comp, buffer, ctx, compName, pending, reEvaluate);

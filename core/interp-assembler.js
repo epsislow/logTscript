@@ -7,7 +7,7 @@ const INTERP_FORBIDDEN_IDS = new Set([
 
 const INTERP_KEYWORDS = new Set([
   'if', 'else', 'for', 'while', 'break', 'continue', 'return',
-  'push', 'remove', 'removeall',
+  'push', 'remove', 'removeall', 'onabort',
 ]);
 
 const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
@@ -192,14 +192,58 @@ class InterpParser {
 
   parseProgram() {
     const methods = {};
+    const onabortHandlers = [];
     while (!this.match('EOF')) {
+      if (this.peek().type === 'KW' && this.peek().value === 'onabort') {
+        const handler = this.parseOnabortMethod();
+        for (const h of onabortHandlers) {
+          if (h.name === handler.name) {
+            interpError(`duplicate onabort handler '${handler.name}'`, handler.line);
+          }
+        }
+        onabortHandlers.push(handler);
+        continue;
+      }
       const method = this.parseMethod();
       if (methods[method.name]) {
         interpError(`duplicate method '${method.name}'`, method.line);
       }
       methods[method.name] = method;
     }
-    return { methods };
+    return { methods, onabortHandlers };
+  }
+
+  parseOnabortMethod() {
+    const kwTok = this.eat('KW', 'onabort');
+    const nameTok = this.eat('ID');
+    this.eat('SYM', '(');
+    const params = [];
+    if (!this.match('SYM', ')')) {
+      params.push(this.parseParam());
+      while (this.match('SYM', ',')) {
+        params.push(this.parseParam());
+      }
+      this.eat('SYM', ')');
+    }
+    if (params.length > 2) {
+      interpError('onabort handler may have at most 2 params', nameTok.line);
+    }
+    this.eat('SYM', '{');
+    const body = [];
+    while (!this.match('SYM', '}')) {
+      if (this.match('EOF')) {
+        interpError('unclosed onabort handler body', nameTok.line);
+      }
+      body.push(this.parseStmt());
+      this.match('SYM', ';');
+    }
+    return {
+      name: nameTok.value,
+      params,
+      body,
+      line: kwTok.line,
+      isOnabortHandler: true,
+    };
   }
 
   parseParam() {
@@ -476,12 +520,16 @@ class InterpParser {
 
   parseReturnStmt() {
     const lineTok = this.eat('KW', 'return');
-    const exprs = [this.parseExpr()];
-    while (this.match('SYM', ',')) {
-      if (exprs.length >= 10) {
-        interpError('return may have at most 10 values', this.peek().line);
-      }
+    const exprs = [];
+    const t = this.peek();
+    if (!(t.type === 'SYM' && (t.value === ';' || t.value === '}'))) {
       exprs.push(this.parseExpr());
+      while (this.match('SYM', ',')) {
+        if (exprs.length >= 10) {
+          interpError('return may have at most 10 values', this.peek().line);
+        }
+        exprs.push(this.parseExpr());
+      }
     }
     return { kind: 'return', exprs, line: lineTok.line };
   }
@@ -824,11 +872,34 @@ function interpProgramUsesCompContext(stmts) {
   return false;
 }
 
+function validateOnabortHandler(handler, program) {
+  validateOnabortReturnRules(handler.body, handler.name);
+  validateStmtTree(handler.body, program);
+}
+
+function validateOnabortReturnRules(stmts, handlerName) {
+  for (const stmt of stmts || []) {
+    if (stmt.kind === 'return' && stmt.exprs && stmt.exprs.length > 0) {
+      interpError(`onabort handler '${handlerName}' cannot return a value`, stmt.line);
+    }
+    if (stmt.kind === 'if') {
+      validateOnabortReturnRules(stmt.then, handlerName);
+      if (stmt.else) validateOnabortReturnRules(stmt.else, handlerName);
+    } else if (stmt.kind === 'for' || stmt.kind === 'while') {
+      validateOnabortReturnRules(stmt.body, handlerName);
+    }
+  }
+}
+
 function validateInterpProgram(program) {
   const methods = program.methods || {};
-  program.requiresCompContext = false;
+  program.onabortHandlers = program.onabortHandlers || [];
+  program.requiresCompContext = program.onabortHandlers.length > 0;
   for (const name of Object.keys(methods)) {
     validateReturnArity(methods[name]);
+  }
+  for (const handler of program.onabortHandlers) {
+    validateOnabortHandler(handler, program);
   }
   for (const name of Object.keys(methods)) {
     validateStmtTree(methods[name].body, program);
@@ -840,7 +911,7 @@ function validateInterpProgram(program) {
 
 function parseInterpBody(bodyRaw, ctxLabel) {
   const src = (bodyRaw || '').trim();
-  if (!src) return { methods: {} };
+  if (!src) return { methods: {}, onabortHandlers: [], requiresCompContext: false };
   const tokens = interpTokenize(src);
   const parser = new InterpParser(tokens, ctxLabel);
   const program = parser.parseProgram();

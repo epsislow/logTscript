@@ -2,6 +2,147 @@
 
 const INTERP_MAX_LOOP_ITERATIONS = 10000;
 
+let _interpExecCtx = null;
+
+function interpRunWithContext(options, fn) {
+  const prev = _interpExecCtx;
+  _interpExecCtx = {
+    options: options || {},
+    astCallSeq: 0,
+    astPath: [],
+    currentAstCall: '',
+    currentMethod: '',
+  };
+  try {
+    return fn();
+  } finally {
+    _interpExecCtx = prev;
+  }
+}
+
+function classifyInterpAbortKind(msg) {
+  const m = String(msg || '');
+  if (/^ast binary is invalid/i.test(m) || /wire has \d+ bits/i.test(m) || /payload needs/i.test(m) || /^empty wire/i.test(m)) {
+    return { code: 2, kind: 'astValidationError' };
+  }
+  if (/unknown AST method/i.test(m)) return { code: 3, kind: 'missingAstMethod' };
+  if (/missing \/type annotation/i.test(m)) return { code: 4, kind: 'missingTypeAnnotation' };
+  if (/undefined variable/i.test(m)) return { code: 5, kind: 'undefinedVariable' };
+  if (/division by zero/i.test(m)) return { code: 6, kind: 'divisionByZero' };
+  if (/overflow/i.test(m)) return { code: 7, kind: 'overflow' };
+  if (/vector index out of range/i.test(m)) return { code: 8, kind: 'vectorIndex' };
+  if (/corrupt wire/i.test(m)) return { code: 9, kind: 'corruptWire' };
+  if (/corrupt vector/i.test(m)) return { code: 10, kind: 'corruptVector' };
+  if (/loop iteration limit/i.test(m)) return { code: 11, kind: 'loopLimit' };
+  if (/unknown method/i.test(m)) return { code: 12, kind: 'missingHelper' };
+  if (/cannot encode value/i.test(m)) return { code: 13, kind: 'pushTypeMismatch' };
+  if (/not indexable/i.test(m)) return { code: 14, kind: 'notIndexable' };
+  return { code: 1, kind: 'genericError' };
+}
+
+function parseInterpAbortLine(msg) {
+  const m = /\(line (\d+)\)/.exec(String(msg || ''));
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function buildInterpErrorInfo(msg, ctxOverride) {
+  const ctx = ctxOverride || _interpExecCtx || {};
+  const kind = classifyInterpAbortKind(msg);
+  const options = ctx.options || {};
+  const info = {
+    kindCode: kind.code,
+    kind: kind.kind,
+    line: parseInterpAbortLine(msg),
+    method: ctx.currentMethod || '',
+    call: ctx.currentAstCall || '',
+    callNr: ctx.astCallSeq || 0,
+    nodeText: ctx.astPath && ctx.astPath.length ? `root:${ctx.astPath.join(':')}` : '',
+    compName: options.compName || '',
+  };
+  if (ctx.isOnabortHandler) {
+    info.method = ctx.handlerName || info.method;
+    info.call = 'onabort';
+    info.callNr = ctx.handlerIndex || 0;
+    info.nodeText = '';
+  }
+  return info;
+}
+
+function createInterpAbort(humanMsg, ctxOverride) {
+  const err = new Error(String(humanMsg));
+  err.interpAbort = true;
+  err.errorInfo = buildInterpErrorInfo(humanMsg, ctxOverride);
+  return err;
+}
+
+function normalizeInterpAbort(err) {
+  if (err && err.interpAbort && err.errorInfo) return err;
+  let msg = err && err.message ? err.message : String(err);
+  if (msg.indexOf('interp:') === 0) msg = msg.replace(/^interp:\s*/, '');
+  if (msg.indexOf('interp line ') === 0) {
+    const m = /^interp line (\d+):\s*(.*)$/.exec(msg);
+    if (m) msg = `${m[2]} (line ${m[1]})`;
+  }
+  return createInterpAbort(msg);
+}
+
+function makeReadOnlyErrorInfo(info) {
+  const o = Object.assign({}, info);
+  return Object.freeze(o);
+}
+
+function formatInterpAbortDisplay(msg, errorInfo) {
+  const info = errorInfo || {};
+  return [
+    `Error: ${msg}`,
+    `kindCode: ${info.kindCode != null ? info.kindCode : 1}`,
+    `kind: ${info.kind != null ? info.kind : 'genericError'}`,
+    `line: ${info.line != null ? info.line : 0}`,
+    `method: ${info.method != null ? info.method : ''}`,
+    `call: ${info.call != null ? info.call : ''}`,
+    `callNr: ${info.callNr != null ? info.callNr : 0}`,
+    `nodeText: ${info.nodeText != null ? info.nodeText : ''}`,
+    `compName: ${info.compName != null ? info.compName : ''}`,
+  ];
+}
+
+function invokeInterpOnabortHandlers(handlers, program, abortErr, pinEnv, options) {
+  const list = handlers || [];
+  if (!list.length) return abortErr;
+  const msg = abortErr && abortErr.message ? abortErr.message : String(abortErr);
+  const baseInfo = abortErr && abortErr.errorInfo
+    ? abortErr.errorInfo
+    : buildInterpErrorInfo(msg, { options: options || {} });
+  const frozenInfo = makeReadOnlyErrorInfo(baseInfo);
+  for (let i = 0; i < list.length; i++) {
+    const handler = list[i];
+    const argValues = [];
+    if (handler.params.length >= 1) argValues.push(msg);
+    if (handler.params.length >= 2) argValues.push(frozenInfo);
+    const prev = _interpExecCtx;
+    _interpExecCtx = {
+      options: options || {},
+      astCallSeq: prev ? prev.astCallSeq : 0,
+      astPath: prev ? prev.astPath.slice() : [],
+      currentAstCall: prev ? prev.currentAstCall : '',
+      currentMethod: handler.name,
+      isOnabortHandler: true,
+      handlerName: handler.name,
+      handlerIndex: i + 1,
+    };
+    try {
+      interpExecuteMethod(handler, argValues, program, pinEnv, options);
+    } catch (e) {
+      const handlerErr = normalizeInterpAbort(e);
+      handlerErr.errorInfo = buildInterpErrorInfo(handlerErr.message, _interpExecCtx);
+      throw handlerErr;
+    } finally {
+      _interpExecCtx = prev;
+    }
+  }
+  return abortErr;
+}
+
 function interpSs() {
   if (typeof LogTScriptSemanticSchemas === 'undefined') {
     throw new Error('semantic-schemas.js is not loaded');
@@ -21,8 +162,9 @@ function interpResolveSchema(registry, name) {
   return interpSs().resolveSchema(registry, n);
 }
 
-function interpError(msg) {
-  throw new Error(`interp: ${msg}`);
+function interpError(msg, line) {
+  const human = line != null ? `${msg} (line ${line})` : String(msg);
+  throw createInterpAbort(human);
 }
 
 function interpUnsignedBitsToInt(bits) {
@@ -593,18 +735,30 @@ function interpExtractFieldBits(payloadBits, payloadSchema, fieldName) {
 }
 
 function interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry, program, env, options) {
-  const method = program.methods[methodName];
-  interpAssertAstMethod(method, methodName);
-  const cache = options.typeCheckCache || (options.typeCheckCache = new Map());
-  cache.registry = registry;
-  const argValues = [];
-  for (const param of method.params) {
-    const fieldNode = interpFindFieldNode(payloadSchema, param.name);
-    if (!fieldNode) interpError(`schema '${payloadSchema.name}' has no field '${param.name}'`);
-    interpValidateSchemaType(param, fieldNode, methodName, payloadSchema.name, cache);
-    argValues.push(interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options));
+  const ctx = _interpExecCtx;
+  if (ctx) {
+    ctx.astCallSeq += 1;
+    if (!ctx.astPath) ctx.astPath = [];
+    ctx.astPath.push(String(methodName).toLowerCase());
+    ctx.currentAstCall = methodName;
+    ctx.currentMethod = methodName;
   }
-  return interpExecuteMethod(method, argValues, program, env, options);
+  try {
+    const method = program.methods[methodName];
+    interpAssertAstMethod(method, methodName);
+    const cache = options.typeCheckCache || (options.typeCheckCache = new Map());
+    cache.registry = registry;
+    const argValues = [];
+    for (const param of method.params) {
+      const fieldNode = interpFindFieldNode(payloadSchema, param.name);
+      if (!fieldNode) interpError(`schema '${payloadSchema.name}' has no field '${param.name}'`);
+      interpValidateSchemaType(param, fieldNode, methodName, payloadSchema.name, cache);
+      argValues.push(interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options));
+    }
+    return interpExecuteMethod(method, argValues, program, env, options);
+  } finally {
+    if (ctx && ctx.astPath && ctx.astPath.length) ctx.astPath.pop();
+  }
 }
 
 function evalInterpWire(wireBits, schemaName, registry, program, env, options) {
@@ -1138,6 +1292,8 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
 }
 
 function interpExecuteMethod(method, argValues, program, sharedEnv, options) {
+  const ctx = _interpExecCtx;
+  if (ctx && !ctx.isOnabortHandler) ctx.currentMethod = method.name;
   const frameEnv = Object.create(null);
   const envTable = (sharedEnv && sharedEnv.env && typeof sharedEnv.env === 'object')
     ? sharedEnv.env
@@ -1202,7 +1358,18 @@ function encodeInterpResult(value, bitWidth) {
 function evalInterpInline(inst, wireBits, schemaName, registry, options) {
   if (!inst || !inst.methods) interpError('invalid inline [interp] instance');
   const env = options && options.env ? Object.assign({}, options.env) : {};
-  return evalInterpWire(wireBits, schemaName, registry, inst, env, options || {});
+  const execOpts = Object.assign({}, options || {});
+  let result;
+  let abortErr = null;
+  interpRunWithContext(execOpts, () => {
+    try {
+      result = evalInterpWire(wireBits, schemaName, registry, inst, env, execOpts);
+    } catch (err) {
+      abortErr = normalizeInterpAbort(err);
+    }
+  });
+  if (abortErr) throw abortErr;
+  return result;
 }
 
 function evalInterpCompExec(wireBits, schemaName, registry, program, pinEnv, compOptions) {
@@ -1210,14 +1377,26 @@ function evalInterpCompExec(wireBits, schemaName, registry, program, pinEnv, com
   if (!env.env || typeof env.env !== 'object') env.env = {};
   const options = Object.assign({}, compOptions || {});
   options.poutBuffer = options.poutBuffer || {};
-  try {
-    evalInterpWire(wireBits, schemaName, registry, program, env, options);
-  } catch (err) {
-    if (err && err.message && err.message.indexOf('interp:') === 0) {
-      const detail = err.message.replace(/^interp:\s*/, '');
-      throw new Error(`ast binary is invalid for schema ${schemaName}: ${detail}`);
+  let abortErr = null;
+  interpRunWithContext(options, () => {
+    try {
+      evalInterpWire(wireBits, schemaName, registry, program, env, options);
+    } catch (err) {
+      abortErr = normalizeInterpAbort(err);
     }
-    throw err;
+  });
+  if (abortErr) {
+    const handlers = program.onabortHandlers || [];
+    if (handlers.length) {
+      try {
+        invokeInterpOnabortHandlers(handlers, program, abortErr, pinEnv, options);
+        abortErr.commitBuffer = options.poutBuffer;
+      } catch (handlerErr) {
+        throw normalizeInterpAbort(handlerErr);
+      }
+    }
+    abortErr.poutBuffer = options.poutBuffer;
+    throw abortErr;
   }
   return options.poutBuffer;
 }
@@ -1252,6 +1431,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.encodeInterpCompPoutValue = encodeInterpCompPoutValue;
   globalThis.validateInterpAstWire = validateInterpAstWire;
   globalThis.INTERP_MAX_LOOP_ITERATIONS = INTERP_MAX_LOOP_ITERATIONS;
+  globalThis.classifyInterpAbortKind = classifyInterpAbortKind;
+  globalThis.buildInterpErrorInfo = buildInterpErrorInfo;
+  globalThis.formatInterpAbortDisplay = formatInterpAbortDisplay;
+  globalThis.normalizeInterpAbort = normalizeInterpAbort;
+  globalThis.invokeInterpOnabortHandlers = invokeInterpOnabortHandlers;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -1264,5 +1448,10 @@ if (typeof module !== 'undefined' && module.exports) {
     encodeInterpCompPoutValue,
     validateInterpAstWire,
     INTERP_MAX_LOOP_ITERATIONS,
+    classifyInterpAbortKind,
+    buildInterpErrorInfo,
+    formatInterpAbortDisplay,
+    normalizeInterpAbort,
+    invokeInterpOnabortHandlers,
   };
 }

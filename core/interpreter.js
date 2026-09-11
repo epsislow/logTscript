@@ -2237,7 +2237,7 @@ class Interpreter {
 
     if (inlineInst && inlineInst.kind === 'interp' && method === 'eval') {
       if (inlineInst.requiresCompContext) {
-        throw new Error(`${instName}:eval cannot run inline with push/remove (use comp [interp])`);
+        throw new Error(`${instName}:eval cannot run inline with push/remove/onabort (use comp [interp])`);
       }
       const evalFn = typeof evalInterpInline === 'function' ? evalInterpInline : null;
       const encFn = typeof encodeInterpResult === 'function' ? encodeInterpResult : null;
@@ -2489,6 +2489,7 @@ class Interpreter {
         kind: inline.kind,
         name: inline.name,
         methods: prog.methods || {},
+        onabortHandlers: prog.onabortHandlers || [],
         bodyRaw: inline.bodyRaw,
         requiresCompContext: !!prog.requiresCompContext,
       });
@@ -4471,7 +4472,7 @@ class Interpreter {
   }
 
   reportRuntimeError(err) {
-    const msg = (err && err.message) ? err.message : String(err);
+    let msg = (err && err.message) ? err.message : String(err);
     if (err && !err.scriptLoc && this.currentStmt && this.currentStmt.line) {
       err.scriptLoc = {
         line: this.currentStmt.line,
@@ -4480,9 +4481,26 @@ class Interpreter {
       };
     }
     this.lastReportedError = err;
-    const line = 'Error: ' + msg;
     if (!this.out) this.out = [];
-    this.out.push(line);
+    const formatFn = typeof formatInterpAbortDisplay === 'function' ? formatInterpAbortDisplay : null;
+    const buildFn = typeof buildInterpErrorInfo === 'function' ? buildInterpErrorInfo : null;
+    let errorInfo = err && err.errorInfo;
+    if (!errorInfo && buildFn && (
+      (err && err.interpAbort)
+      || /^ast binary is invalid/i.test(msg)
+      || /\(line \d+\)/.test(msg)
+      || /undefined variable/i.test(msg)
+      || /division by zero/i.test(msg)
+      || /cannot encode value/i.test(msg)
+    )) {
+      errorInfo = buildFn(msg, { options: {} });
+      if (err && !err.errorInfo) err.errorInfo = errorInfo;
+    }
+    if (errorInfo && formatFn) {
+      for (const line of formatFn(msg, errorInfo)) this.out.push(line);
+    } else {
+      this.out.push('Error: ' + msg);
+    }
     if (typeof this.onRuntimeError === 'function') {
       this.onRuntimeError(err, this.out);
     } else if (typeof render === 'function') {
