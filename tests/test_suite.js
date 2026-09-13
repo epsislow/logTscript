@@ -57919,6 +57919,12 @@ inline [interp] .calcInterp {
     ':',
   ].join('\n');
 
+  const F6_STMT_SEQ = [
+    '<StmtSeq>+:',
+    '    stmts: bound <CallStatement>[1-]',
+    ':',
+  ].join('\n');
+
   const F6_SCHEMAS = [
     F6_BYTE,
     F6_SYMBOL,
@@ -57933,6 +57939,7 @@ inline [interp] .calcInterp {
     F6_CALL_STATEMENT,
     F6_PROGRAM,
     F6_PROBE,
+    F6_STMT_SEQ,
   ].join('\n');
 
   const F6_PARSER = `
@@ -57940,6 +57947,7 @@ inline [parser] .factLang:
     token INT = [0-9]+;
     token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
     rule program = statement+;
+    rule stmtSeq = statement+;
     rule statement
         = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
         | $name:ID "=" $value:expression ";" -> CallAssign;
@@ -58052,6 +58060,81 @@ inline [interp] .factInterp {
   }
 
   regInterpDual(5403, 5404, 'f6b eval lazy cache on deferred node', runF6LazyEvalHits);
+
+  function runF6ForcedCacheRefresh(h, session) {
+    session.run(F6_CORE);
+    const inst = session.interp.inlineInstances.get('.factInterp');
+    const g = f6Grammar(session);
+    const built = buildAstFromParse(g, 'x', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('parse x', String(built.ok), '1');
+    const handle = interpMakeNodeHandle({
+      kind: 'leaf',
+      schemaRef: 'expr',
+      payloadBits: built.bits,
+      pathKey: 'r/x',
+      fieldName: 'x',
+    });
+    const pinEnv = { env: { x: 5 } };
+    const map = new Map();
+    const opts = {
+      evaluationMap: map,
+      registry: session.interp.schemaRegistry,
+      program: inst,
+      sharedEnv: pinEnv,
+    };
+    const v1 = interpEvalNodeHandle(handle, false, session.interp.schemaRegistry, inst, pinEnv, opts);
+    h.assert('initial lazy', v1, 5);
+    pinEnv.env.x = 99;
+    const v2 = interpEvalNodeHandle(handle, false, session.interp.schemaRegistry, inst, pinEnv, opts);
+    h.assert('lazy stale after env change', v2, 5);
+    const v3 = interpEvalNodeHandle(handle, true, session.interp.schemaRegistry, inst, pinEnv, opts);
+    h.assert('forced fresh', v3, 99);
+    const v4 = interpEvalNodeHandle(handle, false, session.interp.schemaRegistry, inst, pinEnv, opts);
+    h.assert('lazy after forced', v4, 99);
+  }
+
+  reg(5409, 'interp', 'f6b eval forced refreshes cache after env change', runF6ForcedCacheRefresh);
+
+  reg(5410, 'interp', 'f6b eval truthy forced second arg parses', function(h) {
+    const w = parseInterpBody('WhileLoop(c^, b^) { while eval(c, 1) { eval(b, 1); } return 0; }');
+    const p = parseInterpBody('Probe(n^) { flag = 1; return eval(n, flag); }');
+    h.assert('while eval forced', w.methods.WhileLoop.body.length > 0, true);
+    h.assert('eval variable forced', p.methods.Probe.body.length > 0, true);
+  });
+
+  const F6_STMT_INTERP = `
+inline [interp] .stmtInterp {
+    CallNumber(value/u8) { return value; }
+    CallAssign(name/ascii, value/s16) {
+        hits = env['__hits'];
+        env['__hits'] = hits + 1;
+        env[name] = value;
+        return value;
+    }
+    StmtSeq(stmts^) {
+        env['__hits'] = 0;
+        eval(stmts, 1);
+        hitsAfterForced = env['__hits'];
+        eval(stmts);
+        hitsAfterLazy = env['__hits'];
+        return hitsAfterLazy;
+    }
+}`;
+
+  const F6_STMT_CORE = F6_SCHEMAS + '\n' + F6_PARSER + '\n' + F6_STMT_INTERP;
+
+  function runF6CompositeLazyNoRerun(h, session) {
+    session.run(F6_STMT_CORE);
+    session.run(
+      F6_STMT_CORE
+      + '\n4096wire<StmtSeq> sq =: .factLang:packAst("a=10; b=20;", <StmtSeq>, "stmtSeq")'
+      + '\n16wire hits = .stmtInterp:eval(sq, <StmtSeq>)'
+    );
+    const w = session.getWire(session.interp, 'hits');
+    h.assert('two assigns on forced', w, '0000000000000010');
+  }
+
+  regInterpDual(5411, 5412, 'f6b composite BVA lazy eval does not re-run stmts', runF6CompositeLazyNoRerun);
 
   function runF6ForcedReeval(h, session) {
     const w = f6EvalProgramWire(h, session, 'n=3; while(n) { n=n-1; } out=n;', 'result');

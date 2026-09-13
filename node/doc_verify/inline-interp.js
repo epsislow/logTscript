@@ -527,6 +527,90 @@ module.exports.cases.push(
     check: (interp) => f6EvalProgram(interp, 'fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;') === 120,
   },
   {
+    name: 'deferred forced cache refresh',
+    src: F6_DEFERRED,
+    check: (interp) => {
+      const g = f6Grammar(interp);
+      const inst = interp.inlineInstances.get('.factInterp');
+      if (!g || !inst) return false;
+      const built = ab.buildAstFromParse(g, 'x', 'expr', interp.schemaRegistry, { startRule: 'expression' });
+      if (!built || !built.ok) return false;
+      const handle = ie.interpMakeNodeHandle({
+        kind: 'leaf',
+        schemaRef: 'expr',
+        payloadBits: built.bits,
+        pathKey: 'r/x',
+        fieldName: 'x',
+      });
+      const pinEnv = { env: { x: 5 } };
+      const map = new Map();
+      const opts = { evaluationMap: map, registry: interp.schemaRegistry, program: inst, sharedEnv: pinEnv };
+      const v1 = ie.interpEvalNodeHandle(handle, false, interp.schemaRegistry, inst, pinEnv, opts);
+      pinEnv.env.x = 99;
+      const v2 = ie.interpEvalNodeHandle(handle, false, interp.schemaRegistry, inst, pinEnv, opts);
+      const v3 = ie.interpEvalNodeHandle(handle, true, interp.schemaRegistry, inst, pinEnv, opts);
+      const v4 = ie.interpEvalNodeHandle(handle, false, interp.schemaRegistry, inst, pinEnv, opts);
+      return v1 === 5 && v2 === 5 && v3 === 99 && v4 === 99;
+    },
+  },
+  {
+    name: 'deferred composite BVA lazy no rerun',
+    src: [
+      F6_DEFERRED,
+      '<StmtSeq>+:',
+      '    stmts: bound <CallStatement>[1-]',
+      ':',
+      `inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule stmtSeq = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`,
+      `inline [interp] .stmtInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        hits = env['__hits'];
+        env['__hits'] = hits + 1;
+        env[name] = value;
+        return value;
+    }
+    StmtSeq(stmts^) {
+        env['__hits'] = 0;
+        eval(stmts, 1);
+        eval(stmts);
+        return env['__hits'];
+    }
+}`,
+    ].join('\n'),
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.factLang');
+      const inst = interp.inlineInstances.get('.stmtInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const packed = ab.buildAstFromParse(g, 'a=10; b=20;', 'StmtSeq', interp.schemaRegistry, { startRule: 'stmtSeq' });
+      if (!packed || !packed.ok) return false;
+      return ie.evalInterpInline(inst, packed.bits, 'StmtSeq', interp.schemaRegistry, { evaluationMap: new Map() }) === 2;
+    },
+  },
+  {
     name: 'leaf /node rejects at dispatch',
     src: [
       '<CallNumber>:',

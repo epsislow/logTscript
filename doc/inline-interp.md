@@ -545,6 +545,83 @@ show(result)
 
 Expected output: **`0000000000001000`** (3 + 5 = 8).
 
+### Forced vs lazy cache
+
+| Call | Behavior |
+|------|----------|
+| **`eval(h)`** / **`eval(h, 0)`** | On cache hit, return stored value **without** re-executing the subtree |
+| **`eval(h, 1)`** or any **truthy** second argument | Always re-execute, **overwrite** cache, return fresh value |
+| After **`eval(h, 1)`**, then **`eval(h)`** | Lazy call returns the **last** forced result |
+
+Use **`eval(condition, 1)`** in loops when the condition must observe **`env`** updates (see the while example below). Use bare **`eval(left)`** when the same subtree value should be reused (see the lazy **`CallAdd`** example above).
+
+You can pass a **variable** as the second argument (for example **`flag = 1; eval(node, flag)`**) — any truthy value forces re-evaluation.
+
+### Composite BVA: lazy `eval` does not re-run statements
+
+A deferred **BVA** handle (`bound <CallStatement>[1-]`) runs all elements on **`eval(stmts, 1)`**. A following lazy **`eval(stmts)`** returns the cached last result **without** re-executing assigns:
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+<StmtSeq>+:
+    stmts: bound <CallStatement>[1-]
+:
+
+inline [parser] .seqLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule stmtSeq = statement+;
+    rule statement = $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression = INT -> CallNumber;
+:
+
+inline [interp] .seqInterp {
+    CallNumber(value/u8) { return value; }
+    CallAssign(name/ascii, value/s16) {
+        hits = env['__hits'];
+        env['__hits'] = hits + 1;
+        env[name] = value;
+        return value;
+    }
+    StmtSeq(stmts^) {
+        env['__hits'] = 0;
+        eval(stmts, 1);
+        eval(stmts);
+        return env['__hits'];
+    }
+}
+
+4096wire<StmtSeq> sq =: .seqLang:packAst("a=10; b=20;", <StmtSeq>, "stmtSeq")
+16wire hits = .seqInterp:eval(sq, <StmtSeq>)
+show(hits)
+```
+
+Expected output: **`0000000000000010`** (two assigns on forced run; lazy second **`eval`** does not increment again).
+
 ### `while eval(condition)` re-reads `env`
 
 A deferred **condition** subtree is re-evaluated on every loop test, so assignments inside the body affect the next iteration:
