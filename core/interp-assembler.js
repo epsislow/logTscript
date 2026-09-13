@@ -12,7 +12,7 @@ const INTERP_KEYWORDS = new Set([
 
 const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 
-const INTERP_BUILTINS = new Set(['show', 'showx']);
+const INTERP_BUILTINS = new Set(['show', 'showx', 'eval']);
 
 const INTERP_SHOW_MAX_ARGS = 32;
 const INTERP_SHOWX_MAX_ARGS = 32;
@@ -26,6 +26,7 @@ function interpError(msg, line) {
 }
 
 function validateInterpType(typeName, line) {
+  if (typeName === 'node') return;
   if (!typeName || !INTERP_TYPE_RE.test(typeName)) {
     interpError(`unknown type '/${typeName || ''}'`, line);
   }
@@ -258,7 +259,10 @@ class InterpParser {
     let vectorFixedCount = 0;
     let asciiCharsPerElem = 0;
     let asciiNullDelim = false;
-    if (this.match('SYM', '[')) {
+    let nodeSugar = false;
+    if (this.match('SYM', '^')) {
+      nodeSugar = true;
+    } else if (this.match('SYM', '[')) {
       vector = true;
       if (this.peek().type === 'NUM') {
         vectorFixedCount = parseInt(this.eat('NUM').value, 10);
@@ -277,10 +281,15 @@ class InterpParser {
       }
     }
     let typeName = null;
-    if (this.match('SYM', '/')) {
+    if (nodeSugar) {
+      typeName = 'node';
+    } else if (this.match('SYM', '/')) {
       const typeTok = this.eat('ID');
       validateInterpType(typeTok.value, typeTok.line);
       typeName = typeTok.value;
+    }
+    if (nodeSugar && vector) {
+      interpError('deferred /node cannot be combined with vector []', nameTok.line);
     }
     if (asciiNullDelim && typeName !== 'ascii') {
       interpError('~/ is only valid for /ascii', nameTok.line);
@@ -395,9 +404,15 @@ class InterpParser {
 
   parseWhileStmt() {
     const lineTok = this.eat('KW', 'while');
-    this.eat('SYM', '(');
-    const cond = this.parseCond();
-    this.eat('SYM', ')');
+    let cond;
+    if (this.match('SYM', '(')) {
+      cond = this.parseCond();
+      this.eat('SYM', ')');
+    } else if (this.peek().type === 'ID' && this.peek().value === 'eval') {
+      cond = this.parseExpr();
+    } else {
+      interpError('while requires (condition) or eval(...)', lineTok.line);
+    }
     const body = this.parseBlock();
     return { kind: 'while', cond, body, line: lineTok.line };
   }
@@ -798,6 +813,13 @@ function validateReturnArity(method) {
   method.returnArity = arity;
 }
 
+function interpValidateEvalBuiltinCall(args, line) {
+  const n = (args || []).length;
+  if (n < 1 || n > 2) {
+    interpError('eval requires 1 or 2 arguments', line);
+  }
+}
+
 function interpValidateShowBuiltinCall(name, args, line) {
   const n = (args || []).length;
   if (name === 'show') {
@@ -819,6 +841,11 @@ function interpValidateShowBuiltinCall(name, args, line) {
 
 function validateExprCallArity(expr, program, line, expectMulti) {
   if (!expr || expr.kind !== 'call') return;
+  if (expr.name === 'eval') {
+    interpValidateEvalBuiltinCall(expr.args, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
   if (INTERP_BUILTINS.has(expr.name)) {
     interpError(`'${expr.name}' cannot be used as expression — use as statement`, line);
   }
@@ -892,7 +919,9 @@ function validateStmtTree(stmts, program) {
       validateExprTree(stmt.expr, program, stmt.line);
       if (stmt.index) validateExprTree(stmt.index, program, stmt.line);
     } else if (stmt.kind === 'call') {
-      if (INTERP_BUILTINS.has(stmt.name)) {
+      if (stmt.name === 'eval') {
+        interpValidateEvalBuiltinCall(stmt.args, stmt.line);
+      } else if (INTERP_BUILTINS.has(stmt.name)) {
         interpValidateShowBuiltinCall(stmt.name, stmt.args, stmt.line);
       }
       for (const a of stmt.args || []) validateExprTree(a, program, stmt.line);

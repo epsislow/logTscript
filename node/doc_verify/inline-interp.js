@@ -383,3 +383,168 @@ module.exports.cases.push(
     },
   },
 );
+
+const F6_DEFERRED = [
+  '<byte>:',
+  '    value: 8',
+  ':',
+  '<symbol>+:',
+  '    bytes: bound <byte>[1-]',
+  ':',
+  '<CallNumber>:',
+  '    value: 8',
+  ':',
+  '<CallVariable>:',
+  '    name: bound <symbol>',
+  ':',
+  '<CallAdd>:',
+  '    left:  bound <expr>',
+  '    right: bound <expr>',
+  ':',
+  '<CallSub>:',
+  '    left:  bound <expr>',
+  '    right: bound <expr>',
+  ':',
+  '<CallMul>:',
+  '    left:  bound <expr>',
+  '    right: bound <expr>',
+  ':',
+  '<expr>+:',
+  '    CallNumber?:   <CallNumber>',
+  '    CallVariable?: bound <CallVariable>',
+  '    CallAdd?:      bound <CallAdd>',
+  '    CallSub?:      bound <CallSub>',
+  '    CallMul?:      bound <CallMul>',
+  ':',
+  '<CallAssign>:',
+  '    name:  bound <symbol>',
+  '    value: bound <expr>',
+  ':',
+  '<WhileLoop>:',
+  '    condition: bound <expr>',
+  '    body:      bound <CallStatement>[1-]',
+  ':',
+  '<CallStatement>+:',
+  '    CallAssign?: bound <CallAssign>',
+  '    WhileLoop?:  bound <WhileLoop>',
+  ':',
+  '<program>+:',
+  '    statements: bound <CallStatement>[1-]',
+  ':',
+  '<DeferredProbe>:',
+  '    node: bound <expr>',
+  ':',
+  `inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`,
+  `inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        while eval(condition, 1) {
+            eval(body, 1);
+        }
+        return 0;
+    }
+    DeferredProbe(node^) {
+        v1 = eval(node);
+        v2 = eval(node);
+        return v2;
+    }
+}`,
+].join('\n');
+
+function f6Grammar(interp) {
+  const inst = interp.inlineInstances.get('.factLang');
+  if (!inst) return null;
+  return { tokens: inst.tokens, rules: inst.rules };
+}
+
+function f6EvalProgram(interp, src) {
+  const g = f6Grammar(interp);
+  const inst = interp.inlineInstances.get('.factInterp');
+  if (!g || !inst) return null;
+  const packed = ab.buildAstFromParse(g, src, 'program', interp.schemaRegistry, { startRule: 'program' });
+  if (!packed || !packed.ok) return null;
+  return ie.evalInterpInline(inst, packed.bits, 'program', interp.schemaRegistry, { evaluationMap: new Map() });
+}
+
+module.exports.cases.push(
+  {
+    name: 'deferred eval lazy cache',
+    src: F6_DEFERRED,
+    check: (interp) => {
+      const g = f6Grammar(interp);
+      const inst = interp.inlineInstances.get('.factInterp');
+      if (!g || !inst) return false;
+      const built = ab.buildAstFromParse(g, '7', 'expr', interp.schemaRegistry, { startRule: 'expression' });
+      if (!built || !built.ok) return false;
+      const handle = ie.interpMakeNodeHandle({
+        kind: 'leaf',
+        schemaRef: 'expr',
+        payloadBits: built.bits,
+        pathKey: 'r/probe',
+        fieldName: 'probe',
+      });
+      const map = new Map();
+      const opts = { evaluationMap: map, registry: interp.schemaRegistry, program: inst, sharedEnv: { env: {} } };
+      const v1 = ie.interpEvalNodeHandle(handle, false, interp.schemaRegistry, inst, opts.sharedEnv, opts);
+      const v2 = ie.interpEvalNodeHandle(handle, false, interp.schemaRegistry, inst, opts.sharedEnv, opts);
+      return v1 === 7 && v2 === 7 && map.size === 1;
+    },
+  },
+  {
+    name: 'deferred while re-reads env',
+    src: F6_DEFERRED,
+    check: (interp) => f6EvalProgram(interp, 'n=3; while(n) { n=n-1; } out=n;') === 0,
+  },
+  {
+    name: 'deferred factorial 5! = 120',
+    src: F6_DEFERRED,
+    check: (interp) => f6EvalProgram(interp, 'fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;') === 120,
+  },
+  {
+    name: 'leaf /node rejects at dispatch',
+    src: [
+      '<CallNumber>:',
+      '    value: 8',
+      ':',
+      'inline [interp] .badLeaf {',
+      '  CallNumber(value/node) { return 0; }',
+      '}',
+    ].join('\n'),
+    check: (interp) => {
+      const inst = interp.inlineInstances.get('.badLeaf');
+      if (!inst) return false;
+      try {
+        ie.evalInterpWire('0000000000101010', 'CallNumber', interp.schemaRegistry, inst, {});
+        return false;
+      } catch (e) {
+        return String(e.message).indexOf('requires bound or BVA field for /node') >= 0;
+      }
+    },
+  },
+);

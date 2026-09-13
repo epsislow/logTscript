@@ -2307,8 +2307,10 @@ class Interpreter {
           };
       }
       const numResult = evalFn(inlineInst, wireBits, schemaName, this.schemaRegistry, evalOpts);
-      const bits = encFn(numResult, null);
-      return this._inlineParserWireReturn(bits, bits.length, computeRefs);
+      const outWidth = this._interpEvalOutWidth > 0 ? this._interpEvalOutWidth : null;
+      const bits = encFn(numResult, outWidth);
+      const bw = outWidth && outWidth > 0 ? outWidth : bits.length;
+      return this._inlineParserWireReturn(bits, bw, computeRefs);
     }
 
     throw new Error(`Unknown method '${method}' for ${instName}`);
@@ -12770,7 +12772,17 @@ if (s.assignment) {
   }
 
   // Evaluate RHS
-  const exprResult = this.evalExpr(expr, computeRefs);
+  let exprResult;
+  if (isWire && !range) {
+    this._interpEvalOutWidth = bitWidth;
+    try {
+      exprResult = this.evalExpr(expr, computeRefs);
+    } finally {
+      this._interpEvalOutWidth = null;
+    }
+  } else {
+    exprResult = this.evalExpr(expr, computeRefs);
+  }
   if (isWire && !range && exprResult.some(part => part.zConnectNoDrive)) {
     return;
   }
@@ -13121,7 +13133,15 @@ if (s.assignment) {
         ? s.decls[0].name
         : null;
       if (declTargetWire) this._inlineLogicAssignWire = declTargetWire;
-      exprResult = this.evalExpr(s.expr, computeRefs);
+      const declInterpWidth = s.decls && s.decls[0] && this.isWire(s.decls[0].type)
+        ? (getBitWidthFromDecl(this, s.decls[0]) || this.getBitWidth(s.decls[0].type))
+        : null;
+      if (declInterpWidth != null) this._interpEvalOutWidth = declInterpWidth;
+      try {
+        exprResult = this.evalExpr(s.expr, computeRefs);
+      } finally {
+        if (declInterpWidth != null) this._interpEvalOutWidth = null;
+      }
     } catch (e) {
       this.reportRuntimeError(e);
       return;
@@ -13473,7 +13493,13 @@ if (s.assignment) {
             return outputs;
           }
         }
-        const exprResult = this.evalExpr(s.assignment.expr, false);
+        let exprResult;
+        this._interpEvalOutWidth = varArrayFieldTarget ? bits : (sliceRange ? this._sliceRangeWidth(sliceRange) : bits);
+        try {
+          exprResult = this.evalExpr(s.assignment.expr, false);
+        } finally {
+          this._interpEvalOutWidth = null;
+        }
         if (exprResult.some(part => part.zConnectNoDrive)) {
           this._inlineLogicAssignWire = null;
           this.currentStmt = prevStmt;
@@ -13574,8 +13600,19 @@ if (s.assignment) {
     if (declTargetWire && this.isWire(s.decls[0].type)) {
       this._inlineLogicAssignWire = declTargetWire;
     }
+    const declWireWidth = declUseExprWidth != null
+      ? declUseExprWidth
+      : (s.decls && s.decls[0] && this.isWire(s.decls[0].type)
+        ? (getBitWidthFromDecl(this, s.decls[0]) || this.getBitWidth(s.decls[0].type))
+        : null);
     // During NEXT(~) recomputation, use computeRefs=false to avoid creating new storage for literals
-    const exprResult = this.evalExpr(s.expr, false);
+    let exprResult;
+    if (declWireWidth != null) this._interpEvalOutWidth = declWireWidth;
+    try {
+      exprResult = this.evalExpr(s.expr, false);
+    } finally {
+      if (declWireWidth != null) this._interpEvalOutWidth = null;
+    }
     
     // Compute total value from expression
     // Always prefer reading from ref to get current value (important for WIREWRITE mode)

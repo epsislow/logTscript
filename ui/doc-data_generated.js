@@ -24278,6 +24278,9 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Multi-return** | Helpers may \`return a, b, …\` (max **10**); use \`x, y = helper()\` — not on AST methods |
 | **Vectors** | \`param[]/type\`, \`[N]/type\`, \`[N]M/ascii\`, \`[]~/ascii\`, \`[N]~/ascii\` — see [Vector parameters](#vector-parameters) |
 | **Runtime API** | \`.myInterp:eval(astWire, <schema>)\` → numeric wire (width from assignment LHS) |
+| **Deferred params** | \`param/node\` or \`param^\` — AST subtree handle; use **\`eval(node)\`** or **\`eval(node, forced)\`** inside the method |
+| **\`eval\` builtin** | Re-evaluate a deferred handle; lazy cache per \`(pathKey, schema)\` unless second arg is truthy |
+| **\`while eval(...)\`** | Condition re-reads env each iteration when the AST node is deferred |
 | **Env** | \`env[name]\` inside method bodies for \`CallAssign\` / \`CallVariable\` programs |
 | **Debug** | \`show(a, b)\` and \`showx(Style, …)\` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
 | **Doc** | \`doc(inline.interp)\`, \`doc(.myInterp)\` |
@@ -24710,6 +24713,293 @@ inline [interp] .calcInterp {
 
 ---
 
+## Deferred parameters (\`/node\`, \`^\`, \`eval\`)
+
+By default, every typed AST parameter is **decoded immediately** at dispatch (\`left/s16\` → JavaScript number). For **bound** or **BVA** fields (including **\`bound <expr>\`** union subtrees), you can defer evaluation:
+
+| Syntax | IR type | Meaning |
+|--------|---------|---------|
+| \`body/node\` | \`/node\` | Pass an **AST node handle** instead of a decoded value |
+| \`body^\` | \`/node\` | Sugar for \`/node\` on the same parameter |
+
+Inside the method body, call the builtin **\`eval(handle)\`** to evaluate the subtree. **\`eval(handle, 1)\`** (or any truthy second argument) **forces** a fresh evaluation and bypasses the lazy cache.
+
+| Rule | Detail |
+|------|--------|
+| Valid targets | Bound fields, BVA arrays, and **\`bound <expr>\`** expression unions |
+| Invalid | Leaf numeric fields (\`value: 8\`) — abort at first dispatch |
+| **\`eval\` name** | Reserved — not a user method name |
+| **\`while eval(cond)\`** | Allowed without extra parentheses around \`eval(...)\` |
+| Cache key | \`(pathKey, schemaRef)\` for the duration of one \`:eval\` session |
+
+### Leaf \`/node\` aborts at dispatch
+
+\`value/node\` on a leaf field is rejected when the engine first dispatches \`CallNumber\`:
+
+\`\`\`logts
+<CallNumber>:
+    value: 8
+:
+
+inline [interp] .badLeaf {
+    CallNumber(value/node) {
+        return 0;
+    }
+}
+\`\`\`
+
+At runtime, \`:eval\` aborts with **\`requires bound or BVA field for /node\`**.
+
+### Lazy \`eval\` cache on a deferred expression
+
+\`CallAdd(left^, …)\` defers the left subtree. Two **\`eval(left)\`** calls reuse the same cached value (one map entry per handle):
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+:
+
+inline [parser] .probeLang:
+    token INT = [0-9]+;
+    rule expression = expression "+" term -> CallAdd | term;
+    rule term = INT -> CallNumber;
+:
+
+inline [interp] .probeInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left^, right/s16) {
+        a = eval(left);
+        b = eval(left);
+        return b + right;
+    }
+}
+
+4096wire<expr> ast =: .probeLang:packAst("3+5", <expr>, "expression")
+16wire result = .probeInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000000001000\`** (3 + 5 = 8).
+
+### \`while eval(condition)\` re-reads \`env\`
+
+A deferred **condition** subtree is re-evaluated on every loop test, so assignments inside the body affect the next iteration:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallSub>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallSub?:      bound <CallSub>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<WhileLoop>:
+    condition: bound <expr>
+    body:      bound <CallStatement>[1-]
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+    WhileLoop?:  bound <WhileLoop>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .loopLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "-" term -> CallSub
+        | term;
+    rule term = INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .loopInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        while eval(condition, 1) {
+            eval(body, 1);
+        }
+        return 0;
+    }
+}
+
+4096wire<program> prog =: .loopLang:packAst("n=3; while(n) { n=n-1; } out=n;", <program>, "program")
+16wire result = .loopInterp:eval(prog, <program>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000000000000\`** (\`n\` is zero after the loop).
+
+### Factorial via deferred while (5! = 120)
+
+Full program: assignments, multiply/subtract, and a **\`WhileLoop\`** interpreter method using forced re-evaluation:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallSub>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallAdd?:      bound <CallAdd>
+    CallSub?:      bound <CallSub>
+    CallMul?:      bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<WhileLoop>:
+    condition: bound <expr>
+    body:      bound <CallStatement>[1-]
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+    WhileLoop?:  bound <WhileLoop>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        while eval(condition, 1) {
+            eval(body, 1);
+        }
+        return 0;
+    }
+}
+
+4096wire<program> prog =: .factLang:packAst("fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;", <program>, "program")
+16wire result = .factInterp:eval(prog, <program>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000001111000\`** (120).
+
+### Caret sugar (\`^\` ≡ \`/node\`)
+
+Both forms compile to the same \`/node\` parameter type:
+
+\`\`\`logts
+WhileLoop(condition^, body/node) { … }
+\`\`\`
+
+---
+
 ## Runtime: \`.calcInterp:eval(astWire, <schema>)\`
 
 | Argument | Meaning |
@@ -25081,6 +25371,9 @@ Eval stops immediately on:
 | \`[N]~/ascii\` with fewer than N null-delimited elements | \`corrupt vector field bit length\` |
 | Var-array count inconsistent with available bits | \`corrupt vector field bit length\` |
 | Loop > 10 000 iterations | Error |
+| \`/node\` on leaf field | \`requires bound or BVA field for /node\` |
+| \`eval\` on non-handle | \`eval requires deferred node handle\` |
+| User method named \`eval\` | Assembler error — name reserved |
 
 Errors surface in the **Output** panel (legacy propagation) or as a thrown runtime error (wave propagation).
 

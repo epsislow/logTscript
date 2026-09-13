@@ -4,14 +4,66 @@ const INTERP_MAX_LOOP_ITERATIONS = 10000;
 
 let _interpExecCtx = null;
 
+function interpIsNodeHandle(v) {
+  return v != null && typeof v === 'object' && v.__interpNodeHandle === true;
+}
+
+function interpMakeNodeHandle(spec) {
+  return {
+    __interpNodeHandle: true,
+    kind: spec.kind,
+    schemaRef: spec.schemaRef,
+    payloadBits: spec.payloadBits,
+    pathKey: spec.pathKey,
+    fieldName: spec.fieldName || '',
+    fieldNode: spec.fieldNode || null,
+  };
+}
+
+function interpBoundFieldSchemaRef(fieldNode, registry) {
+  fieldNode = interpNormalizeFieldNode(fieldNode);
+  if (!fieldNode || !fieldNode.schema) return String(fieldNode && fieldNode.schemaRef || '');
+  const sub = interpResolveSchema(registry, fieldNode.schema.name || fieldNode.schemaRef || fieldNode.schema);
+  return sub ? sub.name : String(fieldNode.schema.name || fieldNode.schemaRef || fieldNode.schema || '');
+}
+
+function interpMakeNodeHandleFromParam(param, payloadBits, fieldNode, registry, pathKeyPrefix) {
+  const kind = interpSchemaFieldKind(fieldNode, registry);
+  if (kind !== 'bound' && kind !== 'bva' && kind !== 'expr') {
+    interpError(`schema field '${param.name}' requires bound or BVA field for /node`);
+  }
+  const schemaRef = kind === 'expr'
+    ? (interpBoundFieldSchemaRef(fieldNode, registry) || 'expr')
+    : interpBoundFieldSchemaRef(fieldNode, registry);
+  const handleKind = kind === 'bva' ? 'composite' : 'leaf';
+  const pathKey = (pathKeyPrefix || 'r') + '/' + param.name;
+  return interpMakeNodeHandle({
+    kind: handleKind,
+    schemaRef,
+    payloadBits,
+    pathKey,
+    fieldName: param.name,
+    fieldNode,
+  });
+}
+
+function interpEvalMapKey(handle) {
+  return String(handle.pathKey) + '|' + String(handle.schemaRef);
+}
+
 function interpRunWithContext(options, fn) {
   const prev = _interpExecCtx;
+  const opts = options || {};
   _interpExecCtx = {
-    options: options || {},
+    options: opts,
     astCallSeq: 0,
     astPath: [],
     currentAstCall: '',
     currentMethod: '',
+    evaluationMap: opts.evaluationMap || new Map(),
+    registry: opts.registry || null,
+    program: opts.program || null,
+    sharedEnv: opts.sharedEnv || null,
   };
   try {
     return fn();
@@ -348,6 +400,13 @@ function interpValidateSchemaType(param, fieldNode, methodName, schemaName, cach
       /* []M/ascii — valid on any slice container */
     } else if (!interpIsNumericTypeName(tn) && tn !== 'ascii') {
       interpError(`schema '${schemaName}' field '${param.name}' incompatible with vector /${tn}`);
+    }
+    if (cache) cache.set(key, true);
+    return;
+  }
+  if (tn === 'node') {
+    if (kind !== 'bound' && kind !== 'bva' && kind !== 'expr') {
+      interpError(`schema '${schemaName}' field '${param.name}' requires bound or BVA field for /node`);
     }
     if (cache) cache.set(key, true);
     return;
@@ -743,12 +802,16 @@ function interpExtractFieldBits(payloadBits, payloadSchema, fieldName) {
 
 function interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry, program, env, options) {
   const ctx = _interpExecCtx;
+  const pathKeyPrefix = (options && options.pathKeyPrefix) || 'r';
   if (ctx) {
     ctx.astCallSeq += 1;
     if (!ctx.astPath) ctx.astPath = [];
     ctx.astPath.push(String(methodName).toLowerCase());
     ctx.currentAstCall = methodName;
     ctx.currentMethod = methodName;
+    ctx.registry = registry;
+    ctx.program = program;
+    ctx.sharedEnv = env;
   }
   try {
     const method = program.methods[methodName];
@@ -760,7 +823,12 @@ function interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry,
       const fieldNode = interpFindFieldNode(payloadSchema, param.name);
       if (!fieldNode) interpError(`schema '${payloadSchema.name}' has no field '${param.name}'`);
       interpValidateSchemaType(param, fieldNode, methodName, payloadSchema.name, cache);
-      argValues.push(interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options));
+      if (param.typeName === 'node') {
+        const bits = interpExtractFieldBits(payloadBits, payloadSchema, param.name);
+        argValues.push(interpMakeNodeHandleFromParam(param, bits, fieldNode, registry, pathKeyPrefix));
+      } else {
+        argValues.push(interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options));
+      }
     }
     return interpExecuteMethod(method, argValues, program, env, options);
   } finally {
@@ -772,7 +840,13 @@ function evalInterpWire(wireBits, schemaName, registry, program, env, options) {
   const bits = wireBits == null ? '' : String(wireBits);
   const schema = interpResolveSchema(registry, schemaName);
   if (!schema) interpError(`unknown schema '${schemaName}'`);
-  return evalInterpSchemaPayload(bits, schema, registry, program, env, options || {});
+  const execOpts = Object.assign({}, options || {});
+  if (!execOpts.pathKeyPrefix) execOpts.pathKeyPrefix = 'r';
+  if (!execOpts.evaluationMap) execOpts.evaluationMap = new Map();
+  execOpts.registry = registry;
+  execOpts.program = program;
+  execOpts.sharedEnv = env;
+  return evalInterpSchemaPayload(bits, schema, registry, program, env, execOpts);
 }
 
 function interpFindProgramStatementsNode(schema) {
@@ -830,6 +904,7 @@ function evalInterpUnionRoot(bits, schema, registry, program, env, options) {
   const maskInfo = SB.readPresenceMask(bits, maskBits, 0);
   let optIdx = 0;
   let offset = maskInfo.payloadStart;
+  const pathKeyPrefix = (options && options.pathKeyPrefix) || 'r';
   for (const node of schema.structure) {
     if (node.kind !== 'optional_field') continue;
     const present = maskInfo.mask.charAt(optIdx) === '1';
@@ -852,7 +927,11 @@ function evalInterpUnionRoot(bits, schema, registry, program, env, options) {
     if (!program.methods[methodName]) {
       interpError(`unknown AST method '${methodName}'`);
     }
-    return interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry, program, env, options);
+    const branchPath = pathKeyPrefix + '/' + methodName;
+    return interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry, program, env, {
+      ...(options || {}),
+      pathKeyPrefix: branchPath,
+    });
   }
   interpError('empty union — no active AST branch');
 }
@@ -862,12 +941,17 @@ function evalInterpProgramStatements(bits, stmtsNode, registry, program, env, op
   let offset = 0;
   let last = 0;
   let count = 0;
+  const basePath = (options && options.pathKeyPrefix) || 'r';
   while (offset < bits.length) {
     const sub = SB.readBoundSubstream(bits, offset);
     if (sub.len === 0 && count >= (stmtsNode.minCount || 1)) break;
     if (sub.len === 0) break;
     const stmtSchema = interpResolveSchema(registry, stmtsNode.schema.name || stmtsNode.schema);
-    last = evalInterpUnionRoot(sub.payloadBits, stmtSchema, registry, program, env, options);
+    const stmtPath = basePath + '/statements[' + count + ']';
+    last = evalInterpUnionRoot(sub.payloadBits, stmtSchema, registry, program, env, {
+      ...(options || {}),
+      pathKeyPrefix: stmtPath,
+    });
     offset += sub.totalWidth;
     count++;
     if (stmtsNode.maxCount != null && count >= stmtsNode.maxCount) break;
@@ -897,6 +981,82 @@ function interpCompare(op, left, right) {
     case '>=': return ln >= rn;
     default: interpError(`unknown compare operator '${op}'`);
   }
+}
+
+function interpEvalNodeHandle(handle, forced, registry, program, env, options) {
+  if (!interpIsNodeHandle(handle)) interpError('eval requires deferred node handle');
+  const execOpts = Object.assign({}, options || {});
+  const map = execOpts.evaluationMap || (_interpExecCtx && _interpExecCtx.evaluationMap);
+  if (!map) interpError('eval requires active interpreter session');
+  const mapKey = interpEvalMapKey(handle);
+  if (!forced && map.has(mapKey)) return map.get(mapKey);
+
+  let result;
+  if (handle.kind === 'composite') {
+    const SB = interpSb();
+    const fieldNode = handle.fieldNode;
+    const bits = handle.payloadBits == null ? '' : String(handle.payloadBits);
+    const elemSchema = fieldNode && fieldNode.schema
+      ? interpResolveSchema(registry, fieldNode.schema.name || fieldNode.schemaRef || fieldNode.schema)
+      : null;
+    if (!elemSchema) interpError('composite handle missing element schema');
+    let offset = 0;
+    let idx = 0;
+    result = 0;
+    while (offset < bits.length) {
+      const sub = SB.readBoundSubstream(bits, offset);
+      if (sub.len === 0) break;
+      const childHandle = interpMakeNodeHandle({
+        kind: 'leaf',
+        schemaRef: elemSchema.name,
+        payloadBits: sub.payloadBits,
+        pathKey: handle.pathKey + '/' + handle.fieldName + '[' + idx + ']',
+        fieldName: handle.fieldName + '[' + idx + ']',
+        fieldNode: { kind: 'bound', schema: elemSchema, isBound: true },
+      });
+      result = interpEvalNodeHandle(childHandle, forced, registry, program, env, execOpts);
+      offset += sub.totalWidth;
+      idx++;
+      if (fieldNode.maxCount != null && idx >= fieldNode.maxCount) break;
+    }
+  } else {
+    const schema = interpResolveSchema(registry, handle.schemaRef);
+    if (!schema) interpError(`unknown schema '${handle.schemaRef}'`);
+    result = evalInterpSchemaPayload(handle.payloadBits, schema, registry, program, env, {
+      ...execOpts,
+      pathKeyPrefix: handle.pathKey,
+    });
+  }
+  map.set(mapKey, result);
+  return result;
+}
+
+function interpResolveEvalHandleArg(expr, env, callMethodFn, line) {
+  const v = interpEvalExpr(expr, env, callMethodFn, line);
+  if (!interpIsNodeHandle(v)) {
+    interpError(`eval requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
+  }
+  return v;
+}
+
+function interpBuiltinEval(args, env, callMethodFn, program, sharedEnv, options, line) {
+  if (!args || !args.length) interpError(`eval requires at least 1 argument${line != null ? ` (line ${line})` : ''}`);
+  const handle = interpResolveEvalHandleArg(args[0], env, callMethodFn, line);
+  let forced = false;
+  if (args.length > 1) {
+    forced = interpTruthy(interpEvalExpr(args[1], env, callMethodFn, line));
+  }
+  const ctx = _interpExecCtx || {};
+  const registry = (options && options.registry) || ctx.registry;
+  const prog = program || ctx.program;
+  const pinEnv = sharedEnv || ctx.sharedEnv || env;
+  if (!registry || !prog) interpError('eval requires active AST evaluation context');
+  const execOpts = Object.assign({}, options || {});
+  execOpts.evaluationMap = execOpts.evaluationMap || ctx.evaluationMap;
+  execOpts.registry = registry;
+  execOpts.program = prog;
+  execOpts.sharedEnv = pinEnv;
+  return interpEvalNodeHandle(handle, forced, registry, prog, pinEnv, execOpts);
 }
 
 function interpEvalCond(expr, env, callMethodFn, line) {
@@ -982,6 +1142,18 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       }
     }
     case 'call':
+      if (expr.name === 'eval') {
+        const ctx = _interpExecCtx || {};
+        return interpBuiltinEval(
+          expr.args,
+          env,
+          callMethodFn,
+          ctx.program,
+          ctx.sharedEnv,
+          ctx.options || {},
+          expr.line != null ? expr.line : line,
+        );
+      }
       if (expr.name === 'vectorLen') {
         const arr = interpEvalExpr(expr.args[0], env, callMethodFn, line);
         if (!Array.isArray(arr)) interpError(`vectorLen expects vector${line != null ? ` (line ${line})` : ''}`);
@@ -1307,6 +1479,8 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
     } else if (stmt.kind === 'call') {
       if (stmt.name === 'show' || stmt.name === 'showx') {
         interpRunShowBuiltin(stmt.name, stmt.args, env, callMethodFn, options, stmt.line);
+      } else if (stmt.name === 'eval') {
+        interpBuiltinEval(stmt.args, env, callMethodFn, program, sharedEnv || env, options, stmt.line);
       } else {
         const vals = (stmt.args || []).map((a) => evalArg(a));
         const m = program.methods[stmt.name];
@@ -1445,6 +1619,10 @@ function evalInterpInline(inst, wireBits, schemaName, registry, options) {
   if (!inst || !inst.methods) interpError('invalid inline [interp] instance');
   const env = options && options.env ? Object.assign({}, options.env) : {};
   const execOpts = Object.assign({}, options || {});
+  execOpts.evaluationMap = execOpts.evaluationMap || new Map();
+  execOpts.registry = registry;
+  execOpts.program = inst;
+  execOpts.sharedEnv = env;
   let result;
   let abortErr = null;
   interpRunWithContext(execOpts, () => {
@@ -1463,6 +1641,10 @@ function evalInterpCompExec(wireBits, schemaName, registry, program, pinEnv, com
   if (!env.env || typeof env.env !== 'object') env.env = {};
   const options = Object.assign({}, compOptions || {});
   options.poutBuffer = options.poutBuffer || {};
+  options.evaluationMap = options.evaluationMap || new Map();
+  options.registry = registry;
+  options.program = program;
+  options.sharedEnv = env;
   let abortErr = null;
   interpRunWithContext(options, () => {
     try {
@@ -1509,6 +1691,9 @@ function validateInterpAstWire(wireBits, schemaName, registry) {
 }
 
 if (typeof globalThis !== 'undefined') {
+  globalThis.interpIsNodeHandle = interpIsNodeHandle;
+  globalThis.interpMakeNodeHandle = interpMakeNodeHandle;
+  globalThis.interpEvalNodeHandle = interpEvalNodeHandle;
   globalThis.evalInterpWire = evalInterpWire;
   globalThis.evalInterpInline = evalInterpInline;
   globalThis.evalInterpCompExec = evalInterpCompExec;
@@ -1526,6 +1711,9 @@ if (typeof globalThis !== 'undefined') {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    interpIsNodeHandle,
+    interpMakeNodeHandle,
+    interpEvalNodeHandle,
     evalInterpWire,
     evalInterpInline,
     evalInterpCompExec,

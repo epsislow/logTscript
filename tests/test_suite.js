@@ -57824,5 +57824,248 @@ inline [interp] .calcInterp {
   reg(5396, 'parser', 'parseResult error and errors path show legacy', runParseResultErrorPaths);
   reg(5397, 'parser', 'parseResult error and errors path show wave', runParseResultErrorPaths, { propagation: 'wave' });
 
+  /* ----- F6a/F6b — deferred /node params + eval ----- */
+
+  function regInterpDual(legacyId, waveId, title, run) {
+    reg(legacyId, 'interp', title + ' legacy', run);
+    reg(waveId, 'interp', title + ' wave', run, { propagation: 'wave' });
+  }
+
+  const F6_BYTE = [
+    '<byte>:',
+    '    value: 8',
+    ':',
+  ].join('\n');
+
+  const F6_SYMBOL = [
+    '<symbol>+:',
+    '    bytes: bound <byte>[1-]',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_NUMBER = [
+    '<CallNumber>:',
+    '    value: 8',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_VARIABLE = [
+    '<CallVariable>:',
+    '    name: bound <symbol>',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_ADD = [
+    '<CallAdd>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_SUB = [
+    '<CallSub>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_MUL = [
+    '<CallMul>:',
+    '    left:  bound <expr>',
+    '    right: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F6_EXPR = [
+    '<expr>+:',
+    '    CallNumber?:   <CallNumber>',
+    '    CallVariable?: bound <CallVariable>',
+    '    CallAdd?:      bound <CallAdd>',
+    '    CallSub?:      bound <CallSub>',
+    '    CallMul?:      bound <CallMul>',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_ASSIGN = [
+    '<CallAssign>:',
+    '    name:  bound <symbol>',
+    '    value: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F6_WHILE_LOOP = [
+    '<WhileLoop>:',
+    '    condition: bound <expr>',
+    '    body:      bound <CallStatement>[1-]',
+    ':',
+  ].join('\n');
+
+  const F6_CALL_STATEMENT = [
+    '<CallStatement>+:',
+    '    CallAssign?: bound <CallAssign>',
+    '    WhileLoop?:  bound <WhileLoop>',
+    ':',
+  ].join('\n');
+
+  const F6_PROGRAM = [
+    '<program>+:',
+    '    statements: bound <CallStatement>[1-]',
+    ':',
+  ].join('\n');
+
+  const F6_PROBE = [
+    '<DeferredProbe>:',
+    '    node: bound <expr>',
+    ':',
+  ].join('\n');
+
+  const F6_SCHEMAS = [
+    F6_BYTE,
+    F6_SYMBOL,
+    F6_CALL_NUMBER,
+    F6_CALL_VARIABLE,
+    F6_CALL_ADD,
+    F6_CALL_SUB,
+    F6_CALL_MUL,
+    F6_EXPR,
+    F6_CALL_ASSIGN,
+    F6_WHILE_LOOP,
+    F6_CALL_STATEMENT,
+    F6_PROGRAM,
+    F6_PROBE,
+  ].join('\n');
+
+  const F6_PARSER = `
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`;
+
+  const F6_INTERP = `
+inline [interp] .factInterp {
+    CallNumber(value/u8) {
+        return value;
+    }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        while eval(condition, 1) {
+            eval(body, 1);
+        }
+        return 0;
+    }
+    DeferredProbe(node^) {
+        v1 = eval(node);
+        v2 = eval(node);
+        return v2;
+    }
+}`;
+
+  const F6_CORE = F6_SCHEMAS + '\n' + F6_PARSER + '\n' + F6_INTERP;
+
+  function f6Grammar(session) {
+    const inst = session.interp.inlineInstances.get('.factLang');
+    return { tokens: inst.tokens, rules: inst.rules };
+  }
+
+  function f6EscStr(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+
+  function f6EvalProgramWire(h, session, src, wireName) {
+    session.run(F6_CORE);
+    const wn = wireName || 'result';
+    session.run(F6_CORE + '\n4096wire<program> prog =: .factLang:packAst("' + f6EscStr(src) + '", <program>, "program")\n16wire ' + wn + ' = .factInterp:eval(prog, <program>)');
+    return session.getWire(session.interp, wn);
+  }
+
+  reg(5400, 'interp', 'f6a /node on leaf field rejects at dispatch', function(h, session) {
+    const bad = F6_SCHEMAS + '\ninline [interp] .bad {\n  CallNumber(value/node) { return 0; }\n}';
+    session.run(bad);
+    const inst = session.interp.inlineInstances.get('.bad');
+    h.assertThrows('leaf /node', function() {
+      evalInterpWire('0000000000101010', 'CallNumber', session.interp.schemaRegistry, inst, {});
+    }, 'requires bound or BVA field for /node');
+  });
+
+  reg(5400 + 1, 'interp', 'f6a sugar ^ equivalent to /node in IR', function(h) {
+    const a = parseInterpBody('WhileLoop(condition^, body/node) { return 0; }');
+    const b = parseInterpBody('WhileLoop(condition/node, body/node) { return 0; }');
+    h.assert('caret type', a.methods.WhileLoop.params[0].typeName, 'node');
+    h.assert('slash type', b.methods.WhileLoop.params[0].typeName, 'node');
+    h.assert('same params', JSON.stringify(a.methods.WhileLoop.params), JSON.stringify(b.methods.WhileLoop.params));
+  });
+
+  reg(5400 + 2, 'interp', 'f6a eval reserved as method name', function(h) {
+    h.assertThrows('eval method', function() {
+      parseInterpBody('eval(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  function runF6LazyEvalHits(h, session) {
+    session.run(F6_CORE);
+    const inst = session.interp.inlineInstances.get('.factInterp');
+    const g = f6Grammar(session);
+    const built = buildAstFromParse(g, '7', 'expr', session.interp.schemaRegistry, { startRule: 'expression' });
+    h.assert('parse 7', String(built.ok), '1');
+    const handle = interpMakeNodeHandle({
+      kind: 'leaf',
+      schemaRef: 'expr',
+      payloadBits: built.bits,
+      pathKey: 'r/probe',
+      fieldName: 'probe',
+    });
+    const pinEnv = { env: {} };
+    const map = new Map();
+    const opts = {
+      evaluationMap: map,
+      registry: session.interp.schemaRegistry,
+      program: inst,
+      sharedEnv: pinEnv,
+    };
+    const v1 = interpEvalNodeHandle(handle, false, session.interp.schemaRegistry, inst, pinEnv, opts);
+    const v2 = interpEvalNodeHandle(handle, false, session.interp.schemaRegistry, inst, pinEnv, opts);
+    h.assert('lazy same value', v2, v1);
+    h.assert('lazy cache one entry', map.size, 1);
+    h.assert('value 7', v1, 7);
+  }
+
+  regInterpDual(5403, 5404, 'f6b eval lazy cache on deferred node', runF6LazyEvalHits);
+
+  function runF6ForcedReeval(h, session) {
+    const w = f6EvalProgramWire(h, session, 'n=3; while(n) { n=n-1; } out=n;', 'result');
+    h.assert('n zero after loop', w, '0000000000000000');
+  }
+
+  regInterpDual(5405, 5406, 'f6b while deferred condition re-reads env', runF6ForcedReeval);
+
+  function runF6Factorial120(h, session) {
+    const w = f6EvalProgramWire(h, session, 'fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;', 'result');
+    h.assert('5!=120', w, '0000000001111000');
+  }
+
+  regInterpDual(5407, 5408, 'f6d factorial 5! eval 120', runF6Factorial120);
+
   window.LogTScriptTestSuite.finalize();
 })();
