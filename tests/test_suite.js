@@ -58215,6 +58215,208 @@ inline [interp] .evaledInterp {
 
   regInterpDual(5415, 5416, 'f6g evaled wire probe legacy+wave', runF6EvaledWireProbe);
 
+  /* ----- F7 — save:/get: handle slots ----- */
+
+  const F7_BODY_STMT = [
+    '<F7BodyStmt>+:',
+    '    CallAssign?: bound <CallAssign>',
+    ':',
+  ].join('\n');
+
+  const F7_CALL_BEGIN = [
+    '<CallBeginBlock>:',
+    '    body: bound <F7BodyStmt>[1-]',
+    ':',
+  ].join('\n');
+
+  const F7_CALL_COMMIT = [
+    '<CallCommit>:',
+    ':',
+  ].join('\n');
+
+  const F7_CALL_STATEMENT = [
+    '<CallStatement>+:',
+    '    CallAssign?:      bound <CallAssign>',
+    '    WhileLoop?:       bound <WhileLoop>',
+    '    CallBeginBlock?:  bound <CallBeginBlock>',
+    '    CallCommit?:      <CallCommit>',
+    ':',
+  ].join('\n');
+
+  const F7_SAVE_PROBE = [
+    '<SaveProbeBody>:',
+    '    node: bound <CallAssign>',
+    ':',
+    '<SaveProbeRoot>+:',
+    '    SaveProbe?: bound <SaveProbeBody>',
+    ':',
+    '<SaveNoExecBody>:',
+    '    node: bound <CallAssign>',
+    ':',
+    '<SaveNoExecRoot>+:',
+    '    SaveNoExec?: bound <SaveNoExecBody>',
+    ':',
+  ].join('\n');
+
+  const F7_SCHEMAS = [
+    F6_BYTE,
+    F6_SYMBOL,
+    F6_CALL_NUMBER,
+    F6_CALL_VARIABLE,
+    F6_CALL_ADD,
+    F6_CALL_SUB,
+    F6_CALL_MUL,
+    F6_EXPR,
+    F6_CALL_ASSIGN,
+    F7_BODY_STMT,
+    F7_CALL_STATEMENT,
+    F6_WHILE_LOOP,
+    F7_CALL_BEGIN,
+    F7_CALL_COMMIT,
+    F6_PROGRAM,
+    F7_SAVE_PROBE,
+  ].join('\n');
+
+  const F7_PARSER = `
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule saveRoot = $node:statement -> SaveProbe;
+    rule saveNoExecRoot = $node:statement -> SaveNoExec;
+    rule statement
+        = "begin" "{" $body:statement+ "}" -> CallBeginBlock
+        | "commit" ";" -> CallCommit
+        | "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`;
+
+  const F7_SLOT_INTERP = `
+inline [interp] .slotInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    SaveProbe(node^) {
+        save:slot = node;
+        pre = env['hits'];
+        eval(get:slot, 1);
+        post = env['hits'];
+        return pre * 10 + post;
+    }
+    SaveNoExec(node^) {
+        save:slot = node;
+        pre = env['hits'];
+        mid = env['hits'];
+        eval(get:slot, 1);
+        after = env['hits'];
+        return pre * 100 + mid * 10 + after;
+    }
+    CallBeginBlock(body^) {
+        save:txBody = body;
+        return 0;
+    }
+    CallCommit() {
+        eval(get:txBody, 1);
+        return env['hits'];
+    }
+}`;
+
+  const F7_CORE = F7_SCHEMAS + '\n' + F7_PARSER + '\n' + F7_SLOT_INTERP;
+
+  function runF7SaveGetInline(h, session) {
+    session.run(F7_CORE);
+    const inst = session.interp.inlineInstances.get('.slotInterp');
+    const g = f6Grammar(session);
+    const built = buildAstFromParse(g, 'hits=1;', 'SaveProbeRoot', session.interp.schemaRegistry, { startRule: 'saveRoot' });
+    h.assert('pack save probe', String(built.ok), '1');
+    const pinEnv = { env: { hits: 0 } };
+    const v = evalInterpInline(inst, built.bits, 'SaveProbeRoot', session.interp.schemaRegistry, {
+      evaluationMap: new Map(),
+      savedHandles: new Map(),
+      env: pinEnv,
+    });
+    h.assert('pre0 post1', v, 1);
+    h.assert('hits updated', pinEnv.env.hits, 1);
+  }
+
+  reg(5420, 'interp', 'f7 save:get deferred assign via slot', runF7SaveGetInline);
+
+  function runF7SaveNoExec(h, session) {
+    session.run(F7_CORE);
+    const inst = session.interp.inlineInstances.get('.slotInterp');
+    const g = f6Grammar(session);
+    const built = buildAstFromParse(g, 'hits=1;', 'SaveNoExecRoot', session.interp.schemaRegistry, { startRule: 'saveNoExecRoot' });
+    h.assert('pack', String(built.ok), '1');
+    const v = evalInterpInline(inst, built.bits, 'SaveNoExecRoot', session.interp.schemaRegistry, {
+      evaluationMap: new Map(),
+      savedHandles: new Map(),
+      env: { env: { hits: 0 } },
+    });
+    h.assert('save no exec until eval', v, 1);
+  }
+
+  reg(5421, 'interp', 'f7 save: does not execute subtree', runF7SaveNoExec);
+
+  reg(5422, 'interp', 'f7 get:unknown slot aborts', function(h, session) {
+    session.run(F7_CORE);
+    const inst = session.interp.inlineInstances.get('.slotInterp');
+    inst.methods.SaveProbe = parseInterpBody('SaveProbe(node^) { eval(get:missing, 1); return 0; }').methods.SaveProbe;
+    const g = f6Grammar(session);
+    const built = buildAstFromParse(g, 'hits=1;', 'SaveProbeRoot', session.interp.schemaRegistry, { startRule: 'saveRoot' });
+    h.assert('pack', String(built.ok), '1');
+    h.assertThrows('get unknown', function() {
+      evalInterpInline(inst, built.bits, 'SaveProbeRoot', session.interp.schemaRegistry, {
+        evaluationMap: new Map(),
+        savedHandles: new Map(),
+        env: { env: { hits: 0 } },
+      });
+    }, 'unknown save slot');
+  });
+
+  reg(5423, 'interp', 'f7 save: literal rejected at elaboration', function(h) {
+    h.assertThrows('save literal', function() {
+      parseInterpBody('Probe(node^) { save:slot = 5; return 0; }');
+    }, 'deferred node handle');
+  });
+
+  reg(5424, 'interp', 'f7 save/get reserved method names', function(h) {
+    h.assertThrows('save method', function() {
+      parseInterpBody('save(x/u8) { return x; }');
+    }, 'reserved');
+    h.assertThrows('get method', function() {
+      parseInterpBody('get(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  function runF7TxWire(h, session) {
+    session.run(F7_CORE);
+    session.run(
+      F7_CORE
+      + '\n4096wire<program> prog =: .factLang:packAst("hits=0; begin { hits=hits+1; } commit; out=hits;", <program>, "program")'
+      + '\n16wire result = .slotInterp:eval(prog, <program>)'
+    );
+    h.assert('tx commit runs saved body', session.getWire(session.interp, 'result'), '0000000000000001');
+  }
+
+  regInterpDual(5425, 5426, 'f7 begin/commit transaction wire legacy+wave', runF7TxWire);
+
   function runF6ForcedReeval(h, session) {
     const w = f6EvalProgramWire(h, session, 'n=3; while(n) { n=n-1; } out=n;', 'result');
     h.assert('n zero after loop', w, '0000000000000000');

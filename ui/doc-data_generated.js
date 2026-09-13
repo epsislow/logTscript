@@ -24282,6 +24282,9 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`eval\` builtin** | Re-evaluate a deferred handle; lazy cache per \`(pathKey, schema)\` unless second arg is truthy |
 | **\`evaled\` builtin** | Returns **1** if the handle is already in the lazy cache, **0** otherwise — **does not execute** the subtree |
 | **\`evaled\` name** | Reserved — not a user method name (same as **\`eval\`**) |
+| **\`save:slot = expr\`** | Store a deferred **\`/node\`** handle in the current **\`:eval\`** session (does **not** run the subtree) |
+| **\`get:slot\`** | Read a handle previously stored with **\`save:\`** — use in **\`eval(get:slot, …)\`** |
+| **\`save\` / \`get\` names** | Reserved — not user method names (same as **\`eval\`**) |
 | **\`while eval(...)\`** | Condition re-reads env each iteration when the AST node is deferred |
 | **Env** | \`env[name]\` inside method bodies for \`CallAssign\` / \`CallVariable\` programs |
 | **Debug** | \`show(a, b)\` and \`showx(Style, …)\` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
@@ -24870,6 +24873,250 @@ show(result)
 Expected output: **\`0000000000010001\`** (decimal **17** — pre **\`0\`**, post **\`1\`**, value **\`7\`**).
 
 Use **\`evaled\`** to skip redundant forced work when a subtree is already materialized, for example **\`if (!evaled(condition)) { eval(condition, 1); }\`** before a loop body that needs a fresh condition read.
+
+### \`save:\` / \`get:\` — deferred handle slots
+
+During an **\`:eval\`** session, **\`save:ident = expr\`** stores a deferred AST handle under **\`ident\`**. The right-hand side must be a **\`/node\`** parameter or another handle expression — not a literal, call result, or arithmetic. **\`save:\`** does **not** execute the subtree; it only records the handle for later.
+
+**\`get:ident\`** reads a slot saved earlier in the **same** **\`:eval\`** session. Typical use: **\`eval(get:slot, 1)\`** to run a saved body on demand. Unknown slots abort with **\`unknown save slot\`**.
+
+| Form | Behavior |
+|------|----------|
+| **\`save:slot = node\`** | Bind deferred handle **\`node\`** to **\`slot\`** |
+| **\`eval(get:slot)\`** / **\`eval(get:slot, 1)\`** | Execute the saved subtree (lazy or forced) |
+| **\`save:\` / \`get:\` on RHS of \`save:\`** | Allowed — copy or re-bind an existing slot |
+| Overwrite | **\`save:\`** with the same name replaces the previous handle |
+| Session scope | Slots live in the active **\`:eval\`** map (shared with nested **\`eval\`**, like **\`evaluationMap\`**) |
+
+**Example — save, then forced eval:** the assign **\`hits=1\`** runs only inside **\`eval(get:slot, 1)\`**. Encoding **\`pre * 10 + post\`** → **\`0 * 10 + 1 = 1\`**.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <CallNumber>
+:
+
+<SaveProbeBody>:
+    node: bound <CallAssign>
+:
+
+<SaveProbeRoot>+:
+    SaveProbe?: bound <SaveProbeBody>
+:
+
+inline [parser] .slotLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule saveRoot = $node:statement -> SaveProbe;
+    rule statement = $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression = INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .slotInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    SaveProbe(node^) {
+        save:slot = node;
+        env['hits'] = 0;
+        pre = env['hits'];
+        eval(get:slot, 1);
+        post = env['hits'];
+        return pre * 10 + post;
+    }
+}
+
+4096wire<SaveProbeRoot> sp =: .slotLang:packAst("hits=1;", <SaveProbeRoot>, "saveRoot")
+16wire result = .slotInterp:eval(sp, <SaveProbeRoot>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000000000001\`** (decimal **1**).
+
+**Example — \`save:\` does not execute:** three reads of **\`env['hits']\`** stay **\`0\`** until **\`eval(get:slot, 1)\`**. Encoding **\`pre * 100 + mid * 10 + after\`** → **\`1\`**.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <CallNumber>
+:
+
+<SaveNoExecBody>:
+    node: bound <CallAssign>
+:
+
+<SaveNoExecRoot>+:
+    SaveNoExec?: bound <SaveNoExecBody>
+:
+
+inline [parser] .slotLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule saveNoExecRoot = $node:statement -> SaveNoExec;
+    rule statement = $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression = INT -> CallNumber;
+:
+
+inline [interp] .slotInterp {
+    CallNumber(value/u8) { return value; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    SaveNoExec(node^) {
+        save:slot = node;
+        env['hits'] = 0;
+        pre = env['hits'];
+        mid = env['hits'];
+        eval(get:slot, 1);
+        after = env['hits'];
+        return pre * 100 + mid * 10 + after;
+    }
+}
+
+4096wire<SaveNoExecRoot> sn =: .slotLang:packAst("hits=1;", <SaveNoExecRoot>, "saveNoExecRoot")
+16wire result = .slotInterp:eval(sn, <SaveNoExecRoot>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000000000001\`**.
+
+**Example — begin / commit transaction:** **\`begin { … }\`** saves the block body; **\`commit;\`** runs it once with **\`eval(get:txBody, 1)\`**. Final **\`out=hits\`** reads the updated env.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallSub>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallAdd?:      bound <CallAdd>
+    CallSub?:      bound <CallSub>
+:
+
+<F7BodyStmt>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<CallStatement>+:
+    CallAssign?:      bound <CallAssign>
+    CallBeginBlock?:  bound <CallBeginBlock>
+    CallCommit?:      <CallCommit>
+:
+
+<CallBeginBlock>:
+    body: bound <F7BodyStmt>[1-]
+:
+
+<CallCommit>:
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .txLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "begin" "{" $body:statement+ "}" -> CallBeginBlock
+        | "commit" ";" -> CallCommit
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term = factor;
+    rule factor = INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .txInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallBeginBlock(body^) {
+        save:txBody = body;
+        return 0;
+    }
+    CallCommit() {
+        eval(get:txBody, 1);
+        return env['hits'];
+    }
+}
+
+4096wire<program> prog =: .txLang:packAst("hits=0; begin { hits=hits+1; } commit; out=hits;", <program>, "program")
+16wire result = .txInterp:eval(prog, <program>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000000000001\`**.
+
+Use this pattern when parser rules must **capture** a subtree (for example a **\`begin\`** block) and interpreter code should **choose when** to execute it — for example staging work at parse time and committing on an explicit **\`commit;\`** marker.
 
 ### Composite BVA: lazy \`eval\` does not re-run statements
 

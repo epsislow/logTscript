@@ -691,3 +691,207 @@ module.exports.cases.push(
     },
   },
 );
+
+const F7_SLOT_CORE = [
+  '<byte>:',
+  '    value: 8',
+  ':',
+  '<symbol>+:',
+  '    bytes: bound <byte>[1-]',
+  ':',
+  '<CallNumber>:',
+  '    value: 8',
+  ':',
+  '<CallVariable>:',
+  '    name: bound <symbol>',
+  ':',
+  '<CallAssign>:',
+  '    name:  bound <symbol>',
+  '    value: bound <CallNumber>',
+  ':',
+  '<SaveProbeBody>:',
+  '    node: bound <CallAssign>',
+  ':',
+  '<SaveProbeRoot>+:',
+  '    SaveProbe?: bound <SaveProbeBody>',
+  ':',
+  `inline [parser] .slotLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule saveRoot = $node:statement -> SaveProbe;
+    rule statement = $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression = INT -> CallNumber | $name:ID -> CallVariable;
+:`,
+  `inline [interp] .slotInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    SaveProbe(node^) {
+        save:slot = node;
+        pre = env['hits'];
+        eval(get:slot, 1);
+        post = env['hits'];
+        return pre * 10 + post;
+    }
+}`,
+].join('\n');
+
+const F7_TX_CORE = [
+  '<byte>:',
+  '    value: 8',
+  ':',
+  '<symbol>+:',
+  '    bytes: bound <byte>[1-]',
+  ':',
+  '<CallNumber>:',
+  '    value: 8',
+  ':',
+  '<CallVariable>:',
+  '    name: bound <symbol>',
+  ':',
+  '<CallAdd>:',
+  '    left:  bound <expr>',
+  '    right: bound <expr>',
+  ':',
+  '<CallSub>:',
+  '    left:  bound <expr>',
+  '    right: bound <expr>',
+  ':',
+  '<expr>+:',
+  '    CallNumber?:   <CallNumber>',
+  '    CallVariable?: bound <CallVariable>',
+  '    CallAdd?:      bound <CallAdd>',
+  '    CallSub?:      bound <CallSub>',
+  ':',
+  '<CallAssign>:',
+  '    name:  bound <symbol>',
+  '    value: bound <expr>',
+  ':',
+  '<F7BodyStmt>+:',
+  '    CallAssign?: bound <CallAssign>',
+  ':',
+  '<CallStatement>+:',
+  '    CallAssign?:      bound <CallAssign>',
+  '    CallBeginBlock?:  bound <CallBeginBlock>',
+  '    CallCommit?:      <CallCommit>',
+  ':',
+  '<CallBeginBlock>:',
+  '    body: bound <F7BodyStmt>[1-]',
+  ':',
+  '<CallCommit>:',
+  ':',
+  '<program>+:',
+  '    statements: bound <CallStatement>[1-]',
+  ':',
+  `inline [parser] .txLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "begin" "{" $body:statement+ "}" -> CallBeginBlock
+        | "commit" ";" -> CallCommit
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term = factor;
+    rule factor = INT -> CallNumber | $name:ID -> CallVariable;
+:`,
+  `inline [interp] .txInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    CallBeginBlock(body^) {
+        save:txBody = body;
+        return 0;
+    }
+    CallCommit() {
+        eval(get:txBody, 1);
+        return env['hits'];
+    }
+}`,
+].join('\n');
+
+module.exports.cases.push(
+  {
+    name: 'save get deferred assign pre0 post1',
+    src: F7_SLOT_CORE,
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.slotLang');
+      const inst = interp.inlineInstances.get('.slotInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const packed = ab.buildAstFromParse(g, 'hits=1;', 'SaveProbeRoot', interp.schemaRegistry, { startRule: 'saveRoot' });
+      if (!packed || !packed.ok) return false;
+      const v = ie.evalInterpInline(inst, packed.bits, 'SaveProbeRoot', interp.schemaRegistry, {
+        evaluationMap: new Map(),
+        savedHandles: new Map(),
+        env: { env: { hits: 0 } },
+      });
+      return v === 1;
+    },
+  },
+  {
+    name: 'save literal rejected at elaboration',
+    src: 'inline [interp] .x { Probe(n^) { save:slot = 5; return 0; } }',
+    expectError: 'deferred node handle',
+    check: () => {
+      try {
+        ia.parseInterpBody('Probe(n^) { save:slot = 5; return 0; }');
+        return false;
+      } catch (e) {
+        return String(e.message).indexOf('deferred node handle') >= 0;
+      }
+    },
+  },
+  {
+    name: 'save and get reserved method names',
+    src: 'inline [interp] .x { save(x/u8) { return x; } }',
+    expectError: 'reserved',
+    check: () => {
+      try {
+        ia.parseInterpBody('save(x/u8) { return x; }');
+        return false;
+      } catch (e) {
+        if (String(e.message).indexOf('reserved') < 0) return false;
+      }
+      try {
+        ia.parseInterpBody('get(x/u8) { return x; }');
+        return false;
+      } catch (e) {
+        return String(e.message).indexOf('reserved') >= 0;
+      }
+    },
+  },
+  {
+    name: 'begin commit transaction wire',
+    src: F7_TX_CORE,
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.txLang');
+      const inst = interp.inlineInstances.get('.txInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const packed = ab.buildAstFromParse(
+        g,
+        'hits=0; begin { hits=hits+1; } commit; out=hits;',
+        'program',
+        interp.schemaRegistry,
+        { startRule: 'program' },
+      );
+      if (!packed || !packed.ok) return false;
+      return ie.evalInterpInline(inst, packed.bits, 'program', interp.schemaRegistry, {
+        evaluationMap: new Map(),
+        savedHandles: new Map(),
+      }) === 1;
+    },
+  },
+);

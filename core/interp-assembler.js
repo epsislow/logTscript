@@ -14,6 +14,9 @@ const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 
 const INTERP_BUILTINS = new Set(['show', 'showx', 'eval', 'evaled']);
 
+/** Reserved as user method names — conflict with save:/get: syntax (D1227). */
+const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get']);
+
 const INTERP_SHOW_MAX_ARGS = 32;
 const INTERP_SHOWX_MAX_ARGS = 32;
 const INTERP_SHOWX_MIN_ARGS = 1;
@@ -316,6 +319,9 @@ class InterpParser {
     if (INTERP_BUILTINS.has(nameTok.value)) {
       interpError(`'${nameTok.value}' is reserved — use as statement builtin, not method name`, nameTok.line);
     }
+    if (INTERP_SLOT_RESERVED_METHODS.has(nameTok.value)) {
+      interpError(`'${nameTok.value}' is reserved — save:/get: handle slots use this prefix`, nameTok.line);
+    }
     this.eat('SYM', '(');
     const params = [];
     if (!this.match('SYM', ')')) {
@@ -448,6 +454,12 @@ class InterpParser {
     if (t.type === 'KW' && t.value === 'removeall') {
       const lineTok = this.eat('KW', 'removeall');
       return { kind: 'removeall', line: lineTok.line };
+    }
+    if (t.type === 'ID' && t.value === 'save') {
+      const next = this.tokens[this.pos + 1];
+      if (next && next.type === 'SYM' && next.value === ':') {
+        return this.parseSaveStmt();
+      }
     }
     if (t.type === 'ID') {
       const next = this.tokens[this.pos + 1];
@@ -582,6 +594,15 @@ class InterpParser {
     return { kind: 'remove', channel: channelTok.value, line: lineTok.line };
   }
 
+  parseSaveStmt() {
+    const lineTok = this.eat('ID', 'save');
+    this.eat('SYM', ':');
+    const slotTok = this.eat('ID');
+    this.eat('SYM', '=');
+    const expr = this.parseExpr();
+    return { kind: 'save', name: slotTok.value, expr, line: lineTok.line };
+  }
+
   parseDestructuringAssign() {
     const lineTok = this.eat('ID');
     const names = [lineTok.value];
@@ -706,6 +727,10 @@ class InterpParser {
     if (this.match('ID')) {
       const idTok = this.tokens[this.pos - 1];
       const id = idTok.value;
+      if (id === 'get' && this.match('SYM', ':')) {
+        const slotTok = this.eat('ID');
+        return { kind: 'getSlot', name: slotTok.value, line: slotTok.line };
+      }
       if (this.match('SYM', '(')) {
         const args = [];
         if (!this.match('SYM', ')')) {
@@ -874,8 +899,24 @@ function validateExprCallArity(expr, program, line, expectMulti) {
   }
 }
 
+function validateHandleSaveExpr(expr, line) {
+  if (!expr) {
+    interpError('save: requires deferred node handle expression', line);
+  }
+  if (expr.kind === 'number' || expr.kind === 'string' || expr.kind === 'array') {
+    interpError('save: requires deferred node handle', line);
+  }
+  if (expr.kind === 'binop' || expr.kind === 'unary' || expr.kind === 'index' || expr.kind === 'postfix') {
+    interpError('save: requires deferred node handle', line);
+  }
+  if (expr.kind === 'call') {
+    interpError('save: requires deferred node handle, not a call result', line);
+  }
+}
+
 function validateExprTree(expr, program, line) {
   if (!expr) return;
+  if (expr.kind === 'getSlot') return;
   if (expr.kind === 'call') {
     validateExprCallArity(expr, program, line, false);
     for (const a of expr.args || []) validateExprTree(a, program, line);
@@ -912,6 +953,9 @@ function validateStmtTree(stmts, program) {
       }
       for (const a of stmt.expr.args || []) validateExprTree(a, program, stmt.line);
     } else if (stmt.kind === 'assign') {
+      validateExprTree(stmt.expr, program, stmt.line);
+    } else if (stmt.kind === 'save') {
+      validateHandleSaveExpr(stmt.expr, stmt.line);
       validateExprTree(stmt.expr, program, stmt.line);
     } else if (stmt.kind === 'return') {
       for (const ex of stmt.exprs) validateExprTree(ex, program, stmt.line);

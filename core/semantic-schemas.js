@@ -1372,7 +1372,9 @@
         }));
       schema.presenceMaskBits = schema.optionalFields.length;
     }
-    schema.hasBound = structure.some((n) => n.kind === 'bound' || (n.kind === 'optional_field' && n.isBound));
+    schema.hasBound = structure.some(
+      (n) => n.kind === 'bound' || n.kind === 'bound_var_array' || (n.kind === 'optional_field' && n.isBound),
+    );
     applySchemaMinMaxMeta(schema);
     return syncFieldsFromLeafPaths(schema);
   }

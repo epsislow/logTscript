@@ -61,9 +61,11 @@ function interpRunWithContext(options, fn) {
     currentAstCall: '',
     currentMethod: '',
     evaluationMap: opts.evaluationMap || new Map(),
+    savedHandles: opts.savedHandles || new Map(),
     registry: opts.registry || null,
     program: opts.program || null,
     sharedEnv: opts.sharedEnv || null,
+    options: opts,
   };
   try {
     return fn();
@@ -713,7 +715,7 @@ function interpMethodHasTypedParams(method) {
 
 function interpAssertAstMethod(method, methodName) {
   if (!method) interpError(`unknown AST method '${methodName}'`);
-  if (!interpMethodHasTypedParams(method)) {
+  if ((method.params || []).length > 0 && !interpMethodHasTypedParams(method)) {
     interpError(`method '${methodName}' missing /type annotations on params`);
   }
 }
@@ -755,10 +757,18 @@ function interpDecodeParamBits(bits, param, fieldNode, registry, program, env, o
   interpError(`cannot decode param '${param.name}' with /${tn}`);
 }
 
+function interpSchemaNeedsManualFieldExtract(payloadSchema) {
+  if (!payloadSchema) return false;
+  if (payloadSchema.hasDynamicWidth || payloadSchema.hasBound) return true;
+  return (payloadSchema.structure || []).some(
+    (n) => n.kind === 'bound_var_array' || n.isBoundVarArray || n.kind === 'bound' || n.isBound,
+  );
+}
+
 function interpExtractFieldBits(payloadBits, payloadSchema, fieldName) {
   const bits = payloadBits == null ? '' : String(payloadBits);
   const ss = interpSs();
-  if (!payloadSchema.hasDynamicWidth && !payloadSchema.hasBound) {
+  if (!interpSchemaNeedsManualFieldExtract(payloadSchema)) {
     if (typeof ss.extractField !== 'function') {
       interpError('semantic-schemas extractField is not available');
     }
@@ -843,6 +853,7 @@ function evalInterpWire(wireBits, schemaName, registry, program, env, options) {
   const execOpts = Object.assign({}, options || {});
   if (!execOpts.pathKeyPrefix) execOpts.pathKeyPrefix = 'r';
   if (!execOpts.evaluationMap) execOpts.evaluationMap = new Map();
+  if (!execOpts.savedHandles) execOpts.savedHandles = new Map();
   execOpts.registry = registry;
   execOpts.program = program;
   execOpts.sharedEnv = env;
@@ -1031,7 +1042,38 @@ function interpEvalNodeHandle(handle, forced, registry, program, env, options) {
   return result;
 }
 
+function interpGetSavedHandlesMap(options) {
+  const ctx = _interpExecCtx || {};
+  const opts = options || ctx.options || {};
+  return opts.savedHandles || ctx.savedHandles || null;
+}
+
+function interpResolveHandleValue(expr, env, callMethodFn, line, options) {
+  if (!expr) {
+    interpError(`save: requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (expr.kind === 'getSlot') {
+    const map = interpGetSavedHandlesMap(options);
+    if (!map || !map.has(expr.name)) {
+      interpError(`unknown save slot '${expr.name}'${line != null ? ` (line ${line})` : ''}`);
+    }
+    return map.get(expr.name);
+  }
+  const v = interpEvalExpr(expr, env, callMethodFn, line);
+  if (!interpIsNodeHandle(v)) {
+    interpError(`save: requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
+  }
+  return v;
+}
+
 function interpResolveEvalHandleArg(expr, env, callMethodFn, line) {
+  if (expr && expr.kind === 'getSlot') {
+    const map = interpGetSavedHandlesMap(null);
+    if (!map || !map.has(expr.name)) {
+      interpError(`unknown save slot '${expr.name}'${line != null ? ` (line ${line})` : ''}`);
+    }
+    return map.get(expr.name);
+  }
   const v = interpEvalExpr(expr, env, callMethodFn, line);
   if (!interpIsNodeHandle(v)) {
     interpError(`eval requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
@@ -1064,6 +1106,7 @@ function interpBuiltinEval(args, env, callMethodFn, program, sharedEnv, options,
   if (!registry || !prog) interpError('eval requires active AST evaluation context');
   const execOpts = Object.assign({}, options || {});
   execOpts.evaluationMap = execOpts.evaluationMap || ctx.evaluationMap;
+  execOpts.savedHandles = execOpts.savedHandles || ctx.savedHandles;
   execOpts.registry = registry;
   execOpts.program = prog;
   execOpts.sharedEnv = pinEnv;
@@ -1111,6 +1154,13 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       const out = [];
       for (const el of expr.elements || []) out.push(interpEvalExpr(el, env, callMethodFn, line));
       return out;
+    }
+    case 'getSlot': {
+      const map = interpGetSavedHandlesMap(null);
+      if (!map || !map.has(expr.name)) {
+        interpError(`unknown save slot '${expr.name}'${line != null ? ` (line ${line})` : ''}`);
+      }
+      return map.get(expr.name);
     }
     case 'var': {
       if (!Object.prototype.hasOwnProperty.call(env, expr.name)) {
@@ -1472,13 +1522,25 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
     if (stmt.kind === 'assign') {
       env[stmt.name] = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
       locals.add(stmt.name);
+    } else if (stmt.kind === 'save') {
+      const handle = interpResolveHandleValue(stmt.expr, env, callMethodFn, stmt.line, options);
+      const map = interpGetSavedHandlesMap(options);
+      if (!map) {
+        interpError(`save: requires active eval context${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+      }
+      map.set(stmt.name, handle);
     } else if (stmt.kind === 'destructureAssign') {
       interpExecuteDestructuringAssign(stmt, env, locals, program, callMethodFn, sharedEnv, options);
     } else if (stmt.kind === 'indexAssign') {
       const idx = interpEvalExpr(stmt.index, env, callMethodFn, stmt.line);
       const val = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
       if (stmt.name === 'env' && sharedEnv) {
-        sharedEnv[String(idx)] = val;
+        const key = String(idx);
+        if (sharedEnv.env && typeof sharedEnv.env === 'object') {
+          sharedEnv.env[key] = val;
+        } else {
+          sharedEnv[key] = val;
+        }
       } else {
         const arr = env[stmt.name];
         if (!Array.isArray(arr)) {
@@ -1643,6 +1705,7 @@ function evalInterpInline(inst, wireBits, schemaName, registry, options) {
   const env = options && options.env ? Object.assign({}, options.env) : {};
   const execOpts = Object.assign({}, options || {});
   execOpts.evaluationMap = execOpts.evaluationMap || new Map();
+  execOpts.savedHandles = execOpts.savedHandles || new Map();
   execOpts.registry = registry;
   execOpts.program = inst;
   execOpts.sharedEnv = env;
@@ -1665,6 +1728,7 @@ function evalInterpCompExec(wireBits, schemaName, registry, program, pinEnv, com
   const options = Object.assign({}, compOptions || {});
   options.poutBuffer = options.poutBuffer || {};
   options.evaluationMap = options.evaluationMap || new Map();
+  options.savedHandles = options.savedHandles || new Map();
   options.registry = registry;
   options.program = program;
   options.sharedEnv = env;

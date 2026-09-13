@@ -97,7 +97,7 @@
     let count = 0;
     for (const node of schemaOptionalFields(schema)) {
       const val = fieldValues[node.name];
-      if (val != null && val !== '') count++;
+      if (Object.prototype.hasOwnProperty.call(fieldValues, node.name) && val != null) count++;
     }
     if (count > 1) {
       throw new Error(`Schema '${schema.name}': at most one optional branch may be present (got ${count})`);

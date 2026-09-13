@@ -54,7 +54,7 @@
     let mask = '';
     for (const field of optionalFields) {
       const val = fieldValues[field.name];
-      const present = val != null && val !== '';
+      const present = Object.prototype.hasOwnProperty.call(fieldValues, field.name) && val != null;
       mask += present ? '1' : '0';
     }
     return mask;
