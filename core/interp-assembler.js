@@ -1063,7 +1063,7 @@ function formatInterpTypeDoc() {
     '',
     'Block forms:  inline [interp] .lang: ... :   or   inline [interp] .lang { ... }',
     '',
-    'See doc/inline-interp.md',
+    'See doc/inline-interp.md and doc/inline-interp-deferred.md',
     'doc(inline.interp)  doc(.myInterp)',
     '',
     'Runtime:  .myInterp:eval(astWire, <schema>)  — evaluate typed AST wire',
