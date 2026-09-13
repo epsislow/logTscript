@@ -58136,6 +58136,85 @@ inline [interp] .stmtInterp {
 
   regInterpDual(5411, 5412, 'f6b composite BVA lazy eval does not re-run stmts', runF6CompositeLazyNoRerun);
 
+  /* ----- F6g — evaled(handle) cache probe ----- */
+
+  const F6_EVALED_PROBE = [
+    '<EvaledProbeBody>:',
+    '    node: bound <expr>',
+    ':',
+    '<EvaledProbeRoot>+:',
+    '    EvaledProbe?: bound <EvaledProbeBody>',
+    ':',
+  ].join('\n');
+
+  const F6_EVALED_PARSER = `
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule stmtSeq = statement+;
+    rule evaledRoot = $node:expression -> EvaledProbe;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`;
+
+  const F6_EVALED_INTERP = `
+inline [interp] .evaledInterp {
+    CallNumber(value/u8) { return value; }
+    EvaledProbe(node^) {
+        pre = evaled(node);
+        val = eval(node);
+        post = evaled(node);
+        return pre * 100 + post * 10 + val;
+    }
+}`;
+
+  const F6_EVALED_CORE = F6_SCHEMAS + '\n' + F6_EVALED_PROBE + '\n' + F6_EVALED_PARSER + '\n' + F6_EVALED_INTERP;
+
+  function runF6EvaledInlineProbe(h, session) {
+    session.run(F6_EVALED_CORE);
+    const inst = session.interp.inlineInstances.get('.evaledInterp');
+    const g = f6Grammar(session);
+    const built = buildAstFromParse(g, '7', 'EvaledProbeRoot', session.interp.schemaRegistry, { startRule: 'evaledRoot' });
+    h.assert('pack probe', String(built.ok), '1');
+    const map = new Map();
+    const v = evalInterpInline(inst, built.bits, 'EvaledProbeRoot', session.interp.schemaRegistry, { evaluationMap: map });
+    h.assert('pre0 post1 val7', v, 17);
+    h.assert('cache populated', map.size, 1);
+  }
+
+  reg(5413, 'interp', 'f6g evaled builtin pre0 post1 in one eval', runF6EvaledInlineProbe);
+
+  reg(5414, 'interp', 'f6g evaled reserved as method name', function(h) {
+    h.assertThrows('evaled method', function() {
+      parseInterpBody('evaled(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  function runF6EvaledWireProbe(h, session) {
+    session.run(F6_EVALED_CORE);
+    session.run(
+      F6_EVALED_CORE
+      + '\n4096wire<EvaledProbeRoot> ep =: .factLang:packAst("7", <EvaledProbeRoot>, "evaledRoot")'
+      + '\n16wire result = .evaledInterp:eval(ep, <EvaledProbeRoot>)'
+    );
+    h.assert('pre0 post1 val7', session.getWire(session.interp, 'result'), '0000000000010001');
+  }
+
+  regInterpDual(5415, 5416, 'f6g evaled wire probe legacy+wave', runF6EvaledWireProbe);
+
   function runF6ForcedReeval(h, session) {
     const w = f6EvalProgramWire(h, session, 'n=3; while(n) { n=n-1; } out=n;', 'result');
     h.assert('n zero after loop', w, '0000000000000000');

@@ -12,7 +12,7 @@ const INTERP_KEYWORDS = new Set([
 
 const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 
-const INTERP_BUILTINS = new Set(['show', 'showx', 'eval']);
+const INTERP_BUILTINS = new Set(['show', 'showx', 'eval', 'evaled']);
 
 const INTERP_SHOW_MAX_ARGS = 32;
 const INTERP_SHOWX_MAX_ARGS = 32;
@@ -820,6 +820,13 @@ function interpValidateEvalBuiltinCall(args, line) {
   }
 }
 
+function interpValidateEvaledBuiltinCall(args, line) {
+  const n = (args || []).length;
+  if (n !== 1) {
+    interpError('evaled requires exactly 1 argument', line);
+  }
+}
+
 function interpValidateShowBuiltinCall(name, args, line) {
   const n = (args || []).length;
   if (name === 'show') {
@@ -843,6 +850,11 @@ function validateExprCallArity(expr, program, line, expectMulti) {
   if (!expr || expr.kind !== 'call') return;
   if (expr.name === 'eval') {
     interpValidateEvalBuiltinCall(expr.args, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'evaled') {
+    interpValidateEvaledBuiltinCall(expr.args, line);
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
@@ -921,6 +933,8 @@ function validateStmtTree(stmts, program) {
     } else if (stmt.kind === 'call') {
       if (stmt.name === 'eval') {
         interpValidateEvalBuiltinCall(stmt.args, stmt.line);
+      } else if (stmt.name === 'evaled') {
+        interpValidateEvaledBuiltinCall(stmt.args, stmt.line);
       } else if (INTERP_BUILTINS.has(stmt.name)) {
         interpValidateShowBuiltinCall(stmt.name, stmt.args, stmt.line);
       }

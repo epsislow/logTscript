@@ -1039,6 +1039,17 @@ function interpResolveEvalHandleArg(expr, env, callMethodFn, line) {
   return v;
 }
 
+function interpBuiltinEvaled(args, env, callMethodFn, options, line) {
+  if (!args || args.length !== 1) {
+    interpError(`evaled requires exactly 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const handle = interpResolveEvalHandleArg(args[0], env, callMethodFn, line);
+  const ctx = _interpExecCtx || {};
+  const map = (options && options.evaluationMap) || ctx.evaluationMap;
+  if (!map) return 0;
+  return map.has(interpEvalMapKey(handle)) ? 1 : 0;
+}
+
 function interpBuiltinEval(args, env, callMethodFn, program, sharedEnv, options, line) {
   if (!args || !args.length) interpError(`eval requires at least 1 argument${line != null ? ` (line ${line})` : ''}`);
   const handle = interpResolveEvalHandleArg(args[0], env, callMethodFn, line);
@@ -1150,6 +1161,16 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
           callMethodFn,
           ctx.program,
           ctx.sharedEnv,
+          ctx.options || {},
+          expr.line != null ? expr.line : line,
+        );
+      }
+      if (expr.name === 'evaled') {
+        const ctx = _interpExecCtx || {};
+        return interpBuiltinEvaled(
+          expr.args,
+          env,
+          callMethodFn,
           ctx.options || {},
           expr.line != null ? expr.line : line,
         );
@@ -1481,6 +1502,8 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
         interpRunShowBuiltin(stmt.name, stmt.args, env, callMethodFn, options, stmt.line);
       } else if (stmt.name === 'eval') {
         interpBuiltinEval(stmt.args, env, callMethodFn, program, sharedEnv || env, options, stmt.line);
+      } else if (stmt.name === 'evaled') {
+        interpBuiltinEvaled(stmt.args, env, callMethodFn, options, stmt.line);
       } else {
         const vals = (stmt.args || []).map((a) => evalArg(a));
         const m = program.methods[stmt.name];

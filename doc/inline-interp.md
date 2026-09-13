@@ -30,6 +30,8 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Runtime API** | `.myInterp:eval(astWire, <schema>)` → numeric wire (width from assignment LHS) |
 | **Deferred params** | `param/node` or `param^` — AST subtree handle; use **`eval(node)`** or **`eval(node, forced)`** inside the method |
 | **`eval` builtin** | Re-evaluate a deferred handle; lazy cache per `(pathKey, schema)` unless second arg is truthy |
+| **`evaled` builtin** | Returns **1** if the handle is already in the lazy cache, **0** otherwise — **does not execute** the subtree |
+| **`evaled` name** | Reserved — not a user method name (same as **`eval`**) |
 | **`while eval(...)`** | Condition re-reads env each iteration when the AST node is deferred |
 | **Env** | `env[name]` inside method bodies for `CallAssign` / `CallVariable` programs |
 | **Debug** | `show(a, b)` and `showx(Style, …)` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
@@ -556,6 +558,68 @@ Expected output: **`0000000000001000`** (3 + 5 = 8).
 Use **`eval(condition, 1)`** in loops when the condition must observe **`env`** updates (see the while example below). Use bare **`eval(left)`** when the same subtree value should be reused (see the lazy **`CallAdd`** example above).
 
 You can pass a **variable** as the second argument (for example **`flag = 1; eval(node, flag)`**) — any truthy value forces re-evaluation.
+
+### `evaled(handle)` — cache probe without execution
+
+**`evaled(handle)`** reads the current **`evaluationMap`** for the active `:eval` session. It returns **`1`** when an entry exists for the handle’s **`(pathKey, schemaRef)`** pair, and **`0`** when it does not. Unlike **`eval`**, it **never runs** the deferred subtree.
+
+| Call | Executes subtree? | Typical use |
+|------|-------------------|-------------|
+| **`evaled(h)`** | No | Check whether a lazy **`eval(h)`** would hit the cache |
+| **`eval(h)`** | Yes (or cache hit) | Materialize the subtree value |
+| **`eval(h, 1)`** | Yes (always) | Force refresh after env changes |
+
+**`evaled`** reflects **cache membership only** — it does not inspect **`env`** and does not detect stale cached values. After **`eval(h, 1)`**, **`evaled(h)`** returns **`1`** until the map is discarded with the session.
+
+On a **composite BVA** handle, **`evaled(stmts)`** reports whether the **whole block** is cached, not individual statements.
+
+Probe **before** and **after** a single **`eval(node)`** on the literal **`7`**. Encoding: **`pre * 100 + post * 10 + val`** → **`0 * 100 + 1 * 10 + 7 = 17`**:
+
+```logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+<EvaledProbeBody>:
+    node: bound <expr>
+:
+
+<EvaledProbeRoot>+:
+    EvaledProbe?: bound <EvaledProbeBody>
+:
+
+inline [parser] .evaledLang:
+    token INT = [0-9]+;
+    rule evaledRoot = $node:expression -> EvaledProbe;
+    rule expression = INT -> CallNumber;
+:
+
+inline [interp] .evaledInterp {
+    CallNumber(value/u8) { return value; }
+    EvaledProbe(node^) {
+        pre = evaled(node);
+        val = eval(node);
+        post = evaled(node);
+        return pre * 100 + post * 10 + val;
+    }
+}
+
+4096wire<EvaledProbeRoot> ep =: .evaledLang:packAst("7", <EvaledProbeRoot>, "evaledRoot")
+16wire result = .evaledInterp:eval(ep, <EvaledProbeRoot>)
+show(result)
+```
+
+Expected output: **`0000000000010001`** (decimal **17** — pre **`0`**, post **`1`**, value **`7`**).
+
+Use **`evaled`** to skip redundant forced work when a subtree is already materialized, for example **`if (!evaled(condition)) { eval(condition, 1); }`** before a loop body that needs a fresh condition read.
 
 ### Composite BVA: lazy `eval` does not re-run statements
 

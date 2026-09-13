@@ -3,6 +3,7 @@
 const pa = require('../../core/parser-assembler.js');
 const ab = require('../../core/ast-builder.js');
 const ie = require('../../core/interp-engine.js');
+const ia = require('../../core/interp-assembler.js');
 
 if (typeof globalThis.compileParserTokenRegex !== 'function') {
   globalThis.compileParserTokenRegex = pa.compileParserTokenRegex;
@@ -628,6 +629,64 @@ module.exports.cases.push(
         return false;
       } catch (e) {
         return String(e.message).indexOf('requires bound or BVA field for /node') >= 0;
+      }
+    },
+  },
+  {
+    name: 'evaled pre0 post1 without executing before eval',
+    src: [
+      '<byte>:',
+      '    value: 8',
+      ':',
+      '<CallNumber>:',
+      '    value: 8',
+      ':',
+      '<expr>+:',
+      '    CallNumber?: <CallNumber>',
+      ':',
+      '<EvaledProbeBody>:',
+      '    node: bound <expr>',
+      ':',
+      '<EvaledProbeRoot>+:',
+      '    EvaledProbe?: bound <EvaledProbeBody>',
+      ':',
+      `inline [parser] .evaledLang:
+    token INT = [0-9]+;
+    rule evaledRoot = $node:expression -> EvaledProbe;
+    rule expression = INT -> CallNumber;
+:`,
+      `inline [interp] .evaledInterp {
+    CallNumber(value/u8) { return value; }
+    EvaledProbe(node^) {
+        pre = evaled(node);
+        val = eval(node);
+        post = evaled(node);
+        return pre * 100 + post * 10 + val;
+    }
+}`,
+    ].join('\n'),
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.evaledLang');
+      const inst = interp.inlineInstances.get('.evaledInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const built = ab.buildAstFromParse(g, '7', 'EvaledProbeRoot', interp.schemaRegistry, { startRule: 'evaledRoot' });
+      if (!built || !built.ok) return false;
+      const map = new Map();
+      const v = ie.evalInterpInline(inst, built.bits, 'EvaledProbeRoot', interp.schemaRegistry, { evaluationMap: map });
+      return v === 17 && map.size === 1;
+    },
+  },
+  {
+    name: 'evaled reserved as method name',
+    src: 'inline [interp] .x { evaled(n/u8) { return n; } }',
+    expectError: 'reserved',
+    check: () => {
+      try {
+        ia.parseInterpBody('evaled(x/u8) { return x; }');
+        return false;
+      } catch (e) {
+        return String(e.message).indexOf('reserved') >= 0;
       }
     },
   },
