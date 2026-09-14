@@ -472,6 +472,48 @@ The **assignment LHS width** determines how the numeric result is encoded. By de
 
 The tag width must match the assignment wire width (**`; s8`** requires **`8wire`** on the LHS). Without a tag, negative integers **abort** (`negative result cannot encode as unsigned wire`).
 
+Value ranges for **`; s8`**, **`; q8p8`**, **`; f64`**, … match [wire literal format limits](wire-literals.md#standard-numeric-format-limits).
+
+### Result format tags — signed **`; s8`**
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .castDemo {
+    MapProbe(pad/s8) {
+        return -1;
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .castDemo:eval(w, <MapProbe>; s8)
+show(result)
+```
+
+Expected: **`result`** = **`11111111`** (−1 in two's complement). Without **`; s8`**, the same return value **aborts** on an unsigned **`8wire`**.
+
+### Result format tags — fixed-point **`; q8p8`**
+
+```logts-play
+<MapProbe>+:
+    pad: 16
+:
+
+inline [interp] .castDemo {
+    MapProbe(pad/s16) {
+        return 1.5;
+    }
+}
+
+16wire<MapProbe> w = ^0000
+16wire result = .castDemo:eval(w, <MapProbe>; q8p8)
+show(result)
+```
+
+Expected: **`result`** = **`0000000110000000`** (1.5 as Q8.8). Fractional returns require a **fixed-point or float** tag — see the [format limits table](wire-literals.md#standard-numeric-format-limits).
+
 ### Evaluate a packed expression (42)
 
 ```logts-play

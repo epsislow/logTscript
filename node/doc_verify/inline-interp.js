@@ -2,6 +2,9 @@
 
 const pa = require('../../core/parser-assembler.js');
 const ab = require('../../core/ast-builder.js');
+if (typeof globalThis.LogTScriptNumericFormats === 'undefined') {
+  globalThis.LogTScriptNumericFormats = require('../../core/numeric-formats.js');
+}
 const ie = require('../../core/interp-engine.js');
 const ia = require('../../core/interp-assembler.js');
 
@@ -240,6 +243,28 @@ module.exports = {
         if (!inst) return false;
         const bits = f3hPackBoundByte('a') + f3hPackBoundByte('b') + f3hPackBoundByte('c');
         return ie.evalInterpWire(bits, 'F3hBytes', interp.schemaRegistry, inst, { declaredWidth: bits.length }) === 3;
+      },
+    },
+    {
+      name: 'eval result tag s8 encodes -1',
+      src: CORE,
+      check: () => ie.encodeInterpResult(-1, 8, { typeName: 's8' }) === '11111111',
+    },
+    {
+      name: 'eval result tag q8p8 encodes 1.5',
+      src: CORE,
+      check: () => ie.encodeInterpResult(1.5, 16, { typeName: 'q8p8' }) === '0000000110000000',
+    },
+    {
+      name: 'eval unsigned rejects negative without tag',
+      src: CORE,
+      check: () => {
+        try {
+          ie.encodeInterpResult(-1, 8, null);
+          return false;
+        } catch (e) {
+          return String(e.message).indexOf('negative result cannot encode') >= 0;
+        }
       },
     },
     {

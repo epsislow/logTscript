@@ -33,6 +33,7 @@ Postfixes shared by several forms:
 | **Bit range** | `\255.0-7`, `^FF.4/8` | Slice after conversion to bits |
 | **Padding** `;p` | `\12;8`, `^f;8` | Pad unsigned **scalar** literal to `p` bits (left zeroes) |
 | **Grouped tag** | `\2 \-1;s8`, `\170 \187 \204;u8`, `\1.5;q4p4` | Suffix on last atom applies to **all** elements in the group |
+| **Format limits** | [Standard numeric formats](#standard-numeric-format-limits) | **`;s8`**, **`;q8p8`**, **`;f64`**, … — width and value range |
 
 ---
 
@@ -155,6 +156,68 @@ show(w; ascii)
 | Fractional `\1.5` | Requires `;qXpY`, `;fp16`, or `;bf16` — not plain `;8` / `;s8` |
 
 Concatenation between groups still uses `+`: `\1 \2;8 + ^0F`.
+
+---
+
+## Standard numeric format limits
+
+Grouped-literal suffixes **`;sW`**, **`;uW`**, **`;qXpY`**, **`;fp16`**, **`;bf16`**, **`;f32`**, **`;f64`** — and the same tags on **`.myInterp:eval(...)`** result encoding ([inline-interp.md](inline-interp.md)) — share one set of numeric limits. Width **`W`** must match the wire (**`; s8`** → **`8wire`**, **`; q8p8`** → **`16wire`**, **`; f64`** → **`64wire`**).
+
+General rules:
+
+| Rule | Detail |
+|------|--------|
+| **Integer tags** | **`;sW`** / **`;uW`**: values must be **whole numbers** in range (no fractions) |
+| **Fixed-point `;qXpY`** | **QX.PY** = **X** integer bits + **Y** fractional bits; width = **X + Y** |
+| **Float tags** | **`;fp16`**, **`;bf16`**, **`;f32`**, **`;f64`**: IEEE-style; out-of-range finite values **saturate** on encode |
+| **Custom widths** | Literal tags **`;sW`** / **`;uW`** / **`;qXpY`** allow **W ≤ 64** total bits; the table below lists **standard** widths only |
+
+### Standard formats — range and width
+
+| Tag | Bits | Example wire | Representable range (inclusive) | Fractional values |
+|-----|------|--------------|--------------------------------|-------------------|
+| **`;u8`** | 8 | `8wire` | **0** … **255** | No |
+| **`;u16`** | 16 | `16wire` | **0** … **65535** | No |
+| **`;u32`** | 32 | `32wire` | **0** … **4294967295** | No |
+| **`;s8`** | 8 | `8wire` | **−128** … **127** | No |
+| **`;s16`** | 16 | `16wire` | **−32768** … **32767** | No |
+| **`;s32`** | 32 | `32wire` | **−2147483648** … **2147483647** | No |
+| **`;q4p4`** | 8 | `8wire` | **−8** … **+7.9375** (step **1/16**) | Yes |
+| **`;q8p8`** | 16 | `16wire` | **−128** … **≈ +127.996** (step **1/256**) | Yes |
+| **`;q16p16`** | 32 | `32wire` | **−32768** … **≈ +32767.99998** (step **1/65536**) | Yes |
+| **`;fp16`** | 16 | `16wire` | IEEE binary16 finite range (≈ **±65504**) | Yes |
+| **`;bf16`** | 16 | `16wire` | bfloat16 finite range (≈ **±3.39×10³⁸**) | Yes |
+| **`;f32`** | 32 | `32wire` | IEEE binary32 finite range (≈ **±3.4×10³⁸**) | Yes |
+| **`;f64`** | 64 | `64wire` | IEEE binary64 finite range (≈ **±1.8×10³⁰⁸**) | Yes |
+
+**Examples:**
+
+```logts-play
+8wire a = \-1;s8
+16wire b = \1.5;q8p8
+show(a)
+show(b)
+```
+
+**`:eval` with format tag** (same limits on the numeric return):
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .fmtDemo {
+    MapProbe(pad/s8) {
+        return -1;
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .fmtDemo:eval(w, <MapProbe>; s8)
+show(result)
+```
+
+Expected: **`a`** = **`11111111`**, **`b`** = **`0000000110000000`**, **`result`** = **`11111111`**.
 
 ---
 
