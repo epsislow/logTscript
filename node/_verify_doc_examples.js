@@ -107,11 +107,11 @@ function expandPagePatterns(patterns) {
 
 function createSandbox() {
   const sandbox = createTestNodeSandbox({ verbose: false });
-  vm.createContext(sandbox);
+  let src = '';
   for (const script of TEST_RUNTIME_SCRIPTS) {
-    const file = path.join(ROOT, script);
-    vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
+    src += fs.readFileSync(path.join(ROOT, script), 'utf8') + '\n';
   }
+  vm.runInNewContext(src, sandbox);
   return sandbox;
 }
 

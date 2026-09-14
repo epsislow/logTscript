@@ -712,6 +712,7 @@ inline [interp] .f9Blob {
         push textOut: parts;
         myList2 = {};
         setKeysValues(myList2, ["a", "b"], textIn);
+        push res: vectorLen(getValues(myList2));
         return vectorLen(getValues(myList2));
     }
 }
@@ -726,8 +727,8 @@ comp [interp] .f9BlobComp:
     :
 
 8wire<F9Blob> ast = ^00
-24wire textInWire = 001100010011000000110010
-24wire textOutWire = \0;24
+40wire textInWire = 0011000100110000000000000011001000110000
+40wire textOutWire = 0000000000000000000000000000000000000000
 16wire resWire = 0000000000000000
 1wire run = 1
 
@@ -742,7 +743,7 @@ comp [interp] .f9BlobComp:
 show(resWire)
 ```
 
-Expected: **`resWire`** = **`00000010`** (two string values merged from pin vector **`textIn`**). **`textOutWire`** echoes the same null-delimited vector produced via **`implode`/`explode`** round-trip on **`getValues(myList)`**.
+Expected: **`resWire`** = **`0000000000000010`** (two string values merged from pin vector **`textIn`**). **`textOutWire`** = **`0011000100110000000000000011001000110000`** — null-delimited **`"10\0" + "20"`** (5 bytes → **`40wire`** on both **`[]~/ascii`** pin and pout). A **`24wire`** buffer is too narrow for that blob.
 
 **Reserved** (not user method names): **`toString`**, **`toInt`**, **`toFloat`**, **`toBool`**, **`typeOf`**, **`split`**, **`implode`**, **`explode`**.
 

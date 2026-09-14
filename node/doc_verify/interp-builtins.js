@@ -1,6 +1,9 @@
 'use strict';
 
 const ia = require('../../core/interp-assembler.js');
+if (typeof globalThis.LogTScriptNumericFormats === 'undefined') {
+  globalThis.LogTScriptNumericFormats = require('../../core/numeric-formats.js');
+}
 const ie = require('../../core/interp-engine.js');
 
 const BUILTIN_CORE = [
