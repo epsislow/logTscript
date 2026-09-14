@@ -20,6 +20,11 @@ const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get', 'has', 'unset']);
 /** Reserved map builtin names — not user method names. */
 const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'setKeysValues', 'hasKey', 'hasIndex', 'vectorLen']);
 
+/** Reserved scalar/text builtin names — expression calls (split: destructure only). */
+const INTERP_SCALAR_BUILTIN_NAMES = new Set([
+  'toString', 'toInt', 'toFloat', 'toBool', 'typeOf', 'split', 'implode', 'explode',
+]);
+
 const INTERP_UNSET_MAX_TARGETS = 10;
 
 const INTERP_SHOW_MAX_ARGS = 32;
@@ -78,6 +83,7 @@ function interpTokenize(src) {
           const esc = src[i + 1];
           if (esc === 'n') str += '\n';
           else if (esc === 't') str += '\t';
+          else if (esc === '0') str += '\0';
           else if (esc === '\\') str += '\\';
           else if (esc === quote) str += quote;
           else str += esc;
@@ -328,6 +334,9 @@ class InterpParser {
       interpError(`'${nameTok.value}' is reserved — save:/get:/has:/unset: use this prefix`, nameTok.line);
     }
     if (INTERP_MAP_BUILTIN_NAMES.has(nameTok.value)) {
+      interpError(`'${nameTok.value}' is reserved — use as builtin call, not method name`, nameTok.line);
+    }
+    if (INTERP_SCALAR_BUILTIN_NAMES.has(nameTok.value)) {
       interpError(`'${nameTok.value}' is reserved — use as builtin call, not method name`, nameTok.line);
     }
     this.eat('SYM', '(');
@@ -1019,6 +1028,20 @@ function validateExprCallArity(expr, program, line, expectMulti) {
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
+  if (expr.name === 'split') {
+    interpError('split must be used with destructuring assignment', line);
+  }
+  if (expr.name === 'toString' || expr.name === 'toInt' || expr.name === 'toFloat'
+      || expr.name === 'toBool' || expr.name === 'typeOf') {
+    if ((expr.args || []).length !== 1) interpError(`${expr.name} expects 1 argument`, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'implode' || expr.name === 'explode') {
+    if ((expr.args || []).length !== 2) interpError(`${expr.name} expects 2 arguments`, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
   if (INTERP_BUILTINS.has(expr.name)) {
     interpError(`'${expr.name}' cannot be used as expression — use as statement`, line);
   }
@@ -1089,6 +1112,17 @@ function validateStmtTree(stmts, program) {
             stmt.line,
           );
         }
+      } else if (stmt.expr.kind === 'call' && stmt.expr.name === 'split') {
+        if (stmt.names.length !== 2) {
+          interpError(
+            `split destructuring expects 2 name(s), got ${stmt.names.length}`,
+            stmt.line,
+          );
+        }
+        if ((stmt.expr.args || []).length !== 2) {
+          interpError('split expects 2 arguments', stmt.line);
+        }
+        for (const a of stmt.expr.args || []) validateExprTree(a, program, stmt.line);
       } else if (stmt.expr.kind === 'call') {
         const m = program.methods[stmt.expr.name];
         if (!m) {

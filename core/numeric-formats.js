@@ -1389,6 +1389,7 @@
     formatNum2tText,
     parseT2numCallTags,
     tryT2numFromAsciiText,
+    parseT2numAsciiText,
     num2tDigitsFromBits,
     parseLiteralTag,
     getFormatModeWidth,

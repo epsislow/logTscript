@@ -168,6 +168,82 @@ module.exports = {
       ).result === 1,
     },
     {
+      name: 'toInt and toString cast',
+      src: BUILTIN_CORE,
+      check: () => {
+        const r = execMethodBody(
+          [
+            'MapProbe(pad/u8) {',
+            '  n = toInt("10");',
+            '  b = toBool("false");',
+            '  s = toString(n);',
+            '  return toInt(s) + b;',
+            '}',
+          ].join('\n'),
+          'MapProbe',
+        );
+        return r.result === 10;
+      },
+    },
+    {
+      name: 'typeOf map int string',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  myList = {};',
+          '  hits = 0;',
+          '  if (typeOf(myList) == "map") { hits = hits + 1; }',
+          '  if (typeOf(42) == "int") { hits = hits + 1; }',
+          '  if (typeOf("x") == "string") { hits = hits + 1; }',
+          '  return hits;',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 3,
+    },
+    {
+      name: 'split destructure',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  a, b = split("hello", 2);',
+          '  return vectorLen(explode(a + b, ""));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 5,
+    },
+    {
+      name: 'implode explode round-trip',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  blob = implode(["a", "b"], "\\0");',
+          '  parts = explode(blob, "\\0");',
+          '  return vectorLen(parts);',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 2,
+    },
+    {
+      name: 'explode empty text and implode empty vector',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  e = implode([], "|");',
+          '  z = explode("", "|");',
+          '  return vectorLen(z) + vectorLen(explode("ab", ""));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 2,
+    },
+    {
       name: 'unset save slot',
       src: BUILTIN_CORE,
       check: () => {

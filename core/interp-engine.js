@@ -1373,6 +1373,188 @@ function interpUnsetMapKey(lvalue, env, locals, callMethodFn, line) {
   interpError(`invalid unset target${line != null ? ` (line ${line})` : ''}`);
 }
 
+function interpGetParseT2numAsciiText() {
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+  return NF && typeof NF.parseT2numAsciiText === 'function' ? NF.parseT2numAsciiText : null;
+}
+
+function interpCastAbortContainer(v, line) {
+  if (Array.isArray(v) || interpIsPlainMap(v) || interpIsNodeHandle(v)) {
+    interpError(`cast expects scalar${line != null ? ` (line ${line})` : ''}`);
+  }
+}
+
+function interpParseNumericText(text, line) {
+  const parse = interpGetParseT2numAsciiText();
+  if (!parse) interpError('numeric-formats.js is not loaded');
+  const parsed = parse(text);
+  if (!parsed.ok) {
+    interpError(`${parsed.error}${line != null ? ` (line ${line})` : ''}`);
+  }
+  return parsed.value;
+}
+
+function interpBuiltinToString(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`toString expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const v = interpEvalExpr(args[0], env, callMethodFn, line);
+  interpCastAbortContainer(v, line);
+  if (typeof v !== 'number' && typeof v !== 'string' && typeof v !== 'boolean') {
+    interpError(`cast expects scalar${line != null ? ` (line ${line})` : ''}`);
+  }
+  return String(v);
+}
+
+function interpBuiltinToInt(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`toInt expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const v = interpEvalExpr(args[0], env, callMethodFn, line);
+  interpCastAbortContainer(v, line);
+  let n;
+  if (typeof v === 'string') {
+    n = Math.trunc(interpParseNumericText(v, line));
+  } else if (typeof v === 'boolean') {
+    n = v ? 1 : 0;
+  } else if (typeof v === 'number') {
+    n = Math.trunc(v);
+  } else {
+    interpError(`cast expects scalar${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (!Number.isSafeInteger(n)) {
+    interpError(`integer out of range${line != null ? ` (line ${line})` : ''}`);
+  }
+  return n;
+}
+
+function interpBuiltinToFloat(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`toFloat expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const v = interpEvalExpr(args[0], env, callMethodFn, line);
+  interpCastAbortContainer(v, line);
+  if (typeof v === 'string') {
+    const n = interpParseNumericText(v, line);
+    if (!Number.isFinite(n)) {
+      interpError(`invalid numeric text${line != null ? ` (line ${line})` : ''}`);
+    }
+    return n;
+  }
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) {
+      interpError(`invalid numeric text${line != null ? ` (line ${line})` : ''}`);
+    }
+    return v;
+  }
+  interpError(`cast expects scalar${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpBuiltinToBool(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`toBool expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const v = interpEvalExpr(args[0], env, callMethodFn, line);
+  interpCastAbortContainer(v, line);
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'number') return (v !== 0 && !Number.isNaN(v)) ? 1 : 0;
+  if (typeof v === 'string') {
+    if (v === 'true' || v === '1') return 1;
+    if (v === 'false' || v === '0') return 0;
+    return interpTruthy(v) ? 1 : 0;
+  }
+  interpError(`cast expects scalar${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpBuiltinTypeOf(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`typeOf expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const arg = args[0];
+  if (arg && arg.kind === 'var') {
+    if (!Object.prototype.hasOwnProperty.call(env, arg.name)) {
+      interpError(`undefined variable '${arg.name}'${line != null ? ` (line ${line})` : ''}`);
+    }
+  }
+  const v = interpEvalExpr(arg, env, callMethodFn, line);
+  if (typeof v === 'string') return 'string';
+  if (typeof v === 'boolean') return 'bool';
+  if (typeof v === 'number') {
+    return Number.isInteger(v) ? 'int' : 'float';
+  }
+  if (Array.isArray(v)) return 'vector';
+  if (interpIsPlainMap(v)) return 'map';
+  if (interpIsNodeHandle(v)) return 'node';
+  interpError(`typeOf: unsupported value${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpBuiltinSplit(args, env, callMethodFn, line) {
+  if (!args || args.length !== 2) {
+    interpError(`split expects 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const text = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (typeof text !== 'string') {
+    interpError(`split expects string text${line != null ? ` (line ${line})` : ''}`);
+  }
+  const nVal = interpEvalExpr(args[1], env, callMethodFn, line);
+  if (typeof nVal !== 'number' || !Number.isInteger(nVal)) {
+    interpError(`split expects integer index${line != null ? ` (line ${line})` : ''}`);
+  }
+  const L = text.length;
+  if (nVal === 0) return ['', text];
+  if (nVal > 0) {
+    if (nVal >= L) return [text, ''];
+    return [text.substring(0, nVal), text.substring(nVal)];
+  }
+  const k = Math.abs(nVal);
+  if (k >= L) return ['', text];
+  return [text.substring(0, L - k), text.substring(L - k)];
+}
+
+function interpBuiltinImplode(args, env, callMethodFn, line) {
+  if (!args || args.length !== 2) {
+    interpError(`implode expects 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const vec = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (!Array.isArray(vec)) {
+    interpError(`implode expects vector${line != null ? ` (line ${line})` : ''}`);
+  }
+  const sep = interpEvalExpr(args[1], env, callMethodFn, line);
+  if (typeof sep !== 'string') {
+    interpError(`implode expects string separator${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (vec.length === 0) return '';
+  for (let i = 0; i < vec.length; i++) {
+    if (typeof vec[i] !== 'string') {
+      interpError(`implode expects vector of strings${line != null ? ` (line ${line})` : ''}`);
+    }
+  }
+  return vec.join(sep);
+}
+
+function interpBuiltinExplode(args, env, callMethodFn, line) {
+  if (!args || args.length !== 2) {
+    interpError(`explode expects 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const text = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (typeof text !== 'string') {
+    interpError(`explode expects string text${line != null ? ` (line ${line})` : ''}`);
+  }
+  const sep = interpEvalExpr(args[1], env, callMethodFn, line);
+  if (typeof sep !== 'string') {
+    interpError(`explode expects string separator${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (text.length === 0) return [];
+  if (sep === '') {
+    const out = [];
+    for (let i = 0; i < text.length; i++) out.push(text.charAt(i));
+    return out;
+  }
+  if (text.indexOf(sep) === -1) return [text];
+  return text.split(sep);
+}
+
 function interpBuiltinGetKeys(args, env, callMethodFn, line) {
   if (!args || args.length < 1 || args.length > 2) {
     interpError(`getKeys expects 1 or 2 arguments${line != null ? ` (line ${line})` : ''}`);
@@ -1581,6 +1763,30 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       if (expr.name === 'setKeysValues') {
         return interpBuiltinSetKeysValues(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
       }
+      if (expr.name === 'toString') {
+        return interpBuiltinToString(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'toInt') {
+        return interpBuiltinToInt(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'toFloat') {
+        return interpBuiltinToFloat(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'toBool') {
+        return interpBuiltinToBool(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'typeOf') {
+        return interpBuiltinTypeOf(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'split') {
+        interpError(`split must be used with destructuring assignment${line != null ? ` (line ${line})` : ''}`);
+      }
+      if (expr.name === 'implode') {
+        return interpBuiltinImplode(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'explode') {
+        return interpBuiltinExplode(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
       return callMethodFn(expr.name, expr.args, line);
     default:
       interpError('invalid expression node');
@@ -1684,6 +1890,8 @@ function interpExecuteDestructuringAssign(stmt, env, locals, program, callMethod
     } else {
       values = stmt.names.length === 1 ? [popped.val] : [popped.key, popped.val];
     }
+  } else if (stmt.expr.kind === 'call' && stmt.expr.name === 'split') {
+    values = interpBuiltinSplit(stmt.expr.args, env, callMethodFn, stmt.line);
   } else if (stmt.expr.kind === 'call') {
     const m = program.methods[stmt.expr.name];
     if (!m) {

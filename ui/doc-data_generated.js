@@ -30864,8 +30864,12 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`hasIndex(vec, i)\`** | **\`1\`** if integer index in bounds, **\`0\`** if out of range |
 | **\`has:slotName\`** | **\`1\`** if save slot exists, **\`0\`** if not — does not return a handle |
 | **\`setKeysValues(map, keys, values)\`** | **Merge/upsert** pairs from parallel vectors into an **existing** map; returns total flat key count after merge |
+| **\`toString(v)\`**, **\`toInt(v)\`**, **\`toFloat(v)\`**, **\`toBool(v)\`** | Scalar runtime casts (≠ wire **\`T2NUM\`**) |
+| **\`typeOf(v)\`** | Runtime type name: **\`string\`**, **\`int\`**, **\`float\`**, **\`bool\`**, **\`vector\`**, **\`map\`**, **\`node\`** |
+| **\`a, b = split(text, n)\`** | Two-part string split — **destructure only** |
+| **\`implode(vec, sep)\`**, **\`explode(text, sep)\`** | Join / split **string** vectors at runtime |
 
-**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`setKeysValues\`**, **\`hasKey\`**, **\`hasIndex\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
+**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`setKeysValues\`**, **\`hasKey\`**, **\`hasIndex\`**, **\`toString\`**, **\`toInt\`**, **\`toFloat\`**, **\`toBool\`**, **\`typeOf\`**, **\`split\`**, **\`implode\`**, **\`explode\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
 
 ---
 
@@ -31362,6 +31366,217 @@ Expected: **\`result\`** = **\`00000010\`**.
 ### String values and \`getValues\`
 
 For comp round-trip through **\`getValues\`**, keep stored values **homogeneous** (all strings, all numbers, …). Mixed **\`typeof\`** in one map is fine for **\`setKeysValues\`**, but **\`getValues\`** requires one scalar type — store text as **\`/ascii\`** strings when exporting.
+
+---
+
+## Scalar casts — \`toString\`, \`toInt\`, \`toFloat\`, \`toBool\`
+
+Runtime conversions inside **\`inline [interp]\`** — **not** wire **\`T2NUM\`/\`NUM2T\`**. Use wire encode/decode blocks when values cross the AST boundary.
+
+| Builtin | Input | Output |
+|---------|-------|--------|
+| **\`toString(v)\`** | Scalar (**number**, **string**, **boolean**) | **string** |
+| **\`toInt(v)\`** | Scalar | **integer** (truncated) |
+| **\`toFloat(v)\`** | Scalar | **number** (finite) |
+| **\`toBool(v)\`** | Scalar | **\`1\`** or **\`0\`** |
+
+Vector, map, or deferred **node** handle → **abort** (\`cast expects scalar\`).
+
+String numerics use the same strict ASCII parse as **\`T2NUM\`** — no partial parse (\`"12abc"\` aborts). **\`toInt\`** requires a [safe integer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isSafeInteger); larger values abort with **\`integer out of range\`**.
+
+**\`toBool\`** hybrid rules (explicit conversion — **\`if (cond)\`** still uses pure truthy semantics):
+
+| Input | **\`toBool(v)\`** |
+|-------|-----------------|
+| **\`0\`**, **\`NaN\`** | **\`0\`** |
+| Non-zero **number** | **\`1\`** |
+| **\`"true"\`**, **\`"1"\`** (exact) | **\`1\`** |
+| **\`"false"\`**, **\`"0"\`** (exact) | **\`0\`** |
+| Other non-empty **string** | **\`1\`** if truthy (\`"maybe"\` → **\`1\`**) |
+| **\`""\`** | **\`0\`** |
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .castDemo {
+    MapProbe(pad/u8) {
+        n = toInt("10");
+        b = toBool("false");
+        s = toString(n);
+        return toInt(s) + b;
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .castDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00001010\`** — **\`toInt("10")\` → 10**, **\`toBool("false")\` → 0**, **\`toString(10)\` → \`"10"\`**, **\`toInt("10")\` → 10**, total **10 + 0 = 10**.
+
+---
+
+## \`typeOf(v)\` — runtime type name
+
+Returns a **string** label:
+
+| Runtime value | **\`typeOf(v)\`** |
+|---------------|-----------------|
+| **\`"hi"\`** | **\`"string"\`** |
+| **\`42\`** | **\`"int"\`** |
+| **\`1.5\`** | **\`"float"\`** |
+| **\`true\` / \`false\`** (boolean) | **\`"bool"\`** |
+| **\`[1, 2]\`** | **\`"vector"\`** |
+| **\`{}\`** map | **\`"map"\`** |
+| **\`get:slot\`** handle | **\`"node"\`** |
+
+Undefined variable → **abort** (\`undefined variable\`).
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .typeDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        hits = 0;
+        if (typeOf(myList) == "map") { hits = hits + 1; }
+        if (typeOf(42) == "int") { hits = hits + 1; }
+        if (typeOf("x") == "string") { hits = hits + 1; }
+        return hits;
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .typeDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000011\`** — three matching **\`typeOf\`** labels.
+
+---
+
+## \`split(text, n)\` — two-part string split
+
+**Destructure only:** **\`a, b = split(text, n)\`** — not valid in a simple assignment or expression.
+
+| **\`n\`** | **\`a\`** | **\`b\`** |
+|---------|---------|---------|
+| **\`0\`** | **\`""\`** | full **text** |
+| **\`n > 0\`**, in range | prefix **\`text[0:n]\`** | suffix **\`text[n:]\`** |
+| **\`n > 0\`**, **\`n ≥ len(text)\`** | full **text** | **\`""\`** |
+| **\`n < 0\`**, **\`|n| < len(text)\`** | prefix before last **\`|n|\`** chars | last **\`|n|\`** chars |
+| **\`n < 0\`**, **\`|n| ≥ len(text)\`** | **\`""\`** | full **text** |
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .splitDemo {
+    MapProbe(pad/u8) {
+        a, b = split("hello", 2);
+        return vectorLen(explode(a + b, ""));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .splitDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`a="he"\`**, **\`b="llo"\`** → **\`vectorLen(explode("hello",""))\` = 5** → **\`result\`** = **\`00000101\`**.
+
+---
+
+## \`implode(vec, sep)\` and \`explode(text, sep)\`
+
+Join or split **string vectors** at runtime (MVP: vector elements must already be **strings**).
+
+| Case | **\`implode\`** | **\`explode\`** |
+|------|---------------|---------------|
+| Normal | **\`implode(["a","b"], "\\0")\`** → **\`"a\\0b"\`** | **\`explode("a\\0b", "\\0")\`** → **\`["a","b"]\`** |
+| Empty vector / text | **\`implode([], sep)\`** → **\`""\`** | **\`explode("", sep)\`** → **\`[]\`** |
+| Separator absent | — | **\`explode("hello", "|")\`** → **\`["hello"]\`** |
+| Empty separator | — | **\`explode("ab", "")\`** → **\`["a","b"]\`** |
+
+In **\`inline [interp]\`** string literals, **\`\\0\`** is a null byte (use **\`"\\0"\`** as separator for null-delimited blobs).
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .joinDemo {
+    MapProbe(pad/u8) {
+        vals = ["x", "y"];
+        blob = implode(vals, "\\0");
+        parts = explode(blob, "\\0");
+        return vectorLen(parts);
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .joinDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000010\`**.
+
+### Comp round-trip — \`implode\` on pout, \`explode\` on pin
+
+Export string values from a map through one null-delimited **\`[]~/ascii\`** pout; read them back on a matching pin:
+
+\`\`\`logts-play
+<F9Blob>+:
+    pad: 8
+:
+
+inline [interp] .f9Blob {
+    F9Blob(pad/u8) {
+        myList = {};
+        setKeysValues(myList, ["a", "b"], ["10", "20"]);
+        blob = implode(getValues(myList), "\\0");
+        parts = explode(blob, "\\0");
+        push textOut: parts;
+        myList2 = {};
+        setKeysValues(myList2, ["a", "b"], textIn);
+        return vectorLen(getValues(myList2));
+    }
+}
+
+comp [interp] .f9BlobComp:
+    on: 1
+    astSchema = .F9Blob
+    .f9Blob { }
+    pin textIn[]~/ascii as textIn
+    pout textOut[]~/ascii as textOut
+    pout res/u16 as resOut
+    :
+
+8wire<F9Blob> ast = ^00
+24wire textInWire = 001100010011000000110010
+24wire textOutWire = \\0;24
+16wire resWire = 0000000000000000
+1wire run = 1
+
+.f9BlobComp:{
+    ast = ast
+    textIn = textInWire
+    textOut >= textOutWire
+    resOut >= resWire
+    set = run
+}
+
+show(resWire)
+\`\`\`
+
+Expected: **\`resWire\`** = **\`00000010\`** (two string values merged from pin vector **\`textIn\`**). **\`textOutWire\`** echoes the same null-delimited vector produced via **\`implode\`/\`explode\`** round-trip on **\`getValues(myList)\`**.
+
+**Reserved** (not user method names): **\`toString\`**, **\`toInt\`**, **\`toFloat\`**, **\`toBool\`**, **\`typeOf\`**, **\`split\`**, **\`implode\`**, **\`explode\`**.
 
 ---
 

@@ -59090,5 +59090,250 @@ inline [interp] .slotInterp {
 
   regCanvasDual(5528, 5529, 'f8g canvas xs[-] and xs[*] parity', runF8gCanvasPopClear);
 
+  /* ----- F9 — scalar cast, typeOf, split, implode/explode ----- */
+
+  const F9_CAST_INTERP = [
+    'ToStr() { return toString(42); }',
+    'ToInt() { return toInt("10"); }',
+    'ToFloat() { return toFloat("1.5"); }',
+    'ToBoolNum() { return toBool(1); }',
+    'ToBoolLit() {',
+    '  return toBool("false") + toBool("0") + toBool("true") + toBool("1") + toBool("maybe");',
+    '}',
+    'SplitBasic() {',
+    '  a, b = split("hello", 2);',
+    '  return vectorLen(explode(a + b, ""));',
+    '}',
+    'SplitZeroNeg() {',
+    '  a, b = split("hello", 0);',
+    '  c, d = split("hello", -1);',
+    '  e, f = split("hello", -2);',
+    '  ok = 0;',
+    '  if (a == "" && b == "hello") { ok = ok + 1; }',
+    '  if (c == "hell" && d == "o") { ok = ok + 1; }',
+    '  if (e == "hel" && f == "lo") { ok = ok + 1; }',
+    '  return ok;',
+    '}',
+    'SplitOob() {',
+    '  a, b = split("hello", 99);',
+    '  c, d = split("hello", -99);',
+    '  e, f = split("h", 2);',
+    '  ok = 0;',
+    '  if (a == "hello" && b == "") { ok = ok + 1; }',
+    '  if (c == "" && d == "hello") { ok = ok + 1; }',
+    '  if (e == "h" && f == "") { ok = ok + 1; }',
+    '  return ok;',
+    '}',
+    'ImplodeRound() {',
+    '  blob = implode(["a", "b"], "\\0");',
+    '  parts = explode(blob, "\\0");',
+    '  return vectorLen(parts);',
+    '}',
+    'ImplodeEmpty() {',
+    '  e = implode([], "|");',
+    '  z = explode("", "|");',
+    '  return vectorLen(z) + vectorLen(explode("ab", ""));',
+    '}',
+    'ExplodeSingle() {',
+    '  parts = explode("hello", "|");',
+    '  return vectorLen(parts);',
+    '}',
+    'TypeOfProbe() {',
+    '  n = 0;',
+    '  if (typeOf("hi") == "string") { n = n + 1; }',
+    '  if (typeOf(42) == "int") { n = n + 1; }',
+    '  if (typeOf(1.5) == "float") { n = n + 1; }',
+    '  if (typeOf([1]) == "vector") { n = n + 1; }',
+    '  myMap = {};',
+    '  if (typeOf(myMap) == "map") { n = n + 1; }',
+    '  return n;',
+    '}',
+    'TypeOfNode() {',
+    '  h = get:txBody;',
+    '  return typeOf(h);',
+    '}',
+  ].join('\n');
+
+  regInterpDual(5530, 5531, 'f9 cast toString and toInt', function(h, session) {
+    h.assert('toString 42', f8Exec(session, F9_CAST_INTERP, 'ToStr').result, '42');
+    h.assert('toInt 10', f8Exec(session, F9_CAST_INTERP, 'ToInt').result, 10);
+  });
+
+  regInterpDual(5532, 5533, 'f9 cast toFloat and toBool number', function(h, session) {
+    h.assert('toFloat 1.5', f8Exec(session, F9_CAST_INTERP, 'ToFloat').result, 1.5);
+    h.assert('toBool 1', f8Exec(session, F9_CAST_INTERP, 'ToBoolNum').result, 1);
+  });
+
+  regInterpDual(5534, 5535, 'f9 toBool string literals and truthy fallback', function(h, session) {
+    h.assert('toBool literals sum 3', f8Exec(session, F9_CAST_INTERP, 'ToBoolLit').result, 3);
+  });
+
+  regInterpDual(5536, 5537, 'f9 invalid numeric text aborts', function(h, session) {
+    h.assertThrows('toInt bla', function() {
+      f8Exec(session, 'Bad() { return toInt("bla"); }', 'Bad');
+    }, 'invalid numeric text');
+    h.assertThrows('toFloat bla', function() {
+      f8Exec(session, 'Bad() { return toFloat("bla"); }', 'Bad');
+    }, 'invalid numeric text');
+    h.assertThrows('partial parse', function() {
+      f8Exec(session, 'Bad() { return toInt("12abc"); }', 'Bad');
+    }, 'invalid numeric text');
+  });
+
+  regInterpDual(5538, 5539, 'f9 toInt safe integer range aborts', function(h, session) {
+    h.assertThrows('out of range', function() {
+      f8Exec(session, 'Bad() { return toInt("9007199254740992"); }', 'Bad');
+    }, 'integer out of range');
+  });
+
+  regInterpDual(5540, 5541, 'f9 cast on vector map handle aborts', function(h, session) {
+    h.assertThrows('vector', function() {
+      f8Exec(session, 'Bad() { return toString([1]); }', 'Bad');
+    }, 'cast expects scalar');
+    h.assertThrows('map', function() {
+      f8Exec(session, 'Bad() { myList = {}; return toInt(myList); }', 'Bad');
+    }, 'cast expects scalar');
+    const handle = interpMakeNodeHandle({
+      kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+    });
+    const savedHandles = new Map();
+    savedHandles.set('txBody', handle);
+    h.assertThrows('handle', function() {
+      f8Exec(session, 'Bad() { h = get:txBody; return toFloat(h); }', 'Bad', { env: {} }, savedHandles);
+    }, 'cast expects scalar');
+  });
+
+  regInterpDual(5542, 5543, 'f9 typeOf string int float vector map', function(h, session) {
+    h.assert('five kinds', f8Exec(session, F9_CAST_INTERP, 'TypeOfProbe').result, 5);
+  });
+
+  regInterpDual(5544, 5545, 'f9 typeOf deferred node handle', function(h, session) {
+    const handle = interpMakeNodeHandle({
+      kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+    });
+    const savedHandles = new Map();
+    savedHandles.set('txBody', handle);
+    h.assert('node', f8Exec(session, F9_CAST_INTERP, 'TypeOfNode', { env: {} }, savedHandles).result, 'node');
+  });
+
+  regInterpDual(5546, 5547, 'f9 typeOf undefined variable aborts', function(h, session) {
+    h.assertThrows('undefined', function() {
+      f8Exec(session, 'Bad() { return typeOf(missing); }', 'Bad');
+    }, 'undefined variable');
+  });
+
+  regInterpDual(5548, 5549, 'f9 split destructure basic', function(h, session) {
+    h.assert('hello len 5', f8Exec(session, F9_CAST_INTERP, 'SplitBasic').result, 5);
+  });
+
+  regInterpDual(5550, 5551, 'f9 split n=0 and negative indices', function(h, session) {
+    h.assert('three cases', f8Exec(session, F9_CAST_INTERP, 'SplitZeroNeg').result, 3);
+  });
+
+  regInterpDual(5552, 5553, 'f9 split OOB positive and negative', function(h, session) {
+    h.assert('three OOB cases', f8Exec(session, F9_CAST_INTERP, 'SplitOob').result, 3);
+  });
+
+  reg(5554, 'interp', 'f9 split three-name destructure parse error', function(h) {
+    h.assertThrows('three names', function() {
+      parseInterpBody('Bad() { a, b, c = split("x", 1); return 0; }');
+    }, 'split destructuring expects');
+  });
+
+  regInterpDual(5555, 5556, 'f9 split bad argument types abort', function(h, session) {
+    h.assertThrows('non-string', function() {
+      f8Exec(session, 'Bad() { a, b = split(42, 1); return 0; }', 'Bad');
+    }, 'split expects string');
+    h.assertThrows('non-integer n', function() {
+      f8Exec(session, 'Bad() { a, b = split("x", 1.5); return 0; }', 'Bad');
+    }, 'split expects integer');
+  });
+
+  reg(5557, 'interp', 'f9 split in simple assignment parse error', function(h) {
+    h.assertThrows('assign split', function() {
+      parseInterpBody('Bad() { x = split("a", 1); return 0; }');
+    }, 'split must be used with destructuring');
+  });
+
+  regInterpDual(5558, 5559, 'f9 implode explode round-trip', function(h, session) {
+    h.assert('two parts', f8Exec(session, F9_CAST_INTERP, 'ImplodeRound').result, 2);
+  });
+
+  regInterpDual(5560, 5561, 'f9 implode empty and explode empty or chars', function(h, session) {
+    h.assert('empty vec + char split', f8Exec(session, F9_CAST_INTERP, 'ImplodeEmpty').result, 2);
+  });
+
+  regInterpDual(5562, 5563, 'f9 explode missing separator single element', function(h, session) {
+    h.assert('one element', f8Exec(session, F9_CAST_INTERP, 'ExplodeSingle').result, 1);
+  });
+
+  reg(5564, 'interp', 'f9 reserved cast builtin method names', function(h) {
+    h.assertThrows('toString method', function() {
+      parseInterpBody('toString(x/u8) { return x; }');
+    }, 'reserved');
+    h.assertThrows('split method', function() {
+      parseInterpBody('split(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  const F9_BLOB_SCHEMA = [
+    '<F9Blob>+:',
+    '    pad: 8',
+    ':',
+  ].join('\n');
+
+  const F9_BLOB_INTERP = [
+    'inline [interp] .f9Blob {',
+    '    F9Blob(pad/u8) {',
+    '        myList = {};',
+    '        setKeysValues(myList, ["a", "b"], ["10", "20"]);',
+    '        blob = implode(getValues(myList), "\\0");',
+    '        parts = explode(blob, "\\0");',
+    '        push textOut: parts;',
+    '        myList2 = {};',
+    '        setKeysValues(myList2, ["a", "b"], textIn);',
+    '        push res: vectorLen(getValues(myList2));',
+    '        return vectorLen(getValues(myList2));',
+    '    }',
+    '}',
+  ].join('\n');
+
+  const F9_BLOB_COMP = [
+    'comp [interp] .f9BlobComp:',
+    '    on: 1',
+    '    astSchema = .F9Blob',
+    '    .f9Blob { }',
+    '    pin textIn[]~/ascii as textIn',
+    '    pout textOut[]~/ascii as textOut',
+    '    pout res/u16 as resOut',
+    '    :',
+  ].join('\n');
+
+  const F9_BLOB_CORE = F9_BLOB_SCHEMA + '\n' + F9_BLOB_INTERP + '\n' + F9_BLOB_COMP;
+
+  function runF9CompImplodeExplode(h, session) {
+    const textInBlob = '10\0' + '20';
+    const textInBits = f3iAsciiBits(textInBlob);
+    const textOutLen = textInBits.length;
+    session.run(F9_BLOB_CORE + '\n' + [
+      '8wire<F9Blob> ast = 00000000',
+      textInBits.length + 'wire textInWire = ' + textInBits,
+      textOutLen + 'wire textOutWire = ' + '0'.repeat(textOutLen),
+      '16wire resWire = 0000000000000000',
+      '1wire run = 1',
+      '.f9BlobComp:{',
+      '  ast = ast',
+      '  textIn = textInWire',
+      '  textOut >= textOutWire',
+      '  resOut >= resWire',
+      '  set = run',
+      '}',
+    ].join('\n'));
+    h.assert('two values merged from pin', session.getWire(session.interp, 'resWire'), '0000000000000010');
+    h.assert('pout implode round-trip', session.getWire(session.interp, 'textOutWire'), textInBits);
+  }
+
+  regInterpDual(5565, 5566, 'f9 comp implode explode null-delimited ascii legacy+wave', runF9CompImplodeExplode);
+
   window.LogTScriptTestSuite.finalize();
 })();
