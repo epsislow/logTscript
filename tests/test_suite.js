@@ -59335,5 +59335,82 @@ inline [interp] .slotInterp {
 
   regInterpDual(5565, 5566, 'f9 comp implode explode null-delimited ascii legacy+wave', runF9CompImplodeExplode);
 
+  /* ----- :eval result format tags (; s8, ; signed, …) ----- */
+
+  const EVAL_FMT_SCHEMA = [
+    '<MapProbe>+:',
+    '    pad: 8',
+    ':',
+  ].join('\n');
+
+  const EVAL_FMT_INTERP = [
+    'inline [interp] .castDemo {',
+    '    MapProbe(pad/s8) {',
+    '        return -1;',
+    '    }',
+    '}',
+  ].join('\n');
+
+  const EVAL_FMT_CORE = EVAL_FMT_SCHEMA + '\n' + EVAL_FMT_INTERP;
+
+  function runEvalFmtSignedNegOne(h, session) {
+    session.run(EVAL_FMT_CORE + '\n' + [
+      '8wire<MapProbe> w = ^00',
+      '8wire result = .castDemo:eval(w, <MapProbe>; s8)',
+      'show(result)',
+    ].join('\n'));
+    h.assert('s8 -1 encodes as 11111111', session.getWire(session.interp, 'result'), '11111111');
+  }
+
+  regInterpDual(5567, 5568, 'eval result tag ; s8 encodes negative return', runEvalFmtSignedNegOne);
+
+  regInterpDual(5569, 5570, 'eval without format tag rejects negative unsigned', function(h, session) {
+    h.assertThrows('unsigned negative', function() {
+      session.run(EVAL_FMT_CORE + '\n' + [
+        '8wire<MapProbe> w = ^00',
+        '8wire result = .castDemo:eval(w, <MapProbe>)',
+      ].join('\n'));
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'negative result cannot encode as unsigned wire');
+  });
+
+  regInterpDual(5571, 5572, 'eval ; signed uses lhs wire width', function(h, session) {
+    session.run(EVAL_FMT_CORE + '\n' + [
+      '8wire<MapProbe> w = ^00',
+      '8wire result = .castDemo:eval(w, <MapProbe>; signed)',
+    ].join('\n'));
+    h.assert('signed tag -1', session.getWire(session.interp, 'result'), '11111111');
+  });
+
+  regInterpDual(5575, 5576, 'eval ; q8p8 encodes fractional return', function(h, session) {
+    session.run([
+      '<MapProbe>+:',
+      '    pad: 16',
+      ':',
+      'inline [interp] .castDemo {',
+      '    MapProbe(pad/s16) {',
+      '        return 1.5;',
+      '    }',
+      '}',
+      '16wire<MapProbe> w = ^0000',
+      '16wire result = .castDemo:eval(w, <MapProbe>; q8p8)',
+    ].join('\n'));
+    h.assert('q8p8 1.5', session.getWire(session.interp, 'result'), '0000000110000000');
+  });
+
+  regInterpDual(5573, 5574, 'eval format tag width mismatch aborts', function(h, session) {
+    h.assertThrows('width mismatch', function() {
+      session.run(EVAL_FMT_CORE + '\n' + [
+        '8wire<MapProbe> w = ^00',
+        '16wire result = .castDemo:eval(w, <MapProbe>; s8)',
+      ].join('\n'));
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'requires 8-bit wire');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

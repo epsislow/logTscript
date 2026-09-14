@@ -1399,6 +1399,7 @@
     tagParsedFromFormatMode,
     fixedNumberToRaw,
     fixedRawToNumber,
+    encodeNformatValue,
     decodeToFloat,
     encodeFromFloat,
     parseNformatCallTags,

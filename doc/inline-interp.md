@@ -455,7 +455,22 @@ Assignment programs (`CallAssign`, `CallVariable`), deferred AST handles (`/node
 | `astWire` | Wire holding a packed AST (from `:packAst`, `pr:ast`, field slice, …) |
 | `<schema>` | Schema reference (`<expr>`, `<program>`, …) — root union or program shape |
 
-The **assignment LHS width** determines how the numeric result is encoded (unsigned, zero-padded).
+The **assignment LHS width** determines how the numeric result is encoded. By default the value is treated as an **unsigned** integer (zero-padded). For signed or other numeric encodings, add a **format tag** after the arguments (same **`; tag`** convention as **`show`**, **`T2NUM`**, …):
+
+```logts
+8wire result = .myInterp:eval(ast, <schema>; s8)
+64wire result = .myInterp:eval(ast, <schema>; f64)
+8wire result = .myInterp:eval(ast, <schema>; signed)
+```
+
+| Tag | Encoding |
+|-----|----------|
+| **`; s8`**, **`; s16`**, … | Fixed-width **signed** two's complement |
+| **`; u8`**, **`; u16`**, … | Fixed-width **unsigned** (explicit; same as default for that width) |
+| **`; signed`** | Signed using the **LHS wire width** (e.g. **`8wire`** → **`/s8`**) |
+| **`; f32`**, **`; f64`**, **`; q4p4`**, … | IEEE float or fixed-point format |
+
+The tag width must match the assignment wire width (**`; s8`** requires **`8wire`** on the LHS). Without a tag, negative integers **abort** (`negative result cannot encode as unsigned wire`).
 
 ### Evaluate a packed expression (42)
 

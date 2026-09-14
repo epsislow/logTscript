@@ -2306,9 +2306,17 @@ class Interpreter {
             if (line != null) this.out.push(line);
           };
       }
+      const parseFmtFn = typeof parseInterpEvalResultFormat === 'function'
+        ? parseInterpEvalResultFormat
+        : null;
+      let formatSpec = null;
+      if (invoke.callTags && invoke.callTags.length) {
+        if (!parseFmtFn) throw new Error('interp-engine.js is not loaded');
+        formatSpec = parseFmtFn(invoke.callTags, `${instName}:eval`);
+      }
       const numResult = evalFn(inlineInst, wireBits, schemaName, this.schemaRegistry, evalOpts);
       const outWidth = this._interpEvalOutWidth > 0 ? this._interpEvalOutWidth : null;
-      const bits = encFn(numResult, outWidth);
+      const bits = encFn(numResult, outWidth, formatSpec);
       const bw = outWidth && outWidth > 0 ? outWidth : bits.length;
       return this._inlineParserWireReturn(bits, bw, computeRefs);
     }

@@ -2010,9 +2010,14 @@ function interpEncodeScalarValue(value, typeName, targetBits, alias) {
     return bits;
   }
   if (typeName === 'f32' || typeName === 'f64' || typeName === 'fp16' || typeName === 'bf16' || /^q\d+p\d+$/.test(typeName)) {
-    const encFn = typeof encodeNformatValue === 'function' ? encodeNformatValue : null;
     const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const nf = NF && typeof NF.encodeFromFloat === 'function' ? NF.encodeFromFloat : null;
+    const fixedEnc = NF && typeof NF.fixedNumberToRaw === 'function' ? NF.fixedNumberToRaw : null;
+    const encFn = typeof encodeNformatValue === 'function'
+      ? encodeNformatValue
+      : (fixedEnc && /^q\d+p\d+$/.test(typeName)
+        ? (v, mode) => fixedEnc(v, mode)
+        : null);
     const w = targetBits && targetBits > 0 ? targetBits : interpCompDeclBitWidth({ typeName });
     if (!w) fail(value);
     if ((typeName === 'f32' || typeName === 'f64' || typeName === 'fp16' || typeName === 'bf16') && nf) {
@@ -2367,7 +2372,60 @@ function interpExecuteMethod(method, argValues, program, sharedEnv, options) {
   return 0;
 }
 
-function encodeInterpResult(value, bitWidth) {
+function interpFormatTypeBitWidth(typeName) {
+  const uMatch = /^u(\d+)$/.exec(typeName);
+  if (uMatch) return parseInt(uMatch[1], 10);
+  const sMatch = /^s(\d+)$/.exec(typeName);
+  if (sMatch) return parseInt(sMatch[1], 10);
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+  if (NF && typeof NF.getFormatModeWidth === 'function') {
+    const w = NF.getFormatModeWidth(typeName);
+    if (w) return w;
+  }
+  return null;
+}
+
+function parseInterpEvalResultFormat(callTags, fnName) {
+  if (!callTags || !callTags.length) return null;
+  const label = fnName || ':eval';
+  if (callTags.length !== 1) {
+    throw new Error(`${label}: exactly one result format tag expected (e.g. '; s8')`);
+  }
+  const t = callTags[0];
+  if (!t || t.value !== 1) {
+    throw new Error(`${label}: result format tag must be enabled`);
+  }
+  const name = t.name;
+  if (name === 'signed') return { mode: 'signed' };
+  if (/^s\d+$/.test(name) || /^u\d+$/.test(name)) return { typeName: name };
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+  if (NF && typeof NF.isNumericFormatMode === 'function' && NF.isNumericFormatMode(name)) {
+    return { typeName: name };
+  }
+  throw new Error(`${label}: unknown result format tag '${name}'`);
+}
+
+function encodeInterpResult(value, bitWidth, formatSpec) {
+  if (formatSpec) {
+    let typeName;
+    if (formatSpec.mode === 'signed') {
+      const w = bitWidth && bitWidth > 0 ? bitWidth : 8;
+      typeName = 's' + w;
+    } else {
+      typeName = formatSpec.typeName;
+    }
+    const fmtW = interpFormatTypeBitWidth(typeName);
+    const outW = bitWidth && bitWidth > 0 ? bitWidth : fmtW;
+    if (fmtW != null && outW != null && fmtW !== outW) {
+      interpError(`result format /${typeName} requires ${fmtW}-bit wire, got ${outW}`);
+    }
+    const targetW = outW || fmtW || 8;
+    try {
+      return interpEncodeScalarValue(value, typeName, targetW, 'eval');
+    } catch (err) {
+      interpError(err && err.message ? err.message : String(err));
+    }
+  }
   if (typeof value === 'number' && Number.isFinite(value)) {
     const n = Math.trunc(value);
     const w = bitWidth && bitWidth > 0 ? bitWidth : 8;
@@ -2470,6 +2528,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.evalInterpInline = evalInterpInline;
   globalThis.evalInterpCompExec = evalInterpCompExec;
   globalThis.encodeInterpResult = encodeInterpResult;
+  globalThis.parseInterpEvalResultFormat = parseInterpEvalResultFormat;
   globalThis.decodeInterpCompPinBits = decodeInterpCompPinBits;
   globalThis.encodeInterpCompPoutValue = encodeInterpCompPoutValue;
   globalThis.validateInterpAstWire = validateInterpAstWire;
@@ -2492,6 +2551,7 @@ if (typeof module !== 'undefined' && module.exports) {
     evalInterpInline,
     evalInterpCompExec,
     encodeInterpResult,
+    parseInterpEvalResultFormat,
     decodeInterpCompPinBits,
     encodeInterpCompPoutValue,
     validateInterpAstWire,
