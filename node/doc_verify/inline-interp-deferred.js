@@ -654,4 +654,173 @@ module.exports.cases.push(
       }) === 1;
     },
   },
+  {
+    name: 'f10 nodeLen on composite BVA',
+    src: [
+      F6_DEFERRED,
+      '<StmtSeq>+:',
+      '    stmts: bound <CallStatement>[1-]',
+      ':',
+      `inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule stmtSeq = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`,
+      `inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) { env[name] = value; return value; }
+    WhileLoop(condition^, body^) {
+        while (eval(condition, 1)) { eval(body, 1); }
+        return 0;
+    }
+    DeferredProbe(node^) {
+        v1 = eval(node);
+        v2 = eval(node);
+        return v2;
+    }
+    StmtSeq(stmts^) { return nodeLen(stmts); }
+}`,
+    ].join('\n'),
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.factLang');
+      const inst = interp.inlineInstances.get('.factInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const packed = ab.buildAstFromParse(g, 'a=1; b=2; c=3;', 'StmtSeq', interp.schemaRegistry, { startRule: 'stmtSeq' });
+      if (!packed || !packed.ok) return false;
+      return ie.evalInterpInline(inst, packed.bits, 'StmtSeq', interp.schemaRegistry, {
+        evaluationMap: new Map(),
+        savedHandles: new Map(),
+      }) === 3;
+    },
+  },
+  {
+    name: 'f10 nodeTag without eval',
+    src: [
+      F6_DEFERRED,
+      '<StmtSeq>+:',
+      '    stmts: bound <CallStatement>[1-]',
+      ':',
+      `inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule stmtSeq = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:`,
+      `inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) { env[name] = value; return value; }
+    WhileLoop(condition^, body^) {
+        while (eval(condition, 1)) { eval(body, 1); }
+        return 0;
+    }
+    DeferredProbe(node^) {
+        v1 = eval(node);
+        v2 = eval(node);
+        return v2;
+    }
+    StmtSeq(stmts^) {
+        env['a'] = 5;
+        t = nodeTag(stmts[0]);
+        u = nodeTag(stmts[1]);
+        return env['a'];
+    }
+}`,
+    ].join('\n'),
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.factLang');
+      const inst = interp.inlineInstances.get('.factInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const packed = ab.buildAstFromParse(g, 'a=5; while(0) { b=1; }', 'StmtSeq', interp.schemaRegistry, { startRule: 'stmtSeq' });
+      if (!packed || !packed.ok) return false;
+      return ie.evalInterpInline(inst, packed.bits, 'StmtSeq', interp.schemaRegistry, {
+        evaluationMap: new Map(),
+        savedHandles: new Map(),
+      }) === 5;
+    },
+  },
+  {
+    name: 'f10 factorial via body index',
+    src: [
+      F6_DEFERRED,
+      `inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        while (eval(condition, 1)) {
+            i = 0;
+            while (i < nodeLen(body)) {
+                stmt = body[i];
+                eval(stmt, 1);
+                i = i + 1;
+            }
+        }
+        return 0;
+    }
+}`,
+    ].join('\n'),
+    check: (interp) => {
+      const gInst = interp.inlineInstances.get('.factLang');
+      const inst = interp.inlineInstances.get('.factInterp');
+      if (!gInst || !inst) return false;
+      const g = { tokens: gInst.tokens, rules: gInst.rules };
+      const packed = ab.buildAstFromParse(
+        g,
+        'fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;',
+        'program',
+        interp.schemaRegistry,
+        { startRule: 'program' },
+      );
+      if (!packed || !packed.ok) return false;
+      return ie.evalInterpInline(inst, packed.bits, 'program', interp.schemaRegistry, {
+        evaluationMap: new Map(),
+        savedHandles: new Map(),
+      }) === 120;
+    },
+  },
 );

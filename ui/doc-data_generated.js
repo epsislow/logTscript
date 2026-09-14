@@ -24278,9 +24278,15 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`evaled(handle)\`** | Returns **1** if cached, **0** if not — **does not execute** the subtree |
 | **\`save:slot = expr\`** | Store a deferred handle in the session (does **not** run the subtree) |
 | **\`get:slot\`** | Read a saved handle — use in \`eval(get:slot, …)\` |
-| **Reserved names** | \`eval\`, \`evaled\`, \`save\`, \`get\` — not user method names |
+| **Reserved names** | \`eval\`, \`evaled\`, \`save\`, \`get\`, \`nodeLen\`, \`first\`, \`last\`, \`nodeTag\`, \`isNodeTag\` — not user method names |
 | **\`while eval(cond)\`** | Condition re-reads \`env\` each iteration when the AST node is deferred |
 | **Leaf \`/node\`** | Invalid on leaf numeric fields — abort at first dispatch |
+| **\`body[i]\`** | Index a composite deferred handle (BVA) — returns a child handle **without** \`eval\` |
+| **\`nodeLen(h)\`** | Number of child nodes in a composite handle |
+| **\`first\` / \`last\`** | First or last child handle of a composite BVA |
+| **\`nodeTag(h)\`** | Active union branch name (e.g. \`"CallAssign"\`) — **no method execution** |
+| **\`isNodeTag(h, name)\`** | Returns **1** / **0** — compares \`nodeTag(h)\` to \`name\` |
+| **\`show(node)\`** | One-line summary: active tag + schema ref (e.g. \`CallAssign <CallStatement>\`) |
 
 ---
 
@@ -25167,6 +25173,264 @@ Both forms compile to the same \`/node\` parameter type:
 WhileLoop(condition^, body/node) { … }
 \`\`\`
 
+---
+
+## Node indexing & introspection
+
+Composite deferred parameters (bound variable arrays — BVA fields such as \`body/node\` on a \`while\` body) expose child statement handles **without** running them. Use indexing and introspection builtins to walk the AST and call **\`eval\`** only where needed.
+
+### \`body[i]\` — child handle by index
+
+| Property | Detail |
+|----------|--------|
+| **Operand** | Composite handle (\`kind: composite\`) from a \`/node\` or \`^\` parameter backed by a BVA schema field |
+| **Index** | Non-negative integer **\`i\`** |
+| **Result** | Deferred **leaf** handle for child **\`i\`** — same shape as if the engine sliced the BVA during dispatch |
+| **Side effects** | **None** — does **not** call \`eval\`, does **not** touch \`evaluationMap\` or \`env\` |
+| **Bounds** | **\`i ≥ nodeLen(body)\`** → abort **\`node index out of range\`** |
+| **Non-composite** | Index on a leaf handle → abort **\`not a composite node\`** |
+
+\`body[i]\` is **not** vector indexing (F3h). It applies only to deferred node handles.
+
+### \`nodeLen(handle)\`
+
+Returns the number of bound substreams (children) in a composite handle. Non-composite handle → abort **\`not a composite node\`**.
+
+### \`first(handle)\` / \`last(handle)\`
+
+Return the first or last child handle — equivalent to **\`handle[0]\`** and **\`handle[nodeLen(handle) - 1]\`**. Empty composite (length **0**) → abort **\`node index out of range\`**.
+
+### \`nodeTag(handle)\` / \`isNodeTag(handle, name)\`
+
+Read the active union branch from the handle’s \`presence_mask\` **without** invoking a user AST method:
+
+| Builtin | Returns |
+|---------|---------|
+| **\`nodeTag(h)\`** | String branch name (e.g. \`"CallAssign"\`, \`"CallAdd"\`, \`"CallNumber"\`) |
+| **\`isNodeTag(h, "CallAssign")\`** | **1** if \`nodeTag(h) == "CallAssign"\`, else **0** |
+
+No writes to **\`env\`** and no entries in **\`evaluationMap\`**. Internal **\`pathKey\`** values are not exposed.
+
+### \`show(node)\`
+
+When a **\`show\`** argument is a deferred handle, output is one line: **\`<activeTag> <schemaRef>\`** (e.g. **\`CallAssign <CallStatement>\`**). Field payloads are not expanded.
+
+### Selective execution pattern
+
+Walk children, peek tags, and **\`eval\`** only matching statements:
+
+\`\`\`logts
+WhileLoop(condition^, body^) {
+    i = 0;
+    while (i < nodeLen(body)) {
+        stmt = body[i];
+        if (isNodeTag(stmt, "CallAssign")) {
+            eval(stmt, 1);
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+\`\`\`
+
+### Example — \`nodeLen\` and \`body[0]\`
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallAdd?:      bound <CallAdd>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+:
+
+<LenProbe>+:
+    stmts: bound <CallStatement>[1-]
+:
+
+<TagProbe>+:
+    stmts: bound <CallStatement>[1-]
+:
+
+inline [parser] .idxLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule stmtSeq = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+    rule term = INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .idxInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    LenProbe(stmts^) { return nodeLen(stmts); }
+    TagProbe(stmts^) {
+        show(stmts[0]);
+        if (isNodeTag(stmts[1], "CallAssign")) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+4096wire<LenProbe> sq =: .idxLang:packAst("a=1; b=2; c=3;", <LenProbe>, "stmtSeq")
+16wire len = .idxInterp:eval(sq, <LenProbe>)
+4096wire<TagProbe> tq =: .idxLang:packAst("a=5; b=1;", <TagProbe>, "stmtSeq")
+16wire tagHit = .idxInterp:eval(tq, <TagProbe>)
+show(len)
+show(tagHit)
+\`\`\`
+
+Use **Load & Run**. Expected output:
+
+- **\`len\`**: \`0000000000000011\` (3 statements)
+- **\`show(stmts[0])\`** line: \`CallAssign <CallStatement>\`
+- **\`tagHit\`**: \`0000000000000001\` (\`stmts[1]\` is also \`CallAssign\`)
+
+### Example — factorial via indexed \`while\` body
+
+Same semantics as **\`eval(body, 1)\`**, but each child statement is dispatched explicitly:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallSub>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<CallMul>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallSub?:      bound <CallSub>
+    CallMul?:      bound <CallMul>
+:
+
+<CallAssign>:
+    name:  bound <symbol>
+    value: bound <expr>
+:
+
+<WhileLoop>:
+    condition: bound <expr>
+    body:      bound <CallStatement>[1-]
+:
+
+<CallStatement>+:
+    CallAssign?: bound <CallAssign>
+    WhileLoop?:  bound <WhileLoop>
+:
+
+<program>+:
+    statements: bound <CallStatement>[1-]
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "+" term -> CallAdd
+        | expression "-" term -> CallSub
+        | term;
+    rule term
+        = term "*" factor -> CallMul
+        | factor;
+    rule factor
+        = "(" expression ")"
+        | INT -> CallNumber
+        | $name:ID -> CallVariable;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) { return left + right; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallMul(left/s16, right/s16) { return left * right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        while (eval(condition, 1)) {
+            i = 0;
+            while (i < nodeLen(body)) {
+                stmt = body[i];
+                eval(stmt, 1);
+                i = i + 1;
+            }
+        }
+        return 0;
+    }
+}
+
+4096wire<program> prog =: .factLang:packAst("fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;", <program>, "program")
+16wire result = .factInterp:eval(prog, <program>)
+show(result)
+\`\`\`
+
+Expected output: **\`0000000001111000\`** (120).
 
 ---
 

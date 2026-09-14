@@ -1042,6 +1042,150 @@ function interpEvalNodeHandle(handle, forced, registry, program, env, options) {
   return result;
 }
 
+function interpCompositeNodeLen(handle, line) {
+  if (!interpIsNodeHandle(handle) || handle.kind !== 'composite') {
+    interpError(`not a composite node${line != null ? ` (line ${line})` : ''}`);
+  }
+  const SB = interpSb();
+  const bits = handle.payloadBits == null ? '' : String(handle.payloadBits);
+  const fieldNode = handle.fieldNode;
+  let offset = 0;
+  let count = 0;
+  while (offset < bits.length) {
+    const sub = SB.readBoundSubstream(bits, offset);
+    if (sub.len === 0) break;
+    offset += sub.totalWidth;
+    count++;
+    if (fieldNode && fieldNode.maxCount != null && count >= fieldNode.maxCount) break;
+  }
+  return count;
+}
+
+function interpSliceCompositeChild(handle, index, registry, line) {
+  if (!interpIsNodeHandle(handle) || handle.kind !== 'composite') {
+    interpError(`not a composite node${line != null ? ` (line ${line})` : ''}`);
+  }
+  const idx = Number(index);
+  if (!Number.isInteger(idx) || idx < 0) {
+    interpError(`node index must be non-negative integer${line != null ? ` (line ${line})` : ''}`);
+  }
+  const len = interpCompositeNodeLen(handle, line);
+  if (idx >= len) {
+    interpError(`node index out of range${line != null ? ` (line ${line})` : ''}`);
+  }
+  const SB = interpSb();
+  const bits = handle.payloadBits == null ? '' : String(handle.payloadBits);
+  const fieldNode = handle.fieldNode;
+  const elemSchema = fieldNode && fieldNode.schema
+    ? interpResolveSchema(registry, fieldNode.schema.name || fieldNode.schemaRef || fieldNode.schema)
+    : null;
+  if (!elemSchema) interpError('composite handle missing element schema');
+  let offset = 0;
+  let cur = 0;
+  while (offset < bits.length) {
+    const sub = SB.readBoundSubstream(bits, offset);
+    if (sub.len === 0) break;
+    if (cur === idx) {
+      return interpMakeNodeHandle({
+        kind: 'leaf',
+        schemaRef: elemSchema.name,
+        payloadBits: sub.payloadBits,
+        pathKey: handle.pathKey + '/' + handle.fieldName + '[' + idx + ']',
+        fieldName: handle.fieldName + '[' + idx + ']',
+        fieldNode: { kind: 'bound', schema: elemSchema, isBound: true },
+      });
+    }
+    offset += sub.totalWidth;
+    cur++;
+    if (fieldNode && fieldNode.maxCount != null && cur >= fieldNode.maxCount) break;
+  }
+  interpError(`node index out of range${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpPeekUnionTag(bits, schema, registry, line) {
+  if (!schema) interpError(`unknown schema for nodeTag${line != null ? ` (line ${line})` : ''}`);
+  if (!schema.hasPresenceMask) return schema.name;
+  const SB = interpSb();
+  const maskBits = schema.presenceMaskBits || 0;
+  const maskInfo = SB.readPresenceMask(bits == null ? '' : String(bits), maskBits, 0);
+  let optIdx = 0;
+  for (const node of schema.structure || []) {
+    if (node.kind !== 'optional_field') continue;
+    const present = maskInfo.mask.charAt(optIdx) === '1';
+    optIdx++;
+    if (!present) continue;
+    return node.name;
+  }
+  interpError(`empty union — no active AST branch${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpNodeTagFromHandle(handle, registry, line) {
+  if (!interpIsNodeHandle(handle)) {
+    interpError(`nodeTag expects node handle${line != null ? ` (line ${line})` : ''}`);
+  }
+  const schema = interpResolveSchema(registry, handle.schemaRef);
+  return interpPeekUnionTag(handle.payloadBits, schema, registry, line);
+}
+
+function interpInterpRegistryFromCtx() {
+  const ctx = _interpExecCtx || {};
+  return ctx.registry || (ctx.options && ctx.options.registry) || null;
+}
+
+function interpBuiltinNodeLen(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`nodeLen expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const handle = interpEvalExpr(args[0], env, callMethodFn, line);
+  return interpCompositeNodeLen(handle, line);
+}
+
+function interpBuiltinFirst(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`first expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const handle = interpEvalExpr(args[0], env, callMethodFn, line);
+  const len = interpCompositeNodeLen(handle, line);
+  if (len < 1) interpError(`node index out of range${line != null ? ` (line ${line})` : ''}`);
+  const registry = interpInterpRegistryFromCtx();
+  if (!registry) interpError('first requires active interpreter session');
+  return interpSliceCompositeChild(handle, 0, registry, line);
+}
+
+function interpBuiltinLast(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`last expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const handle = interpEvalExpr(args[0], env, callMethodFn, line);
+  const len = interpCompositeNodeLen(handle, line);
+  if (len < 1) interpError(`node index out of range${line != null ? ` (line ${line})` : ''}`);
+  const registry = interpInterpRegistryFromCtx();
+  if (!registry) interpError('last requires active interpreter session');
+  return interpSliceCompositeChild(handle, len - 1, registry, line);
+}
+
+function interpBuiltinNodeTag(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`nodeTag expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const handle = interpEvalExpr(args[0], env, callMethodFn, line);
+  const registry = interpInterpRegistryFromCtx();
+  if (!registry) interpError('nodeTag requires active interpreter session');
+  return interpNodeTagFromHandle(handle, registry, line);
+}
+
+function interpBuiltinIsNodeTag(args, env, callMethodFn, line) {
+  if (!args || args.length !== 2) {
+    interpError(`isNodeTag expects 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const handle = interpEvalExpr(args[0], env, callMethodFn, line);
+  const want = interpEvalExpr(args[1], env, callMethodFn, line);
+  const registry = interpInterpRegistryFromCtx();
+  if (!registry) interpError('isNodeTag requires active interpreter session');
+  const tag = interpNodeTagFromHandle(handle, registry, line);
+  return String(tag) === String(want) ? 1 : 0;
+}
+
 function interpGetSavedHandlesMap(options) {
   const ctx = _interpExecCtx || {};
   const opts = options || ctx.options || {};
@@ -1675,19 +1819,33 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       return env[expr.name];
     }
     case 'index': {
-      const container = interpEvalContainerForIndexRead(expr.object, env, callMethodFn, expr.line != null ? expr.line : line);
-      const idx = interpEvalExpr(expr.index, env, callMethodFn, line);
+      const lineNo = expr.line != null ? expr.line : line;
+      const idx = interpEvalExpr(expr.index, env, callMethodFn, lineNo);
+      let container;
+      if (expr.object.kind === 'var' || expr.object.kind === 'index') {
+        container = interpEvalContainerForIndexRead(expr.object, env, callMethodFn, lineNo);
+      } else {
+        container = interpEvalExpr(expr.object, env, callMethodFn, lineNo);
+      }
       if (Array.isArray(container)) {
-        return interpVectorIndex(container, idx, expr.line != null ? expr.line : line);
+        return interpVectorIndex(container, idx, lineNo);
       }
       if (interpIsPlainMap(container)) {
         const key = interpMapKeyFromIndex(idx);
         if (!Object.prototype.hasOwnProperty.call(container, key)) {
-          interpError(`undefined variable '${key}'${line != null ? ` (line ${line})` : ''}`);
+          interpError(`undefined variable '${key}'${lineNo != null ? ` (line ${lineNo})` : ''}`);
         }
         return container[key];
       }
-      interpError(`not indexable${line != null ? ` (line ${line})` : ''}`);
+      if (interpIsNodeHandle(container)) {
+        if (container.kind !== 'composite') {
+          interpError(`not a composite node${lineNo != null ? ` (line ${lineNo})` : ''}`);
+        }
+        const registry = interpInterpRegistryFromCtx();
+        if (!registry) interpError('node index requires active interpreter session');
+        return interpSliceCompositeChild(container, idx, registry, lineNo);
+      }
+      interpError(`not indexable${lineNo != null ? ` (line ${lineNo})` : ''}`);
     }
     case 'pop': {
       const container = interpEvalContainerForPopClear(
@@ -1786,6 +1944,21 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       }
       if (expr.name === 'explode') {
         return interpBuiltinExplode(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'nodeLen') {
+        return interpBuiltinNodeLen(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'first') {
+        return interpBuiltinFirst(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'last') {
+        return interpBuiltinLast(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'nodeTag') {
+        return interpBuiltinNodeTag(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'isNodeTag') {
+        return interpBuiltinIsNodeTag(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
       }
       return callMethodFn(expr.name, expr.args, line);
     default:
@@ -2098,6 +2271,17 @@ function interpFormatShowValue(value) {
   if (Array.isArray(value)) {
     const parts = value.map((el) => interpFormatShowValue(el));
     return `[${parts.join(', ')}]`;
+  }
+  if (interpIsNodeHandle(value)) {
+    const registry = interpInterpRegistryFromCtx();
+    if (!registry) return `<${value.schemaRef}>`;
+    try {
+      const schema = interpResolveSchema(registry, value.schemaRef);
+      const tag = interpPeekUnionTag(value.payloadBits, schema, registry);
+      return `${tag} <${value.schemaRef}>`;
+    } catch (_) {
+      return `<${value.schemaRef}>`;
+    }
   }
   return String(value);
 }

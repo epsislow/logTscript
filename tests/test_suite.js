@@ -59412,5 +59412,152 @@ inline [interp] .slotInterp {
     }, 'requires 8-bit wire');
   });
 
+  /* ----- F10 — node indexing & introspection on deferred handles ----- */
+
+  const F10_PARSER = F6_PARSER;
+
+  const F10_INTERP = F6_INTERP.replace(
+    '        while eval(condition, 1) {\n            eval(body, 1);\n        }',
+    '        while eval(condition, 1) {\n            i = 0;\n            while (i < nodeLen(body)) {\n                stmt = body[i];\n                eval(stmt, 1);\n                i = i + 1;\n            }\n        }',
+  );
+
+  function f10Core(interpBody) {
+    const interp = F10_INTERP.replace(
+      '    DeferredProbe(node^) {',
+      interpBody + '\n    DeferredProbe(node^) {',
+    );
+    return F6_SCHEMAS + '\n' + F10_PARSER + '\n' + interp;
+  }
+
+  const F10_CORE = f10Core('');
+
+  function f10EvalStmtSeq(session, core, src, wireName) {
+    const wn = wireName || 'result';
+    session.run(core + '\n4096wire<StmtSeq> sq =: .factLang:packAst("' + f6EscStr(src) + '", <StmtSeq>, "stmtSeq")\n16wire ' + wn + ' = .factInterp:eval(sq, <StmtSeq>)');
+    return session.getWire(session.interp, wn);
+  }
+
+  function f10EvalDeferred(session, core, src, wireName) {
+    const wn = wireName || 'result';
+    session.run(core + '\n4096wire<DeferredProbe> w =: .factLang:packAst("' + f6EscStr(src) + '", <DeferredProbe>, "expression")\n16wire ' + wn + ' = .factInterp:eval(w, <DeferredProbe>)');
+    return session.getWire(session.interp, wn);
+  }
+
+  function f10EvalProgram(session, core, src, wireName) {
+    const wn = wireName || 'result';
+    session.run(core + '\n4096wire<program> prog =: .factLang:packAst("' + f6EscStr(src) + '", <program>, "program")\n16wire ' + wn + ' = .factInterp:eval(prog, <program>)');
+    return session.getWire(session.interp, wn);
+  }
+
+  regInterpDual(5577, 5578, 'f10a nodeLen on composite BVA 3 statements', function(h, session) {
+    const core = f10Core('    StmtSeq(stmts^) { return nodeLen(stmts); }');
+    const w = f10EvalStmtSeq(session, core, 'a=1; b=2; c=3;');
+    h.assert('nodeLen 3', w, '0000000000000011');
+  });
+
+  regInterpDual(5579, 5580, 'f10a body[0] child handle typeOf node', function(h, session) {
+    const core = f10Core('    StmtSeq(stmts^) { if (typeOf(stmts[0]) == "node") { return 1; } return 0; }');
+    const w = f10EvalStmtSeq(session, core, 'a=1; b=2;');
+    h.assert('typeOf node', w, '0000000000000001');
+  });
+
+  regInterpDual(5581, 5582, 'f10a body[i] OOB aborts', function(h, session) {
+    const core = f10Core('    StmtSeq(stmts^) { return stmts[9]; }');
+    h.assertThrows('oob', function() {
+      f10EvalStmtSeq(session, core, 'a=1;');
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'node index out of range');
+  });
+
+  regInterpDual(5583, 5584, 'f10a body[i] on leaf handle aborts', function(h, session) {
+    const core = f10Core('    StmtSeq(stmts^) { n = stmts[0]; return n[0]; }');
+    h.assertThrows('leaf index', function() {
+      f10EvalStmtSeq(session, core, 'a=1;');
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'not a composite node');
+  });
+
+  regInterpDual(5585, 5586, 'f10b first last on composite 2 elements', function(h, session) {
+    const core = f10Core([
+      '    StmtSeq(stmts^) {',
+      '        f = first(stmts);',
+      '        l = last(stmts);',
+      '        if (typeOf(f) == "node" && typeOf(l) == "node") { return 1; }',
+      '        return 0;',
+      '    }',
+    ].join('\n'));
+    const w = f10EvalStmtSeq(session, core, 'a=1; b=2;');
+    h.assert('first and last are nodes', w, '0000000000000001');
+  });
+
+  regInterpDual(5587, 5588, 'f10c nodeTag CallAssign vs WhileLoop', function(h, session) {
+    const core = f10Core([
+      '    StmtSeq(stmts^) {',
+      '        t0 = nodeTag(stmts[0]);',
+      '        t1 = nodeTag(stmts[1]);',
+      '        n = 0;',
+      '        if (t0 == "CallAssign") { n = 10; }',
+      '        if (t1 == "WhileLoop") { n = n + 1; }',
+      '        return n;',
+      '    }',
+    ].join('\n'));
+    const w = f10EvalStmtSeq(session, core, 'a=5; while(0) { b=1; }');
+    h.assert('tags 11', w, '0000000000001011');
+  });
+
+  regInterpDual(5589, 5590, 'f10c isNodeTag 1 and 0', function(h, session) {
+    const core = f10Core('    StmtSeq(stmts^) { return isNodeTag(stmts[0], "CallAssign") + isNodeTag(stmts[1], "WhileLoop"); }');
+    const w = f10EvalStmtSeq(session, core, 'a=5; while(0) { b=1; }');
+    h.assert('isNodeTag sum 2', w, '0000000000000010');
+  });
+
+  regInterpDual(5591, 5592, 'f10c nodeTag without eval leaves env unchanged', function(h, session) {
+    const core = f10Core([
+      '    StmtSeq(stmts^) {',
+      '        env[\'a\'] = 5;',
+      '        t = nodeTag(stmts[0]);',
+      '        u = nodeTag(stmts[1]);',
+      '        return env[\'a\'];',
+      '    }',
+    ].join('\n'));
+    const w = f10EvalStmtSeq(session, core, 'a=5; while(0) { b=1; }');
+    h.assert('env a still 5', w, '0000000000000101');
+  });
+
+  regInterpDual(5593, 5594, 'f10c selective eval only CallAssign updates env', function(h, session) {
+    const core = f10Core([
+      '    StmtSeq(stmts^) {',
+      '        i = 0;',
+      '        while (i < nodeLen(stmts)) {',
+      '            stmt = stmts[i];',
+      '            if (isNodeTag(stmt, "CallAssign")) {',
+      '                eval(stmt, 1);',
+      '            }',
+      '            i = i + 1;',
+      '        }',
+      '        return env[\'a\'];',
+      '    }',
+    ].join('\n'));
+    const w = f10EvalStmtSeq(session, core, 'a=10; while(0) { b=1; } a=20;');
+    h.assert('final a is 20 after selective eval', w, '0000000000010100');
+  });
+
+  regInterpDual(5595, 5596, 'f10d show node handle tag and schema', function(h, session) {
+    const core = f10Core('    StmtSeq(stmts^) { show(stmts[0]); return 0; }');
+    const outBefore = session.out.length;
+    f10EvalStmtSeq(session, core, 'x=1;');
+    const lines = session.out.slice(outBefore);
+    h.assert('show line', String(lines.some((l) => l.indexOf('CallAssign <CallStatement>') >= 0)), 'true');
+  });
+
+  regInterpDual(5597, 5598, 'f10 E2E factorial via body index loop legacy+wave', function(h, session) {
+    const w = f10EvalProgram(session, F10_CORE, 'fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;', 'result');
+    h.assert('indexed body 5!=120', w, '0000000001111000');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

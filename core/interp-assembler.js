@@ -23,6 +23,7 @@ const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'setKeysValues
 /** Reserved scalar/text builtin names — expression calls (split: destructure only). */
 const INTERP_SCALAR_BUILTIN_NAMES = new Set([
   'toString', 'toInt', 'toFloat', 'toBool', 'typeOf', 'split', 'implode', 'explode',
+  'nodeLen', 'first', 'last', 'nodeTag', 'isNodeTag',
 ]);
 
 const INTERP_UNSET_MAX_TARGETS = 10;
@@ -1032,8 +1033,14 @@ function validateExprCallArity(expr, program, line, expectMulti) {
     interpError('split must be used with destructuring assignment', line);
   }
   if (expr.name === 'toString' || expr.name === 'toInt' || expr.name === 'toFloat'
-      || expr.name === 'toBool' || expr.name === 'typeOf') {
+      || expr.name === 'toBool' || expr.name === 'typeOf' || expr.name === 'nodeLen'
+      || expr.name === 'first' || expr.name === 'last' || expr.name === 'nodeTag') {
     if ((expr.args || []).length !== 1) interpError(`${expr.name} expects 1 argument`, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'isNodeTag') {
+    if ((expr.args || []).length !== 2) interpError('isNodeTag expects 2 arguments', line);
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
