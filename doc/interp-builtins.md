@@ -28,8 +28,11 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **`unset: a, b, …`** | Comma-separated list (max **10** targets), left to right |
 | **`unset: slotName`** | Remove a **`save:`** handle from `savedHandles` (not a local variable) |
 | **`vectorLen(getKeys(map))`** | Key count — same helper as [canvas builtins](canvas-builtins.md) |
+| **`hasKey(map, key)`** | **`1`** if key exists on an **existing** map, **`0`** if key absent |
+| **`hasIndex(vec, i)`** | **`1`** if integer index in bounds, **`0`** if out of range |
+| **`has:slotName`** | **`1`** if save slot exists, **`0`** if not — does not return a handle |
 
-**Reserved** (not user method names): **`getKeys`**, **`getValues`**, prefix **`unset:`**, and method name **`unset`**.
+**Reserved** (not user method names): **`getKeys`**, **`getValues`**, **`hasKey`**, **`hasIndex`**, prefixes **`unset:`** / **`has:`**, and method names **`unset`** / **`has`**.
 
 ---
 
@@ -205,6 +208,130 @@ inline [interp] .slotDemo {
 After **`unset: txBody`**, **`get:txBody`** in the same session aborts with **`unknown save slot`**. Combine slot and map targets in one statement: **`unset: txBody, env["hits"]`**.
 
 Full wire examples with **`save:`** / deferred handles → [inline-interp-deferred.md](inline-interp-deferred.md).
+
+---
+
+## Membership probes — `hasKey`, `hasIndex`, `has:`
+
+Use these when you need **`0`/`1`** without aborting on a **missing key** or **out-of-range index**. They complement strict reads (`map["k"]` aborts when the key is missing) and **`unset:`** (no-op on absent keys).
+
+| Situation | **`hasKey` / `hasIndex`** | **`unset:`** (reference) |
+|-----------|---------------------------|---------------------------|
+| Key/index absent on **valid** container | **`0`** | no-op |
+| Container variable **undefined** | **abort** | **abort** |
+| Wrong container type | **abort** (`hasKey expects map` / `hasIndex expects vector`) | — |
+| **`hasIndex`** index not an integer | **abort** | — |
+
+### `hasKey(map, key)`
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        env["hits"] = 10;
+        show(hasKey(env, "hits"));
+        show(hasKey(env, "missing"));
+        return hasKey(env, "hits");
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+```
+
+Expected: Output **`1`** then **`0`**; **`result`** = **`00000001`**.
+
+Missing key on an existing map:
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        return hasKey(myList, "k");
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+```
+
+Expected: **`result`** = **`00000000`**.
+
+### `hasIndex(vec, i)`
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        arr = [10, 20, 30];
+        show(hasIndex(arr, 1));
+        show(hasIndex(arr, 9));
+        return hasIndex(arr, 2);
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+```
+
+Expected: Output **`1`** then **`0`**; **`result`** = **`00000001`**.
+
+### `has:slotName`
+
+Returns **`1`** when a **`save:`** slot exists, **`0`** when it does not — unlike **`get:slot`**, which aborts on a missing slot.
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .slotDemo {
+    MapProbe(pad/u8) {
+        return has:txBody;
+    }
+}
+```
+
+Use inside a session that has (or has not) executed **`save:txBody = …`**. See [inline-interp-deferred.md](inline-interp-deferred.md) for full slot wiring.
+
+### Guarded read pattern
+
+```logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 1;
+        v = 0;
+        if (hasKey(myList, "a")) {
+            v = myList["a"];
+        }
+        return v;
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+```
+
+Expected: **`result`** = **`00000001`**.
 
 ---
 

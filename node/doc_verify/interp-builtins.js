@@ -83,6 +83,60 @@ module.exports = {
       ).result === 0,
     },
     {
+      name: 'hasKey env present and missing',
+      src: BUILTIN_CORE,
+      check: () => {
+        const hit = execMethodBody(
+          'MapProbe(pad/u8) { env["hits"] = 10; return hasKey(env, "hits"); }',
+          'MapProbe',
+        ).result === 1;
+        const miss = execMethodBody(
+          'MapProbe(pad/u8) { return hasKey(env, "hits"); }',
+          'MapProbe',
+        ).result === 0;
+        return hit && miss;
+      },
+    },
+    {
+      name: 'hasIndex bounds',
+      src: BUILTIN_CORE,
+      check: () => {
+        const inB = execMethodBody(
+          'MapProbe(pad/u8) { arr = [1, 2]; return hasIndex(arr, 0); }',
+          'MapProbe',
+        ).result === 1;
+        const oob = execMethodBody(
+          'MapProbe(pad/u8) { arr = [1, 2]; return hasIndex(arr, 9); }',
+          'MapProbe',
+        ).result === 0;
+        return inB && oob;
+      },
+    },
+    {
+      name: 'has slot present',
+      src: BUILTIN_CORE,
+      check: () => {
+        const inst = ia.parseInterpBody('HasSlot(pad/u8) { return has:txBody; }');
+        const savedHandles = new Map();
+        savedHandles.set('txBody', ie.interpMakeNodeHandle({
+          kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+        }));
+        const env = { env: {} };
+        const opts = {
+          evaluationMap: new Map(),
+          savedHandles,
+          registry: null,
+          program: inst,
+          sharedEnv: env,
+        };
+        let result;
+        ie.interpRunWithContext(opts, () => {
+          result = ie.interpExecuteMethod(inst.methods.HasSlot, [], inst, env, opts);
+        });
+        return result === 1;
+      },
+    },
+    {
       name: 'unset save slot',
       src: BUILTIN_CORE,
       check: () => {

@@ -31,6 +31,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Unset** | `unset: myList["k"]` — delete key; absent key is a no-op → [builtins](interp-builtins.md) |
 | **Allowed values** | Scalars (numbers, strings, booleans) and **nested map** references — not AST handles |
 | **Introspect** | `getKeys(map)`, `getValues(map)` → [interp-builtins.md](interp-builtins.md) |
+| **Probe** | `hasKey(map, key)` — **`0`/`1`** without abort on missing key → [interp-builtins.md](interp-builtins.md) |
 
 ---
 
@@ -163,7 +164,7 @@ Expected: **`result`** = **`00001001`**.
 | AST node handle (`/node`, `^`, `save:`/`get:`) | **No** — assign aborts |
 | JavaScript array used as vector | Use vector indexing, not string keys |
 
-Reading a missing key always **aborts** with **`undefined variable`**. To remove a key without aborting on a missing read, use **`unset:`** → [interp-builtins.md](interp-builtins.md).
+Reading a missing key always **aborts** with **`undefined variable`**. To test membership without aborting, use **`hasKey(map, key)`** → **`0`**. To remove a key, use **`unset:`** → [interp-builtins.md](interp-builtins.md).
 
 ---
 

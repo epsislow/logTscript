@@ -58557,7 +58557,123 @@ inline [interp] .slotInterp {
   }
   regInterpDual(5445, 5446, 'f8d unset save slot', runF8UnsetSlot);
 
-  reg(5447, 'interp', 'f8 parse empty map literal', function(h) {
+  /* ----- F8e — hasKey, hasIndex, has:slot ----- */
+
+  function runF8HasKeyEnvHit(h, session) {
+    const r = f8Exec(session, [
+      'HasEnvHit() {',
+      '  env["hits"] = 10;',
+      '  return hasKey(env, "hits");',
+      '}',
+    ].join('\n'), 'HasEnvHit');
+    h.assert('env key present', r.result, 1);
+  }
+  regInterpDual(5447, 5448, 'f8e hasKey env present key', runF8HasKeyEnvHit);
+
+  function runF8HasKeyEnvMissing(h, session) {
+    const r = f8Exec(session, 'HasEnvMiss() { return hasKey(env, "hits"); }', 'HasEnvMiss');
+    h.assert('env key absent', r.result, 0);
+  }
+  regInterpDual(5449, 5450, 'f8e hasKey env missing key returns 0', runF8HasKeyEnvMissing);
+
+  function runF8HasKeyMapMissingKey(h, session) {
+    const r = f8Exec(session, [
+      'HasMapKey() {',
+      '  myList = {};',
+      '  return hasKey(myList, "k");',
+      '}',
+    ].join('\n'), 'HasMapKey');
+    h.assert('map key absent', r.result, 0);
+  }
+  regInterpDual(5451, 5452, 'f8e hasKey map missing key returns 0', runF8HasKeyMapMissingKey);
+
+  regInterpDual(5453, 5454, 'f8e hasKey undefined myList aborts', function(h, session) {
+    h.assertThrows('undefined myList', function() {
+      f8Exec(session, 'Bad() { return hasKey(myList, "k"); }', 'Bad');
+    }, 'undefined variable');
+  });
+
+  regInterpDual(5455, 5456, 'f8e hasKey non-map aborts', function(h, session) {
+    h.assertThrows('scalar map', function() {
+      f8Exec(session, 'Bad() { x = 5; return hasKey(x, "k"); }', 'Bad');
+    }, 'hasKey expects map');
+  });
+
+  function runF8HasIndexInBounds(h, session) {
+    const r = f8Exec(session, [
+      'HasIdx() {',
+      '  arr = [10, 20, 30];',
+      '  return hasIndex(arr, 1);',
+      '}',
+    ].join('\n'), 'HasIdx');
+    h.assert('index in bounds', r.result, 1);
+  }
+  regInterpDual(5457, 5458, 'f8e hasIndex in bounds', runF8HasIndexInBounds);
+
+  function runF8HasIndexOob(h, session) {
+    const r = f8Exec(session, [
+      'HasIdxOob() {',
+      '  arr = [10, 20];',
+      '  return hasIndex(arr, 5);',
+      '}',
+    ].join('\n'), 'HasIdxOob');
+    h.assert('index oob', r.result, 0);
+  }
+  regInterpDual(5459, 5460, 'f8e hasIndex out of bounds returns 0', runF8HasIndexOob);
+
+  regInterpDual(5461, 5462, 'f8e hasIndex non-integer aborts', function(h, session) {
+    h.assertThrows('non-integer index', function() {
+      f8Exec(session, 'Bad() { arr = [1]; return hasIndex(arr, 1.5); }', 'Bad');
+    }, 'hasIndex expects integer index');
+  });
+
+  regInterpDual(5463, 5464, 'f8e hasIndex undefined arr aborts', function(h, session) {
+    h.assertThrows('undefined arr', function() {
+      f8Exec(session, 'Bad() { return hasIndex(arr, 0); }', 'Bad');
+    }, 'undefined variable');
+  });
+
+  function runF8HasSlotPresent(h, session) {
+    const inst = parseInterpBody('HasSlot() { return has:txBody; }');
+    const savedHandles = new Map();
+    savedHandles.set('txBody', interpMakeNodeHandle({
+      kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+    }));
+    const env = { env: {} };
+    const opts = {
+      evaluationMap: new Map(),
+      savedHandles,
+      registry: session.interp ? session.interp.schemaRegistry : null,
+      program: inst,
+      sharedEnv: env,
+    };
+    let result;
+    interpRunWithContext(opts, () => {
+      result = interpExecuteMethod(inst.methods.HasSlot, [], inst, env, opts);
+    });
+    h.assert('slot present', result, 1);
+  }
+  regInterpDual(5465, 5466, 'f8e has slot after save', runF8HasSlotPresent);
+
+  function runF8HasSlotAbsent(h, session) {
+    const r = f8Exec(session, 'HasSlot() { return has:txBody; }', 'HasSlot');
+    h.assert('slot absent', r.result, 0);
+  }
+  regInterpDual(5467, 5468, 'f8e has slot absent returns 0', runF8HasSlotAbsent);
+
+  reg(5469, 'interp', 'f8e reserved hasKey method name', function(h) {
+    h.assertThrows('hasKey method', function() {
+      parseInterpBody('hasKey(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  reg(5470, 'interp', 'f8e reserved has method name', function(h) {
+    h.assertThrows('has method', function() {
+      parseInterpBody('has(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  reg(5471, 'interp', 'f8 parse empty map literal', function(h) {
     const p = parseInterpBody('T() { myList = {}; return 0; }');
     h.assert('method', p.methods.T != null, true);
   });

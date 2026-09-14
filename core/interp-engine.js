@@ -1131,7 +1131,8 @@ function interpEvalCond(expr, env, callMethodFn, line) {
     const r = interpEvalExpr(expr.right, env, callMethodFn, line);
     return interpCompare(expr.op, l, r);
   }
-  return interpTruthy(interpEvalExpr(expr, env, callMethodFn, line));
+  const inner = expr.kind === 'truthy' ? expr.expr : expr;
+  return interpTruthy(interpEvalExpr(inner, env, callMethodFn, line));
 }
 
 function interpVectorIndex(obj, idx, line) {
@@ -1395,6 +1396,33 @@ function interpBuiltinGetValues(args, env, callMethodFn, line) {
   return interpMapFlatValues(map, line);
 }
 
+function interpBuiltinHasKey(args, env, callMethodFn, line) {
+  if (!args || args.length !== 2) {
+    interpError(`hasKey expects 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const map = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (!interpIsPlainMap(map)) {
+    interpError(`hasKey expects map${line != null ? ` (line ${line})` : ''}`);
+  }
+  const key = interpMapKeyFromIndex(interpEvalExpr(args[1], env, callMethodFn, line));
+  return Object.prototype.hasOwnProperty.call(map, key) ? 1 : 0;
+}
+
+function interpBuiltinHasIndex(args, env, callMethodFn, line) {
+  if (!args || args.length !== 2) {
+    interpError(`hasIndex expects 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const vec = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (!Array.isArray(vec)) {
+    interpError(`hasIndex expects vector${line != null ? ` (line ${line})` : ''}`);
+  }
+  const idxVal = interpEvalExpr(args[1], env, callMethodFn, line);
+  if (typeof idxVal !== 'number' || !Number.isInteger(idxVal)) {
+    interpError(`hasIndex expects integer index${line != null ? ` (line ${line})` : ''}`);
+  }
+  return (idxVal >= 0 && idxVal < vec.length) ? 1 : 0;
+}
+
 function interpEvalExpr(expr, env, callMethodFn, line) {
   if (!expr) return 0;
   switch (expr.kind) {
@@ -1415,6 +1443,10 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
         interpError(`unknown save slot '${expr.name}'${line != null ? ` (line ${line})` : ''}`);
       }
       return map.get(expr.name);
+    }
+    case 'hasSlot': {
+      const map = interpGetSavedHandlesMap(null);
+      return (map && map.has(expr.name)) ? 1 : 0;
     }
     case 'var': {
       if (!Object.prototype.hasOwnProperty.call(env, expr.name)) {
@@ -1489,6 +1521,12 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       }
       if (expr.name === 'getValues') {
         return interpBuiltinGetValues(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'hasKey') {
+        return interpBuiltinHasKey(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'hasIndex') {
+        return interpBuiltinHasIndex(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
       }
       return callMethodFn(expr.name, expr.args, line);
     default:

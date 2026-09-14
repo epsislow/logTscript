@@ -25211,7 +25211,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Runtime API** | \`.myInterp:eval(astWire, <schema>)\` → numeric wire (width from assignment LHS) |
 | **Deferred / \`env\`** | \`/node\`, \`^\`, \`eval\`, \`evaled\`, \`save:\`/\`get:\`, assignment **\`env\`** → [deferred parameters](inline-interp-deferred.md) |
 | **Maps** | \`{}\`, string-key \`map["k"]\`, session **\`env\`** → [interp-maps.md](interp-maps.md) |
-| **Map builtins** | \`getKeys\`, \`getValues\`, \`unset:\` → [interp-builtins.md](interp-builtins.md) |
+| **Map builtins** | \`getKeys\`, \`getValues\`, \`hasKey\`, \`hasIndex\`, \`unset:\`, \`has:\` → [interp-builtins.md](interp-builtins.md) |
 | **Debug** | \`show(a, b)\` and \`showx(Style, …)\` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
 | **Doc** | \`doc(inline.interp)\`, \`doc(.myInterp)\` |
 
@@ -25874,7 +25874,7 @@ doc(.demo)
 |-------|------|
 | Deferred \`/node\`, \`eval\`, \`env\`, \`save:\`/\`get:\` | [inline-interp-deferred.md](inline-interp-deferred.md) |
 | Maps (\`{}\`, string keys, \`env\`) | [interp-maps.md](interp-maps.md) |
-| \`getKeys\`, \`getValues\`, \`unset:\` | [interp-builtins.md](interp-builtins.md) |
+| \`getKeys\`, \`getValues\`, \`hasKey\`, \`hasIndex\`, \`unset:\`, \`has:\` | [interp-builtins.md](interp-builtins.md) |
 | Parser grammar + \`:packAst\` | [inline-parser.md](inline-parser.md) |
 | Schema shapes (\`<expr>+\`, bound fields) | [semantic-schemas.md](semantic-schemas.md) |
 | Canvas-like control flow reference | [inline-canvas.md](inline-canvas.md) |
@@ -30860,8 +30860,11 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`unset: a, b, …\`** | Comma-separated list (max **10** targets), left to right |
 | **\`unset: slotName\`** | Remove a **\`save:\`** handle from \`savedHandles\` (not a local variable) |
 | **\`vectorLen(getKeys(map))\`** | Key count — same helper as [canvas builtins](canvas-builtins.md) |
+| **\`hasKey(map, key)\`** | **\`1\`** if key exists on an **existing** map, **\`0\`** if key absent |
+| **\`hasIndex(vec, i)\`** | **\`1\`** if integer index in bounds, **\`0\`** if out of range |
+| **\`has:slotName\`** | **\`1\`** if save slot exists, **\`0\`** if not — does not return a handle |
 
-**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, prefix **\`unset:\`**, and method name **\`unset\`**.
+**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`hasKey\`**, **\`hasIndex\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
 
 ---
 
@@ -31040,6 +31043,130 @@ Full wire examples with **\`save:\`** / deferred handles → [inline-interp-defe
 
 ---
 
+## Membership probes — \`hasKey\`, \`hasIndex\`, \`has:\`
+
+Use these when you need **\`0\`/\`1\`** without aborting on a **missing key** or **out-of-range index**. They complement strict reads (\`map["k"]\` aborts when the key is missing) and **\`unset:\`** (no-op on absent keys).
+
+| Situation | **\`hasKey\` / \`hasIndex\`** | **\`unset:\`** (reference) |
+|-----------|---------------------------|---------------------------|
+| Key/index absent on **valid** container | **\`0\`** | no-op |
+| Container variable **undefined** | **abort** | **abort** |
+| Wrong container type | **abort** (\`hasKey expects map\` / \`hasIndex expects vector\`) | — |
+| **\`hasIndex\`** index not an integer | **abort** | — |
+
+### \`hasKey(map, key)\`
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        env["hits"] = 10;
+        show(hasKey(env, "hits"));
+        show(hasKey(env, "missing"));
+        return hasKey(env, "hits");
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: Output **\`1\`** then **\`0\`**; **\`result\`** = **\`00000001\`**.
+
+Missing key on an existing map:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        return hasKey(myList, "k");
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000000\`**.
+
+### \`hasIndex(vec, i)\`
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        arr = [10, 20, 30];
+        show(hasIndex(arr, 1));
+        show(hasIndex(arr, 9));
+        return hasIndex(arr, 2);
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: Output **\`1\`** then **\`0\`**; **\`result\`** = **\`00000001\`**.
+
+### \`has:slotName\`
+
+Returns **\`1\`** when a **\`save:\`** slot exists, **\`0\`** when it does not — unlike **\`get:slot\`**, which aborts on a missing slot.
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .slotDemo {
+    MapProbe(pad/u8) {
+        return has:txBody;
+    }
+}
+\`\`\`
+
+Use inside a session that has (or has not) executed **\`save:txBody = …\`**. See [inline-interp-deferred.md](inline-interp-deferred.md) for full slot wiring.
+
+### Guarded read pattern
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 1;
+        v = 0;
+        if (hasKey(myList, "a")) {
+            v = myList["a"];
+        }
+        return v;
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000001\`**.
+
+---
+
 ## \`push\` from \`comp [interp]\`
 
 **\`getKeys\`** returns **\`[]/ascii\`** suitable for a vector pout. Inline **\`:eval\`** cannot **\`push\`** — use **\`comp [interp]\`**:
@@ -31128,6 +31255,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Unset** | \`unset: myList["k"]\` — delete key; absent key is a no-op → [builtins](interp-builtins.md) |
 | **Allowed values** | Scalars (numbers, strings, booleans) and **nested map** references — not AST handles |
 | **Introspect** | \`getKeys(map)\`, \`getValues(map)\` → [interp-builtins.md](interp-builtins.md) |
+| **Probe** | \`hasKey(map, key)\` — **\`0\`/\`1\`** without abort on missing key → [interp-builtins.md](interp-builtins.md) |
 
 ---
 
@@ -31260,7 +31388,7 @@ Expected: **\`result\`** = **\`00001001\`**.
 | AST node handle (\`/node\`, \`^\`, \`save:\`/\`get:\`) | **No** — assign aborts |
 | JavaScript array used as vector | Use vector indexing, not string keys |
 
-Reading a missing key always **aborts** with **\`undefined variable\`**. To remove a key without aborting on a missing read, use **\`unset:\`** → [interp-builtins.md](interp-builtins.md).
+Reading a missing key always **aborts** with **\`undefined variable\`**. To test membership without aborting, use **\`hasKey(map, key)\`** → **\`0\`**. To remove a key, use **\`unset:\`** → [interp-builtins.md](interp-builtins.md).
 
 ---
 

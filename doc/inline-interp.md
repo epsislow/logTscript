@@ -30,7 +30,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Runtime API** | `.myInterp:eval(astWire, <schema>)` → numeric wire (width from assignment LHS) |
 | **Deferred / `env`** | `/node`, `^`, `eval`, `evaled`, `save:`/`get:`, assignment **`env`** → [deferred parameters](inline-interp-deferred.md) |
 | **Maps** | `{}`, string-key `map["k"]`, session **`env`** → [interp-maps.md](interp-maps.md) |
-| **Map builtins** | `getKeys`, `getValues`, `unset:` → [interp-builtins.md](interp-builtins.md) |
+| **Map builtins** | `getKeys`, `getValues`, `hasKey`, `hasIndex`, `unset:`, `has:` → [interp-builtins.md](interp-builtins.md) |
 | **Debug** | `show(a, b)` and `showx(Style, …)` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
 | **Doc** | `doc(inline.interp)`, `doc(.myInterp)` |
 
@@ -693,7 +693,7 @@ doc(.demo)
 |-------|------|
 | Deferred `/node`, `eval`, `env`, `save:`/`get:` | [inline-interp-deferred.md](inline-interp-deferred.md) |
 | Maps (`{}`, string keys, `env`) | [interp-maps.md](interp-maps.md) |
-| `getKeys`, `getValues`, `unset:` | [interp-builtins.md](interp-builtins.md) |
+| `getKeys`, `getValues`, `hasKey`, `hasIndex`, `unset:`, `has:` | [interp-builtins.md](interp-builtins.md) |
 | Parser grammar + `:packAst` | [inline-parser.md](inline-parser.md) |
 | Schema shapes (`<expr>+`, bound fields) | [semantic-schemas.md](semantic-schemas.md) |
 | Canvas-like control flow reference | [inline-canvas.md](inline-canvas.md) |

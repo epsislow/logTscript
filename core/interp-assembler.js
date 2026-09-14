@@ -14,11 +14,11 @@ const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 
 const INTERP_BUILTINS = new Set(['show', 'showx', 'eval', 'evaled']);
 
-/** Reserved as user method names — conflict with save:/get: syntax (D1227). */
-const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get', 'unset']);
+/** Reserved as user method names — conflict with save:/get:/has: syntax (D1227). */
+const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get', 'has', 'unset']);
 
 /** Reserved map builtin names — not user method names. */
-const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'vectorLen']);
+const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'hasKey', 'hasIndex', 'vectorLen']);
 
 const INTERP_UNSET_MAX_TARGETS = 10;
 
@@ -325,7 +325,7 @@ class InterpParser {
       interpError(`'${nameTok.value}' is reserved — use as statement builtin, not method name`, nameTok.line);
     }
     if (INTERP_SLOT_RESERVED_METHODS.has(nameTok.value)) {
-      interpError(`'${nameTok.value}' is reserved — save:/get:/unset: use this prefix`, nameTok.line);
+      interpError(`'${nameTok.value}' is reserved — save:/get:/has:/unset: use this prefix`, nameTok.line);
     }
     if (INTERP_MAP_BUILTIN_NAMES.has(nameTok.value)) {
       interpError(`'${nameTok.value}' is reserved — use as builtin call, not method name`, nameTok.line);
@@ -789,6 +789,10 @@ class InterpParser {
         const slotTok = this.eat('ID');
         return { kind: 'getSlot', name: slotTok.value, line: slotTok.line };
       }
+      if (id === 'has' && this.match('SYM', ':')) {
+        const slotTok = this.eat('ID');
+        return { kind: 'hasSlot', name: slotTok.value, line: slotTok.line };
+      }
       if (this.match('SYM', '(')) {
         const args = [];
         if (!this.match('SYM', ')')) {
@@ -958,6 +962,16 @@ function validateExprCallArity(expr, program, line, expectMulti) {
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
+  if (expr.name === 'hasKey') {
+    if ((expr.args || []).length !== 2) interpError('hasKey expects 2 arguments', line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'hasIndex') {
+    if ((expr.args || []).length !== 2) interpError('hasIndex expects 2 arguments', line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
   if (expr.name === 'vectorLen') {
     if ((expr.args || []).length !== 1) interpError('vectorLen expects 1 argument', line);
     for (const a of expr.args || []) validateExprTree(a, program, line);
@@ -997,6 +1011,7 @@ function validateHandleSaveExpr(expr, line) {
 function validateExprTree(expr, program, line) {
   if (!expr) return;
   if (expr.kind === 'getSlot') return;
+  if (expr.kind === 'hasSlot') return;
   if (expr.kind === 'call') {
     validateExprCallArity(expr, program, line, false);
     for (const a of expr.args || []) validateExprTree(a, program, line);
