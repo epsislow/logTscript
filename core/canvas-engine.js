@@ -165,6 +165,12 @@ function canvasExecuteStmts(stmts, env, locals, program, state, ctx, options, ca
         const value = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line, pinEnv);
         canvasVectorAppend(env, stmt.name, value, stmt.line);
         locals.add(stmt.name);
+      } else if (stmt.kind === 'popDiscard') {
+        canvasVectorPopDiscard(env, stmt.name, stmt.line);
+        locals.add(stmt.name);
+      } else if (stmt.kind === 'clearDiscard') {
+        canvasVectorClearDiscard(env, stmt.name, stmt.line);
+        locals.add(stmt.name);
       } else if (stmt.kind === 'concatAssign') {
         const rhs = canvasEvalExpr(stmt.expr, env, callMethodFn, stmt.line, pinEnv);
         canvasVectorConcat(env, stmt.name, rhs, stmt.line);
@@ -300,6 +306,18 @@ function canvasVectorAppend(env, name, value, line) {
   arr.push(value);
 }
 
+function canvasVectorPopDiscard(env, name, line) {
+  const arr = canvasRequireVector(env, name, line);
+  if (arr.length === 0) return;
+  arr.pop();
+}
+
+function canvasVectorClearDiscard(env, name, line) {
+  const arr = canvasRequireVector(env, name, line);
+  if (arr.length === 0) return;
+  arr.length = 0;
+}
+
 function canvasVectorConcat(env, name, rhs, line) {
   const arr = canvasRequireVector(env, name, line);
   const src = canvasCopyVector(rhs, line);
@@ -373,6 +391,18 @@ function canvasEvalExpr(expr, env, callMethodFn, line, pinEnv) {
       const idx = canvasEvalExpr(expr.index, env, callMethodFn, line, pinEnv);
       return canvasVectorIndex(obj, idx, expr.line != null ? expr.line : line);
     }
+    case 'pop': {
+      if (expr.object.kind !== 'var') {
+        throw new Error(`canvas: invalid pop target${line != null ? ` (line ${line})` : ''}`);
+      }
+      const arr = canvasRequireVector(env, expr.object.name, expr.line != null ? expr.line : line);
+      if (arr.length === 0) {
+        throw new Error(`canvas: pop from empty container${expr.line != null ? ` (line ${expr.line})` : ''}`);
+      }
+      return arr.pop();
+    }
+    case 'clear':
+      throw new Error(`canvas: clear cannot be used as expression${line != null ? ` (line ${line})` : ''}`);
     case 'unary': {
       const v = canvasEvalExpr(expr.expr, env, callMethodFn, line, pinEnv);
       return expr.op === '-' ? -v : v;

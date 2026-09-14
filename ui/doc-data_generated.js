@@ -31408,6 +31408,8 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Allowed values** | Scalars (numbers, strings, booleans) and **nested map** references — not AST handles |
 | **Introspect** | \`getKeys(map)\`, \`getValues(map)\`, \`setKeysValues(map, keys, values)\` → [interp-builtins.md](interp-builtins.md) |
 | **Probe** | \`hasKey(map, key)\` — **\`0\`/\`1\`** without abort on missing key → [interp-builtins.md](interp-builtins.md) |
+| **Pop LIFO** | \`cont[-]\` — discard last element; \`v = cont[-]\` / \`k, v = map[-]\` — pop + assign |
+| **Clear all** | \`cont[*]\` — empty vector or map in place (statement only) |
 
 ---
 
@@ -31553,6 +31555,80 @@ Reading a missing key always **aborts** with **\`undefined variable\`**. To test
 | **\`env = {}\`** | **Not** a session reset — it only rebinds a **local alias**; the shared session table is unchanged and reappears on the next helper entry |
 
 To clear **\`env\`** keys, use **\`unset: env["key"]\`** or loop **\`getKeys(env)\`** + **\`unset:\`**. To replace a local map before bulk load, use **\`myList = {}\`** then **\`setKeysValues(myList, …)\`** → [interp-builtins.md](interp-builtins.md).
+
+---
+
+## Pop \`[-]\` and clear \`[*]\`
+
+Pair notation with append **\`vec[] = value\`**:
+
+| Form | Effect |
+|------|--------|
+| **\`myVec[-];\`** | Pop discard — remove last element; **no-op** if already empty |
+| **\`last = myVec[-];\`** | Pop and assign the value — **aborts** if empty |
+| **\`i, v = myVec[-];\`** | Pop vector — index and value (two names) |
+| **\`k, v = myMap[-];\`** | Pop map — last insertion-order key and value |
+| **\`myCont[*];\`** | Clear **all** elements or keys in place — **no-op** if already empty |
+
+**\`[-]\`** is a sentinel (\`[\` + \`-\` + \`]\`), not index **\`-1\`**. **\`[*]\`** is statement-only — **\`x = myCont[*]\`** aborts at parse time.
+
+Undefined container or wrong type (scalar) → **abort**. Pop destructuring allows **1** or **2** names (same arity rules as multi-return helpers).
+
+Clear mutates the **same** object: if a helper clears a vector passed by reference, the caller sees **\`vectorLen\` 0** afterward.
+
+### Vector pop and clear
+
+\`\`\`logts-play
+<PopClear>+:
+    pad: 8
+:
+
+inline [interp] .popDemo {
+    PopClear(pad/u8) {
+        myVec = [1, 2];
+        last = myVec[-];
+        myVec[*];
+        show(last);
+        show(vectorLen(myVec));
+        return last;
+    }
+}
+
+8wire<PopClear> w = ^00
+8wire result = .popDemo:eval(w, <PopClear>)
+show(result)
+\`\`\`
+
+Expected: Output shows **\`2\`** then **\`0\`**; **\`result\`** = **\`00000010\`**.
+
+**\`last = myVec[-]\`** removes the last element (**\`2\`**) and assigns it. **\`myVec[*]\`** clears the remaining **\`[1]\`** in place — length **0**.
+
+### Map pop
+
+\`\`\`logts-play
+<PopClear>+:
+    pad: 8
+:
+
+inline [interp] .mapPop {
+    PopClear(pad/u8) {
+        myMap = {};
+        myMap["a"] = 10;
+        myMap["b"] = 20;
+        k, v = myMap[-];
+        show(k);
+        show(v);
+        show(vectorLen(getKeys(myMap)));
+        return v;
+    }
+}
+
+8wire<PopClear> w = ^00
+8wire result = .mapPop:eval(w, <PopClear>)
+show(result)
+\`\`\`
+
+Expected: Output shows **\`b\`**, **\`20\`**, **\`1\`** (one key **\`"a"\`** remains); **\`result\`** = **\`00010100\`**.
 
 ---
 

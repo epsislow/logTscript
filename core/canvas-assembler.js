@@ -431,6 +431,23 @@ class CanvasParser {
       const expr = this.parseExpr();
       return { kind: 'append', name: nameTok.value, expr, line: nameTok.line };
     }
+    const t0 = this.peek();
+    if (t0.type === 'SYM' && t0.value === '-') {
+      const t1 = this.tokens[this.pos + 1];
+      if (t1 && t1.type === 'SYM' && t1.value === ']') {
+        this.pos++;
+        this.eat('SYM', ']');
+        return { kind: 'popDiscard', name: nameTok.value, line: nameTok.line };
+      }
+    }
+    if (t0.type === 'SYM' && t0.value === '*') {
+      const t1 = this.tokens[this.pos + 1];
+      if (t1 && t1.type === 'SYM' && t1.value === ']') {
+        this.pos++;
+        this.eat('SYM', ']');
+        return { kind: 'clearDiscard', name: nameTok.value, line: nameTok.line };
+      }
+    }
     const index = this.parseExpr();
     this.eat('SYM', ']');
     this.eat('SYM', '=');
@@ -570,9 +587,27 @@ class CanvasParser {
         return { kind: 'postfix', name: id, op: postOp, line: idTok.line };
       }
       if (this.match('SYM', '[')) {
+        const bracketLine = idTok.line;
+        const t0 = this.peek();
+        if (t0.type === 'SYM' && t0.value === '-') {
+          const t1 = this.tokens[this.pos + 1];
+          if (t1 && t1.type === 'SYM' && t1.value === ']') {
+            this.pos++;
+            this.eat('SYM', ']');
+            return { kind: 'pop', object: { kind: 'var', name: id }, line: bracketLine };
+          }
+        }
+        if (t0.type === 'SYM' && t0.value === '*') {
+          const t1 = this.tokens[this.pos + 1];
+          if (t1 && t1.type === 'SYM' && t1.value === ']') {
+            this.pos++;
+            this.eat('SYM', ']');
+            return { kind: 'clear', object: { kind: 'var', name: id }, line: bracketLine };
+          }
+        }
         const index = this.parseExpr();
         this.eat('SYM', ']');
-        return { kind: 'index', object: { kind: 'var', name: id }, index, line: idTok.line };
+        return { kind: 'index', object: { kind: 'var', name: id }, index, line: bracketLine };
       }
       return { kind: 'var', name: id };
     }

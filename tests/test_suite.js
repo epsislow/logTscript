@@ -58912,5 +58912,183 @@ inline [interp] .slotInterp {
 
   regInterpDual(5497, 5498, 'f8f comp pin hydrate setKeysValues legacy+wave', runF8CompHydratePin);
 
+  /* ----- F8g — pop [-] + clear [*] ----- */
+
+  const F8G_INTERP = [
+    'PopDiscard() {',
+    '  myVec = [1, 2];',
+    '  myVec[-];',
+    '  return myVec[0];',
+    '}',
+    'PopAssign() {',
+    '  myVec = [1, 2];',
+    '  x = myVec[-];',
+    '  return x + vectorLen(myVec);',
+    '}',
+    'PopDestructure() {',
+    '  myVec = [1, 2];',
+    '  i, v = myVec[-];',
+    '  return i + v;',
+    '}',
+    'PopEmptyNoop() {',
+    '  myVec = [];',
+    '  myVec[-];',
+    '  return vectorLen(myVec);',
+    '}',
+    'PopEmptyAssign() {',
+    '  myVec = [];',
+    '  x = myVec[-];',
+    '  return 0;',
+    '}',
+    'PopEmptyDestructure() {',
+    '  myVec = [];',
+    '  i, v = myVec[-];',
+    '  return 0;',
+    '}',
+    'MapPopPair() {',
+    '  myMap = {};',
+    '  myMap["a"] = 1;',
+    '  myMap["b"] = 2;',
+    '  k, v = myMap[-];',
+    '  return vectorLen(getKeys(myMap)) + v;',
+    '}',
+    'ClearVector() {',
+    '  myVec = [1, 2, 3];',
+    '  myVec[*];',
+    '  return vectorLen(myVec);',
+    '}',
+    'ClearMap() {',
+    '  myMap = {};',
+    '  myMap["a"] = 1;',
+    '  myMap[*];',
+    '  return vectorLen(getKeys(myMap));',
+    '}',
+    'ClearEmptyNoop() {',
+    '  myVec = [];',
+    '  myVec[*];',
+    '  return vectorLen(myVec);',
+    '}',
+    'Build() {',
+    '  xs = [1, 2];',
+    '  return xs;',
+    '}',
+    'Touch(arr) {',
+    '  arr[*];',
+    '  return vectorLen(arr);',
+    '}',
+    'SharedClear() {',
+    '  xs = Build();',
+    '  touchLen = Touch(xs);',
+    '  return vectorLen(xs) + touchLen;',
+    '}',
+  ].join('\n');
+
+  regInterpDual(5499, 5500, 'f8g pop discard stmt removes last element', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'PopDiscard');
+    h.assert('len 1 after pop discard', r.result, 1);
+  });
+
+  regInterpDual(5501, 5502, 'f8g assign pop returns last value', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'PopAssign');
+    h.assert('value 2 len 1', r.result, 3);
+  });
+
+  regInterpDual(5503, 5504, 'f8g destructure pop index and value', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'PopDestructure');
+    h.assert('index 1 value 2', r.result, 3);
+  });
+
+  regInterpDual(5505, 5506, 'f8g pop discard on empty vector is no-op', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'PopEmptyNoop');
+    h.assert('still empty', r.result, 0);
+  });
+
+  regInterpDual(5507, 5508, 'f8g assign pop on empty aborts', function(h, session) {
+    h.assertThrows('empty assign pop', function() {
+      f8Exec(session, F8G_INTERP, 'PopEmptyAssign');
+    }, 'pop from empty');
+  });
+
+  regInterpDual(5509, 5510, 'f8g destructure pop on empty aborts', function(h, session) {
+    h.assertThrows('empty destructure pop', function() {
+      f8Exec(session, F8G_INTERP, 'PopEmptyDestructure');
+    }, 'pop from empty');
+  });
+
+  regInterpDual(5511, 5512, 'f8g map pop destructure key and value', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'MapPopPair');
+    h.assert('one key left value 2', r.result, 3);
+  });
+
+  regInterpDual(5513, 5514, 'f8g clear vector empties container', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'ClearVector');
+    h.assert('vector len 0', r.result, 0);
+  });
+
+  regInterpDual(5515, 5516, 'f8g clear map removes all keys', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'ClearMap');
+    h.assert('map key count 0', r.result, 0);
+  });
+
+  regInterpDual(5517, 5518, 'f8g clear on empty container is no-op', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'ClearEmptyNoop');
+    h.assert('still empty', r.result, 0);
+  });
+
+  reg(5519, 'interp', 'f8g clear in expression aborts at parse', function(h) {
+    h.assertThrows('clear expr', function() {
+      parseInterpBody('Bad() { x = myVec[*]; return 0; }');
+    }, 'clear cannot be used as expression');
+  });
+
+  regInterpDual(5521, 5522, 'f8g pop/clear undefined container aborts', function(h, session) {
+    h.assertThrows('undefined pop', function() {
+      f8Exec(session, 'Bad() { myCont[-]; return 0; }', 'Bad');
+    }, 'undefined variable');
+    h.assertThrows('undefined clear', function() {
+      f8Exec(session, 'Bad2() { myCont[*]; return 0; }', 'Bad2');
+    }, 'undefined variable');
+  });
+
+  regInterpDual(5523, 5524, 'f8g pop on scalar aborts', function(h, session) {
+    h.assertThrows('scalar pop', function() {
+      f8Exec(session, 'Bad() { x = 5; x[-]; return 0; }', 'Bad');
+    }, 'not a vector or map');
+  });
+
+  reg(5525, 'interp', 'f8g pop destructure 3 names aborts at parse', function(h) {
+    h.assertThrows('three names', function() {
+      parseInterpBody('Bad() { myVec = [1]; a, b, c = myVec[-]; return 0; }');
+    }, 'pop destructuring expects');
+  });
+
+  regInterpDual(5526, 5527, 'f8g clear in-place shared vector ref', function(h, session) {
+    const r = f8Exec(session, F8G_INTERP, 'SharedClear');
+    h.assert('caller and callee see empty', r.result, 0);
+  });
+
+  function runF8gCanvasPopClear(h) {
+    const prog = parseCanvasBody([
+      'draw() {',
+      '  xs = []',
+      '  xs[] = 10',
+      '  xs[] = 20',
+      '  xs[] = 30',
+      '  last = xs[-]',
+      '  xs[-]',
+      '  xs[*]',
+      '  styleFill("ff0000")',
+      '  drawRect(last, 0, 8, 8)',
+      '}',
+    ].join('\n'));
+    const mock = createCanvasMockCtx();
+    executeCanvasRenderer(prog, parseCanvasRendererBlock('draw()'), mock.ctx, { skipOnError: false });
+    const rects = mock.calls.filter((c) => c.op === 'fillRect');
+    h.assert('one rect drawn', rects.length, 1);
+    h.assert('rect x from last pop value 30', rects[0].x, 30);
+  }
+
+  regCanvasDual(5528, 5529, 'f8g canvas xs[-] and xs[*] parity', runF8gCanvasPopClear);
+
   window.LogTScriptTestSuite.finalize();
 })();

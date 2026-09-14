@@ -644,9 +644,29 @@ class InterpParser {
   parseIndexSuffix(base, line) {
     let node = base;
     while (this.match('SYM', '[')) {
+      const bracketLine = this.tokens[this.pos - 1].line;
+      const t0 = this.peek();
+      if (t0.type === 'SYM' && t0.value === '-') {
+        const t1 = this.tokens[this.pos + 1];
+        if (t1 && t1.type === 'SYM' && t1.value === ']') {
+          this.pos++;
+          this.eat('SYM', ']');
+          node = { kind: 'pop', object: node, line: bracketLine };
+          continue;
+        }
+      }
+      if (t0.type === 'SYM' && t0.value === '*') {
+        const t1 = this.tokens[this.pos + 1];
+        if (t1 && t1.type === 'SYM' && t1.value === ']') {
+          this.pos++;
+          this.eat('SYM', ']');
+          node = { kind: 'clear', object: node, line: bracketLine };
+          continue;
+        }
+      }
       const index = this.parseExpr();
       this.eat('SYM', ']');
-      node = { kind: 'index', object: node, index, line };
+      node = { kind: 'index', object: node, index, line: bracketLine };
     }
     return node;
   }
@@ -680,6 +700,23 @@ class InterpParser {
       this.eat('SYM', '=');
       const expr = this.parseExpr();
       return { kind: 'append', lvalue, name: nameTok.value, expr, line: nameTok.line };
+    }
+    const t0 = this.peek();
+    if (t0.type === 'SYM' && t0.value === '-') {
+      const t1 = this.tokens[this.pos + 1];
+      if (t1 && t1.type === 'SYM' && t1.value === ']') {
+        this.pos++;
+        this.eat('SYM', ']');
+        return { kind: 'popDiscard', lvalue, name: nameTok.value, line: nameTok.line };
+      }
+    }
+    if (t0.type === 'SYM' && t0.value === '*') {
+      const t1 = this.tokens[this.pos + 1];
+      if (t1 && t1.type === 'SYM' && t1.value === ']') {
+        this.pos++;
+        this.eat('SYM', ']');
+        return { kind: 'clearDiscard', lvalue, name: nameTok.value, line: nameTok.line };
+      }
     }
     const index = this.parseExpr();
     this.eat('SYM', ']');
@@ -1030,6 +1067,10 @@ function validateExprTree(expr, program, line) {
   } else if (expr.kind === 'index') {
     validateExprTree(expr.object, program, line);
     validateExprTree(expr.index, program, line);
+  } else if (expr.kind === 'pop') {
+    validateExprTree(expr.object, program, line);
+  } else if (expr.kind === 'clear') {
+    interpError('clear cannot be used as expression', line);
   } else if (expr.kind === 'array') {
     for (const el of expr.elements || []) validateExprTree(el, program, line);
   } else if (expr.kind === 'map') {
@@ -1040,20 +1081,29 @@ function validateExprTree(expr, program, line) {
 function validateStmtTree(stmts, program) {
   for (const stmt of stmts || []) {
     if (stmt.kind === 'destructureAssign') {
-      if (stmt.expr.kind !== 'call') {
-        interpError('destructuring assignment requires a helper call', stmt.line);
+      if (stmt.expr.kind === 'pop') {
+        validateExprTree(stmt.expr, program, stmt.line);
+        if (stmt.names.length < 1 || stmt.names.length > 2) {
+          interpError(
+            `pop destructuring expects 1 or 2 name(s), got ${stmt.names.length}`,
+            stmt.line,
+          );
+        }
+      } else if (stmt.expr.kind === 'call') {
+        const m = program.methods[stmt.expr.name];
+        if (!m) {
+          interpError(`unknown method '${stmt.expr.name}'`, stmt.line);
+        }
+        if (stmt.names.length !== m.returnArity) {
+          interpError(
+            `destructuring expects ${m.returnArity} value(s) from '${stmt.expr.name}', got ${stmt.names.length}`,
+            stmt.line,
+          );
+        }
+        for (const a of stmt.expr.args || []) validateExprTree(a, program, stmt.line);
+      } else {
+        interpError('destructuring assignment requires a helper call or pop', stmt.line);
       }
-      const m = program.methods[stmt.expr.name];
-      if (!m) {
-        interpError(`unknown method '${stmt.expr.name}'`, stmt.line);
-      }
-      if (stmt.names.length !== m.returnArity) {
-        interpError(
-          `destructuring expects ${m.returnArity} value(s) from '${stmt.expr.name}', got ${stmt.names.length}`,
-          stmt.line,
-        );
-      }
-      for (const a of stmt.expr.args || []) validateExprTree(a, program, stmt.line);
     } else if (stmt.kind === 'assign') {
       validateExprTree(stmt.expr, program, stmt.line);
     } else if (stmt.kind === 'save') {
@@ -1073,6 +1123,8 @@ function validateStmtTree(stmts, program) {
     } else if (stmt.kind === 'while') {
       validateExprTree(stmt.cond, program, stmt.line);
       validateStmtTree(stmt.body, program);
+    } else if (stmt.kind === 'popDiscard' || stmt.kind === 'clearDiscard') {
+      if (stmt.lvalue) validateIndexLvalue(stmt.lvalue, program, stmt.line);
     } else if (stmt.kind === 'indexAssign' || stmt.kind === 'append' || stmt.kind === 'concatAssign') {
       validateExprTree(stmt.expr, program, stmt.line);
       if (stmt.lvalue) validateIndexLvalue(stmt.lvalue, program, stmt.line);

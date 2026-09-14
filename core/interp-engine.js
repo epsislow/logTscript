@@ -1507,6 +1507,18 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       }
       interpError(`not indexable${line != null ? ` (line ${line})` : ''}`);
     }
+    case 'pop': {
+      const container = interpEvalContainerForPopClear(
+        expr.object,
+        env,
+        callMethodFn,
+        expr.line != null ? expr.line : line,
+      );
+      const popped = interpPopFromContainer(container, expr.line != null ? expr.line : line, { assign: true });
+      return popped.val;
+    }
+    case 'clear':
+      interpError(`clear cannot be used as expression${line != null ? ` (line ${line})` : ''}`);
     case 'unary': {
       const v = interpEvalExpr(expr.expr, env, callMethodFn, line);
       return expr.op === '-' ? -v : v;
@@ -1575,17 +1587,114 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
   }
 }
 
+function interpReadContainerForPopClear(name, env, line) {
+  if (!Object.prototype.hasOwnProperty.call(env, name)) {
+    interpError(`undefined variable '${name}'${line != null ? ` (line ${line})` : ''}`);
+  }
+  const c = env[name];
+  if (Array.isArray(c) || interpIsPlainMap(c)) return c;
+  interpError(`not a vector or map${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpEvalContainerForPopClear(objectExpr, env, callMethodFn, line) {
+  if (objectExpr.kind === 'var') {
+    if (objectExpr.name === 'env') {
+      const table = env.env;
+      if (!table || typeof table !== 'object') {
+        interpError(`undefined variable 'env'${line != null ? ` (line ${line})` : ''}`);
+      }
+      if (!interpIsPlainMap(table)) {
+        interpError(`not a vector or map${line != null ? ` (line ${line})` : ''}`);
+      }
+      return table;
+    }
+    return interpReadContainerForPopClear(objectExpr.name, env, line);
+  }
+  if (objectExpr.kind === 'index') {
+    const parent = interpEvalContainerForIndexRead(objectExpr.object, env, callMethodFn, line);
+    const idx = interpEvalExpr(objectExpr.index, env, callMethodFn, line);
+    if (Array.isArray(parent)) {
+      return interpVectorIndex(parent, idx, line);
+    }
+    if (interpIsPlainMap(parent)) {
+      const key = interpMapKeyFromIndex(idx);
+      if (!Object.prototype.hasOwnProperty.call(parent, key)) {
+        interpError(`undefined variable '${key}'${line != null ? ` (line ${line})` : ''}`);
+      }
+      const child = parent[key];
+      if (Array.isArray(child) || interpIsPlainMap(child)) return child;
+      interpError(`not a vector or map${line != null ? ` (line ${line})` : ''}`);
+    }
+    interpError(`not a vector or map${line != null ? ` (line ${line})` : ''}`);
+  }
+  interpError(`invalid pop target${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpPopFromContainer(container, line, options) {
+  const assign = options && options.assign;
+  if (Array.isArray(container)) {
+    if (container.length === 0) {
+      if (assign) interpError(`pop from empty container${line != null ? ` (line ${line})` : ''}`);
+      return null;
+    }
+    const idx = container.length - 1;
+    const val = container.pop();
+    return { idx, val };
+  }
+  if (interpIsPlainMap(container)) {
+    const keys = Object.keys(container);
+    if (keys.length === 0) {
+      if (assign) interpError(`pop from empty container${line != null ? ` (line ${line})` : ''}`);
+      return null;
+    }
+    const key = keys[keys.length - 1];
+    const val = container[key];
+    delete container[key];
+    return { key, val };
+  }
+  interpError(`not a vector or map${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpClearContainerInPlace(container, line) {
+  if (Array.isArray(container)) {
+    container.length = 0;
+    return;
+  }
+  if (interpIsPlainMap(container)) {
+    for (const k of Object.keys(container)) delete container[k];
+    return;
+  }
+  interpError(`not a vector or map${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpContainerFromPopClearLvalue(lvalue, env, callMethodFn, line) {
+  if (!lvalue || lvalue.kind !== 'var') {
+    interpError(`invalid pop target${line != null ? ` (line ${line})` : ''}`);
+  }
+  return interpEvalContainerForPopClear(lvalue, env, callMethodFn, line);
+}
+
 function interpExecuteDestructuringAssign(stmt, env, locals, program, callMethodFn, sharedEnv, options) {
-  if (stmt.expr.kind !== 'call') {
-    interpError(`destructuring assignment requires a helper call${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+  let values;
+  if (stmt.expr.kind === 'pop') {
+    const container = interpEvalContainerForPopClear(stmt.expr.object, env, callMethodFn, stmt.line);
+    const popped = interpPopFromContainer(container, stmt.line, { assign: true });
+    if (Object.prototype.hasOwnProperty.call(popped, 'idx')) {
+      values = stmt.names.length === 1 ? [popped.val] : [popped.idx, popped.val];
+    } else {
+      values = stmt.names.length === 1 ? [popped.val] : [popped.key, popped.val];
+    }
+  } else if (stmt.expr.kind === 'call') {
+    const m = program.methods[stmt.expr.name];
+    if (!m) {
+      interpError(`unknown method '${stmt.expr.name}'${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+    }
+    const vals = (stmt.expr.args || []).map((a) => interpEvalExpr(a, env, callMethodFn, stmt.line));
+    const result = interpExecuteMethod(m, vals, program, sharedEnv, options);
+    values = m.returnArity > 1 ? result : [result];
+  } else {
+    interpError(`destructuring assignment requires a helper call or pop${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
   }
-  const m = program.methods[stmt.expr.name];
-  if (!m) {
-    interpError(`unknown method '${stmt.expr.name}'${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
-  }
-  const vals = (stmt.expr.args || []).map((a) => interpEvalExpr(a, env, callMethodFn, stmt.line));
-  const result = interpExecuteMethod(m, vals, program, sharedEnv, options);
-  const values = m.returnArity > 1 ? result : [result];
   if (!Array.isArray(values) || values.length !== stmt.names.length) {
     interpError(
       `return arity mismatch: expected ${stmt.names.length}, got ${Array.isArray(values) ? values.length : 1}${stmt.line != null ? ` (line ${stmt.line})` : ''}`,
@@ -1897,6 +2006,20 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
         interpError(`not a vector${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
       }
       arr.push(val);
+    } else if (stmt.kind === 'popDiscard') {
+      const container = interpContainerFromPopClearLvalue(stmt.lvalue, env, callMethodFn, stmt.line);
+      interpPopFromContainer(container, stmt.line, { assign: false });
+    } else if (stmt.kind === 'clearDiscard') {
+      const container = interpContainerFromPopClearLvalue(stmt.lvalue, env, callMethodFn, stmt.line);
+      if (Array.isArray(container)) {
+        if (container.length === 0) continue;
+        container.length = 0;
+      } else if (interpIsPlainMap(container)) {
+        if (Object.keys(container).length === 0) continue;
+        interpClearContainerInPlace(container, stmt.line);
+      } else {
+        interpError(`not a vector or map${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+      }
     } else if (stmt.kind === 'unset') {
       for (const target of stmt.targets || []) {
         if (target.kind === 'slot') {

@@ -70,5 +70,36 @@ module.exports = {
         'MapProbe',
       ) === 9,
     },
+    {
+      name: 'vector pop assign and clear',
+      src: MAP_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  myVec = [1, 2];',
+          '  x = myVec[-];',
+          '  myVec[*];',
+          '  return x + vectorLen(myVec);',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ) === 2,
+    },
+    {
+      name: 'map pop destructure',
+      src: MAP_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  myMap = {};',
+          '  myMap["a"] = 1;',
+          '  myMap["b"] = 2;',
+          '  k, v = myMap[-];',
+          '  return v + vectorLen(getKeys(myMap));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ) === 3,
+    },
   ],
 };
