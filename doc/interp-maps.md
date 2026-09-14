@@ -30,7 +30,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **Nested** | `env["outer"]["inner"]` — chain `[]` on map references |
 | **Unset** | `unset: myList["k"]` — delete key; absent key is a no-op → [builtins](interp-builtins.md) |
 | **Allowed values** | Scalars (numbers, strings, booleans) and **nested map** references — not AST handles |
-| **Introspect** | `getKeys(map)`, `getValues(map)` → [interp-builtins.md](interp-builtins.md) |
+| **Introspect** | `getKeys(map)`, `getValues(map)`, `setKeysValues(map, keys, values)` → [interp-builtins.md](interp-builtins.md) |
 | **Probe** | `hasKey(map, key)` — **`0`/`1`** without abort on missing key → [interp-builtins.md](interp-builtins.md) |
 
 ---
@@ -165,6 +165,18 @@ Expected: **`result`** = **`00001001`**.
 | JavaScript array used as vector | Use vector indexing, not string keys |
 
 Reading a missing key always **aborts** with **`undefined variable`**. To test membership without aborting, use **`hasKey(map, key)`** → **`0`**. To remove a key, use **`unset:`** → [interp-builtins.md](interp-builtins.md).
+
+---
+
+## `myList = {}` vs `env = {}`
+
+| Assign | Effect |
+|--------|--------|
+| **`myList = {}`** | Replaces a **local** user map — old content is no longer reachable from **`myList`** |
+| **`env["key"] = v`** | Writes the **session** table shared across dispatches in the same **`:eval`** |
+| **`env = {}`** | **Not** a session reset — it only rebinds a **local alias**; the shared session table is unchanged and reappears on the next helper entry |
+
+To clear **`env`** keys, use **`unset: env["key"]`** or loop **`getKeys(env)`** + **`unset:`**. To replace a local map before bulk load, use **`myList = {}`** then **`setKeysValues(myList, …)`** → [interp-builtins.md](interp-builtins.md).
 
 ---
 

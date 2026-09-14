@@ -137,6 +137,37 @@ module.exports = {
       },
     },
     {
+      name: 'setKeysValues merge and return count',
+      src: BUILTIN_CORE,
+      check: () => {
+        const r = execMethodBody(
+          [
+            'MapProbe(pad/u8) {',
+            '  myList = {}; myList["old"] = 1;',
+            '  n = setKeysValues(myList, ["new"], [2]);',
+            '  return n + myList["old"] + myList["new"];',
+            '}',
+          ].join('\n'),
+          'MapProbe',
+        );
+        return r.result === 5;
+      },
+    },
+    {
+      name: 'setKeysValues empty vectors no-op',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  myList = {}; myList["a"] = 1;',
+          '  setKeysValues(myList, [], []);',
+          '  return vectorLen(getKeys(myList));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 1,
+    },
+    {
       name: 'unset save slot',
       src: BUILTIN_CORE,
       check: () => {

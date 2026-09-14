@@ -18,7 +18,7 @@ const INTERP_BUILTINS = new Set(['show', 'showx', 'eval', 'evaled']);
 const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get', 'has', 'unset']);
 
 /** Reserved map builtin names — not user method names. */
-const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'hasKey', 'hasIndex', 'vectorLen']);
+const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'setKeysValues', 'hasKey', 'hasIndex', 'vectorLen']);
 
 const INTERP_UNSET_MAX_TARGETS = 10;
 
@@ -972,6 +972,11 @@ function validateExprCallArity(expr, program, line, expectMulti) {
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
+  if (expr.name === 'setKeysValues') {
+    if ((expr.args || []).length !== 3) interpError('setKeysValues expects 3 arguments', line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
   if (expr.name === 'vectorLen') {
     if ((expr.args || []).length !== 1) interpError('vectorLen expects 1 argument', line);
     for (const a of expr.args || []) validateExprTree(a, program, line);
@@ -1081,6 +1086,8 @@ function validateStmtTree(stmts, program) {
         interpValidateEvalBuiltinCall(stmt.args, stmt.line);
       } else if (stmt.name === 'evaled') {
         interpValidateEvaledBuiltinCall(stmt.args, stmt.line);
+      } else if (stmt.name === 'setKeysValues') {
+        if ((stmt.args || []).length !== 3) interpError('setKeysValues expects 3 arguments', stmt.line);
       } else if (INTERP_BUILTINS.has(stmt.name)) {
         interpValidateShowBuiltinCall(stmt.name, stmt.args, stmt.line);
       }

@@ -58678,5 +58678,239 @@ inline [interp] .slotInterp {
     h.assert('method', p.methods.T != null, true);
   });
 
+  /* ----- F8f — setKeysValues hydrate (A) + for-loop hydrate (B) ----- */
+
+  function runF8SetKeysEnv(h, session) {
+    const r = f8Exec(session, [
+      'HydrateEnv() {',
+      '  keys = ["a", "b"];',
+      '  vals = ["1", "2"];',
+      '  n = setKeysValues(env, keys, vals);',
+      '  return n;',
+      '}',
+    ].join('\n'), 'HydrateEnv');
+    h.assert('env hydrate count', r.result, 2);
+    h.assert('env hydrate val a', r.env.env['a'], '1');
+    h.assert('env hydrate val b', r.env.env['b'], '2');
+  }
+  regInterpDual(5472, 5473, 'f8f setKeysValues env merge from vectors', runF8SetKeysEnv);
+
+  function runF8SetKeysMyList(h, session) {
+    const r = f8Exec(session, [
+      'HydrateList() {',
+      '  myList = {};',
+      '  return setKeysValues(myList, ["x"], [42]);',
+      '}',
+    ].join('\n'), 'HydrateList');
+    h.assert('myList hydrate', r.result, 1);
+  }
+  regInterpDual(5474, 5475, 'f8f setKeysValues myList merge', runF8SetKeysMyList);
+
+  regInterpDual(5476, 5477, 'f8f setKeysValues length mismatch aborts', function(h, session) {
+    h.assertThrows('mismatch', function() {
+      f8Exec(session, [
+        'Bad() {',
+        '  myList = {};',
+        '  setKeysValues(myList, ["a"], [1, 2]);',
+        '  return 0;',
+        '}',
+      ].join('\n'), 'Bad');
+    }, 'length mismatch');
+  });
+
+  function runF8SetKeysMerge(h, session) {
+    const r = f8Exec(session, [
+      'MergeKeep() {',
+      '  myList = {};',
+      '  myList["old"] = 5;',
+      '  setKeysValues(myList, ["new"], [7]);',
+      '  return myList["old"] + myList["new"];',
+      '}',
+    ].join('\n'), 'MergeKeep');
+    h.assert('merge keeps old keys', r.result, 12);
+  }
+  regInterpDual(5478, 5479, 'f8f setKeysValues merge upsert keeps other keys', runF8SetKeysMerge);
+
+  function runF8SetKeysNoOp(h, session) {
+    const r = f8Exec(session, [
+      'NoOpReset() {',
+      '  myList = {};',
+      '  myList["a"] = 1;',
+      '  n1 = setKeysValues(myList, [], []);',
+      '  myList = {};',
+      '  setKeysValues(myList, ["b"], [2]);',
+      '  return n1 + myList["b"];',
+      '}',
+    ].join('\n'), 'NoOpReset');
+    h.assert('no-op then reset hydrate', r.result, 3);
+  }
+  regInterpDual(5480, 5481, 'f8f setKeysValues empty vectors no-op and reset hydrate', runF8SetKeysNoOp);
+
+  function runF8SetKeysRoundTrip(h, session) {
+    const r = f8Exec(session, [
+      'RoundTripA() {',
+      '  myList = {};',
+      '  myList["x"] = 5;',
+      '  myList["y"] = 6;',
+      '  k = getKeys(myList);',
+      '  v = getValues(myList);',
+      '  myList = {};',
+      '  setKeysValues(myList, k, v);',
+      '  return vectorLen(getKeys(myList));',
+      '}',
+    ].join('\n'), 'RoundTripA');
+    h.assert('getKeys/getValues round-trip', r.result, 2);
+  }
+  regInterpDual(5482, 5483, 'f8f setKeysValues round-trip via getKeys getValues', runF8SetKeysRoundTrip);
+
+  function runF8SetKeysLoopB(h, session) {
+    const r = f8Exec(session, [
+      'LoadB() {',
+      '  keys = ["a", "b"];',
+      '  vals = [10, 20];',
+      '  myList = {};',
+      '  i = 0;',
+      '  while (i < vectorLen(keys)) {',
+      '    myList[keys[i]] = vals[i];',
+      '    i = i + 1;',
+      '  }',
+      '  return myList["a"] + myList["b"];',
+      '}',
+    ].join('\n'), 'LoadB');
+    h.assert('variant B for loop merge', r.result, 30);
+  }
+  regInterpDual(5484, 5485, 'f8f hydrate variant B for loop merge', runF8SetKeysLoopB);
+
+  regInterpDual(5486, 5487, 'f8f setKeysValues undefined map aborts', function(h, session) {
+    h.assertThrows('undefined map', function() {
+      f8Exec(session, 'Bad() { return setKeysValues(myList, [], []); }', 'Bad');
+    }, 'undefined variable');
+  });
+
+  reg(5488, 'interp', 'f8f reserved setKeysValues method name', function(h) {
+    h.assertThrows('setKeysValues method', function() {
+      parseInterpBody('setKeysValues(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  function runF8SetKeysDup(h, session) {
+    const r = f8Exec(session, [
+      'DupKeys() {',
+      '  myList = {};',
+      '  n = setKeysValues(myList, ["a", "a"], [1, 2]);',
+      '  return n + myList["a"];',
+      '}',
+    ].join('\n'), 'DupKeys');
+    h.assert('duplicate keys last wins', r.result, 3);
+  }
+  regInterpDual(5489, 5490, 'f8f setKeysValues duplicate keys last wins', runF8SetKeysDup);
+
+  regInterpDual(5491, 5492, 'f8f setKeysValues handle in values aborts', function(h, session) {
+    const inst = parseInterpBody('Bad() { return setKeysValues(myList, ["k"], vals); }');
+    const handle = interpMakeNodeHandle({
+      kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+    });
+    const env = { env: {} };
+    env.myList = Object.create(null);
+    env.vals = [handle];
+    const opts = {
+      evaluationMap: new Map(),
+      savedHandles: new Map(),
+      registry: session.interp ? session.interp.schemaRegistry : null,
+      program: inst,
+      sharedEnv: env,
+    };
+    h.assertThrows('handle value', function() {
+      interpRunWithContext(opts, () => {
+        interpExecuteMethod(inst.methods.Bad, [], inst, env, opts);
+      });
+    }, 'cannot store handle in map');
+  });
+
+  function runF8SetKeysAsciiRound(h, session) {
+    const r = f8Exec(session, [
+      'AsciiRound() {',
+      '  myList = {};',
+      '  setKeysValues(myList, ["msg"], ["hello"]);',
+      '  k = getKeys(myList);',
+      '  v = getValues(myList);',
+      '  myList = {};',
+      '  setKeysValues(myList, k, v);',
+      '  return vectorLen(getValues(myList));',
+      '}',
+    ].join('\n'), 'AsciiRound');
+    h.assert('ascii string round-trip', r.result, 1);
+  }
+  regInterpDual(5493, 5494, 'f8f setKeysValues ascii string round-trip', runF8SetKeysAsciiRound);
+
+  function runF8SetKeysReturnCount(h, session) {
+    const r = f8Exec(session, [
+      'RetCount() {',
+      '  myList = {};',
+      '  return setKeysValues(myList, ["a", "b"], [1, 2]);',
+      '}',
+    ].join('\n'), 'RetCount');
+    h.assert('return key count', r.result, 2);
+  }
+  regInterpDual(5495, 5496, 'f8f setKeysValues returns key count after merge', runF8SetKeysReturnCount);
+
+  function f8FixedAscii5Bits(str) {
+    const padded = (str + '\0\0\0\0\0').slice(0, 5);
+    return f3iAsciiBits(padded);
+  }
+
+  const F8F_HYDRATE_SCHEMA = [
+    '<Hydrate>+:',
+    '    pad: 8',
+    ':',
+  ].join('\n');
+
+  const F8F_HYDRATE_INTERP = [
+    'inline [interp] .f8Hydrate {',
+    '    Hydrate(pad/u8) {',
+    '        myList = {};',
+    '        n = setKeysValues(myList, keysIn, valsIn);',
+    '        total = n + myList["a"] + myList["b"];',
+    '        push res: total;',
+    '        return total;',
+    '    }',
+    '}',
+  ].join('\n');
+
+  const F8F_HYDRATE_COMP = [
+    'comp [interp] .f8HydrateComp:',
+    '    on: 1',
+    '    astSchema = .Hydrate',
+    '    .f8Hydrate { }',
+    '    pin keysIn[2]5/ascii as keysIn',
+    '    pin valsIn[2]/s16 as valsIn',
+    '    pout res/u16 as resOut',
+    '    :',
+  ].join('\n');
+
+  const F8F_HYDRATE_CORE = F8F_HYDRATE_SCHEMA + '\n' + F8F_HYDRATE_INTERP + '\n' + F8F_HYDRATE_COMP;
+
+  function runF8CompHydratePin(h, session) {
+    const keyBits = f8FixedAscii5Bits('a') + ' + ' + f8FixedAscii5Bits('b');
+    const valBits = f3hU16Wire([10, 20]).match(/.{1,16}/g).join(' + ');
+    session.run(F8F_HYDRATE_CORE + '\n' + [
+      '8wire<Hydrate> ast = 00000000',
+      '40wire[2] keysWire = ' + keyBits,
+      '16wire[2] valsWire = ' + valBits,
+      '16wire res = 0000000000000000',
+      '1wire run = 1',
+      '.f8HydrateComp:{',
+      '  ast = ast',
+      '  keysIn = keysWire',
+      '  valsIn = valsWire',
+      '  resOut >= res',
+      '  set = run',
+      '}',
+    ].join('\n'));
+    h.assert('comp hydrate n+a+b = 2+10+20', session.getWire(session.interp, 'res'), '0000000000100000');
+  }
+
+  regInterpDual(5497, 5498, 'f8f comp pin hydrate setKeysValues legacy+wave', runF8CompHydratePin);
+
   window.LogTScriptTestSuite.finalize();
 })();

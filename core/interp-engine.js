@@ -1423,6 +1423,44 @@ function interpBuiltinHasIndex(args, env, callMethodFn, line) {
   return (idxVal >= 0 && idxVal < vec.length) ? 1 : 0;
 }
 
+function interpBuiltinSetKeysValues(args, env, callMethodFn, line) {
+  if (!args || args.length !== 3) {
+    interpError(`setKeysValues expects 3 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const mapExpr = args[0];
+  let map;
+  if (mapExpr && mapExpr.kind === 'var') {
+    if (!Object.prototype.hasOwnProperty.call(env, mapExpr.name)) {
+      interpError(`undefined variable '${mapExpr.name}'${line != null ? ` (line ${line})` : ''}`);
+    }
+    map = env[mapExpr.name];
+  } else {
+    map = interpEvalExpr(mapExpr, env, callMethodFn, line);
+  }
+  if (!interpIsPlainMap(map)) {
+    interpError(`setKeysValues expects map${line != null ? ` (line ${line})` : ''}`);
+  }
+  const keys = interpEvalExpr(args[1], env, callMethodFn, line);
+  const values = interpEvalExpr(args[2], env, callMethodFn, line);
+  if (!Array.isArray(keys)) {
+    interpError(`setKeysValues expects vector keys${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (!Array.isArray(values)) {
+    interpError(`setKeysValues expects vector values${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (keys.length !== values.length) {
+    interpError(`setKeysValues: keys/values length mismatch${line != null ? ` (line ${line})` : ''}`);
+  }
+  for (let i = 0; i < keys.length; i++) {
+    const val = values[i];
+    if (interpIsNodeHandle(val)) {
+      interpError(`cannot store handle in map${line != null ? ` (line ${line})` : ''}`);
+    }
+    map[interpMapKeyFromIndex(keys[i])] = val;
+  }
+  return interpMapEnumerateKeys(map, false).length;
+}
+
 function interpEvalExpr(expr, env, callMethodFn, line) {
   if (!expr) return 0;
   switch (expr.kind) {
@@ -1527,6 +1565,9 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       }
       if (expr.name === 'hasIndex') {
         return interpBuiltinHasIndex(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'setKeysValues') {
+        return interpBuiltinSetKeysValues(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
       }
       return callMethodFn(expr.name, expr.args, line);
     default:
@@ -1875,6 +1916,8 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
         interpBuiltinEval(stmt.args, env, callMethodFn, program, sharedEnv || env, options, stmt.line);
       } else if (stmt.name === 'evaled') {
         interpBuiltinEvaled(stmt.args, env, callMethodFn, options, stmt.line);
+      } else if (stmt.name === 'setKeysValues') {
+        interpBuiltinSetKeysValues(stmt.args, env, callMethodFn, stmt.line);
       } else {
         const vals = (stmt.args || []).map((a) => evalArg(a));
         const m = program.methods[stmt.name];

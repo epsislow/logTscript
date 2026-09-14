@@ -30863,8 +30863,9 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`hasKey(map, key)\`** | **\`1\`** if key exists on an **existing** map, **\`0\`** if key absent |
 | **\`hasIndex(vec, i)\`** | **\`1\`** if integer index in bounds, **\`0\`** if out of range |
 | **\`has:slotName\`** | **\`1\`** if save slot exists, **\`0\`** if not — does not return a handle |
+| **\`setKeysValues(map, keys, values)\`** | **Merge/upsert** pairs from parallel vectors into an **existing** map; returns total flat key count after merge |
 
-**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`hasKey\`**, **\`hasIndex\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
+**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`setKeysValues\`**, **\`hasKey\`**, **\`hasIndex\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
 
 ---
 
@@ -31213,6 +31214,157 @@ Expected: **\`count\`** = **\`00000010\`** (two keys). Inspect **\`keysWire\`** 
 
 ---
 
+## \`setKeysValues(map, keys, values)\` — hydrate from vectors
+
+**Merge/upsert** key/value pairs from two parallel vectors into an **existing** map (\`env\`, \`myList\`, …). Does **not** remove keys that are absent from the vectors — use **\`myList = {}\`** first when you need a full replace.
+
+| Rule | Behavior |
+|------|----------|
+| **Map arg** | Must already exist — undefined name → **\`undefined variable\`** abort |
+| **Vector args** | Both must be vectors; scalars → abort |
+| **Lengths** | **\`vectorLen(keys) == vectorLen(values)\`** — else abort |
+| **Empty vectors** | **\`setKeysValues(map, [], [])\`** → **no-op** |
+| **Duplicate keys** | Last pair in the vector wins |
+| **Return** | **\`vectorLen(getKeys(map))\`** after merge (flat key count) |
+| **Values** | Same rules as map assign — scalars and nested maps OK; AST handles → abort |
+
+### Basic merge
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["old"] = 1;
+        setKeysValues(myList, ["new"], [2]);
+        return myList["old"] + myList["new"];
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000011\`** (1 + 2 = 3 — **\`old\`** kept, **\`new\`** added).
+
+### Reset then hydrate
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 1;
+        myList = {};
+        setKeysValues(myList, ["b"], [2]);
+        return vectorLen(getKeys(myList));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000001\`** (only **\`b\`** — prior **\`a\`** gone after **\`{}\`** assign).
+
+### Hydrate variant A — \`setKeysValues\` (bulk)
+
+Symmetric export: **\`getKeys(map)\`** + **\`getValues(map)\`** → **\`push\`** on comp pouts. Re-import: pin vectors → **\`setKeysValues(map, keysIn, valsIn)\`**.
+
+\`\`\`logts-play
+<Hydrate>+:
+    pad: 8
+:
+
+inline [interp] .hydrateDemo {
+    Hydrate(pad/u8) {
+        myList = {};
+        n = setKeysValues(myList, keysIn, valsIn);
+        push keysOut: getKeys(myList);
+        push valsOut: getValues(myList);
+        push res: n;
+        return n;
+    }
+}
+
+comp [interp] .hydrateComp:
+    on: 1
+    astSchema = .Hydrate
+    .hydrateDemo { }
+    pin keysIn[2]5/ascii as keysIn
+    pin valsIn[2]/s16 as valsIn
+    pout keysOut[2]5/ascii as keysOut
+    pout valsOut[2]/s16 as valsOut
+    pout res/u8 as resOut
+    :
+
+8wire<Hydrate> ast = ^00
+40wire[2] keysWire = 01100001 + 00000000 + 00000000 + 00000000 + 00000000 + 01100010 + 00000000 + 00000000 + 00000000 + 00000000
+16wire[2] valsWire = 0000000000001010 + 0000000000010100
+40wire[2] keysOutWire = \\0;80
+16wire[2] valsOutWire = \\0;32
+8wire res = 00000000
+1wire run = 1
+
+.hydrateComp:{
+    ast = ast
+    keysIn = keysWire
+    valsIn = valsWire
+    keysOut >= keysOutWire
+    valsOut >= valsOutWire
+    resOut >= res
+    set = run
+}
+
+show(res)
+\`\`\`
+
+Expected: **\`res\`** = **\`00000010\`** (two keys **\`a\`**, **\`b\`**). **\`valsOutWire\`** encodes **10** and **20**.
+
+### Hydrate variant B — \`for\` loop (manual merge)
+
+Same merge semantics — you control the loop (conditions, skip, **\`break\`**, length checks):
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        keys = ["x", "y"];
+        vals = [5, 6];
+        myList = {};
+        i = 0;
+        while (i < vectorLen(keys)) {
+            myList[keys[i]] = vals[i];
+            i = i + 1;
+        }
+        return vectorLen(getKeys(myList));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000010\`**.
+
+### String values and \`getValues\`
+
+For comp round-trip through **\`getValues\`**, keep stored values **homogeneous** (all strings, all numbers, …). Mixed **\`typeof\`** in one map is fine for **\`setKeysValues\`**, but **\`getValues\`** requires one scalar type — store text as **\`/ascii\`** strings when exporting.
+
+---
+
 ## Related pages
 
 | Topic | Page |
@@ -31254,7 +31406,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Nested** | \`env["outer"]["inner"]\` — chain \`[]\` on map references |
 | **Unset** | \`unset: myList["k"]\` — delete key; absent key is a no-op → [builtins](interp-builtins.md) |
 | **Allowed values** | Scalars (numbers, strings, booleans) and **nested map** references — not AST handles |
-| **Introspect** | \`getKeys(map)\`, \`getValues(map)\` → [interp-builtins.md](interp-builtins.md) |
+| **Introspect** | \`getKeys(map)\`, \`getValues(map)\`, \`setKeysValues(map, keys, values)\` → [interp-builtins.md](interp-builtins.md) |
 | **Probe** | \`hasKey(map, key)\` — **\`0\`/\`1\`** without abort on missing key → [interp-builtins.md](interp-builtins.md) |
 
 ---
@@ -31389,6 +31541,18 @@ Expected: **\`result\`** = **\`00001001\`**.
 | JavaScript array used as vector | Use vector indexing, not string keys |
 
 Reading a missing key always **aborts** with **\`undefined variable\`**. To test membership without aborting, use **\`hasKey(map, key)\`** → **\`0\`**. To remove a key, use **\`unset:\`** → [interp-builtins.md](interp-builtins.md).
+
+---
+
+## \`myList = {}\` vs \`env = {}\`
+
+| Assign | Effect |
+|--------|--------|
+| **\`myList = {}\`** | Replaces a **local** user map — old content is no longer reachable from **\`myList\`** |
+| **\`env["key"] = v\`** | Writes the **session** table shared across dispatches in the same **\`:eval\`** |
+| **\`env = {}\`** | **Not** a session reset — it only rebinds a **local alias**; the shared session table is unchanged and reappears on the next helper entry |
+
+To clear **\`env\`** keys, use **\`unset: env["key"]\`** or loop **\`getKeys(env)\`** + **\`unset:\`**. To replace a local map before bulk load, use **\`myList = {}\`** then **\`setKeysValues(myList, …)\`** → [interp-builtins.md](interp-builtins.md).
 
 ---
 
