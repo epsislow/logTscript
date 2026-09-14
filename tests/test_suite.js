@@ -58431,5 +58431,136 @@ inline [interp] .slotInterp {
 
   regInterpDual(5407, 5408, 'f6d factorial 5! eval 120', runF6Factorial120);
 
+  /* ----- F8a–F8d — maps, unset, getKeys/getValues, unset slot ----- */
+
+  function f8Exec(session, src, method, pinEnv, savedHandles) {
+    const inst = parseInterpBody(src);
+    const env = pinEnv || { env: {} };
+    const opts = {
+      evaluationMap: new Map(),
+      savedHandles: savedHandles || new Map(),
+      registry: session.interp ? session.interp.schemaRegistry : null,
+      program: inst,
+      sharedEnv: env,
+    };
+    let result;
+    interpRunWithContext(opts, () => {
+      result = interpExecuteMethod(inst.methods[method], [], inst, env, opts);
+    });
+    return { result, env, savedHandles: opts.savedHandles };
+  }
+
+  const F8_MAP_INTERP = [
+    'MapInit() {',
+    '  myList = {};',
+    '  myList["a"] = 42;',
+    '  return myList["a"];',
+    '}',
+    'MapAuto() {',
+    '  myList["k"] = 7;',
+    '  return myList["k"];',
+    '}',
+    'MapUnset() {',
+    '  myList = {};',
+    '  myList["a"] = 1;',
+    '  unset: myList["a"];',
+    '  return vectorLen(getKeys(myList));',
+    '}',
+    'EnvFlat() {',
+    '  inner = {};',
+    '  inner["x"] = 1;',
+    '  env["hits"] = 10;',
+    '  env["nested"] = inner;',
+    '  return vectorLen(getKeys(env));',
+    '}',
+    'EnvFlatAll() {',
+    '  inner = {};',
+    '  inner["x"] = 1;',
+    '  env["hits"] = 10;',
+    '  env["nested"] = inner;',
+    '  return vectorLen(getKeys(env, 1));',
+    '}',
+    'GetValuesOk() {',
+    '  myList = {};',
+    '  myList["x"] = 5;',
+    '  myList["y"] = 6;',
+    '  return vectorLen(getValues(myList));',
+    '}',
+  ].join('\n');
+
+  function runF8MapInit(h, session) {
+    const r = f8Exec(session, F8_MAP_INTERP, 'MapInit');
+    h.assert('map init value', r.result, 42);
+  }
+  regInterpDual(5430, 5431, 'f8a map init and string-key assign', runF8MapInit);
+
+  function runF8AutoVivify(h, session) {
+    const r = f8Exec(session, F8_MAP_INTERP, 'MapAuto');
+    h.assert('auto-vivify', r.result, 7);
+  }
+  regInterpDual(5432, 5433, 'f8a auto-vivify map on first assign', runF8AutoVivify);
+
+  function runF8Unset(h, session) {
+    const r = f8Exec(session, F8_MAP_INTERP, 'MapUnset');
+    h.assert('unset key', r.result, 0);
+  }
+  regInterpDual(5434, 5435, 'f8b unset map key', runF8Unset);
+
+  regInterpDual(5436, 5437, 'f8b unset undefined myList aborts', function(h, session) {
+    h.assertThrows('unset missing map', function() {
+      f8Exec(session, 'BadUnset() { unset: myList["k"]; return 0; }', 'BadUnset');
+    }, 'undefined variable');
+  });
+
+  function runF8GetKeysFlat(h, session) {
+    const r = f8Exec(session, F8_MAP_INTERP, 'EnvFlat');
+    h.assert('flat keys skip nested', r.result, 1);
+  }
+  regInterpDual(5438, 5439, 'f8c getKeys env flat default', runF8GetKeysFlat);
+
+  function runF8GetKeysAll(h, session) {
+    const r = f8Exec(session, F8_MAP_INTERP, 'EnvFlatAll');
+    h.assert('all keys with flag', r.result, 2);
+  }
+  regInterpDual(5440, 5441, 'f8c getKeys env includeNested', runF8GetKeysAll);
+
+  function runF8GetValues(h, session) {
+    const r = f8Exec(session, F8_MAP_INTERP, 'GetValuesOk');
+    h.assert('getValues len', r.result, 2);
+  }
+  regInterpDual(5442, 5443, 'f8c getValues homogeneous map', runF8GetValues);
+
+  reg(5444, 'interp', 'f8 reserved unset method name', function(h) {
+    h.assertThrows('unset method', function() {
+      parseInterpBody('unset(x/u8) { return x; }');
+    }, 'reserved');
+  });
+
+  function runF8UnsetSlot(h, session) {
+    const inst = parseInterpBody('ClearSlot() { unset: txBody; return 0; }');
+    const savedHandles = new Map();
+    savedHandles.set('txBody', interpMakeNodeHandle({
+      kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+    }));
+    const env = { env: {} };
+    const opts = {
+      evaluationMap: new Map(),
+      savedHandles,
+      registry: session.interp ? session.interp.schemaRegistry : null,
+      program: inst,
+      sharedEnv: env,
+    };
+    interpRunWithContext(opts, () => {
+      interpExecuteMethod(inst.methods.ClearSlot, [], inst, env, opts);
+    });
+    h.assert('slot deleted', savedHandles.has('txBody'), false);
+  }
+  regInterpDual(5445, 5446, 'f8d unset save slot', runF8UnsetSlot);
+
+  reg(5447, 'interp', 'f8 parse empty map literal', function(h) {
+    const p = parseInterpBody('T() { myList = {}; return 0; }');
+    h.assert('method', p.methods.T != null, true);
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

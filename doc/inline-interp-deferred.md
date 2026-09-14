@@ -68,7 +68,8 @@ Three separate maps live for one **`:eval`** session:
 |-----|-----|---------|
 | **`env`** | `env[name]`, `CallAssign`, `CallVariable` | Program **values** (numbers, etc.) |
 | **`evaluationMap`** | `eval`, `evaled` | Lazy **subtree result** cache keyed by `(pathKey, schemaRef)` |
-| **`savedHandles`** | `save:`, `get:` | Named **deferred AST handles** for delayed execution |
+| **`savedHandles`** | `save:`, `get:`, `unset: slot` | Named **deferred AST handles** for delayed execution |
+| **User maps** | `myList["k"]`, `{}` | Local **KV tables** (scalars + nested maps) — see [interp-maps.md](interp-maps.md) |
 
 Changes to `env` inside **`eval(get:slot, 1)`** or **`eval(body, 1)`** are visible to later statements in the same session. **`evaled`** inspects only **`evaluationMap`** — not whether an `env` value is stale.
 

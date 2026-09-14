@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp-deferred.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp-deferred.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, interp-builtins.md, interp-maps.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -24318,7 +24318,8 @@ Three separate maps live for one **\`:eval\`** session:
 |-----|-----|---------|
 | **\`env\`** | \`env[name]\`, \`CallAssign\`, \`CallVariable\` | Program **values** (numbers, etc.) |
 | **\`evaluationMap\`** | \`eval\`, \`evaled\` | Lazy **subtree result** cache keyed by \`(pathKey, schemaRef)\` |
-| **\`savedHandles\`** | \`save:\`, \`get:\` | Named **deferred AST handles** for delayed execution |
+| **\`savedHandles\`** | \`save:\`, \`get:\`, \`unset: slot\` | Named **deferred AST handles** for delayed execution |
+| **User maps** | \`myList["k"]\`, \`{}\` | Local **KV tables** (scalars + nested maps) — see [interp-maps.md](interp-maps.md) |
 
 Changes to \`env\` inside **\`eval(get:slot, 1)\`** or **\`eval(body, 1)\`** are visible to later statements in the same session. **\`evaled\`** inspects only **\`evaluationMap\`** — not whether an \`env\` value is stale.
 
@@ -25209,6 +25210,8 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **Vectors** | \`param[]/type\`, \`[N]/type\`, \`[N]M/ascii\`, \`[]~/ascii\`, \`[N]~/ascii\` — see [Vector parameters](#vector-parameters) |
 | **Runtime API** | \`.myInterp:eval(astWire, <schema>)\` → numeric wire (width from assignment LHS) |
 | **Deferred / \`env\`** | \`/node\`, \`^\`, \`eval\`, \`evaled\`, \`save:\`/\`get:\`, assignment **\`env\`** → [deferred parameters](inline-interp-deferred.md) |
+| **Maps** | \`{}\`, string-key \`map["k"]\`, session **\`env\`** → [interp-maps.md](interp-maps.md) |
+| **Map builtins** | \`getKeys\`, \`getValues\`, \`unset:\` → [interp-builtins.md](interp-builtins.md) |
 | **Debug** | \`show(a, b)\` and \`showx(Style, …)\` — Output panel (same as [inline logic](inline-logic.md) / [logic-builtins.md](logic-builtins.md)) |
 | **Doc** | \`doc(inline.interp)\`, \`doc(.myInterp)\` |
 
@@ -25870,6 +25873,8 @@ doc(.demo)
 | Topic | Page |
 |-------|------|
 | Deferred \`/node\`, \`eval\`, \`env\`, \`save:\`/\`get:\` | [inline-interp-deferred.md](inline-interp-deferred.md) |
+| Maps (\`{}\`, string keys, \`env\`) | [interp-maps.md](interp-maps.md) |
+| \`getKeys\`, \`getValues\`, \`unset:\` | [interp-builtins.md](interp-builtins.md) |
 | Parser grammar + \`:packAst\` | [inline-parser.md](inline-parser.md) |
 | Schema shapes (\`<expr>+\`, bound fields) | [semantic-schemas.md](semantic-schemas.md) |
 | Canvas-like control flow reference | [inline-canvas.md](inline-canvas.md) |
@@ -30824,6 +30829,449 @@ doc(comp.clcd)
 - [Oscillator](oscillator.md) — real-time \`osc\` (not a panel button, but live wire driver)
 - [LED](led.md) — displaying values driven by switches and keys
 - [doc() function](doc-function.md) — full \`doc(comp.*)\` listing
+`,
+    'interp-builtins.md': `# Inline interpreter — map & session builtins
+
+Built-in calls and statements for **map introspection**, **key deletion**, and **save-slot cleanup** inside \`inline [interp]\` method bodies.
+
+Map concepts (\`{}\`, string keys, \`env\`) → [interp-maps.md](interp-maps.md). **\`save:\`** / **\`get:\`** handles → [inline-interp-deferred.md](inline-interp-deferred.md). **\`push\`** pout wiring → [comp-interp.md](comp-interp.md).
+
+> **Development feature:** \`inline [parser]\`, \`inline [interp]\`, and related AST tooling are available for experimentation in current builds. They are **not** part of the production language surface yet.
+
+### Running examples (Load / Load & Run)
+
+Runnable blocks on this page use the \`logts-play\` format. Each block shows two buttons in the documentation viewer:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor **without** running it. Inspect or edit the example, then press toolbar **RUN** when ready. |
+| **Load & Run** | Copies the script and runs it immediately — check the **Output** panel for \`show\` results. |
+
+---
+
+## Quick reference
+
+| Form | Purpose |
+|------|---------|
+| **\`getKeys(map)\`** | Return \`[]/ascii\` of **flat** keys (insertion order); skips nested-map values |
+| **\`getKeys(map, 1)\`** | Return **all** keys including those whose value is a nested map |
+| **\`getValues(map)\`** | Return vector of **flat scalar** values (homogeneous type); skips nested maps |
+| **\`unset: map["k"]\`** | Delete one map key — no-op if key absent |
+| **\`unset: a, b, …\`** | Comma-separated list (max **10** targets), left to right |
+| **\`unset: slotName\`** | Remove a **\`save:\`** handle from \`savedHandles\` (not a local variable) |
+| **\`vectorLen(getKeys(map))\`** | Key count — same helper as [canvas builtins](canvas-builtins.md) |
+
+**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, prefix **\`unset:\`**, and method name **\`unset\`**.
+
+---
+
+## \`getKeys(map)\` — flat keys by default
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        inner = {};
+        inner["x"] = 1;
+        env["hits"] = 10;
+        env["nested"] = inner;
+        return vectorLen(getKeys(env));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000001\`** — only **\`hits\`** is a flat scalar entry; **\`nested\`** (map reference) is skipped.
+
+### Include nested-map keys
+
+Pass a truthy second argument to list every key:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        inner = {};
+        inner["x"] = 1;
+        env["hits"] = 10;
+        env["nested"] = inner;
+        return vectorLen(getKeys(env, 1));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000010\`** (keys **\`hits\`** and **\`nested\`**).
+
+Target a map stored inside **\`env\`** explicitly: **\`getKeys(env["myList"])\`** — the second argument is always **\`includeNested\`**, not a slot name.
+
+---
+
+## \`getValues(map)\` — flat scalars only
+
+Returns a vector of values for **flat** keys only (same skip rules as default **\`getKeys\`**). All returned scalars must share one type (all numbers, all strings, or all booleans). A nested map or mixed types **aborts**:
+
+\`\`\`text
+getValues: value for key '…' is not a flat scalar type
+\`\`\`
+
+Homogeneous numeric map:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["x"] = 5;
+        myList["y"] = 6;
+        return vectorLen(getValues(myList));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000010\`**.
+
+---
+
+## \`unset:\` — delete map keys
+
+Removing a key is separate from assignment — there is no **\`map[k] = undefined\`**.
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 1;
+        myList["b"] = 2;
+        unset: myList["a"];
+        return vectorLen(getKeys(myList));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000001\`**.
+
+### Multiple targets
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 1;
+        myList["b"] = 2;
+        unset: myList["a"], myList["b"];
+        return vectorLen(getKeys(myList));
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000000\`**.
+
+### Nested unset
+
+**\`unset: env["myList"]["a"]\`** deletes key **\`"a"\`** inside the map referenced by **\`env["myList"]\`**.  
+**\`unset: env["myList"]\`** removes the **\`myList\`** entry from **\`env\`** (the reference), not the inner map’s keys individually.
+
+### Errors
+
+| Situation | Result |
+|-----------|--------|
+| Key absent | **No-op** (no abort) |
+| Map variable never created | **Abort** — \`undefined variable\` |
+| Target is a vector index (\`flags[0]\`) | **Abort** — \`unset: not supported on vector index\` |
+
+---
+
+## \`unset:\` — discard a \`save:\` slot
+
+A bare identifier (no \`[\`) names a **save slot**, not a local variable — symmetric with **\`save:txBody = …\`** and **\`get:txBody\`**:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .slotDemo {
+    MapProbe(pad/u8) {
+        unset: txBody;
+        return 0;
+    }
+}
+\`\`\`
+
+After **\`unset: txBody\`**, **\`get:txBody\`** in the same session aborts with **\`unknown save slot\`**. Combine slot and map targets in one statement: **\`unset: txBody, env["hits"]\`**.
+
+Full wire examples with **\`save:\`** / deferred handles → [inline-interp-deferred.md](inline-interp-deferred.md).
+
+---
+
+## \`push\` from \`comp [interp]\`
+
+**\`getKeys\`** returns **\`[]/ascii\`** suitable for a vector pout. Inline **\`:eval\`** cannot **\`push\`** — use **\`comp [interp]\`**:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 1;
+        myList["b"] = 2;
+        push keysOut: getKeys(myList);
+        return vectorLen(getKeys(myList));
+    }
+}
+
+comp [interp] .mapComp:
+    on: 1
+    astSchema = .MapProbe
+    .mapDemo { }
+    pout res/u8 as resOut
+    pout keysOut[]/ascii as keysWire
+    :
+
+8wire<MapProbe> ast = ^00
+8wire count = 00000000
+8wire[2] keysWire = 0000000000000000
+1wire run = 1
+
+.mapComp:{
+    ast = ast
+    resOut >= count
+    keysWire >= keysWire
+    set = run
+}
+
+show(count)
+\`\`\`
+
+Expected: **\`count\`** = **\`00000010\`** (two keys). Inspect **\`keysWire\`** in the wire panel for encoded ASCII elements.
+
+---
+
+## Related pages
+
+| Topic | Page |
+|-------|------|
+| Map literal, auto-vivify, \`env\` | [interp-maps.md](interp-maps.md) |
+| \`save:\` / \`get:\` / deferred eval | [inline-interp-deferred.md](inline-interp-deferred.md) |
+| \`vectorLen\`, canvas helpers | [canvas-builtins.md](canvas-builtins.md) |
+| Component exec + pout buffer | [comp-interp.md](comp-interp.md) |
+`,
+    'interp-maps.md': `# Inline interpreter — maps (KV tables)
+
+String-keyed **maps** store scalar values and nested map references inside \`inline [interp]\` method bodies and in the session **\`env\`** table. Maps use **\`{}\`**, **\`map["key"]\`**, and **\`unset:\`** (see [interp-builtins.md](interp-builtins.md) for introspection builtins).
+
+Baseline interpreter syntax → [inline-interp.md](inline-interp.md). Session **\`env\`** for assignment programs → [inline-interp-deferred.md](inline-interp-deferred.md).
+
+> **Development feature:** \`inline [parser]\`, \`inline [interp]\`, and related AST tooling are available for experimentation in current builds. They are **not** part of the production language surface yet.
+
+### Running examples (Load / Load & Run)
+
+Runnable blocks on this page use the \`logts-play\` format. Each block shows two buttons in the documentation viewer:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor **without** running it. Inspect or edit the example, then press toolbar **RUN** when ready. |
+| **Load & Run** | Copies the script and runs it immediately — check the **Output** panel for \`show\` results. |
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Literal** | \`myList = {}\` — empty map |
+| **Write** | \`myList["key"] = value\` — string or numeric index coerced to string key |
+| **Read** | \`myList["key"]\` — missing key **aborts** (\`undefined variable\`) |
+| **Auto-vivify** | First assign to \`myList["k"]\` creates \`myList\` as \`{}\` if the name was unbound |
+| **≠ vector** | Numeric **\`vec[i]\`** on an **array** is a vector index; string-key **\`map["k"]\`** is a map entry |
+| **\`env\`** | Same index syntax — \`env["hits"] = 1\` writes the session table (see [deferred doc](inline-interp-deferred.md)) |
+| **Nested** | \`env["outer"]["inner"]\` — chain \`[]\` on map references |
+| **Unset** | \`unset: myList["k"]\` — delete key; absent key is a no-op → [builtins](interp-builtins.md) |
+| **Allowed values** | Scalars (numbers, strings, booleans) and **nested map** references — not AST handles |
+| **Introspect** | \`getKeys(map)\`, \`getValues(map)\` → [interp-builtins.md](interp-builtins.md) |
+
+---
+
+## Map vs vector
+
+| | **Map** | **Vector** (\`[]/type\` param or \`[ … ]\` literal) |
+|---|---------|--------------------------------------------------|
+| **Keys** | String ( \`"a"\`, \`"hits"\`, … ) | Non-negative integer index \`0 … len-1\` |
+| **Literal** | \`{}\` | \`[1, 2, 3]\` |
+| **Grow on assign** | Auto-vivify map name on first \`name["k"] = v\` | Append at index \`len\` |
+| **Unset** | \`unset: map["k"]\` deletes the key | **Not supported** — aborts |
+| **Length** | \`vectorLen(getKeys(map))\` | \`vectorLen(vec)\` |
+
+A local variable holds **either** a JavaScript array (vector) **or** a plain map object — not both at once. Assigning \`{}\` then using numeric-only vector indexing (or the reverse) follows the container type already stored.
+
+---
+
+## Empty map and string-key assign
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList = {};
+        myList["a"] = 42;
+        show(myList["a"]);
+        return myList["a"];
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: Output shows **\`42\`**; **\`result\`** wire is **\`00101010\`**.
+
+---
+
+## Auto-vivify
+
+The map variable does not need an explicit \`{}\` assignment when the first use is a string-key write:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        myList["k"] = 7;
+        return myList["k"];
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00000111\`**.
+
+---
+
+## Session \`env\` as a map
+
+During **\`:eval\`**, the engine injects **\`env\`** — a flat string-keyed table shared across dispatches in that session. Use the same **\`env["name"]\`** syntax as user maps:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        env["hits"] = 0;
+        env["hits"] = env["hits"] + 1;
+        show(env["hits"]);
+        return env["hits"];
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: Output **\`1\`**; **\`result\`** = **\`00000001\`**.
+
+For parser-driven programs (\`CallAssign\` / \`CallVariable\`), see [inline-interp-deferred.md](inline-interp-deferred.md).
+
+---
+
+## Nested maps
+
+Store a map inside another map, then index through the chain:
+
+\`\`\`logts-play
+<MapProbe>+:
+    pad: 8
+:
+
+inline [interp] .mapDemo {
+    MapProbe(pad/u8) {
+        inner = {};
+        inner["x"] = 9;
+        env["nested"] = inner;
+        return env["nested"]["x"];
+    }
+}
+
+8wire<MapProbe> w = ^00
+8wire result = .mapDemo:eval(w, <MapProbe>)
+show(result)
+\`\`\`
+
+Expected: **\`result\`** = **\`00001001\`**.
+
+---
+
+## Stored value types
+
+| Value | Allowed in map / \`env\` |
+|-------|-------------------------|
+| Number, string, boolean | Yes |
+| Nested user map (\`{}\` or auto-vivified) | Yes — reference stored |
+| AST node handle (\`/node\`, \`^\`, \`save:\`/\`get:\`) | **No** — assign aborts |
+| JavaScript array used as vector | Use vector indexing, not string keys |
+
+Reading a missing key always **aborts** with **\`undefined variable\`**. To remove a key without aborting on a missing read, use **\`unset:\`** → [interp-builtins.md](interp-builtins.md).
+
+---
+
+## Related pages
+
+| Topic | Page |
+|-------|------|
+| \`getKeys\`, \`getValues\`, \`unset:\` | [interp-builtins.md](interp-builtins.md) |
+| \`env\`, \`save:\`/\`get:\`, deferred eval | [inline-interp-deferred.md](inline-interp-deferred.md) |
+| Vector parameters \`[]/type\` | [inline-interp.md](inline-interp.md) |
+| \`push\` pout from comp context | [comp-interp.md](comp-interp.md) |
 `,
     'ioport.md': `# IOPORT
 

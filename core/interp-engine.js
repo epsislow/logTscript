@@ -1143,6 +1143,258 @@ function interpVectorIndex(obj, idx, line) {
   return obj[i];
 }
 
+function interpIsPlainMap(obj) {
+  return obj != null && typeof obj === 'object' && !Array.isArray(obj) && !interpIsNodeHandle(obj);
+}
+
+function interpMapKeyFromIndex(idx) {
+  if (typeof idx === 'boolean') return String(idx);
+  return String(idx);
+}
+
+function interpFlatScalarKind(v) {
+  if (typeof v === 'number') return 'number';
+  if (typeof v === 'string') return 'string';
+  if (typeof v === 'boolean') return 'boolean';
+  return null;
+}
+
+function interpIsFlatScalarValue(v) {
+  return interpFlatScalarKind(v) != null;
+}
+
+function interpMapEnumerateKeys(map, includeNested) {
+  const keys = Object.keys(map);
+  if (includeNested) return keys;
+  const out = [];
+  for (const k of keys) {
+    const v = map[k];
+    if (interpIsPlainMap(v)) continue;
+    if (interpIsNodeHandle(v)) continue;
+    if (!interpIsFlatScalarValue(v)) continue;
+    out.push(k);
+  }
+  return out;
+}
+
+function interpMapFlatValues(map, line) {
+  const keys = interpMapEnumerateKeys(map, false);
+  const values = [];
+  let kind = null;
+  for (const k of keys) {
+    const v = map[k];
+    const vk = interpFlatScalarKind(v);
+    if (vk == null) {
+      interpError(`getValues: value for key '${k}' is not a flat scalar type${line != null ? ` (line ${line})` : ''}`);
+    }
+    if (kind == null) kind = vk;
+    else if (kind !== vk) {
+      interpError(`getValues: value for key '${k}' is not a flat scalar type${line != null ? ` (line ${line})` : ''}`);
+    }
+    values.push(v);
+  }
+  return values;
+}
+
+function interpIndexLvalueRootName(lvalue) {
+  if (!lvalue) return null;
+  if (lvalue.kind === 'var') return lvalue.name;
+  if (lvalue.kind === 'index') return interpIndexLvalueRootName(lvalue.object);
+  return null;
+}
+
+function interpReadMapContainer(name, env, line) {
+  if (!Object.prototype.hasOwnProperty.call(env, name)) {
+    interpError(`undefined variable '${name}'${line != null ? ` (line ${line})` : ''}`);
+  }
+  return env[name];
+}
+
+function interpResolveMapContainerForWrite(name, env, locals, line) {
+  if (!Object.prototype.hasOwnProperty.call(env, name)) {
+    const created = Object.create(null);
+    env[name] = created;
+    locals.add(name);
+    return created;
+  }
+  const existing = env[name];
+  if (Array.isArray(existing)) {
+    interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (interpIsPlainMap(existing)) return existing;
+  if (existing != null && typeof existing === 'object') {
+    interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+  }
+  interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpEvalContainerForIndexWrite(objectExpr, env, locals, callMethodFn, line) {
+  if (objectExpr.kind === 'var') {
+    if (objectExpr.name === 'env') {
+      const table = env.env;
+      if (!table || typeof table !== 'object') {
+        interpError(`undefined variable 'env'${line != null ? ` (line ${line})` : ''}`);
+      }
+      return table;
+    }
+    return interpResolveMapContainerForWrite(objectExpr.name, env, locals, line);
+  }
+  if (objectExpr.kind === 'index') {
+    const parent = interpEvalContainerForIndexWrite(objectExpr.object, env, locals, callMethodFn, line);
+    const key = interpMapKeyFromIndex(interpEvalExpr(objectExpr.index, env, callMethodFn, line));
+    if (Array.isArray(parent)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    if (!interpIsPlainMap(parent)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(parent, key)) {
+      interpError(`undefined variable '${key}'${line != null ? ` (line ${line})` : ''}`);
+    }
+    const child = parent[key];
+    if (!interpIsPlainMap(child)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    return child;
+  }
+  interpError(`invalid index target${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpEvalContainerForIndexRead(objectExpr, env, callMethodFn, line) {
+  if (objectExpr.kind === 'var') {
+    if (objectExpr.name === 'env') {
+      const table = env.env;
+      if (!table || typeof table !== 'object') {
+        interpError(`undefined variable 'env'${line != null ? ` (line ${line})` : ''}`);
+      }
+      return table;
+    }
+    return interpReadMapContainer(objectExpr.name, env, line);
+  }
+  if (objectExpr.kind === 'index') {
+    const parent = interpEvalContainerForIndexRead(objectExpr.object, env, callMethodFn, line);
+    const key = interpMapKeyFromIndex(interpEvalExpr(objectExpr.index, env, callMethodFn, line));
+    if (Array.isArray(parent)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    if (!interpIsPlainMap(parent)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(parent, key)) {
+      interpError(`undefined variable '${key}'${line != null ? ` (line ${line})` : ''}`);
+    }
+    return parent[key];
+  }
+  interpError(`invalid index target${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpWriteIndexLvalue(lvalue, val, env, locals, callMethodFn, line) {
+  if (interpIsNodeHandle(val)) {
+    interpError(`cannot store handle in map${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (lvalue.kind === 'index') {
+    const objectExpr = lvalue.object;
+    if (objectExpr.kind === 'var' && objectExpr.name !== 'env') {
+      const idxVal = interpEvalExpr(lvalue.index, env, callMethodFn, line);
+      let container = Object.prototype.hasOwnProperty.call(env, objectExpr.name)
+        ? env[objectExpr.name]
+        : undefined;
+      if (container === undefined) {
+        container = Object.create(null);
+        env[objectExpr.name] = container;
+        locals.add(objectExpr.name);
+      } else if (Array.isArray(container)) {
+        const i = Number(idxVal);
+        if (!Number.isFinite(i) || i < 0 || i > container.length) {
+          interpError(`vector index out of range${line != null ? ` (line ${line})` : ''}`);
+        }
+        if (i === container.length) container.push(val);
+        else container[i] = val;
+        return;
+      } else if (!interpIsPlainMap(container)) {
+        interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+      }
+      container[interpMapKeyFromIndex(idxVal)] = val;
+      return;
+    }
+    const parent = interpEvalContainerForIndexWrite(objectExpr, env, locals, callMethodFn, line);
+    const idxVal = interpEvalExpr(lvalue.index, env, callMethodFn, line);
+    if (Array.isArray(parent)) {
+      const i = Number(idxVal);
+      if (!Number.isFinite(i) || i < 0 || i > parent.length) {
+        interpError(`vector index out of range${line != null ? ` (line ${line})` : ''}`);
+      }
+      if (i === parent.length) parent.push(val);
+      else parent[i] = val;
+      return;
+    }
+    if (!interpIsPlainMap(parent)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    parent[interpMapKeyFromIndex(idxVal)] = val;
+    return;
+  }
+  interpError(`invalid assignment target${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpUnsetMapKey(lvalue, env, locals, callMethodFn, line) {
+  const root = interpIndexLvalueRootName(lvalue);
+  if (root && root !== 'env' && !Object.prototype.hasOwnProperty.call(env, root)) {
+    interpError(`undefined variable '${root}'${line != null ? ` (line ${line})` : ''}`);
+  }
+  if (lvalue.kind === 'index') {
+    const objectExpr = lvalue.object;
+    if (objectExpr.kind === 'var') {
+      const container = objectExpr.name === 'env'
+        ? env.env
+        : interpReadMapContainer(objectExpr.name, env, line);
+      if (Array.isArray(container)) {
+        interpError(`unset: not supported on vector index${line != null ? ` (line ${line})` : ''}`);
+      }
+      if (!interpIsPlainMap(container)) {
+        interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+      }
+      const key = interpMapKeyFromIndex(interpEvalExpr(lvalue.index, env, callMethodFn, line));
+      if (Object.prototype.hasOwnProperty.call(container, key)) delete container[key];
+      return;
+    }
+    const parent = interpEvalContainerForIndexRead(objectExpr, env, callMethodFn, line);
+    if (Array.isArray(parent)) {
+      interpError(`unset: not supported on vector index${line != null ? ` (line ${line})` : ''}`);
+    }
+    if (!interpIsPlainMap(parent)) {
+      interpError(`not a map${line != null ? ` (line ${line})` : ''}`);
+    }
+    const key = interpMapKeyFromIndex(interpEvalExpr(lvalue.index, env, callMethodFn, line));
+    if (Object.prototype.hasOwnProperty.call(parent, key)) delete parent[key];
+    return;
+  }
+  interpError(`invalid unset target${line != null ? ` (line ${line})` : ''}`);
+}
+
+function interpBuiltinGetKeys(args, env, callMethodFn, line) {
+  if (!args || args.length < 1 || args.length > 2) {
+    interpError(`getKeys expects 1 or 2 arguments${line != null ? ` (line ${line})` : ''}`);
+  }
+  const map = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (!interpIsPlainMap(map)) {
+    interpError(`getKeys expects map${line != null ? ` (line ${line})` : ''}`);
+  }
+  const includeNested = args.length > 1 && interpTruthy(interpEvalExpr(args[1], env, callMethodFn, line));
+  return interpMapEnumerateKeys(map, includeNested);
+}
+
+function interpBuiltinGetValues(args, env, callMethodFn, line) {
+  if (!args || args.length !== 1) {
+    interpError(`getValues expects 1 argument${line != null ? ` (line ${line})` : ''}`);
+  }
+  const map = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (!interpIsPlainMap(map)) {
+    interpError(`getValues expects map${line != null ? ` (line ${line})` : ''}`);
+  }
+  return interpMapFlatValues(map, line);
+}
+
 function interpEvalExpr(expr, env, callMethodFn, line) {
   if (!expr) return 0;
   switch (expr.kind) {
@@ -1155,6 +1407,8 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       for (const el of expr.elements || []) out.push(interpEvalExpr(el, env, callMethodFn, line));
       return out;
     }
+    case 'map':
+      return Object.create(null);
     case 'getSlot': {
       const map = interpGetSavedHandlesMap(null);
       if (!map || !map.has(expr.name)) {
@@ -1169,17 +1423,17 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       return env[expr.name];
     }
     case 'index': {
-      const obj = interpEvalExpr(expr.object, env, callMethodFn, line);
+      const container = interpEvalContainerForIndexRead(expr.object, env, callMethodFn, expr.line != null ? expr.line : line);
       const idx = interpEvalExpr(expr.index, env, callMethodFn, line);
-      if (Array.isArray(obj)) {
-        return interpVectorIndex(obj, idx, expr.line != null ? expr.line : line);
+      if (Array.isArray(container)) {
+        return interpVectorIndex(container, idx, expr.line != null ? expr.line : line);
       }
-      if (obj && typeof obj === 'object') {
-        const key = String(idx);
-        if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (interpIsPlainMap(container)) {
+        const key = interpMapKeyFromIndex(idx);
+        if (!Object.prototype.hasOwnProperty.call(container, key)) {
           interpError(`undefined variable '${key}'${line != null ? ` (line ${line})` : ''}`);
         }
-        return obj[key];
+        return container[key];
       }
       interpError(`not indexable${line != null ? ` (line ${line})` : ''}`);
     }
@@ -1229,6 +1483,12 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
         const arr = interpEvalExpr(expr.args[0], env, callMethodFn, line);
         if (!Array.isArray(arr)) interpError(`vectorLen expects vector${line != null ? ` (line ${line})` : ''}`);
         return arr.length;
+      }
+      if (expr.name === 'getKeys') {
+        return interpBuiltinGetKeys(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'getValues') {
+        return interpBuiltinGetValues(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
       }
       return callMethodFn(expr.name, expr.args, line);
     default:
@@ -1378,6 +1638,9 @@ function encodeInterpCompPoutValue(value, decl, wireBits, execAlias) {
   const alias = execAlias || decl.execAlias;
   const param = interpCompParamFromDecl(decl);
   const targetBits = wireBits != null ? wireBits.length : interpCompDeclBitWidth(decl);
+  if (interpIsPlainMap(value)) {
+    throw new Error(`cannot encode map to pout '${alias}'\nuse getKeys(map) and getValues(map)`);
+  }
   if (decl.vector) {
     if (!Array.isArray(value)) {
       throw new Error(`cannot encode value ${JSON.stringify(value)} for type /${decl.typeName} on ${alias}`);
@@ -1532,28 +1795,36 @@ function interpExecuteStmts(stmts, env, locals, program, callMethodFn, evalArg, 
     } else if (stmt.kind === 'destructureAssign') {
       interpExecuteDestructuringAssign(stmt, env, locals, program, callMethodFn, sharedEnv, options);
     } else if (stmt.kind === 'indexAssign') {
-      const idx = interpEvalExpr(stmt.index, env, callMethodFn, stmt.line);
       const val = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
-      if (stmt.name === 'env' && sharedEnv) {
-        const key = String(idx);
-        if (sharedEnv.env && typeof sharedEnv.env === 'object') {
-          sharedEnv.env[key] = val;
-        } else {
-          sharedEnv[key] = val;
-        }
+      if (stmt.lvalue) {
+        interpWriteIndexLvalue(stmt.lvalue, val, env, locals, callMethodFn, stmt.line);
       } else {
-        const arr = env[stmt.name];
-        if (!Array.isArray(arr)) {
-          interpError(`not a vector${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
-        }
-        const i = Number(idx);
-        if (!Number.isFinite(i) || i < 0 || i > arr.length) {
-          interpError(`vector index out of range${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
-        }
-        if (i === arr.length) {
-          arr.push(val);
-        } else {
-          arr[i] = val;
+        const legacyLvalue = {
+          kind: 'index',
+          object: { kind: 'var', name: stmt.name },
+          index: stmt.index,
+        };
+        interpWriteIndexLvalue(legacyLvalue, val, env, locals, callMethodFn, stmt.line);
+      }
+    } else if (stmt.kind === 'append') {
+      const val = interpEvalExpr(stmt.expr, env, callMethodFn, stmt.line);
+      const name = stmt.lvalue ? interpIndexLvalueRootName(stmt.lvalue) : stmt.name;
+      if (!name) interpError(`invalid append target${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+      if (!Object.prototype.hasOwnProperty.call(env, name)) {
+        interpError(`undefined variable '${name}'${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+      }
+      const arr = env[name];
+      if (!Array.isArray(arr)) {
+        interpError(`not a vector${stmt.line != null ? ` (line ${stmt.line})` : ''}`);
+      }
+      arr.push(val);
+    } else if (stmt.kind === 'unset') {
+      for (const target of stmt.targets || []) {
+        if (target.kind === 'slot') {
+          const map = interpGetSavedHandlesMap(options);
+          if (map) map.delete(target.name);
+        } else if (target.kind === 'mapKey') {
+          interpUnsetMapKey(target.lvalue, env, locals, callMethodFn, stmt.line);
         }
       }
     } else if (stmt.kind === 'return') {
@@ -1782,6 +2053,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.interpMakeNodeHandle = interpMakeNodeHandle;
   globalThis.interpEvalNodeHandle = interpEvalNodeHandle;
   globalThis.evalInterpWire = evalInterpWire;
+  globalThis.interpExecuteMethod = interpExecuteMethod;
+  globalThis.interpRunWithContext = interpRunWithContext;
   globalThis.evalInterpInline = evalInterpInline;
   globalThis.evalInterpCompExec = evalInterpCompExec;
   globalThis.encodeInterpResult = encodeInterpResult;
@@ -1801,6 +2074,8 @@ if (typeof module !== 'undefined' && module.exports) {
     interpIsNodeHandle,
     interpMakeNodeHandle,
     interpEvalNodeHandle,
+    interpExecuteMethod,
+    interpRunWithContext,
     evalInterpWire,
     evalInterpInline,
     evalInterpCompExec,

@@ -1,0 +1,109 @@
+'use strict';
+
+const ia = require('../../core/interp-assembler.js');
+const ie = require('../../core/interp-engine.js');
+
+const BUILTIN_CORE = [
+  '<MapProbe>+:',
+  '    pad: 8',
+  ':',
+  'inline [interp] .mapDemo {',
+  '    MapProbe(pad/u8) {',
+  '        inner = {};',
+  '        inner["x"] = 1;',
+  '        env["hits"] = 10;',
+  '        env["nested"] = inner;',
+  '        return vectorLen(getKeys(env));',
+  '    }',
+  '}',
+  '8wire<MapProbe> w = ^00',
+  '8wire result = .mapDemo:eval(w, <MapProbe>)',
+  'show(result)',
+].join('\n');
+
+function execMethodBody(methodBody, method) {
+  const inst = ia.parseInterpBody(methodBody);
+  const env = { env: {} };
+  const opts = {
+    evaluationMap: new Map(),
+    savedHandles: new Map(),
+    registry: null,
+    program: inst,
+    sharedEnv: env,
+  };
+  let result;
+  ie.interpRunWithContext(opts, () => {
+    result = ie.interpExecuteMethod(inst.methods[method], [], inst, env, opts);
+  });
+  return { result, savedHandles: opts.savedHandles };
+}
+
+module.exports = {
+  doc: 'interp-builtins.md',
+  cases: [
+    {
+      name: 'getKeys env flat default',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  inner = {}; inner["x"] = 1;',
+          '  env["hits"] = 10; env["nested"] = inner;',
+          '  return vectorLen(getKeys(env));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 1,
+    },
+    {
+      name: 'getValues homogeneous map',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  myList = {}; myList["x"] = 5; myList["y"] = 6;',
+          '  return vectorLen(getValues(myList));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 2,
+    },
+    {
+      name: 'unset map key',
+      src: BUILTIN_CORE,
+      check: () => execMethodBody(
+        [
+          'MapProbe(pad/u8) {',
+          '  myList = {}; myList["a"] = 1;',
+          '  unset: myList["a"];',
+          '  return vectorLen(getKeys(myList));',
+          '}',
+        ].join('\n'),
+        'MapProbe',
+      ).result === 0,
+    },
+    {
+      name: 'unset save slot',
+      src: BUILTIN_CORE,
+      check: () => {
+        const inst = ia.parseInterpBody('ClearSlot(pad/u8) { unset: txBody; return 0; }');
+        const savedHandles = new Map();
+        savedHandles.set('txBody', ie.interpMakeNodeHandle({
+          kind: 'leaf', schemaRef: 'byte', payloadBits: '00000001', pathKey: 'r/t', fieldName: 't',
+        }));
+        const env = { env: {} };
+        const opts = {
+          evaluationMap: new Map(),
+          savedHandles,
+          registry: null,
+          program: inst,
+          sharedEnv: env,
+        };
+        ie.interpRunWithContext(opts, () => {
+          ie.interpExecuteMethod(inst.methods.ClearSlot, [], inst, env, opts);
+        });
+        return !savedHandles.has('txBody');
+      },
+    },
+  ],
+};

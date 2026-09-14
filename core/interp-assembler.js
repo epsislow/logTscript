@@ -15,7 +15,12 @@ const INTERP_CMP_OPS = new Set(['==', '!=', '<', '>', '<=', '>=']);
 const INTERP_BUILTINS = new Set(['show', 'showx', 'eval', 'evaled']);
 
 /** Reserved as user method names — conflict with save:/get: syntax (D1227). */
-const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get']);
+const INTERP_SLOT_RESERVED_METHODS = new Set(['save', 'get', 'unset']);
+
+/** Reserved map builtin names — not user method names. */
+const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'vectorLen']);
+
+const INTERP_UNSET_MAX_TARGETS = 10;
 
 const INTERP_SHOW_MAX_ARGS = 32;
 const INTERP_SHOWX_MAX_ARGS = 32;
@@ -320,7 +325,10 @@ class InterpParser {
       interpError(`'${nameTok.value}' is reserved — use as statement builtin, not method name`, nameTok.line);
     }
     if (INTERP_SLOT_RESERVED_METHODS.has(nameTok.value)) {
-      interpError(`'${nameTok.value}' is reserved — save:/get: handle slots use this prefix`, nameTok.line);
+      interpError(`'${nameTok.value}' is reserved — save:/get:/unset: use this prefix`, nameTok.line);
+    }
+    if (INTERP_MAP_BUILTIN_NAMES.has(nameTok.value)) {
+      interpError(`'${nameTok.value}' is reserved — use as builtin call, not method name`, nameTok.line);
     }
     this.eat('SYM', '(');
     const params = [];
@@ -459,6 +467,12 @@ class InterpParser {
       const next = this.tokens[this.pos + 1];
       if (next && next.type === 'SYM' && next.value === ':') {
         return this.parseSaveStmt();
+      }
+    }
+    if (t.type === 'ID' && t.value === 'unset') {
+      const next = this.tokens[this.pos + 1];
+      if (next && next.type === 'SYM' && next.value === ':') {
+        return this.parseUnsetStmt();
       }
     }
     if (t.type === 'ID') {
@@ -603,6 +617,40 @@ class InterpParser {
     return { kind: 'save', name: slotTok.value, expr, line: lineTok.line };
   }
 
+  parseUnsetStmt() {
+    const lineTok = this.eat('ID', 'unset');
+    this.eat('SYM', ':');
+    const targets = [this.parseUnsetTarget()];
+    while (this.match('SYM', ',')) {
+      if (targets.length >= INTERP_UNSET_MAX_TARGETS) {
+        interpError(`unset: may have at most ${INTERP_UNSET_MAX_TARGETS} targets`, this.peek().line);
+      }
+      targets.push(this.parseUnsetTarget());
+    }
+    return { kind: 'unset', targets, line: lineTok.line };
+  }
+
+  parseUnsetTarget() {
+    const idTok = this.eat('ID');
+    let lvalue = { kind: 'var', name: idTok.value };
+    const next = this.peek();
+    if (next && next.type === 'SYM' && next.value === '[') {
+      lvalue = this.parseIndexSuffix(lvalue, idTok.line);
+      return { kind: 'mapKey', lvalue };
+    }
+    return { kind: 'slot', name: idTok.value };
+  }
+
+  parseIndexSuffix(base, line) {
+    let node = base;
+    while (this.match('SYM', '[')) {
+      const index = this.parseExpr();
+      this.eat('SYM', ']');
+      node = { kind: 'index', object: node, index, line };
+    }
+    return node;
+  }
+
   parseDestructuringAssign() {
     const lineTok = this.eat('ID');
     const names = [lineTok.value];
@@ -626,17 +674,20 @@ class InterpParser {
 
   parseVectorAssign() {
     const nameTok = this.eat('ID');
+    let lvalue = { kind: 'var', name: nameTok.value };
     this.eat('SYM', '[');
     if (this.match('SYM', ']')) {
       this.eat('SYM', '=');
       const expr = this.parseExpr();
-      return { kind: 'append', name: nameTok.value, expr, line: nameTok.line };
+      return { kind: 'append', lvalue, name: nameTok.value, expr, line: nameTok.line };
     }
     const index = this.parseExpr();
     this.eat('SYM', ']');
+    lvalue = { kind: 'index', object: lvalue, index, line: nameTok.line };
+    lvalue = this.parseIndexSuffix(lvalue, nameTok.line);
     this.eat('SYM', '=');
     const expr = this.parseExpr();
-    return { kind: 'indexAssign', name: nameTok.value, index, expr, line: nameTok.line };
+    return { kind: 'indexAssign', lvalue, name: nameTok.value, index, expr, line: nameTok.line };
   }
 
   parseConcatAssign() {
@@ -712,6 +763,13 @@ class InterpParser {
     if (this.match('STR')) {
       return { kind: 'string', value: this.tokens[this.pos - 1].value };
     }
+    if (this.match('SYM', '{')) {
+      const lineTok = this.tokens[this.pos - 1];
+      if (!this.match('SYM', '}')) {
+        interpError('map literal must be empty {}', lineTok.line);
+      }
+      return { kind: 'map', line: lineTok.line };
+    }
     if (this.match('SYM', '[')) {
       const lineTok = this.tokens[this.pos - 1];
       const elements = [];
@@ -746,12 +804,9 @@ class InterpParser {
       if (postOp) {
         return { kind: 'postfix', name: id, op: postOp, line: idTok.line };
       }
-      if (this.match('SYM', '[')) {
-        const index = this.parseExpr();
-        this.eat('SYM', ']');
-        return { kind: 'index', object: { kind: 'var', name: id }, index, line: idTok.line };
-      }
-      return { kind: 'var', name: id };
+      let node = { kind: 'var', name: id, line: idTok.line };
+      node = this.parseIndexSuffix(node, idTok.line);
+      return node;
     }
     if (this.match('SYM', '(')) {
       const expr = this.parseExpr();
@@ -871,6 +926,15 @@ function interpValidateShowBuiltinCall(name, args, line) {
   }
 }
 
+function validateIndexLvalue(lvalue, program, line) {
+  if (!lvalue) return;
+  if (lvalue.kind === 'var') return;
+  if (lvalue.kind === 'index') {
+    validateIndexLvalue(lvalue.object, program, line);
+    validateExprTree(lvalue.index, program, line);
+  }
+}
+
 function validateExprCallArity(expr, program, line, expectMulti) {
   if (!expr || expr.kind !== 'call') return;
   if (expr.name === 'eval') {
@@ -880,6 +944,22 @@ function validateExprCallArity(expr, program, line, expectMulti) {
   }
   if (expr.name === 'evaled') {
     interpValidateEvaledBuiltinCall(expr.args, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'getKeys') {
+    const n = (expr.args || []).length;
+    if (n < 1 || n > 2) interpError('getKeys expects 1 or 2 arguments', line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'getValues') {
+    if ((expr.args || []).length !== 1) interpError('getValues expects 1 argument', line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
+  if (expr.name === 'vectorLen') {
+    if ((expr.args || []).length !== 1) interpError('vectorLen expects 1 argument', line);
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
@@ -932,6 +1012,8 @@ function validateExprTree(expr, program, line) {
     validateExprTree(expr.index, program, line);
   } else if (expr.kind === 'array') {
     for (const el of expr.elements || []) validateExprTree(el, program, line);
+  } else if (expr.kind === 'map') {
+    /* empty literal */
   }
 }
 
@@ -973,7 +1055,12 @@ function validateStmtTree(stmts, program) {
       validateStmtTree(stmt.body, program);
     } else if (stmt.kind === 'indexAssign' || stmt.kind === 'append' || stmt.kind === 'concatAssign') {
       validateExprTree(stmt.expr, program, stmt.line);
-      if (stmt.index) validateExprTree(stmt.index, program, stmt.line);
+      if (stmt.lvalue) validateIndexLvalue(stmt.lvalue, program, stmt.line);
+      else if (stmt.index) validateExprTree(stmt.index, program, stmt.line);
+    } else if (stmt.kind === 'unset') {
+      for (const target of stmt.targets || []) {
+        if (target.kind === 'mapKey') validateIndexLvalue(target.lvalue, program, stmt.line);
+      }
     } else if (stmt.kind === 'call') {
       if (stmt.name === 'eval') {
         interpValidateEvalBuiltinCall(stmt.args, stmt.line);
@@ -1063,7 +1150,7 @@ function formatInterpTypeDoc() {
     '',
     'Block forms:  inline [interp] .lang: ... :   or   inline [interp] .lang { ... }',
     '',
-    'See doc/inline-interp.md and doc/inline-interp-deferred.md',
+    'See doc/inline-interp.md, doc/interp-maps.md, doc/interp-builtins.md, and doc/inline-interp-deferred.md',
     'doc(inline.interp)  doc(.myInterp)',
     '',
     'Runtime:  .myInterp:eval(astWire, <schema>)  — evaluate typed AST wire',
