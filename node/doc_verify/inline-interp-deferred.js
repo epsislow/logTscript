@@ -823,4 +823,78 @@ module.exports.cases.push(
       }) === 120;
     },
   },
+  {
+    name: 'f11 body[i]:field chain in WhileLoop show',
+    src: [
+      '<byte>:',
+      '    value: 8',
+      ':',
+      '<symbol>+:',
+      '    bytes: bound <byte>[1-]',
+      ':',
+      '<CallNumber>:',
+      '    value: 8',
+      ':',
+      '<CallVariable>:',
+      '    name: bound <symbol>',
+      ':',
+      '<CallSub>:',
+      '    left:  bound <expr>',
+      '    right: bound <expr>',
+      ':',
+      '<expr>+:',
+      '    CallNumber?:   <CallNumber>',
+      '    CallVariable?: bound <CallVariable>',
+      '    CallSub?:      bound <CallSub>',
+      ':',
+      '<CallAssign>:',
+      '    name:  bound <symbol>',
+      '    value: bound <expr>',
+      ':',
+      '<WhileLoop>:',
+      '    condition: bound <expr>',
+      '    body:      bound <CallStatement>[1-]',
+      ':',
+      '<CallStatement>+:',
+      '    CallAssign?: bound <CallAssign>',
+      '    WhileLoop?:  bound <WhileLoop>',
+      ':',
+      '<program>+:',
+      '    statements: bound <CallStatement>[1-]',
+      ':',
+      `inline [parser] .loopLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule program = statement+;
+    rule statement
+        = "while" "(" $$ $condition:expression ")" "{" $body:statement+ "}" -> WhileLoop
+        | $name:ID "=" $value:expression ";" -> CallAssign;
+    rule expression
+        = expression "-" term -> CallSub
+        | term;
+    rule term = INT -> CallNumber | $name:ID -> CallVariable;
+:`,
+      `inline [interp] .loopInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallSub(left/s16, right/s16) { return left - right; }
+    CallAssign(name/ascii, value/s16) {
+        env[name] = value;
+        return value;
+    }
+    WhileLoop(condition^, body^) {
+        show(body[1]:name/ascii, nodeTag(body[1]), body[1]:value:left:name/ascii, nodeTag(body[1]:value), body[1]:value:right:value/s16);
+        while eval(condition, 1) {
+            eval(body, 1);
+        }
+        return 0;
+    }
+}`,
+      '4096wire<program> prog =: .loopLang:packAst("n=30; i = 0; while(n) { n=n-1; i =i-1; j =3;} out=i;", <program>, "program")',
+      '16wire result = .loopInterp:eval(prog, <program>; s16)',
+      'show(result; s16)',
+    ].join('\n'),
+    expect: ['i CallAssign i CallSub 1', '\\-30;s16'],
+    wires: { result: '1111111111100010' },
+  },
 );

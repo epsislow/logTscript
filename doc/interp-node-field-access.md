@@ -388,7 +388,7 @@ CallStatement[3]
     [2] = WhileLoop
 ```
 
-Use **`show(body[i])`** for depth-1 detail on one element. Chain **`:field`** after **`[i]`** to avoid temp variables: **`show(body[1]:value)`**, **`show(body[1]:value:left)`**.
+Use **`show(body[i])`** for depth-1 detail on one element. Chain **`:field`** after **`[i]`** to avoid temp variables: **`show(body[1]:value)`**, **`show(body[1]:value:left)`**. Full runnable walk-through (decode + **`nodeTag`** on **`body[1]:value:left`**, etc.) → [inline-interp-deferred.md — `body[i]:field` example](inline-interp-deferred.md#example--bodyifield-chain-without-temp-variables).
 
 ```logts-play
 <byte>:
