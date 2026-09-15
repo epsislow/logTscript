@@ -25192,6 +25192,15 @@ Composite deferred parameters (bound variable arrays — BVA fields such as \`bo
 
 \`body[i]\` is **not** vector indexing (F3h). It applies only to deferred node handles.
 
+Chain **field access after index** without a temp variable:
+
+\`\`\`logts
+show(body[1]);            /* whole CallAssign */
+show(body[1]:value);      /* bound value subtree (e.g. CallSub) */
+show(body[1]:name);       /* bound name subtree */
+show(body[1]:value:left); /* deeper slice on the indexed statement */
+\`\`\`
+
 ### \`nodeLen(handle)\`
 
 Returns the number of bound substreams (children) in a composite handle. Non-composite handle → abort **\`not a composite node\`**.
@@ -25213,7 +25222,16 @@ No writes to **\`env\`** and no entries in **\`evaluationMap\`**. Internal **\`p
 
 ### \`show(node)\`
 
-When a **\`show\`** argument is a deferred **node handle**, output is a multi-line tree: the active tag on the first line, then **\`field =\`** lines for each child (bound children show the child tag; leaves show a debug decode width). **\`show(fieldRef)\`** prints the leaf path; **\`show(ref/u8)\`** decodes then prints the scalar. Full syntax (**\`node:left\`**, **\`/typeFormat\`**, **\`isNode\`**) → [interp-node-field-access.md](interp-node-field-access.md).
+When a **\`show\`** argument is a deferred **node handle**, output is a multi-line tree: the active tag on the first line, then **\`field =\`** lines for each child (bound children show the child tag; leaves show a debug decode width). On the **parent**, a BVA field appears as **\`body = [3]\`** (count only). **\`show(body)\`** on the BVA handle itself lists element tags:
+
+\`\`\`text
+CallStatement[3]
+    [0] = CallAssign
+    [1] = CallAssign
+    [2] = WhileLoop
+\`\`\`
+
+Use **\`show(body[i])\`** for depth-1 detail on one statement. **\`show(fieldRef)\`** prints the leaf path; **\`show(ref/u8)\`** decodes then prints the scalar. Full syntax (**\`node:left\`**, **\`/typeFormat\`**, **\`isNode\`**) → [interp-node-field-access.md](interp-node-field-access.md).
 
 ### Selective execution pattern
 
@@ -32562,7 +32580,18 @@ Expected: Output **\`4\`** (length of **\`"hits"\`**).
 
 ## Extended \`show(node)\`
 
-**\`show\`** on a deferred **node handle** prints the active tag, then one line per child field. Bound children show the child tag; leaf fields show a debug decode width.
+**\`show\`** on a deferred **node handle** prints the active tag, then one line per child field. Bound children show the child tag; leaf fields show a debug decode width. On the parent, a BVA field is **\`body = [N]\`** only.
+
+**\`show(body)\`** on a **BVA handle** (e.g. **\`body^\`** in **\`WhileLoop\`**) lists each child’s active union tag:
+
+\`\`\`text
+CallStatement[3]
+    [0] = CallAssign
+    [1] = CallAssign
+    [2] = WhileLoop
+\`\`\`
+
+Use **\`show(body[i])\`** for depth-1 detail on one element. Chain **\`:field\`** after **\`[i]\`** to avoid temp variables: **\`show(body[1]:value)\`**, **\`show(body[1]:value:left)\`**.
 
 \`\`\`logts-play
 <byte>:
