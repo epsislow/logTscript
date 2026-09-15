@@ -59786,5 +59786,73 @@ inline [interp] .slotInterp {
     }, 'missing field');
   });
 
+  function f10WhileShowBodyCore() {
+    return (F6_SCHEMAS + '\n' + F10_PARSER + '\n' + F10_INTERP).replace(
+      '    WhileLoop(condition^, body^) {\n        while eval(condition, 1) {',
+      '    WhileLoop(condition^, body^) {\n        show(body);\n        while eval(condition, 1) {',
+    );
+  }
+
+  regInterpDual(5641, 5642, 'f11 show BVA body direct CallStatement indexed tags', function(h, session) {
+    const outBefore = session.out.length;
+    f10EvalProgram(session, f10WhileShowBodyCore(), 'while(0) { a=1; b=2; c=3; }');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('header CallStatement[3]', String(text.indexOf('CallStatement[3]') >= 0), 'true');
+    h.assert('[0] CallAssign', String(text.indexOf('[0] = CallAssign') >= 0), 'true');
+    h.assert('[1] CallAssign', String(text.indexOf('[1] = CallAssign') >= 0), 'true');
+    h.assert('[2] CallAssign', String(text.indexOf('[2] = CallAssign') >= 0), 'true');
+  });
+
+  regInterpDual(5643, 5644, 'f11 show BVA body mixed statement union tags', function(h, session) {
+    const outBefore = session.out.length;
+    f10EvalProgram(session, f10WhileShowBodyCore(), 'while(0) { a=1; while(0){x=1;} c=3; }');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('header CallStatement[3]', String(text.indexOf('CallStatement[3]') >= 0), 'true');
+    h.assert('[1] WhileLoop', String(text.indexOf('[1] = WhileLoop') >= 0), 'true');
+  });
+
+  function f10WhileShowBodyLineCore(showLine) {
+    return (F6_SCHEMAS + '\n' + F10_PARSER + '\n' + F10_INTERP).replace(
+      '    WhileLoop(condition^, body^) {\n        while eval(condition, 1) {',
+      '    WhileLoop(condition^, body^) {\n        ' + showLine + '\n        while eval(condition, 1) {',
+    );
+  }
+
+  regInterpDual(5645, 5646, 'f11 show body[1]:value field access after BVA index', function(h, session) {
+    const outBefore = session.out.length;
+    f10EvalProgram(session, f10WhileShowBodyLineCore('show(body[1]:value);'), 'while(0) { a=1; i=i-1; c=3; }');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('CallSub tag', String(text.indexOf('CallSub') >= 0), 'true');
+    h.assert('left operand line', String(text.indexOf('left =') >= 0), 'true');
+    h.assert('not full CallAssign', String(text.indexOf('name =') < 0), 'true');
+  });
+
+  regInterpDual(5647, 5648, 'f11 show body[1]:name field access after BVA index', function(h, session) {
+    const outBefore = session.out.length;
+    f10EvalProgram(session, f10WhileShowBodyLineCore('show(body[1]:name);'), 'while(0) { a=1; i=i-1; c=3; }');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('lhs symbol subtree', String(text.indexOf('symbol') >= 0), 'true');
+    h.assert('not CallSub rhs', String(text.indexOf('CallSub') < 0), 'true');
+  });
+
+  regInterpDual(5649, 5650, 'f11 nested body[1]:value:left chain after index', function(h, session) {
+    const outBefore = session.out.length;
+    f10EvalProgram(session, f10WhileShowBodyLineCore('show(body[1]:value:left);'), 'while(0) { a=1; i=i-1; c=3; }');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('CallVariable on left', String(text.indexOf('CallVariable') >= 0), 'true');
+  });
+
+  reg(5651, 'interp', 'parse body[1]:value postfix chain', function(h) {
+    const body = parseInterpBody('Probe(x^) { show(body[1]:value); return 0; }');
+    const showStmt = body.methods.Probe.body[0];
+    h.assert('show call', showStmt.kind, 'call');
+    h.assert('show name', showStmt.name, 'show');
+    const arg = showStmt.args[0];
+    h.assert('fieldAccess', arg.kind, 'fieldAccess');
+    h.assert('index base', arg.base.kind, 'index');
+    h.assert('value segment', arg.segments[0].segKind, 'name');
+    h.assert('value name', arg.segments[0].value, 'value');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -285,7 +285,33 @@ function interpShowFieldRefPath(fieldRef, registry) {
   return `field ${fieldRef.fieldName} (${schema}.${fieldRef.fieldName}, ${w} bit)`;
 }
 
+function interpShowBvaCompositeMultiLine(handle, registry, indent) {
+  const fieldNode = handle.fieldNode;
+  const elemSchema = fieldNode && fieldNode.schema
+    ? interpResolveSchema(registry, fieldNode.schema.name || fieldNode.schemaRef || fieldNode.schema)
+    : null;
+  if (!elemSchema) return [String(handle.schemaRef || 'node')];
+  const len = interpCompositeNodeLen(handle, null);
+  const elemName = elemSchema.name || handle.schemaRef || 'node';
+  const lines = [`${elemName}[${len}]`];
+  for (let i = 0; i < len; i++) {
+    const child = interpSliceCompositeChild(handle, i, registry, null);
+    let tag = elemName;
+    try {
+      tag = interpPeekUnionTag(child.payloadBits, elemSchema, registry);
+    } catch (_) { /* keep element schema name */ }
+    lines.push(indent + '[' + i + '] = ' + tag);
+  }
+  return lines;
+}
+
 function interpShowNodeFieldsMultiLine(handle, registry, indent) {
+  if (handle.kind === 'composite' && handle.fieldNode) {
+    const fKind = interpSchemaFieldKind(handle.fieldNode, registry);
+    if (fKind === 'bva') {
+      return interpShowBvaCompositeMultiLine(handle, registry, indent);
+    }
+  }
   const lines = [];
   const schema = interpResolveSchema(registry, handle.schemaRef);
   if (!schema) return [`${handle.schemaRef}`];

@@ -750,6 +750,26 @@ class InterpParser {
     return node;
   }
 
+  /** `:field` and `[index]` suffixes; repeat so `body[1]:value` and deeper chains parse. */
+  parsePostfixSuffixes(base, line) {
+    let node = this.parseFieldAccessSuffix(base, line);
+    node = this.parseIndexSuffix(node, line);
+    while (true) {
+      const afterIndex = this.parseIndexSuffix(node, line);
+      if (afterIndex !== node) {
+        node = afterIndex;
+        continue;
+      }
+      const afterField = this.parseFieldAccessSuffix(node, line);
+      if (afterField !== node) {
+        node = afterField;
+        continue;
+      }
+      break;
+    }
+    return node;
+  }
+
   parseDestructuringAssign() {
     const lineTok = this.eat('ID');
     const names = [lineTok.value];
@@ -904,16 +924,12 @@ class InterpParser {
       if (id === 'get' && this.match('SYM', ':')) {
         const slotTok = this.eat('ID');
         let node = { kind: 'getSlot', name: slotTok.value, line: slotTok.line };
-        node = this.parseFieldAccessSuffix(node, slotTok.line);
-        node = this.parseIndexSuffix(node, slotTok.line);
-        return node;
+        return this.parsePostfixSuffixes(node, slotTok.line);
       }
       if (id === 'has' && this.match('SYM', ':')) {
         const slotTok = this.eat('ID');
         let node = { kind: 'hasSlot', name: slotTok.value, line: slotTok.line };
-        node = this.parseFieldAccessSuffix(node, slotTok.line);
-        node = this.parseIndexSuffix(node, slotTok.line);
-        return node;
+        return this.parsePostfixSuffixes(node, slotTok.line);
       }
       if (this.match('SYM', '(')) {
         const args = [];
@@ -931,16 +947,12 @@ class InterpParser {
         return { kind: 'postfix', name: id, op: postOp, line: idTok.line };
       }
       let node = { kind: 'var', name: id, line: idTok.line };
-      node = this.parseFieldAccessSuffix(node, idTok.line);
-      node = this.parseIndexSuffix(node, idTok.line);
-      return node;
+      return this.parsePostfixSuffixes(node, idTok.line);
     }
     if (this.match('SYM', '(')) {
       const expr = this.parseExpr();
       this.eat('SYM', ')');
-      let node = this.parseFieldAccessSuffix(expr, t.line);
-      node = this.parseIndexSuffix(node, t.line);
-      return node;
+      return this.parsePostfixSuffixes(expr, t.line);
     }
     interpError(`expected expression, got ${t.type} '${t.value}'`, t.line);
   }

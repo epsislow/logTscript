@@ -377,7 +377,18 @@ Expected: Output **`4`** (length of **`"hits"`**).
 
 ## Extended `show(node)`
 
-**`show`** on a deferred **node handle** prints the active tag, then one line per child field. Bound children show the child tag; leaf fields show a debug decode width.
+**`show`** on a deferred **node handle** prints the active tag, then one line per child field. Bound children show the child tag; leaf fields show a debug decode width. On the parent, a BVA field is **`body = [N]`** only.
+
+**`show(body)`** on a **BVA handle** (e.g. **`body^`** in **`WhileLoop`**) lists each child’s active union tag:
+
+```text
+CallStatement[3]
+    [0] = CallAssign
+    [1] = CallAssign
+    [2] = WhileLoop
+```
+
+Use **`show(body[i])`** for depth-1 detail on one element. Chain **`:field`** after **`[i]`** to avoid temp variables: **`show(body[1]:value)`**, **`show(body[1]:value:left)`**.
 
 ```logts-play
 <byte>:
