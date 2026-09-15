@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp-deferred.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, interp-builtins.md, interp-maps.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp-deferred.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, interp-builtins.md, interp-maps.md, interp-node-field-access.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -24278,7 +24278,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`evaled(handle)\`** | Returns **1** if cached, **0** if not — **does not execute** the subtree |
 | **\`save:slot = expr\`** | Store a deferred handle in the session (does **not** run the subtree) |
 | **\`get:slot\`** | Read a saved handle — use in \`eval(get:slot, …)\` |
-| **Reserved names** | \`eval\`, \`evaled\`, \`save\`, \`get\`, \`nodeLen\`, \`first\`, \`last\`, \`nodeTag\`, \`isNodeTag\` — not user method names |
+| **Reserved names** | \`eval\`, \`evaled\`, \`save\`, \`get\`, \`nodeLen\`, \`first\`, \`last\`, \`nodeTag\`, \`isNodeTag\`, \`isNode\`, \`nodeName\`, \`fieldCount\` — not user method names |
 | **\`while eval(cond)\`** | Condition re-reads \`env\` each iteration when the AST node is deferred |
 | **Leaf \`/node\`** | Invalid on leaf numeric fields — abort at first dispatch |
 | **\`body[i]\`** | Index a composite deferred handle (BVA) — returns a child handle **without** \`eval\` |
@@ -24286,7 +24286,7 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`first\` / \`last\`** | First or last child handle of a composite BVA |
 | **\`nodeTag(h)\`** | Active union branch name (e.g. \`"CallAssign"\`) — **no method execution** |
 | **\`isNodeTag(h, name)\`** | Returns **1** / **0** — compares \`nodeTag(h)\` to \`name\` |
-| **\`show(node)\`** | One-line summary: active tag + schema ref (e.g. \`CallAssign <CallStatement>\`) |
+| **\`show(node)\`** | Multi-line field tree for node handles — see [interp-node-field-access.md](interp-node-field-access.md) |
 
 ---
 
@@ -25213,7 +25213,7 @@ No writes to **\`env\`** and no entries in **\`evaluationMap\`**. Internal **\`p
 
 ### \`show(node)\`
 
-When a **\`show\`** argument is a deferred handle, output is one line: **\`<activeTag> <schemaRef>\`** (e.g. **\`CallAssign <CallStatement>\`**). Field payloads are not expanded.
+When a **\`show\`** argument is a deferred **node handle**, output is a multi-line tree: the active tag on the first line, then **\`field =\`** lines for each child (bound children show the child tag; leaves show a debug decode width). **\`show(fieldRef)\`** prints the leaf path; **\`show(ref/u8)\`** decodes then prints the scalar. Full syntax (**\`node:left\`**, **\`/typeFormat\`**, **\`isNode\`**) → [interp-node-field-access.md](interp-node-field-access.md).
 
 ### Selective execution pattern
 
@@ -31186,11 +31186,16 @@ Runnable blocks on this page use the \`logts-play\` format. Each block shows two
 | **\`has:slotName\`** | **\`1\`** if save slot exists, **\`0\`** if not — does not return a handle |
 | **\`setKeysValues(map, keys, values)\`** | **Merge/upsert** pairs from parallel vectors into an **existing** map; returns total flat key count after merge |
 | **\`toString(v)\`**, **\`toInt(v)\`**, **\`toFloat(v)\`**, **\`toBool(v)\`** | Scalar runtime casts (≠ wire **\`T2NUM\`**) |
-| **\`typeOf(v)\`** | Runtime type name: **\`string\`**, **\`int\`**, **\`float\`**, **\`bool\`**, **\`vector\`**, **\`map\`**, **\`node\`** |
+| **\`typeOf(v)\`** | Runtime type name: **\`string\`**, **\`int\`**, **\`float\`**, **\`bool\`**, **\`vector\`**, **\`map\`**, **\`node\`**, **\`field\`** (leaf **\`fieldRef\`**) |
+| **\`isNode(h)\`** | **\`1\`** / **\`0\`** — whether **\`h\`** is a navigable **node handle** (bound/BVA slice) → [interp-node-field-access.md](interp-node-field-access.md) |
+| **\`nodeName(h)\`** | Schema field name for a child slice (e.g. **\`"left"\`**, **\`"value"\`**) |
+| **\`fieldCount(h)\`** | Number of navigable fields on a composite handle |
 | **\`a, b = split(text, n)\`** | Two-part string split — **destructure only** |
 | **\`implode(vec, sep)\`**, **\`explode(text, sep)\`** | Join / split **string** vectors at runtime |
 
-**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`setKeysValues\`**, **\`hasKey\`**, **\`hasIndex\`**, **\`toString\`**, **\`toInt\`**, **\`toFloat\`**, **\`toBool\`**, **\`typeOf\`**, **\`split\`**, **\`implode\`**, **\`explode\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
+**Reserved** (not user method names): **\`getKeys\`**, **\`getValues\`**, **\`setKeysValues\`**, **\`hasKey\`**, **\`hasIndex\`**, **\`toString\`**, **\`toInt\`**, **\`toFloat\`**, **\`toBool\`**, **\`typeOf\`**, **\`split\`**, **\`implode\`**, **\`explode\`**, **\`isNode\`**, **\`nodeName\`**, **\`fieldCount\`**, prefixes **\`unset:\`** / **\`has:\`**, and method names **\`unset\`** / **\`has\`**.
+
+Field navigation (**\`node:field\`**, **\`/typeFormat\`**, **\`fieldRef\`**) → [interp-node-field-access.md](interp-node-field-access.md).
 
 ---
 
@@ -32177,6 +32182,453 @@ Expected: Output shows **\`b\`**, **\`20\`**, **\`1\`** (one key **\`"a"\`** rem
 | \`env\`, \`save:\`/\`get:\`, deferred eval | [inline-interp-deferred.md](inline-interp-deferred.md) |
 | Vector parameters \`[]/type\` | [inline-interp.md](inline-interp.md) |
 | \`push\` pout from comp context | [comp-interp.md](comp-interp.md) |
+`,
+    'interp-node-field-access.md': `# Inline interpreter — node field access & decode
+
+Navigate **deferred AST handles** by schema field name or index, decode leaf wire bits with **\`/typeFormat\`**, and introspect composite nodes with **\`isNode\`**, **\`nodeName\`**, and **\`fieldCount\`**.
+
+Deferred parameters (\`node^\`, **\`eval\`**, **\`save:\`**) → [inline-interp-deferred.md](inline-interp-deferred.md). Schema shapes → [semantic-schemas.md](semantic-schemas.md). Wire decode on method params → [inline-interp.md](inline-interp.md).
+
+> **Development feature:** \`inline [parser]\`, \`inline [interp]\`, and related AST tooling are available for experimentation in current builds. They are **not** part of the production language surface yet.
+
+### Running examples (Load / Load & Run)
+
+Runnable blocks on this page use the \`logts-play\` format. Each block shows two buttons in the documentation viewer:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor **without** running it. Inspect or edit the example, then press toolbar **RUN** when ready. |
+| **Load & Run** | Copies the script and runs it immediately — check the **Output** panel for \`show\` results. |
+
+---
+
+## Quick reference
+
+| Form | Result |
+|------|--------|
+| **\`node:left\`** | Child handle for bound field **\`left\`** on the current node |
+| **\`node:0\`** / **\`node:1\`** | Same as **\`node:left\`** / **\`node:right\`** on product schemas (index by field order) |
+| **\`node:left:value/u8\`** | Navigate to bound child, then decode leaf **\`value\`** as unsigned 8-bit |
+| **\`ref = node:0\`** | Store a **\`fieldRef\`** (leaf bits + schema position) — not an executable node |
+| **\`ref/u8\`** | Decode a stored **\`fieldRef\`** with **\`/typeFormat\`** (same rules as on a chain) |
+| **\`node:name[]/ascii\`** | Decode a BVA blob as ASCII (empty **\`[]\`** = whole blob) |
+| **\`isNode(h)\`** | **\`1\`** if **\`h\`** is a bound/BVA **node handle**, **\`0\`** for scalars and **\`fieldRef\`** |
+| **\`nodeName(h)\`** | Schema field name for a sliced child (e.g. **\`"left"\`**, **\`"value"\`**) |
+| **\`fieldCount(h)\`** | Number of navigable fields on a composite node (**\`2\`** on **\`CallAdd\`**, **\`1\`** on union leaves) |
+| **\`typeOf(fieldRef)\`** | **\`"field"\`** — extends runtime types in [interp-builtins.md](interp-builtins.md) |
+| **\`show(node)\`** | Multi-line tree: active tag, then **\`field =\`** lines for each child (bound → tag name, leaf → decoded debug width) |
+
+**Reserved** (not user method names): **\`isNode\`**, **\`nodeName\`**, **\`fieldCount\`** — plus deferred builtins from [inline-interp-deferred.md](inline-interp-deferred.md).
+
+**Rules:**
+
+- **\`eval\`**, **\`save:\`**, **\`get:\`** work on **node handles** (\`isNode\` → **\`1\`**). They **abort** on **\`fieldRef\`**.
+- **\`/typeFormat\`** on a **bound** field without reaching a leaf aborts (e.g. **\`node:left/s16\`**).
+- Division **\`left / right\`** is unchanged — bare **\`/type\`** applies only when the token after **\`/\`** is a valid wire type name (\`u8\`, \`s16\`, \`ascii\`, …).
+
+---
+
+## Bound slice → node handle
+
+Inside a method with deferred **\`node^\`**, **\`node:left\`** returns a child **node handle** (same kind as F6 **\`/node\`** on a bound param). **\`typeOf\`** is **\`"node"\`** and **\`isNode\`** is **\`1\`**.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?:   <CallNumber>
+    CallVariable?: bound <CallVariable>
+    CallAdd?:      bound <CallAdd>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    token ID  = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+    rule term = factor;
+    rule factor = INT -> CallNumber | $name:ID -> CallVariable;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallVariable(name/ascii) { return env[name]; }
+    CallAdd(left/s16, right/s16) {
+        child = node:left;
+        if (isNode(child) == 1 && typeOf(child) == "node") {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+4096wire<expr> ast =: .factLang:packAst("3+4", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`1\`** — **\`node:left\`** on **\`CallAdd\`** is a node handle.
+
+---
+
+## Leaf slice → \`fieldRef\` and decode
+
+On **\`CallNumber\`**, **\`node:0\`** (or **\`node:value\`**) addresses the leaf **\`value\`** field. Without **\`/typeFormat\`** the result is a **\`fieldRef\`** (\`typeOf\` → **\`"field"\`**, **\`isNode\`** → **\`0\`**). Append **\`/u8\`** (or any valid wire type) to decode.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) {
+        return node:0/u8;
+    }
+}
+
+9wire<expr> ast =: .factLang:packAst("7", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`7\`**.
+
+---
+
+## Named fields and nested decode
+
+Field names come from the **child schema**, not from the parent tag alone. On **\`CallAdd\`**, **\`node:left:value/u8\`** walks **\`left\`** (bound **\`CallNumber\`**) then decodes leaf **\`value\`**.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+    rule term = INT -> CallNumber;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        return node:left:value/u8 + node:right:value/u8;
+    }
+}
+
+4096wire<expr> ast =: .factLang:packAst("4+5", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`9\`**.
+
+---
+
+## Index vs name
+
+**\`node:0\`** and **\`node:left\`** are equivalent on fixed product nodes. **\`node:1\`** is the second field (**\`right\`** on **\`CallAdd\`**).
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+    rule term = INT -> CallNumber;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        a = node:left:value/u8;
+        b = node:1:value/u8;
+        return a + b;
+    }
+}
+
+4096wire<expr> ast =: .factLang:packAst("10+20", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`30\`**.
+
+---
+
+## \`nodeName\` and \`fieldCount\`
+
+| Handle | \`fieldCount\` | \`nodeName(node:0)\` |
+|--------|--------------|-------------------|
+| **\`CallAdd\`** | **2** | **\`"left"\`** |
+| **\`CallNumber\`** (union leaf) | **1** | **\`"value"\`** |
+| **\`CallVariable\`** | **2** | **\`"name"\`** |
+
+Union nodes expose only the active branch — **\`node:1\`** on **\`CallNumber\`** aborts (**missing field**).
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+    rule term = INT -> CallNumber;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        r = fieldCount(node) * 10;
+        if (nodeName(node:0) == "left") {
+            r = r + 1;
+        }
+        return r;
+    }
+}
+
+4096wire<expr> ast =: .factLang:packAst("1+2", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`21\`** (field count 2 → **\`20\`**, plus **\`1\`** when first field is **\`left\`**).
+
+---
+
+## Stored \`fieldRef\` and \`ref/u8\`
+
+Assign a leaf slice to a local, then decode later:
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    rule expression = INT -> CallNumber;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) {
+        ref = node:value;
+        return ref/u8;
+    }
+}
+
+9wire<expr> ast =: .factLang:packAst("8", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`8\`**.
+
+---
+
+## ASCII on symbol names (\`[]/ascii\`)
+
+For bound **\`symbol\`** fields, navigate to the BVA child before **\`[]/ascii\`**. On **\`CallVariable\`**, **\`node:name[]/ascii\`** decodes the identifier bytes.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<symbol>+:
+    bytes: bound <byte>[1-]
+:
+
+<CallVariable>:
+    name: bound <symbol>
+:
+
+<expr>+:
+    CallVariable?: bound <CallVariable>
+:
+
+inline [parser] .factLang:
+    token ID = [a-zA-Z_][a-zA-Z0-9_]*;
+    rule expression = $name:ID -> CallVariable;
+:
+
+inline [interp] .factInterp {
+    CallVariable(name/ascii) {
+        return vectorLen(explode(node:name[]/ascii, ""));
+    }
+}
+
+16wire<expr> ast =: .factLang:packAst("hits", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+show(result)
+\`\`\`
+
+Expected: Output **\`4\`** (length of **\`"hits"\`**).
+
+---
+
+## Extended \`show(node)\`
+
+**\`show\`** on a deferred **node handle** prints the active tag, then one line per child field. Bound children show the child tag; leaf fields show a debug decode width.
+
+\`\`\`logts-play
+<byte>:
+    value: 8
+:
+
+<CallNumber>:
+    value: 8
+:
+
+<CallAdd>:
+    left:  bound <expr>
+    right: bound <expr>
+:
+
+<expr>+:
+    CallNumber?: <CallNumber>
+    CallAdd?:    bound <CallAdd>
+:
+
+inline [parser] .factLang:
+    token INT = [0-9]+;
+    rule expression
+        = expression "+" term -> CallAdd
+        | term;
+    rule term = INT -> CallNumber;
+:
+
+inline [interp] .factInterp {
+    CallNumber(value/u8) { return value; }
+    CallAdd(left/s16, right/s16) {
+        show(node);
+        return 0;
+    }
+}
+
+4096wire<expr> ast =: .factLang:packAst("2+3", <expr>, "expression")
+16wire result = .factInterp:eval(ast, <expr>)
+\`\`\`
+
+Expected: Output includes **\`CallAdd\`**, **\`left =\`**, and **\`right =\`** lines.
+
+**\`show(fieldRef)\`** prints the leaf path (e.g. **\`field value (CallNumber.value, 8 bit)\`**). **\`show(ref/u8)\`** decodes then prints the scalar.
+
+---
+
+## What aborts
+
+| Expression | Reason |
+|------------|--------|
+| **\`node:missing\`** | Field not in schema for current node |
+| **\`node:left/s16\`** | **\`/typeFormat\`** on bound field — navigate to leaf first |
+| **\`eval(node:0)\`** on **\`CallNumber\`** | **\`fieldRef\`** is not a deferred executable subtree |
+| **\`node:1\`** on **\`CallNumber\`** | Union leaf has only index **\`0\`** |
+
+Slice and decode are **read-only** — they do not call **\`eval\`**, write **\`env\`**, or update **\`evaluationMap\`**.
+
+---
+
+## Related pages
+
+| Topic | Page |
+|-------|------|
+| Deferred **\`node^\`**, **\`eval\`**, **\`save:\`** | [inline-interp-deferred.md](inline-interp-deferred.md) |
+| **\`typeOf\`**, maps, casts | [interp-builtins.md](interp-builtins.md) |
+| **\`nodeLen\`**, **\`body[i]\`**, **\`nodeTag\`** | [inline-interp-deferred.md](inline-interp-deferred.md) (BVA indexing) |
 `,
     'ioport.md': `# IOPORT
 

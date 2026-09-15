@@ -5,7 +5,7 @@ const ab = require('../../core/ast-builder.js');
 if (typeof globalThis.LogTScriptNumericFormats === 'undefined') {
   globalThis.LogTScriptNumericFormats = require('../../core/numeric-formats.js');
 }
-const ie = require('../../core/interp-engine.js');
+const ie = require('../js/interp_doc_verify_globals.js');
 const ia = require('../../core/interp-assembler.js');
 
 if (typeof globalThis.compileParserTokenRegex !== 'function') {

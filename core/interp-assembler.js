@@ -24,6 +24,7 @@ const INTERP_MAP_BUILTIN_NAMES = new Set(['getKeys', 'getValues', 'setKeysValues
 const INTERP_SCALAR_BUILTIN_NAMES = new Set([
   'toString', 'toInt', 'toFloat', 'toBool', 'typeOf', 'split', 'implode', 'explode',
   'nodeLen', 'first', 'last', 'nodeTag', 'isNodeTag',
+  'isNode', 'nodeName', 'fieldCount',
 ]);
 
 const INTERP_UNSET_MAX_TARGETS = 10;
@@ -39,9 +40,12 @@ function interpError(msg, line) {
   throw new Error(`interp: ${msg}`);
 }
 
+function isInterpTypeName(typeName) {
+  return typeName === 'node' || (typeName && INTERP_TYPE_RE.test(typeName));
+}
+
 function validateInterpType(typeName, line) {
-  if (typeName === 'node') return;
-  if (!typeName || !INTERP_TYPE_RE.test(typeName)) {
+  if (!isInterpTypeName(typeName)) {
     interpError(`unknown type '/${typeName || ''}'`, line);
   }
 }
@@ -651,6 +655,71 @@ class InterpParser {
     return { kind: 'slot', name: idTok.value };
   }
 
+  parseFieldDecodeSuffix(line, allowBracketAscii) {
+    let asciiCharsPerElem = 0;
+    let asciiNullDelim = false;
+    let vectorFixedCount = 0;
+    if (allowBracketAscii && this.match('SYM', '[')) {
+      if (this.match('SYM', ']')) {
+        if (this.match('SYM', '~')) {
+          asciiNullDelim = true;
+        } else if (this.peek().type === 'NUM') {
+          asciiCharsPerElem = parseInt(this.eat('NUM').value, 10);
+          if (!Number.isFinite(asciiCharsPerElem) || asciiCharsPerElem < 1) {
+            interpError('[]M/ascii requires positive M', line);
+          }
+        }
+      } else {
+        interpError('field decode [] must be empty or [N] before /type', line);
+      }
+    }
+    if (!this.match('SYM', '/')) return null;
+    const typeTok = this.eat('ID');
+    validateInterpType(typeTok.value, typeTok.line);
+    if (asciiNullDelim && typeTok.value !== 'ascii') {
+      interpError('~/ is only valid for /ascii', line);
+    }
+    if (asciiNullDelim && asciiCharsPerElem > 0) {
+      interpError('cannot combine ~/ascii with [N]/ascii', line);
+    }
+    if (asciiCharsPerElem > 0 && typeTok.value !== 'ascii') {
+      interpError('[]M/type is only valid for /ascii', line);
+    }
+    return {
+      typeName: typeTok.value,
+      asciiCharsPerElem,
+      asciiNullDelim,
+      vectorFixedCount: asciiCharsPerElem > 0 ? asciiCharsPerElem : 0,
+    };
+  }
+
+  parseFieldAccessSuffix(base, line) {
+    const segments = [];
+    while (this.match('SYM', ':')) {
+      const colonLine = this.tokens[this.pos - 1].line;
+      const t = this.peek();
+      if (t.type === 'NUM') {
+        segments.push({ segKind: 'index', value: parseInt(this.eat('NUM').value, 10) });
+      } else if (t.type === 'ID') {
+        segments.push({ segKind: 'name', value: this.eat('ID').value });
+      } else {
+        interpError('expected field name or index after :', colonLine);
+      }
+    }
+    if (!segments.length) {
+      if (this.peek().type === 'SYM' && this.peek().value === '/') {
+        const typeTok = this.tokens[this.pos + 1];
+        if (typeTok && typeTok.type === 'ID' && isInterpTypeName(typeTok.value)) {
+          const decode = this.parseFieldDecodeSuffix(line, false);
+          return { kind: 'fieldAccess', base, segments, decode, line };
+        }
+      }
+      return base;
+    }
+    const decode = this.parseFieldDecodeSuffix(line, true);
+    return { kind: 'fieldAccess', base, segments, decode, line };
+  }
+
   parseIndexSuffix(base, line) {
     let node = base;
     while (this.match('SYM', '[')) {
@@ -834,11 +903,17 @@ class InterpParser {
       const id = idTok.value;
       if (id === 'get' && this.match('SYM', ':')) {
         const slotTok = this.eat('ID');
-        return { kind: 'getSlot', name: slotTok.value, line: slotTok.line };
+        let node = { kind: 'getSlot', name: slotTok.value, line: slotTok.line };
+        node = this.parseFieldAccessSuffix(node, slotTok.line);
+        node = this.parseIndexSuffix(node, slotTok.line);
+        return node;
       }
       if (id === 'has' && this.match('SYM', ':')) {
         const slotTok = this.eat('ID');
-        return { kind: 'hasSlot', name: slotTok.value, line: slotTok.line };
+        let node = { kind: 'hasSlot', name: slotTok.value, line: slotTok.line };
+        node = this.parseFieldAccessSuffix(node, slotTok.line);
+        node = this.parseIndexSuffix(node, slotTok.line);
+        return node;
       }
       if (this.match('SYM', '(')) {
         const args = [];
@@ -856,13 +931,16 @@ class InterpParser {
         return { kind: 'postfix', name: id, op: postOp, line: idTok.line };
       }
       let node = { kind: 'var', name: id, line: idTok.line };
+      node = this.parseFieldAccessSuffix(node, idTok.line);
       node = this.parseIndexSuffix(node, idTok.line);
       return node;
     }
     if (this.match('SYM', '(')) {
       const expr = this.parseExpr();
       this.eat('SYM', ')');
-      return expr;
+      let node = this.parseFieldAccessSuffix(expr, t.line);
+      node = this.parseIndexSuffix(node, t.line);
+      return node;
     }
     interpError(`expected expression, got ${t.type} '${t.value}'`, t.line);
   }
@@ -1044,6 +1122,11 @@ function validateExprCallArity(expr, program, line, expectMulti) {
     for (const a of expr.args || []) validateExprTree(a, program, line);
     return;
   }
+  if (expr.name === 'isNode' || expr.name === 'nodeName' || expr.name === 'fieldCount') {
+    if ((expr.args || []).length !== 1) interpError(`${expr.name} expects 1 argument`, line);
+    for (const a of expr.args || []) validateExprTree(a, program, line);
+    return;
+  }
   if (expr.name === 'implode' || expr.name === 'explode') {
     if ((expr.args || []).length !== 2) interpError(`${expr.name} expects 2 arguments`, line);
     for (const a of expr.args || []) validateExprTree(a, program, line);
@@ -1068,6 +1151,11 @@ function validateExprCallArity(expr, program, line, expectMulti) {
 function validateHandleSaveExpr(expr, line) {
   if (!expr) {
     interpError('save: requires deferred node handle expression', line);
+  }
+  if (expr.kind === 'fieldAccess') {
+    if (expr.decode) interpError('save: requires deferred node handle', line);
+    validateExprTree(expr, null, line);
+    return;
   }
   if (expr.kind === 'number' || expr.kind === 'string' || expr.kind === 'array') {
     interpError('save: requires deferred node handle', line);
@@ -1105,7 +1193,19 @@ function validateExprTree(expr, program, line) {
     for (const el of expr.elements || []) validateExprTree(el, program, line);
   } else if (expr.kind === 'map') {
     /* empty literal */
+  } else if (expr.kind === 'fieldAccess') {
+    validateExprTree(expr.base, program, line);
+    if (expr.decode && expr.base && expr.base.kind === 'var' && expr.base.name === 'node' && !expr.segments.length) {
+      interpError('nodeName on root node requires a field slice', line);
+    }
   }
+}
+
+function validateFieldAccessSaveExpr(expr, line) {
+  if (!expr || expr.kind !== 'fieldAccess') return false;
+  if (expr.decode) return false;
+  validateFieldAccessSaveExpr(expr.base, line);
+  return true;
 }
 
 function validateStmtTree(stmts, program) {

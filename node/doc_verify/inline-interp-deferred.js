@@ -2,7 +2,7 @@
 
 const pa = require('../../core/parser-assembler.js');
 const ab = require('../../core/ast-builder.js');
-const ie = require('../../core/interp-engine.js');
+const ie = require('../js/interp_doc_verify_globals.js');
 const ia = require('../../core/interp-assembler.js');
 
 if (typeof globalThis.compileParserTokenRegex !== 'function') {

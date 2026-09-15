@@ -59550,13 +59550,240 @@ inline [interp] .slotInterp {
     const core = f10Core('    StmtSeq(stmts^) { show(stmts[0]); return 0; }');
     const outBefore = session.out.length;
     f10EvalStmtSeq(session, core, 'x=1;');
-    const lines = session.out.slice(outBefore);
-    h.assert('show line', String(lines.some((l) => l.indexOf('CallAssign <CallStatement>') >= 0)), 'true');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('show tag CallAssign', String(text.indexOf('CallAssign') >= 0), 'true');
+    h.assert('show field name', String(text.indexOf('name =') >= 0), 'true');
   });
 
   regInterpDual(5597, 5598, 'f10 E2E factorial via body index loop legacy+wave', function(h, session) {
     const w = f10EvalProgram(session, F10_CORE, 'fact=1; n=5; while(n) { fact=fact*n; n=n-1; } out=fact;', 'result');
     h.assert('indexed body 5!=120', w, '0000000001111000');
+  });
+
+  /* ----- F11 — handle:field access, fieldRef decode, isNode/nodeName/fieldCount ----- */
+
+  function f11PatchMethod(interpSrc, methodName, sig, bodyLines) {
+    const body = bodyLines.map((l) => '        ' + l).join('\n');
+    const re = new RegExp(`    ${methodName}\\([^\\n]*\\) \\{[\\s\\S]*?\\n    \\}`, 'm');
+    return interpSrc.replace(re, `    ${methodName}(${sig}) {\n${body}\n    }`);
+  }
+
+  function f11Core(patches) {
+    let interp = F10_INTERP;
+    const table = {
+      CallAdd: ['left/s16, right/s16', ['return left + right;']],
+      CallNumber: ['value/u8', ['return value;']],
+      CallVariable: ['name/ascii', ['return env[name];']],
+      CallAssign: ['name/ascii, value/s16', ['env[name] = value;', 'return value;']],
+    };
+    for (const [name, spec] of Object.entries(patches || {})) {
+      const base = table[name];
+      if (!base) continue;
+      interp = f11PatchMethod(interp, name, spec[0] || base[0], spec[1] || base[1]);
+    }
+    return F6_SCHEMAS + '\n' + F10_PARSER + '\n' + interp;
+  }
+
+  function f11EvalExprWire(session, core, src, wireName) {
+    const wn = wireName || 'result';
+    session.run(core + '\n4096wire<expr> w =: .factLang:packAst("' + f6EscStr(src) + '", <expr>, "expression")\n16wire ' + wn + ' = .factInterp:eval(w, <expr>)');
+    return session.getWire(session.interp, wn);
+  }
+
+  function f11EvalProgramWire(session, core, src, wireName) {
+    const wn = wireName || 'result';
+    session.run(core + '\n4096wire<program> prog =: .factLang:packAst("' + f6EscStr(src) + '", <program>, "program")\n16wire ' + wn + ' = .factInterp:eval(prog, <program>)');
+    return session.getWire(session.interp, wn);
+  }
+
+  regInterpDual(5601, 5602, 'f11a bound field slice typeOf node isNode 1', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', [
+      'n = node:left;',
+      'r = isNode(n);',
+      'if (typeOf(n) == "node") { r = r + 1; }',
+      'return r;',
+    ]] });
+    const w = f11EvalExprWire(session, core, '3+4');
+    h.assert('isNode+typeOf node', w, '0000000000000010');
+  });
+
+  regInterpDual(5603, 5604, 'f11a CallNumber index 0 fieldRef decode not node', function(h, session) {
+    const coreIdx = f11Core({ CallNumber: ['value/u8', [
+      'return isNode(node:0) * 100 + node:0/u8;',
+    ]] });
+    const wIdx = f11EvalExprWire(session, coreIdx, '7');
+    h.assert('index 0 fieldRef decode 7', wIdx, '0000000000000111');
+    const coreName = f11Core({ CallNumber: ['value/u8', [
+      'return isNode(node:value) * 100 + node:value/u8;',
+    ]] });
+    const wName = f11EvalExprWire(session, coreName, '7');
+    h.assert('name value fieldRef decode 7', wName, '0000000000000111');
+  });
+
+  regInterpDual(5605, 5606, 'f11b decode node:left:value/u8 on nested CallNumber', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', ['return node:left:value/u8;']] });
+    const w = f11EvalExprWire(session, core, '5+0');
+    h.assert('left child value 5', w, '0000000000000101');
+  });
+
+  regInterpDual(5607, 5608, 'f11b decode node:name/ascii on CallVariable', function(h, session) {
+    const core = f11Core({
+      CallVariable: ['name/ascii', ['return vectorLen(explode(node:name[]/ascii, ""));']],
+    });
+    const w = f11EvalExprWire(session, core, 'hits');
+    h.assert('variable name length 4', w, '0000000000000100');
+  });
+
+  regInterpDual(5609, 5610, 'f11a missing field aborts', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', ['return node:missing;']] });
+    h.assertThrows('missing field', function() {
+      f11EvalExprWire(session, core, '1+2');
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'no field');
+  });
+
+  regInterpDual(5611, 5612, 'f11a field slice does not run eval or change env', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', [
+      'env["hits"] = 0;',
+      'slice = node:left;',
+      'return env["hits"];',
+    ]] });
+    const w = f11EvalExprWire(session, core, '9+1');
+    h.assert('env untouched by slice', w, '0000000000000000');
+  });
+
+  regInterpDual(5613, 5614, 'f11c show node multi-line fields', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', ['show(node);', 'return 0;']] });
+    const outBefore = session.out.length;
+    f11EvalExprWire(session, core, '2+3');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('show CallAdd tag', String(text.indexOf('CallAdd') >= 0), 'true');
+    h.assert('show left field', String(text.indexOf('left =') >= 0), 'true');
+    h.assert('show right field', String(text.indexOf('right =') >= 0), 'true');
+  });
+
+  regInterpDual(5615, 5616, 'f11b nested chain node:left:left:value/u8', function(h, session) {
+    const coreFlat = f11Core({ CallAdd: ['left/s16, right/s16', [
+      'return node:left:value/u8 + node:right:value/u8;',
+    ]] });
+    const w = f11EvalExprWire(session, coreFlat, '1+2');
+    h.assert('flat left right decode sum 3', w, '0000000000000011');
+  });
+
+  regInterpDual(5617, 5618, 'f11b isNode 0 on decoded scalar', function(h, session) {
+    const core = f11Core({ CallNumber: ['value/u8', ['return isNode(node:0/u8);']] });
+    const w = f11EvalExprWire(session, core, '4');
+    h.assert('scalar isNode 0', w, '0000000000000000');
+  });
+
+  regInterpDual(5619, 5620, 'f11a save get on field slice handle', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', [
+      'save:lhs = node:left;',
+      'return isNode(get:lhs);',
+    ]] });
+    const w = f11EvalExprWire(session, core, '6+0');
+    h.assert('save get slice is node', w, '0000000000000001');
+  });
+
+  regInterpDual(5621, 5622, 'f11d index chain node:1:value/u8 is right operand', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', ['return node:1:value/u8;']] });
+    const w = f11EvalExprWire(session, core, '10+20');
+    h.assert('index 1 is right operand 20', w, '0000000000010100');
+  });
+
+  regInterpDual(5623, 5624, 'f11d nodeName and fieldCount on CallAdd', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', [
+      'r = fieldCount(node) * 10;',
+      'if (nodeName(node:0) == "left") { r = r + 1; }',
+      'return r;',
+    ]] });
+    const w = f11EvalExprWire(session, core, '1+2');
+    h.assert('fieldCount 2 nodeName left', w, '0000000000010101');
+  });
+
+  regInterpDual(5625, 5626, 'f11 fieldRef assign then ref/u8 decode', function(h, session) {
+    const core = f11Core({ CallNumber: ['value/u8', [
+      'ref = node:0;',
+      'return ref/u8;',
+    ]] });
+    const w = f11EvalExprWire(session, core, '8');
+    h.assert('ref/u8 decode', w, '0000000000001000');
+  });
+
+  regInterpDual(5627, 5628, 'f11 eval fieldRef aborts', function(h, session) {
+    const coreEval = f11Core({ CallNumber: ['value/u8', ['eval(node:0);', 'return 0;']] });
+    h.assertThrows('eval fieldRef', function() {
+      f11EvalExprWire(session, coreEval, '1');
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'deferred node handle');
+  });
+
+  regInterpDual(5639, 5640, 'f11 decode slash type on bound field aborts', function(h, session) {
+    const coreBound = f11Core({ CallAdd: ['left/s16, right/s16', ['return node:left/s16;']] });
+    h.assertThrows('bound decode', function() {
+      f11EvalExprWire(session, coreBound, '1+2');
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'leaf field');
+  });
+
+  regInterpDual(5629, 5630, 'f11 stored fieldRef decodes via ref slash type', function(h, session) {
+    const core = f11Core({ CallNumber: ['value/u8', [
+      'ref = node:value;',
+      'return ref/u8;',
+    ]] });
+    const w = f11EvalExprWire(session, core, '3');
+    h.assert('stored fieldRef ref/u8', w, '0000000000000011');
+  });
+
+  regInterpDual(5631, 5632, 'f11e ascii decode blob on bound symbol', function(h, session) {
+    const core = f11Core({
+      CallVariable: ['name/ascii', ['return vectorLen(explode(node:name[]/ascii, ""));']],
+    });
+    const w = f11EvalExprWire(session, core, 'ab');
+    h.assert('ascii blob len 2', w, '0000000000000010');
+  });
+
+  regInterpDual(5633, 5634, 'f11c show fieldRef path and show ref/u8', function(h, session) {
+    const core = f11Core({ CallNumber: ['value/u8', [
+      'ref = node:0;',
+      'show(ref);',
+      'show(ref/u8);',
+      'return 0;',
+    ]] });
+    const outBefore = session.out.length;
+    f11EvalExprWire(session, core, '6');
+    const text = session.out.slice(outBefore).join('\n');
+    h.assert('field path', String(text.indexOf('field value') >= 0), 'true');
+    h.assert('decoded scalar', String(text.indexOf('6') >= 0), 'true');
+  });
+
+  regInterpDual(5635, 5636, 'f11 E2E mixed index and name field access', function(h, session) {
+    const core = f11Core({ CallAdd: ['left/s16, right/s16', [
+      'a = node:left:value/u8;',
+      'b = node:1:value/u8;',
+      'return a + b;',
+    ]] });
+    const w = f11EvalExprWire(session, core, '4+5');
+    h.assert('name and index decode', w, '0000000000001001');
+  });
+
+  regInterpDual(5637, 5638, 'f11d union fieldCount 1 and index 1 absent aborts', function(h, session) {
+    const core = f11Core({ CallNumber: ['value/u8', ['return fieldCount(node);']] });
+    const w = f11EvalExprWire(session, core, '1');
+    h.assert('CallNumber fieldCount 1', w, '0000000000000001');
+    const coreBad = f11Core({ CallNumber: ['value/u8', ['return node:1;']] });
+    h.assertThrows('union index 1 absent', function() {
+      f11EvalExprWire(session, coreBad, '1');
+      const err = session.interp && session.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    }, 'missing field');
   });
 
   window.LogTScriptTestSuite.finalize();

@@ -33,11 +33,16 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **`has:slotName`** | **`1`** if save slot exists, **`0`** if not — does not return a handle |
 | **`setKeysValues(map, keys, values)`** | **Merge/upsert** pairs from parallel vectors into an **existing** map; returns total flat key count after merge |
 | **`toString(v)`**, **`toInt(v)`**, **`toFloat(v)`**, **`toBool(v)`** | Scalar runtime casts (≠ wire **`T2NUM`**) |
-| **`typeOf(v)`** | Runtime type name: **`string`**, **`int`**, **`float`**, **`bool`**, **`vector`**, **`map`**, **`node`** |
+| **`typeOf(v)`** | Runtime type name: **`string`**, **`int`**, **`float`**, **`bool`**, **`vector`**, **`map`**, **`node`**, **`field`** (leaf **`fieldRef`**) |
+| **`isNode(h)`** | **`1`** / **`0`** — whether **`h`** is a navigable **node handle** (bound/BVA slice) → [interp-node-field-access.md](interp-node-field-access.md) |
+| **`nodeName(h)`** | Schema field name for a child slice (e.g. **`"left"`**, **`"value"`**) |
+| **`fieldCount(h)`** | Number of navigable fields on a composite handle |
 | **`a, b = split(text, n)`** | Two-part string split — **destructure only** |
 | **`implode(vec, sep)`**, **`explode(text, sep)`** | Join / split **string** vectors at runtime |
 
-**Reserved** (not user method names): **`getKeys`**, **`getValues`**, **`setKeysValues`**, **`hasKey`**, **`hasIndex`**, **`toString`**, **`toInt`**, **`toFloat`**, **`toBool`**, **`typeOf`**, **`split`**, **`implode`**, **`explode`**, prefixes **`unset:`** / **`has:`**, and method names **`unset`** / **`has`**.
+**Reserved** (not user method names): **`getKeys`**, **`getValues`**, **`setKeysValues`**, **`hasKey`**, **`hasIndex`**, **`toString`**, **`toInt`**, **`toFloat`**, **`toBool`**, **`typeOf`**, **`split`**, **`implode`**, **`explode`**, **`isNode`**, **`nodeName`**, **`fieldCount`**, prefixes **`unset:`** / **`has:`**, and method names **`unset`** / **`has`**.
+
+Field navigation (**`node:field`**, **`/typeFormat`**, **`fieldRef`**) → [interp-node-field-access.md](interp-node-field-access.md).
 
 ---
 

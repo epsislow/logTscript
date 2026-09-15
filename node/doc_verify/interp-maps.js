@@ -1,7 +1,7 @@
 'use strict';
 
 const ia = require('../../core/interp-assembler.js');
-const ie = require('../../core/interp-engine.js');
+const ie = require('../js/interp_doc_verify_globals.js');
 
 const MAP_CORE = [
   '<MapProbe>+:',

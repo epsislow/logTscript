@@ -28,7 +28,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **`evaled(handle)`** | Returns **1** if cached, **0** if not — **does not execute** the subtree |
 | **`save:slot = expr`** | Store a deferred handle in the session (does **not** run the subtree) |
 | **`get:slot`** | Read a saved handle — use in `eval(get:slot, …)` |
-| **Reserved names** | `eval`, `evaled`, `save`, `get`, `nodeLen`, `first`, `last`, `nodeTag`, `isNodeTag` — not user method names |
+| **Reserved names** | `eval`, `evaled`, `save`, `get`, `nodeLen`, `first`, `last`, `nodeTag`, `isNodeTag`, `isNode`, `nodeName`, `fieldCount` — not user method names |
 | **`while eval(cond)`** | Condition re-reads `env` each iteration when the AST node is deferred |
 | **Leaf `/node`** | Invalid on leaf numeric fields — abort at first dispatch |
 | **`body[i]`** | Index a composite deferred handle (BVA) — returns a child handle **without** `eval` |
@@ -36,7 +36,7 @@ Runnable blocks on this page use the `logts-play` format. Each block shows two b
 | **`first` / `last`** | First or last child handle of a composite BVA |
 | **`nodeTag(h)`** | Active union branch name (e.g. `"CallAssign"`) — **no method execution** |
 | **`isNodeTag(h, name)`** | Returns **1** / **0** — compares `nodeTag(h)` to `name` |
-| **`show(node)`** | One-line summary: active tag + schema ref (e.g. `CallAssign <CallStatement>`) |
+| **`show(node)`** | Multi-line field tree for node handles — see [interp-node-field-access.md](interp-node-field-access.md) |
 
 ---
 
@@ -963,7 +963,7 @@ No writes to **`env`** and no entries in **`evaluationMap`**. Internal **`pathKe
 
 ### `show(node)`
 
-When a **`show`** argument is a deferred handle, output is one line: **`<activeTag> <schemaRef>`** (e.g. **`CallAssign <CallStatement>`**). Field payloads are not expanded.
+When a **`show`** argument is a deferred **node handle**, output is a multi-line tree: the active tag on the first line, then **`field =`** lines for each child (bound children show the child tag; leaves show a debug decode width). **`show(fieldRef)`** prints the leaf path; **`show(ref/u8)`** decodes then prints the scalar. Full syntax (**`node:left`**, **`/typeFormat`**, **`isNode`**) → [interp-node-field-access.md](interp-node-field-access.md).
 
 ### Selective execution pattern
 

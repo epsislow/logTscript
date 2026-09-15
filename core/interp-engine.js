@@ -794,6 +794,39 @@ function interpExtractFieldBits(payloadBits, payloadSchema, fieldName) {
       }
       continue;
     }
+    if (node.kind === 'optional_field') {
+      const maskBits = payloadSchema.presenceMaskBits || 0;
+      const maskInfo = SB.readPresenceMask(bits, maskBits, 0);
+      let optIdx = 0;
+      let present = false;
+      for (const n2 of payloadSchema.structure || []) {
+        if (n2.kind !== 'optional_field') continue;
+        if (n2.name === fieldName) {
+          present = maskInfo.mask.charAt(optIdx) === '1';
+          break;
+        }
+        optIdx++;
+      }
+      if (!present) interpError(`schema '${payloadSchema.name}' has no field '${fieldName}'`);
+      const inner = interpNormalizeFieldNode(node);
+      const off = maskInfo.payloadStart;
+      if (inner.isBound || inner.kind === 'bound') {
+        const sub = SB.readBoundSubstream(bits, off);
+        return sub.payloadBits;
+      }
+      if (inner.schema) {
+        const subSchema = inner.schema.name || inner.schemaRef || inner.schema;
+        const resolved = typeof subSchema === 'string' ? subSchema : subSchema.name;
+        const ss = interpSs();
+        if (resolved && ss && typeof ss.getSchema === 'function') {
+          const sub = ss.getSchema(resolved);
+          if (sub && sub.totalWidth) {
+            return bits.substring(off, off + sub.totalWidth);
+          }
+        }
+      }
+      return bits.substring(off);
+    }
     if (node.kind === 'bound' || node.isBound) {
       const sub = SB.readBoundSubstream(bits, offset);
       return sub.payloadBits;
@@ -840,7 +873,9 @@ function interpInvokeAstMethod(methodName, payloadBits, payloadSchema, registry,
         argValues.push(interpDecodeParamValue(payloadBits, payloadSchema, param, fieldNode, registry, program, env, options));
       }
     }
-    return interpExecuteMethod(method, argValues, program, env, options);
+    const rootHandle = interpMakeInvokeRootHandle(payloadBits, payloadSchema, registry, pathKeyPrefix);
+    const execOpts = Object.assign({}, options || {}, { invokeRootHandle: rootHandle });
+    return interpExecuteMethod(method, argValues, program, env, execOpts);
   } finally {
     if (ctx && ctx.astPath && ctx.astPath.length) ctx.astPath.pop();
   }
@@ -1169,6 +1204,9 @@ function interpBuiltinNodeTag(args, env, callMethodFn, line) {
     interpError(`nodeTag expects 1 argument${line != null ? ` (line ${line})` : ''}`);
   }
   const handle = interpEvalExpr(args[0], env, callMethodFn, line);
+  if (interpIsFieldRef(handle)) {
+    interpError(`nodeTag expects node handle${line != null ? ` (line ${line})` : ''}`);
+  }
   const registry = interpInterpRegistryFromCtx();
   if (!registry) interpError('nodeTag requires active interpreter session');
   return interpNodeTagFromHandle(handle, registry, line);
@@ -1204,6 +1242,9 @@ function interpResolveHandleValue(expr, env, callMethodFn, line, options) {
     return map.get(expr.name);
   }
   const v = interpEvalExpr(expr, env, callMethodFn, line);
+  if (interpIsFieldRef(v)) {
+    interpError(`save: requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
+  }
   if (!interpIsNodeHandle(v)) {
     interpError(`save: requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
   }
@@ -1219,9 +1260,7 @@ function interpResolveEvalHandleArg(expr, env, callMethodFn, line) {
     return map.get(expr.name);
   }
   const v = interpEvalExpr(expr, env, callMethodFn, line);
-  if (!interpIsNodeHandle(v)) {
-    interpError(`eval requires deferred node handle${line != null ? ` (line ${line})` : ''}`);
-  }
+  interpAssertNodeHandleForEval(v, line);
   return v;
 }
 
@@ -1629,6 +1668,7 @@ function interpBuiltinTypeOf(args, env, callMethodFn, line) {
   }
   if (Array.isArray(v)) return 'vector';
   if (interpIsPlainMap(v)) return 'map';
+  if (interpIsFieldRef(v)) return 'field';
   if (interpIsNodeHandle(v)) return 'node';
   interpError(`typeOf: unsupported value${line != null ? ` (line ${line})` : ''}`);
 }
@@ -1837,6 +1877,9 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
         }
         return container[key];
       }
+      if (interpIsFieldRef(container)) {
+        interpError(`not indexable${lineNo != null ? ` (line ${lineNo})` : ''}`);
+      }
       if (interpIsNodeHandle(container)) {
         if (container.kind !== 'composite') {
           interpError(`not a composite node${lineNo != null ? ` (line ${lineNo})` : ''}`);
@@ -1960,7 +2003,18 @@ function interpEvalExpr(expr, env, callMethodFn, line) {
       if (expr.name === 'isNodeTag') {
         return interpBuiltinIsNodeTag(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
       }
+      if (expr.name === 'isNode') {
+        return interpBuiltinIsNode(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'nodeName') {
+        return interpBuiltinNodeName(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
+      if (expr.name === 'fieldCount') {
+        return interpBuiltinFieldCount(expr.args, env, callMethodFn, expr.line != null ? expr.line : line);
+      }
       return callMethodFn(expr.name, expr.args, line);
+    case 'fieldAccess':
+      return interpEvalFieldAccess(expr, env, callMethodFn, expr.line != null ? expr.line : line);
     default:
       interpError('invalid expression node');
   }
@@ -2272,9 +2326,20 @@ function interpFormatShowValue(value) {
     const parts = value.map((el) => interpFormatShowValue(el));
     return `[${parts.join(', ')}]`;
   }
+  if (interpIsFieldRef(value)) {
+    const registry = interpInterpRegistryFromCtx();
+    if (registry && typeof interpShowFieldRefPath === 'function') {
+      return interpShowFieldRefPath(value, registry);
+    }
+    return `field ${value.fieldName}`;
+  }
   if (interpIsNodeHandle(value)) {
     const registry = interpInterpRegistryFromCtx();
     if (!registry) return `<${value.schemaRef}>`;
+    if (typeof interpShowNodeFieldsMultiLine === 'function') {
+      const lines = interpShowNodeFieldsMultiLine(value, registry, '    ');
+      return lines.join('\n');
+    }
     try {
       const schema = interpResolveSchema(registry, value.schemaRef);
       const tag = interpPeekUnionTag(value.payloadBits, schema, registry);
@@ -2531,6 +2596,13 @@ function interpExecuteMethod(method, argValues, program, sharedEnv, options) {
     frameEnv[param.name] = val;
   }
   const locals = new Set(method.params.map((p) => p.name));
+  if (options && options.invokeRootHandle && interpMethodHasTypedParams(method)) {
+    const hasNodeParam = method.params.some((p) => p.name === 'node');
+    if (!hasNodeParam) {
+      frameEnv.node = options.invokeRootHandle;
+      locals.add('node');
+    }
+  }
   const callMethodFn = (name, args, line) => {
     const m = program.methods[name];
     if (!m) interpError(`unknown method '${name}'${line != null ? ` (line ${line})` : ''}`);
