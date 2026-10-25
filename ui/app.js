@@ -758,6 +758,7 @@ async function init() {
 
   initTimelineAnalyzer();
   if (typeof initSelectionPanel === 'function') initSelectionPanel();
+  if (typeof initFindPanel === 'function') initFindPanel();
   initOutputPanelHeightToggle();
   updateInstSelectorUI();
   updateStepControlsUI();
@@ -1149,6 +1150,8 @@ items.forEach(item => {
         toggleAST();
     } else if (panelName === 'selection') {
         toggleSelection();
+    } else if (panelName === 'find') {
+        toggleFind();
     }
   });
 });

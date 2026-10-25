@@ -350,6 +350,110 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .selection-clip-btn--copy:active {
   background: #06a;
 }
+
+.find-panel {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  margin-top: 0;
+}
+.find-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.find-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.find-status {
+  font-size: 11px;
+  color: #f88;
+  min-height: 1em;
+}
+.find-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.find-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.find-opt-btn {
+  min-width: 2rem;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 6px;
+  background: #101010;
+  border-color: #444;
+  font-family: monospace;
+}
+.find-opt-btn:active {
+  background: #242424;
+}
+.btn.find-opt-btn--active,
+.btn.find-opt-btn--active:hover {
+  background: #1f66e0;
+  border-color: #5a9fff;
+  color: #fff;
+}
+.find-input {
+  flex: 0 0 auto;
+  width: 150px;
+  max-width: 150px;
+  padding: 4px 8px;
+  font-family: monospace;
+  font-size: 13px;
+  background: #000;
+  color: #0f0;
+  border: 1px solid #444;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+.find-input:focus {
+  outline: none;
+  border-color: #5a9fff;
+}
+.find-go-btn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  background: #048;
+  border-color: #555;
+}
+.find-go-btn:active {
+  background: #06a;
+}
+.find-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.find-nav-btn {
+  min-width: 2rem;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  background: #101010;
+  border-color: #444;
+}
+.find-nav-btn:active {
+  background: #242424;
+}
+.find-match-counter {
+  font-size: 12px;
+  font-family: monospace;
+  color: #aaa;
+  min-width: 4.5rem;
+  text-align: center;
+  user-select: none;
+}
 #timelineCanvas {
   display:block;
   width:100%;
@@ -3256,6 +3360,7 @@ show(a,b,c)
         <button class="dropdown-item" data-panel="networkTraffic">Network Traffic</button>
         <button class="dropdown-item" data-panel="waveListen">Signal Trace</button>
         <button class="dropdown-item" data-panel="selection">Selection</button>
+        <button class="dropdown-item" data-panel="find">Find</button>
         <button class="dropdown-item active" data-panel="output">Output</button>
         <button class="dropdown-item active" data-panel="variables">Variables</button>
         <button class="dropdown-item active" data-panel="tabs">Tabs</button>
@@ -3316,6 +3421,26 @@ show(a,b,c)
       <button type="button" class="btn selection-clip-btn selection-clip-btn--copy" data-clip="copy" title="Copy selection">⿻</button>
       <button type="button" class="btn selection-clip-btn" data-clip="paste" title="Paste">⧉</button>
       <button type="button" class="btn selection-clip-btn" data-clip="cut" title="Cut selection">✂</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel find-panel" id="findPanel" style="display:none">
+  <div class="find-head">
+    <h3>Find</h3>
+    <span id="findStatus" class="find-status" aria-live="polite"></span>
+  </div>
+  <div class="find-toolbar">
+    <div class="find-options" aria-label="Find options">
+      <button type="button" id="findWordBtn" class="btn find-opt-btn" aria-pressed="false" title="Whole word OFF">W</button>
+      <button type="button" id="findCaseBtn" class="btn find-opt-btn" aria-pressed="false" title="Case sensitive (match exact case)">Aa</button>
+    </div>
+    <input type="search" id="findInput" class="find-input" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Search in editor…">
+    <button type="button" id="findGoBtn" class="btn find-go-btn" title="Find from cursor">Find</button>
+    <div class="find-nav" aria-label="Previous or next match">
+      <button type="button" id="findPrevBtn" class="btn find-nav-btn" title="Previous match">◀</button>
+      <span id="findMatchCounter" class="find-match-counter" aria-live="polite">[ — ]</span>
+      <button type="button" id="findNextBtn" class="btn find-nav-btn" title="Next match">▶</button>
     </div>
   </div>
 </div>
@@ -3652,6 +3777,7 @@ show(a,b,c)
 <!-- UI: editor, file browser, app init -->
 <script src="ui/editor.js"></script>
 <script src="ui/selection-panel.js"></script>
+<script src="ui/find-panel.js"></script>
 <script src="ui/file-browser.js"></script>
 
 <script src="res/js/marked.min.js"></script>

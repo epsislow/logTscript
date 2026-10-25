@@ -35,6 +35,12 @@ function toggleSelection() {
   }
 }
 
+function toggleFind() {
+  if (typeof toggleFindPanel === 'function') {
+    toggleFindPanel();
+  }
+}
+
 function toggleOutput() {
   const panel = document.getElementById('outputPanel');
   if (panel.style.display === 'none') {
