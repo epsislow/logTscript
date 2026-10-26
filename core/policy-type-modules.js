@@ -1,6 +1,6 @@
 /* ================= POLICY TYPE MODULES (module.type{}) ================= */
 
-var INLINE_KINDS = ['asm', 'lut', 'protocol', 'plc', 'logic', 'canvas', 'parser', 'interp'];
+var INLINE_KINDS = ['asm', 'lut', 'protocol', 'plc', 'logic', 'canvas', 'parser', 'interp', 'fpga'];
 
 var PolicyTypeModuleRegistry = class PolicyTypeModuleRegistry {
   constructor() {

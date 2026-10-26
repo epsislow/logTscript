@@ -2263,6 +2263,29 @@ class Interpreter {
       return this._inlineParserWireReturn(result.bits, result.bitWidth, computeRefs);
     }
 
+    if (inlineInst && inlineInst.kind === 'fpga' && method === 'eval') {
+      const stepFn = typeof fpgaEvalStep === 'function' ? fpgaEvalStep : null;
+      if (!stepFn) throw Error('FPGA sim is not loaded');
+      if (!args || args.length < 2) {
+        throw new Error(`${instName}:eval requires (inputsWire, clockWire[, seqStateInWire])`);
+      }
+      const inBits = this._exprWireBitsArg(args[0], `${instName}:eval inputs`);
+      const clkBits = this._exprWireBitsArg(args[1], `${instName}:eval clock`);
+      const clockBit = clkBits && clkBits.length ? clkBits[clkBits.length - 1] : '0';
+      let seqIn = '0'.repeat(inlineInst.design.seqStateWidth);
+      if (args.length >= 3 && args[2]) {
+        seqIn = this._exprWireBitsArg(args[2], `${instName}:eval seqStateIn`);
+        if (seqIn.length !== inlineInst.design.seqStateWidth) {
+          throw new Error(`${instName}:eval seqStateIn width ${seqIn.length}, expected ${inlineInst.design.seqStateWidth}`);
+        }
+      }
+      const pack = stepFn(inlineInst.design, inBits, clockBit, seqIn);
+      if (pack.length !== inlineInst.design.evalReturnWidth) {
+        throw new Error(`${instName}:eval internal width ${pack.length}, expected ${inlineInst.design.evalReturnWidth}`);
+      }
+      return this._inlineParserWireReturn(pack, inlineInst.design.evalReturnWidth, computeRefs);
+    }
+
     if (inlineInst && inlineInst.kind === 'interp' && method === 'eval') {
       if (inlineInst.requiresCompContext) {
         throw new Error(`${instName}:eval cannot run inline with push/remove/onabort (use comp [interp])`);
@@ -2550,7 +2573,20 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas, parser, interp)`);
+    if (inline.kind === 'fpga') {
+      const parseFpgaFn = typeof parseFpgaInline === 'function' ? parseFpgaInline : null;
+      if (!parseFpgaFn) throw Error('FPGA assembler is not loaded');
+      const { parsed, design } = parseFpgaFn(inline.bodyRaw, inline.name);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        bodyRaw: inline.bodyRaw,
+        parsed,
+        design,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic, canvas, parser, interp, fpga)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -10536,6 +10572,15 @@ if (this.isBuiltinDEMUX(name)) {
           interpHandler._applyPoutWires(comp, compName, this, channels);
         }
       }
+      const fpgaHandler = this.componentRegistry.get('fpga');
+      if (fpgaHandler && typeof fpgaHandler.applyProperties === 'function') {
+        for (const [compName, comp] of this.components) {
+          if (comp.type !== 'fpga') continue;
+          const pending = this.componentPendingProperties.get(compName);
+          if (!pending) continue;
+          fpgaHandler.applyProperties(comp, compName, pending, 'immediate', false, this);
+        }
+      }
     } finally {
       this._logicRedirectSyncWrite = false;
     }
@@ -15150,6 +15195,14 @@ if (s.assignment) {
         InterpComponent.preparePropertyBlock(comp, properties, this, component);
       }
     }
+
+    if (comp.type === 'fpga') {
+      comp._fpgaRedirects = properties.filter((p) => p.property === 'pout>');
+      if (typeof FpgaComponent !== 'undefined'
+          && typeof FpgaComponent.preparePropertyBlock === 'function') {
+        FpgaComponent.preparePropertyBlock(comp, properties, this, component);
+      }
+    }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
     // These blocks should only execute during initial RUN(), not when re-evaluating
@@ -15562,7 +15615,7 @@ if (s.assignment) {
       if (prop.property !== 'pout>') continue;
       const poutName = prop.poutName;
       const compForPout = this.components.get(component);
-      if (!compForPout || compForPout.type === 'logic' || compForPout.type === 'interp') continue;
+      if (!compForPout || compForPout.type === 'logic' || compForPout.type === 'interp' || compForPout.type === 'fpga') continue;
       if (!this.componentRegistry || !this.componentRegistry.supportsRedirect(compForPout.type, poutName, compForPout)) {
         throw Error(`Component ${component} (type: ${compForPout.type}) does not support :${poutName} property`);
       }
@@ -19283,6 +19336,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         if (kindName === 'interp' && typeof formatInterpInstanceDoc === 'function') {
           return formatInterpInstanceDoc(alias, inst);
         }
+        if (kindName === 'fpga' && typeof formatFpgaInstanceDoc === 'function') {
+          return formatFpgaInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
@@ -19308,6 +19364,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
           }
           if (kindName === 'interp' && typeof formatInterpInstanceDoc === 'function') {
             return formatInterpInstanceDoc(instName, inst);
+          }
+          if (kindName === 'fpga' && typeof formatFpgaInstanceDoc === 'function') {
+            return formatFpgaInstanceDoc(instName, inst);
           }
         }
       }
@@ -19336,6 +19395,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     if (kindName === 'interp' && typeof formatInterpTypeDoc === 'function') {
       return formatInterpTypeDoc();
     }
+    if (kindName === 'fpga' && typeof formatFpgaTypeDoc === 'function') {
+      return formatFpgaTypeDoc();
+    }
     return [`${name}: (no inline doc available)`];
   }
 
@@ -19363,6 +19425,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
       if (inst.kind === 'interp' && typeof formatInterpInstanceDoc === 'function') {
         return formatInterpInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'fpga' && typeof formatFpgaInstanceDoc === 'function') {
+        return formatFpgaInstanceDoc(name, inst);
       }
     }
   }

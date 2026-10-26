@@ -4549,7 +4549,14 @@
       {"id":5648,"group":"interp","title":"f11 show body[1]:name field access after BVA index wave","detail":{"scripts":[],"steps":[],"assertions":["lhs symbol subtree","not CallSub rhs"]}},
       {"id":5649,"group":"interp","title":"f11 nested body[1]:value:left chain after index legacy","detail":{"scripts":[],"steps":[],"assertions":["CallVariable on left"]}},
       {"id":5650,"group":"interp","title":"f11 nested body[1]:value:left chain after index wave","detail":{"scripts":[],"steps":[],"assertions":["CallVariable on left"]}},
-      {"id":5651,"group":"interp","title":"parse body[1]:value postfix chain","detail":{"scripts":[],"steps":[],"assertions":["show call","show name","fieldAccess","index base","value segment","value name"]}}
+      {"id":5651,"group":"interp","title":"parse body[1]:value postfix chain","detail":{"scripts":[],"steps":[],"assertions":["show call","show name","fieldAccess","index base","value segment","value name"]}},
+      {"id":5700,"group":"fpga","title":"F200 parse empty inline [fpga]","detail":{"scripts":["inline [fpga] .empty:\n:"],"steps":[],"assertions":["kind fpga","design present"]}},
+      {"id":5701,"group":"fpga","title":"F200 andGate eval AND 11 (legacy)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["y","prev"]}},
+      {"id":5702,"group":"fpga","title":"F200 andGate eval AND 11 (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["y","prev"]}},
+      {"id":5703,"group":"fpga","title":"F205 comp andGate exec wires (legacy)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["q high"]}},
+      {"id":5704,"group":"fpga","title":"F205 comp andGate exec wires (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["q high"]}},
+      {"id":5705,"group":"fpga","title":"F209 comb loop rejected","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["loop error"]}},
+      {"id":5706,"group":"fpga","title":"doc(.andGate) widths","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["evalReturnWidth"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -4614,6 +4621,7 @@
       { id: 'doc', label: 'doc() tests', rangeLabel: '300–362, 1593, 1597–1598, 1614, 1668, 1678, 1799, 2220–2223, 2566–2568, 3531–3532, 5333', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 1593, 1597, 1598, 1614, 1668, 1678, 1799, 2220, 2221, 2222, 2223, 2566, 2567, 2568, 3531, 3532, 5333] },
       { id: 'bitrange', label: 'Dynamic bit range', rangeLabel: '53–60', testIds: [53, 54, 55, 56, 57, 58, 59, 60] },
       { id: 'error-display', label: 'Error display (caret + editor)', rangeLabel: '1388–1395, 1532–1533', testIds: [1388, 1389, 1390, 1391, 1392, 1393, 1394, 1395, 1532, 1533] },
+      { id: 'fpga', label: 'FPGA inline and comp', rangeLabel: '5700–5706', testIds: [5700, 5701, 5702, 5703, 5704, 5705, 5706] },
       { id: 'gates', label: 'gates', rangeLabel: '1662', testIds: [1662] },
       { id: 'global-ref', label: 'Global ^.ref (board/chip)', rangeLabel: '500–503, 1064–1066', testIds: [500, 501, 502, 503, 1064, 1065, 1066] },
       { id: 'grouped-literals-display', label: 'grouped-literals-display', rangeLabel: '2006–2016', testIds: [2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016] },

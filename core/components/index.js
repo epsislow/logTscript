@@ -40,6 +40,7 @@ var PlcComponent = (typeof require !== 'undefined') ? require('./plc') : PlcComp
 var LogicComponent = (typeof require !== 'undefined') ? require('./logic') : LogicComponent;
 var CanvasComponent = (typeof require !== 'undefined') ? require('./canvas') : CanvasComponent;
 var InterpComponent = (typeof require !== 'undefined') ? require('./interp') : InterpComponent;
+var FpgaComponent = (typeof require !== 'undefined') ? require('./fpga') : FpgaComponent;
 var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component') : PcbComponent;
 
 function createComponentRegistry() {
@@ -84,6 +85,7 @@ function createComponentRegistry() {
   registry.register(LogicComponent);
   registry.register(CanvasComponent);
   registry.register(InterpComponent);
+  registry.register(FpgaComponent);
   registry.register(ClockDotsComponent);
   return registry;
 }

@@ -67,6 +67,7 @@ const GROUP_META = [
   { id: 'slider', label: 'Slider component' },
   { id: 'clcd', label: 'CLCD component' },
   { id: 'parser', label: 'Inline parser (inline [parser])' },
+  { id: 'fpga', label: 'FPGA inline and comp' },
   { id: 'alu', label: 'ALU component' },
   { id: 'error-display', label: 'Error display (caret + editor)' },
   { id: 'other', label: 'Other' }

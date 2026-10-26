@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-interp-deferred.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, interp-builtins.md, interp-maps.md, interp-node-field-access.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-NUM2T.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-T2NUM.md, builtin-tagged-index.md, builtin-TISNUM.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, calc-parser-interp-e2e.md, canvas-builtins.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-canvas-hitbox.md, comp-canvas.md, comp-fpga.md, comp-interp-onabort.md, comp-interp.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-canvas.md, inline-fpga.md, inline-interp-deferred.md, inline-interp.md, inline-logic.md, inline-parser-complex-rules.md, inline-parser.md, interactive-components.md, interp-builtins.md, interp-maps.md, interp-node-field-access.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-builtins.md, logic-constraints.md, logic-dcg.md, logic-indexing.md, logic-observers.md, logic-query-exec.md, logic-runtime.md, logic-value-types.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mini-monopoly-interactive.md, mini-monopoly-logic.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, ui-focus-hotkeys.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -13417,6 +13417,71 @@ comp [canvas] .dotPanel:
 | [logic-observers.md](logic-observers.md) | \`observe\` pins → wires (e2e with canvas) |
 | [clcd.md](clcd.md) | Symbol-based display (different from free drawing) |
 `,
+    'comp-fpga.md': `# Component FPGA — \`comp [fpga]\`
+
+\`comp [fpga]\` is the **runtime layer** for an \`inline [fpga]\` design with the **same instance name**. It reads input wires, runs combinational settling (and sequential logic when FF/RAM are present), and writes outputs when **\`set\`** is active (respecting **\`on:\`**).
+
+Use **Load** and **Load & Run** in the documentation viewer on logts-play examples (\`on: 1\` recommended).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Link** | \`comp [fpga] .design:\` must match \`inline [fpga] .design:\` |
+| **\`clock =\`** | **Required** — wire name (1 bit) |
+| **\`on:\`** | \`1\` / \`raise\` / \`edge\` — same idea as [comp-logic.md](comp-logic.md) |
+| **Exec block** | \`.design:{ in0 = wire, out0 >= wire, set = trigger }\` |
+| **No header I/O** | Do not put \`inputs =\` / \`output >=\` in the comp header |
+| **Doc** | \`doc(comp.fpga)\`, \`doc(.design)\` |
+
+---
+
+## AND gate wired to switches
+
+\`\`\`logts-play
+inline [fpga] .andGate:
+  lut.inIdBits = 8
+  cell lut[1] like lut.and
+  lut.in0 = \\0;8
+  lut.in1 = \\1;8
+  out = \\2;8
+:
+
+1wire clk = 0
+1wire inA = 1
+1wire inB = 1
+1wire trig = 1
+1wire q = 0
+
+comp [fpga] .andGate:
+  on: 1
+  clock = clk
+:
+
+.andGate:{ in0 = inA, in1 = inB, out0 >= q, set = trig }
+show(q)
+\`\`\`
+
+Change \`inA\` / \`inB\` and pulse \`set\` to re-evaluate the fabric.
+
+---
+
+## Pipeline
+
+1. **Elaboration** — inline design is parsed; \`doc(.design)\` lists \`outWidth\`, \`seqStateWidth\`, \`evalReturnWidth\`.
+2. **Exec block** — \`inK =\` copies wire values into fabric inputs; \`outK >=\` binds outputs after settle.
+3. **\`set\`** — triggers combinational evaluation (per \`on:\`).
+4. **\`clock\`** — required on every component; drives sequential state when FF/RAM exist.
+
+---
+
+## Related
+
+- [inline-fpga.md](inline-fpga.md) — fabric definition and \`:eval\`
+- [comp-logic.md](comp-logic.md) — similar exec / \`on:\` / \`set\` patterns
+`,
     'comp-interp-onabort.md': `# Component interpreter — \`onabort\` handlers
 
 \`onabort\` methods live in the same \`inline [interp]\` program as your AST helpers. When a **\`comp [interp]\`** run aborts at runtime, the engine builds structured **\`errorInfo\`**, invokes your handlers **in file order**, optionally **commits pout buffer** updates from successful handlers, then prints a uniform error block and stops the script.
@@ -24247,6 +24312,97 @@ Allow comp.type{canvas}
 | [comp-canvas.md](comp-canvas.md) | Device, attrs, \`renderer\`, \`set\` / \`draw\` / \`busy\` |
 | [canvas-builtins.md](canvas-builtins.md) | \`drawRect\`, \`style\`, \`drawText\`, … |
 | [component-color-attributes.md](component-color-attributes.md) | \`^rrggbb\` on component attrs |
+`,
+    'inline-fpga.md': `# Inline FPGA — \`inline [fpga]\`
+
+\`inline [fpga]\` defines a **digital fabric**: LUT configurations, optional FF/RAM banks, and static routing. It is a **definition only** until you run it through [\`comp [fpga]\`](comp-fpga.md) or call **\`:eval\`** for a single simulation step.
+
+Documentation viewer **logts-play** blocks support **Load** and **Load & Run** (use \`on: 1\` on the component so the first run fires when \`set = 1\`).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Syntax** | \`inline [fpga] .name:\` … closing \`:\` |
+| **LUT banks** | \`cell lut[N] like lut.and\` (and other configs) |
+| **Routing** | \`lut.in0 = …\`, \`lut.in1 = …\`, \`out = …\` (compact literals) |
+| **ID width** | \`lut.inIdBits = 8\` (default 8 if omitted) |
+| **Built-in LUTs** | \`lut.not\`, \`lut.and\`, \`lut.or\`, \`lut.xor\` |
+| **\`:eval\`** | \`.name:eval(inputs, clock[, seqState])\` — stateless step; see below |
+| **Doc** | \`doc(inline.fpga)\`, \`doc(.myDesign)\` |
+
+---
+
+## Minimal empty design
+
+\`\`\`logts-play
+inline [fpga] .empty:
+:
+
+doc(.empty)
+\`\`\`
+
+---
+
+## One LUT AND gate (2 inputs, 1 output)
+
+Routing uses decimal literals with \`;8\` padding (same rules as [wire literals](wire-literals.md)). Source **0** and **1** are fabric inputs; LUT output is source **2**.
+
+\`\`\`logts-play
+inline [fpga] .andGate:
+  lut.inIdBits = 8
+  cell lut[1] like lut.and
+  lut.in0 = \\0;8
+  lut.in1 = \\1;8
+  out = \\2;8
+:
+\`\`\`
+
+### \`:eval\` (combinational step)
+
+Return width is always **\`outWidth + seqStateWidth\`**. For this design: **1 + 1 = 2** bits (\`out\` then \`prevClock\`).
+
+\`\`\`logts-play
+inline [fpga] .andGate:
+  lut.inIdBits = 8
+  cell lut[1] like lut.and
+  lut.in0 = \\0;8
+  lut.in1 = \\1;8
+  out = \\2;8
+:
+
+2wire ins = 11
+1wire clk = 0
+1wire y, 1wire prevClk = .andGate:eval(ins, clk)
+show(y)
+show(prevClk)
+\`\`\`
+
+Use **multi-assign** when the left-hand side matches the full return width. A strict \`=\` assign with a shorter LHS follows normal [assignment operators](assignment-operators.md) rules.
+
+---
+
+## Custom LUT table
+
+\`\`\`logts
+lut.myXor = { 00 -> 0; 01 -> 1; 10 -> 1; 11 -> 0 }
+cell lut[4] like lut.myXor
+\`\`\`
+
+---
+
+## Combinational loops
+
+Pure LUT cycles (for example LUT0 → LUT1 → LUT0 with no FF/RAM) are rejected at elaboration with a configuration error.
+
+---
+
+## Related
+
+- [comp-fpga.md](comp-fpga.md) — runtime wiring, \`clock =\`, exec block
+- [wire-literals.md](wire-literals.md) — \`\\N;W\`, \`xc^…\`, binary routing literals
 `,
     'inline-interp-deferred.md': `# Inline interpreter — deferred parameters & \`env\`
 

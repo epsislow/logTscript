@@ -59854,5 +59854,72 @@ inline [interp] .slotInterp {
     h.assert('value name', arg.segments[0].value, 'value');
   });
 
+  function regFpgaDual(legacyId, waveId, title, run) {
+    reg(legacyId, 'fpga', title + ' (legacy)', run);
+    reg(waveId, 'fpga', title + ' (wave)', run, { propagation: 'wave' });
+  }
+
+  const FPGA_AND_GATE = [
+    'inline [fpga] .andGate:',
+    '  lut.inIdBits = 8',
+    '  cell lut[1] like lut.and',
+    '  lut.in0 = \\0;8',
+    '  lut.in1 = \\1;8',
+    '  out = \\2;8',
+    ':',
+  ].join('\n');
+
+  reg(5700, 'fpga', 'F200 parse empty inline [fpga]', function(h, session) {
+    const { interp } = session.run('inline [fpga] .empty:\n:');
+    const inst = interp.inlineInstances.get('.empty');
+    h.assert('kind fpga', inst && inst.kind, 'fpga');
+    h.assert('design present', inst && inst.design != null, true);
+  });
+
+  regFpgaDual(5701, 5702, 'F200 andGate eval AND 11', function(h, session) {
+    const src = FPGA_AND_GATE + '\n2wire ins = 11\n1wire clk = 0\n1wire y, 1wire prev = .andGate:eval(ins, clk)\n';
+    const { interp } = session.run(src);
+    h.assert('y', session.getWire(interp, 'y'), '1');
+    h.assert('prev', session.getWire(interp, 'prev'), '0');
+  });
+
+  regFpgaDual(5703, 5704, 'F205 comp andGate exec wires', function(h, session) {
+    const src = [
+      FPGA_AND_GATE,
+      '1wire clk = 0',
+      '1wire inA = 1',
+      '1wire inB = 1',
+      '1wire trig = 1',
+      '1wire q = 0',
+      'comp [fpga] .andGate:',
+      '  on: 1',
+      '  clock = clk',
+      ':',
+      '.andGate:{ in0 = inA, in1 = inB, out0 >= q, set = trig }',
+    ].join('\n');
+    const { interp } = session.run(src);
+    h.assert('q high', session.getWire(interp, 'q'), '1');
+  });
+
+  reg(5705, 'fpga', 'F209 comb loop rejected', function(h, session) {
+    const src = [
+      'inline [fpga] .loop:',
+      '  lut.inIdBits = 8',
+      '  cell lut[2] like lut.not',
+      '  lut.in0 = \\1;8 \\0;8',
+      '  out = \\0;8',
+      ':',
+    ].join('\n');
+    let err = '';
+    try { session.run(src); } catch (e) { err = String(e.message || e); }
+    h.assert('loop error', err.indexOf('Combinational loop') >= 0, true);
+  });
+
+  reg(5706, 'fpga', 'doc(.andGate) widths', function(h, session) {
+    const out = session.runDoc(FPGA_AND_GATE + '\ndoc(.andGate)');
+    const text = out.join('\n');
+    h.assert('evalReturnWidth', text.indexOf('evalReturnWidth: 2') >= 0, true);
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

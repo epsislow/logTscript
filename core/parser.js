@@ -5753,8 +5753,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic' && kind !== 'canvas' && kind !== 'parser' && kind !== 'interp') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic, canvas, parser, interp)`);
+    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic' && kind !== 'canvas' && kind !== 'parser' && kind !== 'interp' && kind !== 'fpga') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic, canvas, parser, interp, fpga)`);
     }
     if (this.usagePolicy) {
       const chk = this.usagePolicy.isModuleAllowed('inline', kind);
