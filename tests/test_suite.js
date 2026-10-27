@@ -59921,5 +59921,45 @@ inline [interp] .slotInterp {
     h.assert('evalReturnWidth', text.indexOf('evalReturnWidth: 2') >= 0, true);
   });
 
+  const FPGA_TFF = [
+    'inline [fpga] .tff:',
+    '  lut.inIdBits = 8',
+    '  cell lut[1] like lut.not',
+    '  cell ff[1] like ff.d',
+    '  lut.in0 = \\1;8',
+    '  ff.d = \\0;8',
+    '  out = \\1;8',
+    ':',
+  ].join('\n');
+
+  regFpgaDual(5707, 5708, 'F211 TFF eval rising edge', function(h, session) {
+    const src = FPGA_TFF + '\n1wire ins = 0\n1wire q0, 2wire s1 = .tff:eval(ins, 0, 00)\n1wire q1, 2wire s2 = .tff:eval(ins, 1, s1)\n';
+    const { interp } = session.run(src);
+    h.assert('q0', session.getWire(interp, 'q0'), '0');
+    h.assert('q1', session.getWire(interp, 'q1'), '1');
+  });
+
+  const FPGA_NIBBLE_RAM = [
+    'inline [fpga] .nibbleRam:',
+    '  ram.nibble = { address = 2, data = 4 }',
+    '  cell ram[1] like ram.nibble',
+    '  ram.address = \\0;8 \\0;8',
+    '  ram.dataIn = \\3;8 \\4;8 \\5;8 \\6;8',
+    '  ram.write = \\2;8',
+    '  out = \\8;8 \\9;8 \\10;8 \\11;8',
+    ':',
+  ].join('\n');
+
+  regFpgaDual(5709, 5710, 'F208 RAM write then read :eval', function(h, session) {
+    const src = FPGA_NIBBLE_RAM + '\n' + [
+      '21wire pack0 = .nibbleRam:eval(0011111, 1)',
+      '4wire read0, 17wire seq1 = pack0',
+      '21wire pack1 = .nibbleRam:eval(0010000, 0, seq1)',
+      '4wire read1, 17wire seq2 = pack1',
+    ].join('\n');
+    const { interp } = session.run(src);
+    h.assert('read1', session.getWire(interp, 'read1'), '1111');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -191,11 +191,82 @@
     throw new Error(`Unknown FPGA config '${ref}'`);
   }
 
+  function ramMemBits(ramInst, configs) {
+    return ramInst.reduce((s, r) => {
+      const cfg = resolveConfig(r.configRef, configs);
+      return s + (1 << cfg.address) * cfg.data;
+    }, 0);
+  }
+
+  function collectRoutingSourceIds(parsed, instName, lutCount, ffCount, ramInst, configs) {
+    const ids = new Set();
+    function addIds(key, idBits, totalBits) {
+      if (!parsed.routing[key]) return;
+      const bin = decodeRoutingLiteral(parsed.routing[key], totalBits, `${instName} ${key}`);
+      for (const sid of sliceRoutingIds(bin, idBits)) ids.add(sid);
+    }
+    for (const key of Object.keys(parsed.routing)) {
+      if (key.startsWith('lut.in')) {
+        addIds(key, parsed.inIdBits.lut, lutCount * parsed.inIdBits.lut);
+      } else if (key === 'ff.d') {
+        addIds(key, parsed.inIdBits.ff, ffCount * parsed.inIdBits.ff);
+      } else if (key === 'out') {
+        const nFields = Math.max(1, parsed.routing.out.trim().split(/\s+/).filter(Boolean).length);
+        addIds(key, parsed.inIdBits.out, nFields * parsed.inIdBits.out);
+      } else if (key === 'inp') {
+        const nFields = Math.max(1, parsed.routing.inp.trim().split(/\s+/).filter(Boolean).length);
+        addIds(key, parsed.inIdBits.inp, nFields * parsed.inIdBits.inp);
+      } else if (key === 'ram.write') {
+        addIds(key, parsed.inIdBits.ram, ramInst.length * parsed.inIdBits.ram);
+      } else if (key === 'ram.address' || key === 'ram.dataIn') {
+        let totalBits = 0;
+        for (const ri of ramInst) {
+          const cfg = resolveConfig(ri.configRef, configs);
+          totalBits += (key === 'ram.address' ? cfg.address : cfg.data) * parsed.inIdBits.ram;
+        }
+        if (totalBits > 0) addIds(key, parsed.inIdBits.ram, totalBits);
+      }
+    }
+    return ids;
+  }
+
+  function inferInputPortCount(allIds, lutCount, ffCount, ramInst, configs) {
+    if (allIds.size === 0) return 0;
+    const ramCfgs = ramInst.map((r) => resolveConfig(r.configRef, configs));
+    let ramReadSpan = 0;
+    for (const cfg of ramCfgs) ramReadSpan += cfg.data;
+
+    function sidOk(sid, ipc) {
+      const lutBase = ipc;
+      const ffBase = ipc + lutCount;
+      const ramBase = ffBase + ffCount;
+      const ramReadBase = ramBase + ramInst.length;
+      if (sid < ipc) return true;
+      if (lutCount > 0 && sid >= lutBase && sid < lutBase + lutCount) return true;
+      if (ffCount > 0 && sid >= ffBase && sid < ffBase + ffCount) return true;
+      if (ramReadSpan > 0 && sid >= ramReadBase && sid < ramReadBase + ramReadSpan) return true;
+      return false;
+    }
+
+    for (let ipc = 0; ipc <= 256; ipc++) {
+      let ok = true;
+      for (const sid of allIds) {
+        if (!sidOk(sid, ipc)) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return ipc;
+    }
+    throw new Error('routing source ids do not fit input/LUT/FF/RAM namespace');
+  }
+
   function elaborateFpgaDesign(parsed, instName) {
     const lutInst = flattenCells(parsed.cells, 'lut');
     const ffInst = flattenCells(parsed.cells, 'ff');
     const ramInst = flattenCells(parsed.cells, 'ram');
     const lutConfigs = lutInst.map((x) => resolveConfig(x.configRef, parsed.configs));
+    const ramConfigs = ramInst.map((x) => resolveConfig(x.configRef, parsed.configs));
 
     let inputPortCount = 0;
     if (parsed.routing.inp) {
@@ -204,57 +275,16 @@
       const bin = decodeRoutingLiteral(parsed.routing.inp, totalBits, `${instName} inp`);
       inputPortCount = sliceRoutingIds(bin, parsed.inIdBits.inp).length;
     } else {
-      const lutCount = lutInst.length;
-      const lutInputIds = new Set();
-      for (const key of Object.keys(parsed.routing)) {
-        if (!key.startsWith('lut.in')) continue;
-        const idBits = parsed.inIdBits.lut;
-        const totalBits = lutCount * idBits;
-        const bin = decodeRoutingLiteral(parsed.routing[key], totalBits, `${instName} ${key}`);
-        for (const sid of sliceRoutingIds(bin, idBits)) lutInputIds.add(sid);
-      }
-
-      function lutNamespaceOk(i) {
-        if (lutInputIds.size === 0) return true;
-        for (const sid of lutInputIds) {
-          const isInput = sid < i;
-          const isLutOut = lutCount > 0 && sid >= i && sid < i + lutCount;
-          if (!isInput && !isLutOut) return false;
-        }
-        return true;
-      }
-
-      inputPortCount = 0;
-      if (parsed.routing.out && lutCount > 0) {
-        const idBits = parsed.inIdBits.out;
-        const nFields = Math.max(1, parsed.routing.out.trim().split(/\s+/).filter(Boolean).length);
-        const totalBits = nFields * idBits;
-        const bin = decodeRoutingLiteral(parsed.routing.out, totalBits, `${instName} out`);
-        const outIds = sliceRoutingIds(bin, idBits);
-        if (outIds.length > 0) {
-          inputPortCount = outIds[0];
-          if (!lutNamespaceOk(inputPortCount)) {
-            throw new Error(`${instName}: out routing and lut inputs disagree on inputPortCount`);
-          }
-        }
-      } else if (lutInputIds.size > 0) {
-        let found = false;
-        for (let i = 0; i <= 256; i++) {
-          if (lutNamespaceOk(i)) {
-            inputPortCount = i;
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          throw new Error(`${instName}: routing source ids do not fit input/LUT namespace`);
-        }
-      }
+      const allIds = collectRoutingSourceIds(
+        parsed, instName, lutInst.length, ffInst.length, ramInst, parsed.configs,
+      );
+      inputPortCount = inferInputPortCount(allIds, lutInst.length, ffInst.length, ramInst, parsed.configs);
     }
 
     const lutBase = inputPortCount;
     const ffBase = lutBase + lutInst.length;
     const ramBase = ffBase + ffInst.length;
+    const ramReadBase = ramBase + ramInst.length;
 
     function sourceIdLutOut(i) { return lutBase + i; }
 
@@ -266,6 +296,47 @@
       const totalBits = lutInst.length * idBits;
       const bin = decodeRoutingLiteral(parsed.routing[key], totalBits, `${instName} ${key}`);
       lutRouting[port] = sliceRoutingIds(bin, idBits);
+    }
+
+    const ffDRouting = [];
+    if (parsed.routing['ff.d'] && ffInst.length) {
+      const idBits = parsed.inIdBits.ff;
+      const totalBits = ffInst.length * idBits;
+      const bin = decodeRoutingLiteral(parsed.routing['ff.d'], totalBits, `${instName} ff.d`);
+      ffDRouting.push(...sliceRoutingIds(bin, idBits));
+    }
+
+    const ramWriteRouting = [];
+    const ramAddressRouting = [];
+    const ramDataInRouting = [];
+    if (ramInst.length) {
+      const idBits = parsed.inIdBits.ram;
+      if (parsed.routing['ram.write']) {
+        const bin = decodeRoutingLiteral(parsed.routing['ram.write'], ramInst.length * idBits, `${instName} ram.write`);
+        ramWriteRouting.push(...sliceRoutingIds(bin, idBits));
+      }
+      if (parsed.routing['ram.address']) {
+        let totalBits = 0;
+        for (const cfg of ramConfigs) totalBits += cfg.address * idBits;
+        const bin = decodeRoutingLiteral(parsed.routing['ram.address'], totalBits, `${instName} ram.address`);
+        const ids = sliceRoutingIds(bin, idBits);
+        let pos = 0;
+        for (const cfg of ramConfigs) {
+          ramAddressRouting.push(ids.slice(pos, pos + cfg.address));
+          pos += cfg.address;
+        }
+      }
+      if (parsed.routing['ram.dataIn']) {
+        let totalBits = 0;
+        for (const cfg of ramConfigs) totalBits += cfg.data * idBits;
+        const bin = decodeRoutingLiteral(parsed.routing['ram.dataIn'], totalBits, `${instName} ram.dataIn`);
+        const ids = sliceRoutingIds(bin, idBits);
+        let pos = 0;
+        for (const cfg of ramConfigs) {
+          ramDataInRouting.push(ids.slice(pos, pos + cfg.data));
+          pos += cfg.data;
+        }
+      }
     }
 
     let outputPortCount = 0;
@@ -291,20 +362,20 @@
       lutConfigs,
       lutRouting,
       ffInst,
+      ffDRouting,
       ramInst,
+      ramConfigs,
+      ramWriteRouting,
+      ramAddressRouting,
+      ramDataInRouting,
+      ramReadBase,
       lutBase,
       ffBase,
       ramBase,
       inIdBits: parsed.inIdBits,
-      seqStateWidth: 1 + ffInst.length + ramInst.reduce((s, r) => {
-        const cfg = resolveConfig(r.configRef, parsed.configs);
-        return s + (1 << cfg.address) * cfg.data;
-      }, 0),
+      seqStateWidth: 1 + ffInst.length + ramMemBits(ramInst, parsed.configs),
       outWidth: outputPortCount,
-      evalReturnWidth: outputPortCount + (1 + ffInst.length + ramInst.reduce((s, r) => {
-        const c = resolveConfig(r.configRef, parsed.configs);
-        return s + (1 << c.address) * c.data;
-      }, 0)),
+      evalReturnWidth: outputPortCount + (1 + ffInst.length + ramMemBits(ramInst, parsed.configs)),
     };
     design.evalReturnWidth = design.outWidth + design.seqStateWidth;
 
